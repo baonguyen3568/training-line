@@ -43,6 +43,18 @@ def train_decoder_prefix(conversation: dict[str, Any], processor: Any) -> Any:
     return batch["decoder_input_ids"][0, : first + 1], batch
 
 
+def strip_trailing_pad(ids: list[int], pad_id: int | None) -> tuple[list[int], int]:
+    """Drop trailing pad ids; returns the kept ids and how many pads were dropped.
+
+    Parse-2.0's tokenizer.json pads to 9000 with pad_id 1: a pad tail must never turn a good answer into a parse
+    failure.
+    """
+    end = len(ids)
+    while pad_id is not None and end > 0 and ids[end - 1] == pad_id:
+        end -= 1
+    return ids[:end], len(ids) - end
+
+
 def _local_dir(path: str, what: str) -> Path:
     """Only pinned local snapshots (prepared + hash-verified, ADR-003): never a hub id resolved to `main`."""
     p = Path(path)
@@ -66,7 +78,13 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--max-new-tokens", type=int, default=1536)
+    ap.add_argument(
+        "--expect-prefix",
+        default="",
+        help="comma-separated decoder ids the training prefix must equal, e.g. 2,0,50004,50008,50001 (001a §10.5)",
+    )
     args = ap.parse_args()
+    expected_prefix = [int(x) for x in args.expect_prefix.split(",") if x]
     model_dir, data_dir = _local_dir(args.model, "model"), _local_dir(args.data, "data")
 
     ds = load_dataset(str(data_dir), split=args.split)
@@ -85,6 +103,8 @@ def main() -> int:
                 prefix, batch = train_decoder_prefix(item["conversation"], processor)
             except ValueError as exc:
                 raise SystemExit(f"[{i}] {exc}") from exc
+            if expected_prefix and prefix.tolist() != expected_prefix:
+                raise SystemExit(f"[{i}] training prefix {prefix.tolist()} != expected {expected_prefix}")
             # HF generate() prepends generation_config.decoder_start_token_id (2 for Parse) unless the prefix already
             # starts with it; training's collate starts with <s> (0). Pin the start token to the training prefix so the
             # eval context is identical to training (verified by the assert below).
@@ -100,6 +120,7 @@ def main() -> int:
             if gen[0, : prefix.shape[0]].tolist() != prefix.tolist():
                 raise SystemExit(f"[{i}] eval prefix differs from training prefix: {gen[0, :12].tolist()}")
             new = gen[0, prefix.shape[0] :].tolist()
+            new, n_pad = strip_trailing_pad(new, tokenizer.pad_token_id)
             text = tokenizer.decode(new, skip_special_tokens=False)
             for special in (tokenizer.eos_token, tokenizer.pad_token):
                 if special:
@@ -113,6 +134,7 @@ def main() -> int:
                 "data_dir": str(data_dir),
                 "split": args.split,
                 "n_new_tokens": len(new),
+                "n_trailing_pad_stripped": n_pad,
                 "truncated": len(new) >= args.max_new_tokens,
             }
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
