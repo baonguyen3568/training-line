@@ -916,3 +916,16 @@ draft:
   restore_prompt: Restore the unsaved workflow from {time}?
   restore: Restore
   discard: Discard
+engine_warning:
+  heading: Warnings found in the run log
+  col: Warnings
+  not_scanned: Not checked
+  pending: Checked when the run finishes
+  clean: No warnings
+  count: "Warnings: {warning_count}"
+  generic:
+    title: The run log shows a possible problem
+    what: "Warning code: {code}. See this run's log for details."
+  bf16_adam_params:
+    title: The model may have learned less than expected
+    what: Weights were trained in bf16 without an fp32 copy, so very small updates were rounded away. The model may have learned much less than the number of steps suggests. Compare its score with the base model before using it.

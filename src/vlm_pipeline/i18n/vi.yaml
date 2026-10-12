@@ -916,3 +916,16 @@ draft:
   restore_prompt: Khôi phục workflow chưa lưu từ {time}?
   restore: Khôi phục
   discard: Bỏ
+engine_warning:
+  heading: Cảnh báo trong log chạy
+  col: Cảnh báo
+  not_scanned: Chưa kiểm tra
+  pending: Sẽ kiểm tra khi chạy xong
+  clean: Không có cảnh báo
+  count: "Cảnh báo: {warning_count}"
+  generic:
+    title: Log chạy có dấu hiệu bất thường
+    what: "Mã cảnh báo: {code}. Xem log của lần chạy này để biết chi tiết."
+  bf16_adam_params:
+    title: Model có thể học được ít hơn mong đợi
+    what: Trọng số được train ở bf16 mà không giữ bản fp32, nên các bước cập nhật quá nhỏ bị làm tròn mất. Model có thể học được ít hơn nhiều so với số bước đã chạy. Hãy so điểm với model gốc trước khi dùng.

@@ -36,9 +36,9 @@ describe("engine warnings", () => {
 
   it("explains known codes and falls back for unknown ones without rendering markup", () => {
     render(<EngineWarningsPanel warnings={["bf16_adam_params", "<b>x</b>"]} status="completed" />);
-    expect(screen.getByText(/không giữ bản fp32/)).toBeTruthy();
-    expect(screen.getByText(/<b>x<\/b>/)).toBeTruthy(); // plain text, not HTML
+    expect(screen.getByText(/Model có thể học được ít hơn mong đợi/)).toBeTruthy();
+    expect(screen.getByText(/Mã cảnh báo: <b>x<\/b>/)).toBeTruthy(); // plain text, not HTML
     render(<EngineWarningsCell warnings={["bf16_adam_params"]} status="completed" />);
-    expect(screen.getByText(/1 cảnh báo/)).toBeTruthy();
+    expect(screen.getByText(/Cảnh báo: 1/)).toBeTruthy();
   });
 });

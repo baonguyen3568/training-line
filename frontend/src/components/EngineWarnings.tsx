@@ -9,10 +9,10 @@ const LIVE = new Set(["queued", "running"]);
 function warningCopy(code: string): { title: string; what: string } {
   const shown = identifierView(code).text;
   return {
-    title:
-      tpOptional(["engine_warning", code, "title"]) ??
-      t("engine_warning.generic.title", { code: shown }),
-    what: tpOptional(["engine_warning", code, "what"]) ?? t("engine_warning.generic.what"),
+    title: tpOptional(["engine_warning", code, "title"]) ?? t("engine_warning.generic.title"),
+    what:
+      tpOptional(["engine_warning", code, "what"]) ??
+      t("engine_warning.generic.what", { code: shown }),
   };
 }
 
@@ -28,7 +28,7 @@ export function EngineWarningsCell({ warnings, status }: { warnings: Warnings; s
     return <span className="state ready">✓ {t("engine_warning.clean")}</span>;
   return (
     <span className="state warn" title={warnings.map((c) => warningCopy(c).title).join("\n")}>
-      ⚠ {t("engine_warning.count", { count: warnings.length })}
+      ⚠ {t("engine_warning.count", { warning_count: warnings.length })}
     </span>
   );
 }
