@@ -39,7 +39,7 @@ Quy tắc tốc độ cho M1: code UI/core chỉ cần 1 reviewer (cleancode HO�
 Docker/deps/network/secrets/xoá file/plugin. Không viết proposal mới cho M1, chỉ làm theo P009/P010 đã có.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| M1-1 | `nodes/`: NodeSpec + registry cho ~8 node v1: Dataset (CORD-v2 / thư mục ảnh), Model (từ catalog), Fine-tune, Evaluate, Chạy thử (inference), Quantize FP8, Benchmark, Export | bao-cleancode + bao-research (params từ recipe) | REVIEW (12 node: f1eb045, 4b12dd7, 7f0e0ae; chờ i18n design + soát research) |
+| M1-1 | `nodes/`: NodeSpec + registry cho ~8 node v1: Dataset (CORD-v2 / thư mục ảnh), Model (từ catalog), Fine-tune, Evaluate, Chạy thử (inference), Quantize FP8, Benchmark, Export | bao-cleancode + bao-research (params từ recipe) | DONE (12 node + catalog: f1eb045, 4b12dd7, 7f0e0ae, 4739bd6, afdc074; research soát OK, i18n gate xanh) |
 | M1-2 | `graph/`: validate (type/cycle/thiếu input) + executor (topo, cache fingerprint, chạy node → job, event stream, cancel/resume cơ bản) | bao-fixcode (dùng spec xfail của tester) | DONE (e6da8a1 + 2dd806a): validate + cache + executor; 60 spec + 9 test; review cleancode |
 | M1-3 | `app/`: FastAPI GET /api/nodes, POST /api/graphs/validate, POST /api/runs, GET runs/metrics, WS events, auth token (D13); FakeWorker | bao-backend | REVIEW (ec726ac: API + D13 security live; cancel + container worker chờ executor M1-2) |
 | M1-4 | Frontend: thư viện node (sidebar, tìm kiếm, kéo thả vào canvas), workflow trống, nối dây kéo-thả, xoá/nhân bản node, lưu/mở file workflow (.json), trạng thái chạy từng node trên canvas, nối API thật | bao-frontend | DOING |
