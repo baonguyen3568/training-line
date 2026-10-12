@@ -193,3 +193,12 @@ def test_namespaced_train_node_with_broken_manifest_is_protected(root: Path, idx
     p = plan_cache(root, idx, cap_gb=0)
     assert [(i.cache_key, why) for i, why in p.protected] == [("ns", "TRAINED_MODEL")]
     assert (run / "checkpoints").exists()
+
+
+def test_leased_entry_is_skipped_as_in_use(root: Path, idx: ArtifactIndex) -> None:
+    run = _cached_run(root, idx, "input-of-long-job")
+    idx.lease(["input-of-long-job"], run_id="graph-7")
+    assert plan_cache(root, idx, cap_gb=0).evict == ()
+    res = evict(root, idx, ["input-of-long-job"], by="user", manual=True)
+    assert res.skipped == [("input-of-long-job", "IN_USE_BY_RUNNING_WORKFLOW")]
+    assert (run / "checkpoints").exists()

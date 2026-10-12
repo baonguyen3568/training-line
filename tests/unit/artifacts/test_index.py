@@ -160,3 +160,28 @@ def test_trained_model_flag_roundtrip_and_old_db_migration(tmp_path: Path) -> No
     entry = idx.lookup("k")
     assert entry is not None
     assert entry.trained_model
+
+
+def test_leased_entries_are_not_evictable_until_released(idx: ArtifactIndex, tmp_path: Path) -> None:
+    for k in ("in-use", "free"):
+        idx.record(k, run_id=k, node_type="t", outputs=_out(tmp_path, k))
+    idx.lease(["in-use"], run_id="graph-1")
+    idx.lease(["in-use"], run_id="graph-1")  # idempotent
+    idx.lease(["in-use"], run_id="graph-2")
+    assert [e.cache_key for e in idx.evictable()] == ["free"]
+    assert not idx.begin_evict("in-use")
+    assert idx.leased_by("in-use") == ["graph-1", "graph-2"]
+    idx.release_run("graph-1")
+    assert not idx.begin_evict("in-use")  # graph-2 still holds it
+    idx.release_run("graph-2")
+    assert idx.begin_evict("in-use")
+
+
+def test_stale_leases_are_reported_but_still_block(tmp_path: Path) -> None:
+    clock = Clock()
+    idx = ArtifactIndex(tmp_path / "app.db", clock=clock)
+    idx.record("k", run_id="r", node_type="t", outputs=_out(tmp_path, "r"))
+    idx.lease(["k"], run_id="crashed-graph")
+    clock.t += 25 * 3600
+    assert [(k, r) for k, r, _ in idx.stale_leases()] == [("k", "crashed-graph")]
+    assert not idx.begin_evict("k")

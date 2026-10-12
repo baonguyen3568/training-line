@@ -195,7 +195,8 @@ def evict(root: Path, index: ArtifactIndex, cache_keys: list[str], *, by: str, m
             result.skipped.append((key, reason))
             continue
         if entry is None or not index.begin_evict(key):
-            result.skipped.append((key, "not evictable any more (pinned, needed, in use or gone)"))
+            why = "IN_USE_BY_RUNNING_WORKFLOW" if index.leased_by(key) else "not evictable (pinned, needed or gone)"
+            result.skipped.append((key, why))
             continue
         run_dir = root / RUNS_REL / entry.run_id
         if run_dir.is_symlink() or not _inside(run_dir.resolve(), runs_dir) or run_dir.resolve() == runs_dir:

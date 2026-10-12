@@ -5,6 +5,10 @@ The executor ``record``s every completed cacheable node, ``lookup``s before runn
 so it never races the executor: ``begin_evict`` (completed -> evicting, executor sees a miss) -> delete files ->
 ``finish_evict`` (-> evicted). Pinned entries and parents still needed at load time by a live child cannot be evicted.
 
+The executor ``lease``s every entry it hits or produces for the duration of a graph run and ``release_run``s in a
+``finally``; leased entries are never evicted. Leases older than 24 h are listed by ``stale_leases`` for the UI/PM but
+still block eviction (fail closed).
+
 Stdlib only (``sqlite3``), WAL mode, one connection guarded by a lock so one instance can be shared across threads.
 """
 
@@ -42,7 +46,31 @@ CREATE TABLE IF NOT EXISTS artifact_parents (
     PRIMARY KEY (child, parent)
 );
 CREATE INDEX IF NOT EXISTS artifact_parents_parent ON artifact_parents (parent);
+CREATE TABLE IF NOT EXISTS artifact_leases (
+    cache_key TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    since REAL NOT NULL,
+    PRIMARY KEY (cache_key, run_id)
+);
+CREATE INDEX IF NOT EXISTS artifacts_lru ON artifacts (state, pinned, last_hit_at);
 """
+
+# An entry is not evictable while a running graph holds a lease on it (it may be the input of a long job) or while
+# a live child needs it at load time. Kept as full literals (no string building around SQL).
+_EVICTABLE_SQL = (
+    "SELECT a.* FROM artifacts a WHERE a.state = 'completed' AND a.pinned = 0"
+    " AND NOT EXISTS (SELECT 1 FROM artifact_parents p JOIN artifacts c ON c.cache_key = p.child"
+    " WHERE p.parent = a.cache_key AND c.requires_parent_at_load = 1 AND c.state IN ('completed', 'evicting'))"
+    " AND NOT EXISTS (SELECT 1 FROM artifact_leases l WHERE l.cache_key = a.cache_key)"
+    " ORDER BY COALESCE(a.last_hit_at, a.completed_at) ASC, a.cache_key ASC"
+)
+_BEGIN_EVICT_SQL = (
+    "UPDATE artifacts SET state = 'evicting' WHERE cache_key = :k AND state = 'completed' AND pinned = 0"
+    " AND NOT EXISTS (SELECT 1 FROM artifact_parents p JOIN artifacts c ON c.cache_key = p.child"
+    " WHERE p.parent = :k AND c.requires_parent_at_load = 1 AND c.state IN ('completed', 'evicting'))"
+    " AND NOT EXISTS (SELECT 1 FROM artifact_leases l WHERE l.cache_key = :k)"
+)
+STALE_LEASE_S = 24 * 3600.0
 
 
 @dataclass(frozen=True)
@@ -180,6 +208,36 @@ class ArtifactIndex:
         with self._tx() as db:
             db.execute("UPDATE artifacts SET state = 'invalid' WHERE cache_key = ?", (cache_key,))
 
+    def lease(self, cache_keys: Sequence[str], run_id: str) -> None:
+        """Protect ``cache_keys`` from eviction while graph run ``run_id`` uses them (idempotent)."""
+        now = self._clock()
+        with self._tx() as db:
+            db.executemany(
+                "INSERT OR IGNORE INTO artifact_leases (cache_key, run_id, since) VALUES (?, ?, ?)",
+                [(k, run_id, now) for k in cache_keys],
+            )
+
+    def release_run(self, run_id: str) -> None:
+        """Drop every lease held by graph run ``run_id`` (call from ``finally``)."""
+        with self._tx() as db:
+            db.execute("DELETE FROM artifact_leases WHERE run_id = ?", (run_id,))
+
+    def leased_by(self, cache_key: str) -> list[str]:
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT run_id FROM artifact_leases WHERE cache_key = ? ORDER BY run_id", (cache_key,)
+            ).fetchall()
+        return [r["run_id"] for r in rows]
+
+    def stale_leases(self, *, older_than_s: float = STALE_LEASE_S) -> list[tuple[str, str, float]]:
+        """(cache_key, run_id, since) of leases older than ``older_than_s``: reported, still blocking."""
+        cutoff = self._clock() - older_than_s
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT cache_key, run_id, since FROM artifact_leases WHERE since < ? ORDER BY since", (cutoff,)
+            ).fetchall()
+        return [(r["cache_key"], r["run_id"], r["since"]) for r in rows]
+
     # ------------------------------------------------------------------ retention side
     def set_pinned(self, cache_key: str, pinned: bool) -> None:
         with self._tx() as db:
@@ -198,24 +256,13 @@ class ArtifactIndex:
     def evictable(self) -> list[CacheEntry]:
         """Completed, unpinned entries without a live dependent, least recently used first."""
         with self._lock:
-            rows = self._db.execute(
-                "SELECT a.* FROM artifacts a WHERE a.state = 'completed' AND a.pinned = 0 AND NOT EXISTS ("
-                " SELECT 1 FROM artifact_parents p JOIN artifacts c ON c.cache_key = p.child"
-                " WHERE p.parent = a.cache_key AND c.requires_parent_at_load = 1"
-                " AND c.state IN ('completed', 'evicting'))"
-                " ORDER BY COALESCE(a.last_hit_at, a.completed_at) ASC, a.cache_key ASC"
-            ).fetchall()
+            rows = self._db.execute(_EVICTABLE_SQL).fetchall()
         return [self._entry(r) for r in rows]
 
     def begin_evict(self, cache_key: str) -> bool:
         """Atomically completed -> evicting if still evictable; False means someone else changed it (skip)."""
         with self._tx() as db:
-            cur = db.execute(
-                "UPDATE artifacts SET state = 'evicting' WHERE cache_key = ? AND state = 'completed' AND pinned = 0"
-                " AND NOT EXISTS (SELECT 1 FROM artifact_parents p JOIN artifacts c ON c.cache_key = p.child"
-                " WHERE p.parent = ? AND c.requires_parent_at_load = 1 AND c.state IN ('completed', 'evicting'))",
-                (cache_key, cache_key),
-            )
+            cur = db.execute(_BEGIN_EVICT_SQL, {"k": cache_key})
             return cur.rowcount == 1
 
     def finish_evict(self, cache_key: str, *, ok: bool = True) -> None:
