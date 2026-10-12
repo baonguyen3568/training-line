@@ -6,6 +6,7 @@ description: Run the local CI quality gates (ruff format/lint, mypy, import-lint
 # Local CI gates (no GPU, no network beyond uv cache)
 
 Run from repo root. All commands are CPU-only and must never take the GPU lock.
+Before committing code that reads a new data/config file: `bash scripts/check.sh --clean` (pristine worktree of HEAD).
 
 ```bash
 uv sync --locked --group dev                 # tooling env, fails if uv.lock stale
