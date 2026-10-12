@@ -219,6 +219,17 @@ def _docker_kill(name: str) -> None:
     subprocess.run(["docker", "kill", name], capture_output=True, check=False)  # noqa: S603,S607
 
 
+_SIGNAL_STOP_RE = re.compile(r"Received signal \d+, initiating graceful stop")
+
+
+def _stopped_by_signal(log_path: Path) -> bool:
+    try:
+        with log_path.open("r", encoding="utf-8", errors="replace") as fh:
+            return any(_SIGNAL_STOP_RE.search(line) for line in fh)
+    except OSError:
+        return False
+
+
 _TRAINABLE_RE = re.compile(r"Trainable parameters percentage:\s*([0-9.]+)\s*%")
 
 
@@ -360,6 +371,9 @@ def run_job(
             state, preempted_by_memguard=guard.should_stop.is_set(), cancelled_by_executor=cancelled.is_set()
         )
         status, code = classify_exit(info)
+        if status == RunStatus.COMPLETED and _stopped_by_signal(run_dir / "logs" / "stdout.log"):
+            # AutoModel turns SIGTERM into a graceful stop with exit 0: not a finished run (stopped from outside).
+            status, code = RunStatus.INTERRUPTED, None
         manifest = manifest.model_copy(
             update={
                 "status": status,

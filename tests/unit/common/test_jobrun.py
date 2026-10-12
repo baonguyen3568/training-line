@@ -109,3 +109,14 @@ def test_lock_token_and_normal_env_still_pass() -> None:
     assert "TOKENIZERS_PARALLELISM=false" in args
     assert "VLM_GPU_LOCK_TOKEN=t" in args
     assert "VLM_EXPECTED_TRAINABLE_PCT=29.4:31.4" in args
+
+
+def test_graceful_stop_line_detected(tmp_path: Path) -> None:
+    from vlm_pipeline.common.jobrun import _stopped_by_signal
+
+    log = tmp_path / "stdout.log"
+    log.write_text("step 9\n2026-10-12 | INFO | root | Received signal 15, initiating graceful stop\n")
+    assert _stopped_by_signal(log)
+    log.write_text("step 59\ndone\n")
+    assert not _stopped_by_signal(log)
+    assert not _stopped_by_signal(tmp_path / "missing.log")
