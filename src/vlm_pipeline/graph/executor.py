@@ -176,6 +176,9 @@ class Executor:
         self.workspace = workspace
         self._cancels: dict[str, threading.Event] = {}
         self._sinks: dict[str, Callable[[Event], None]] = {}  # per-run event sink (one shared Executor per app)
+        # One computation per cache key at a time: concurrent graph runs sharing a node would otherwise run it twice
+        # in the same run dir (and the same container name); the second one waits and then gets a cache hit.
+        self._key_locks: dict[str, threading.Lock] = {}
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------------------------------- public
@@ -272,6 +275,23 @@ class Executor:
             worker=worker_identity(self.worker, node.spec),
         )
         keys[nid] = key
+        with self._lock:
+            key_lock = self._key_locks.setdefault(key, threading.Lock())
+        with key_lock:
+            self._compute(run, node, key=key, inputs=inputs, upstream=upstream, keys=keys, cancel=cancel)
+
+    def _compute(
+        self,
+        run: GraphRun,
+        node: _Node,
+        *,
+        key: str,
+        inputs: dict[str, ArtifactRef],
+        upstream: list[tuple[str, str, str]],
+        keys: dict[str, str],
+        cancel: threading.Event,
+    ) -> None:
+        nid = node.node_id
         if node.spec.cacheable and self._try_cache(run, nid, key):
             return
 
