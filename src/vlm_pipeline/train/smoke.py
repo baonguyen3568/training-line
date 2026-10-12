@@ -1,0 +1,85 @@
+"""Run an AutoModel recipe YAML as a smoke/calibration job (temporary CLI until the graph executor exists).
+
+``python -m vlm_pipeline.train.smoke --config configs/train/smoke/x.yaml --tag parse-v1.1 --est-peak-gb 14
+    [--prepared .cache/prepared/<dir>] [--base-model org/m --base-revision <sha>]``
+
+Substitutes ``RUN_DIR`` / ``PREPARED_MODEL_DIR`` placeholders, runs ``automodel`` in vlm-automodel through the job
+runner (preflight + GPU lock + run.json), then converts AutoModel's training.jsonl into the contract metrics.jsonl.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import secrets
+import time
+from pathlib import Path
+
+from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job
+from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.runinfo import RunManifest, automodel_to_metrics, write_manifest
+
+DEFAULT_IMAGE = "vlm-automodel:26.08-1"
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(prog="python -m vlm_pipeline.train.smoke")
+    p.add_argument("--config", type=Path, required=True)
+    p.add_argument("--tag", required=True, help="short run name, e.g. lora-parse-v1.1")
+    p.add_argument("--est-peak-gb", type=float, required=True)
+    p.add_argument("--ckpt-gb", type=float, default=1.0)
+    p.add_argument("--prepared", type=Path, help="prepared model dir (contains model/) for PREPARED_MODEL_DIR")
+    p.add_argument("--base-model")
+    p.add_argument("--base-revision")
+    p.add_argument("--dataset")
+    p.add_argument("--image", default=DEFAULT_IMAGE)
+    a = p.parse_args(argv)
+
+    root = project_root()
+    run_id = f"{time.strftime('%Y%m%d-%H%M')}-{a.tag}-{secrets.token_hex(2)}"
+    run_dir = root / "outputs" / "runs" / run_id
+    (run_dir / "logs").mkdir(parents=True)
+    run_dir_c = f"{CONTAINER_ROOT}/outputs/runs/{run_id}"
+    text = (root / a.config).read_text(encoding="utf-8").replace("RUN_DIR", run_dir_c)
+    if "PREPARED_MODEL_DIR" in text:
+        if a.prepared is None:
+            p.error("config uses PREPARED_MODEL_DIR: pass --prepared")
+        prepared = json.loads((root / a.prepared / "prepared.json").read_text(encoding="utf-8"))
+        text = text.replace("PREPARED_MODEL_DIR", prepared["container_dir"])
+    (run_dir / "config.yaml").write_text(text, encoding="utf-8")
+
+    manifest = RunManifest(
+        run_id=run_id,
+        name=f"smoke {a.tag}",
+        stage="train",
+        task="lora",
+        base_model=a.base_model,
+        base_model_revision=a.base_revision,
+        dataset=a.dataset,
+        config_path=str(a.config),
+        config_hash=hashlib.sha256(text.encode()).hexdigest()[:16],
+        container_image=a.image,
+        tags=["smoke"],
+    )
+    write_manifest(run_dir, manifest)
+    job = ContainerJob(
+        name=run_id,
+        image=a.image,
+        argv=("automodel", f"{run_dir_c}/config.yaml", "--nproc-per-node", "1"),
+        workdir="/opt/Automodel",
+    )
+    final = run_job(job, manifest, run_dir, project_root=root, who="bao-backend", est_peak_gb=a.est_peak_gb,
+                    ckpt_gb=a.ckpt_gb)  # fmt: skip
+    for src, split in (("training.jsonl", "train"), ("validation.jsonl", "val")):
+        path = run_dir / "checkpoints" / src
+        if path.exists():
+            lines = list(automodel_to_metrics(path.read_text(encoding="utf-8").splitlines(), split=split))  # type: ignore[arg-type]
+            with (run_dir / "metrics.jsonl").open("a", encoding="utf-8") as out:
+                out.writelines(line + "\n" for line in lines)
+    print(json.dumps({"run_id": run_id, "status": final.status, "error_code": final.error_code}))
+    return 0 if final.status == "completed" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
