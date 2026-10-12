@@ -4,6 +4,7 @@ import { Gallery } from "./components/Gallery";
 import { Header, type Nav } from "./components/Header";
 import { t } from "./i18n";
 import { clearDraft, type Draft, loadDraft, saveDraft } from "./lib/draft";
+import { formatDateTime } from "./lib/format";
 import { useSystem } from "./store/system";
 import { useWorkflow } from "./store/workflow";
 
@@ -22,6 +23,15 @@ export function App() {
   const [view, setView] = useState<View>({ kind: "home" });
   const worker = useSystem((s) => s.status?.worker);
   const [draft, setDraft] = useState<Draft | null>(() => loadDraft());
+
+  // "Xem kết quả" in the check bar asks for the runs view.
+  useEffect(() => {
+    const go = (e: Event) => {
+      if ((e as CustomEvent).detail === "runs") setView({ kind: "runs" });
+    };
+    window.addEventListener("vlm:navigate", go);
+    return () => window.removeEventListener("vlm:navigate", go);
+  }, []);
 
   // Autosave the open workflow (debounced 1s) so a reload never loses work (design review M1 K1).
   useEffect(() => {
@@ -61,7 +71,7 @@ export function App() {
       <Suspense fallback={<div className="skeleton-grid" aria-busy="true" />}>
         {draft && !workflow && (
           <p className="banner draft" role="alert">
-            {t("draft.restore_prompt", { time: new Date(draft.savedAt).toLocaleString() })}{" "}
+            {t("draft.restore_prompt", { time: formatDateTime(draft.savedAt) })}{" "}
             <button
               type="button"
               className="primary"

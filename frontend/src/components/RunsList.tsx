@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { RunInfo } from "../api/types";
 import { t } from "../i18n";
+import { formatDateTime } from "../lib/format";
 import { useUi } from "../store/ui";
 
 export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
@@ -37,7 +38,7 @@ export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
                   </button>
                 </td>
                 <td>{t(`run_monitor.status.${r.status ?? "running"}`)}</td>
-                <td>{r.started_at ? new Date(r.started_at * 1000).toLocaleString() : "—"}</td>
+                <td>{r.started_at ? formatDateTime(r.started_at * 1000) : "—"}</td>
               </tr>
             ))}
           </tbody>

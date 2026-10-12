@@ -1,8 +1,9 @@
 import { useReactFlow } from "@xyflow/react";
 import { useState } from "react";
 import { t } from "../i18n";
-import { formatEstimate } from "../lib/format";
+import { formatDuration, formatEstimate } from "../lib/format";
 import { nodeTitle } from "../lib/nodeText";
+import { stepNumbers } from "../lib/topo";
 import { useWorkflow } from "../store/workflow";
 
 /** Always-visible pre-flight bar (P010 §6): Run is disabled only by blocking errors; warnings never open dialogs. */
@@ -27,19 +28,22 @@ export function CheckBar() {
   const failedCount = states.filter(([, s]) => s.status === "failed").length;
   const current = states.find(([, s]) => s.status === "running");
   const currentNode = current && workflow.nodes.find((n) => n.id === current[0]);
+  // Step number = the ①②③ shown on the node (design review M1 r2 #1), not a done-counter.
   const progress = currentNode
     ? t("run.progress", {
-        done_count: doneCount,
+        current_step: stepNumbers(workflow).get(currentNode.id) ?? doneCount + 1,
         total_count: states.length,
         node: nodeTitle(specs.get(currentNode.type), currentNode.type),
       })
     : null;
-  const finishedText =
-    run?.status === "connection_lost" || run?.status === "run_not_found"
-      ? t("run.connection_lost")
-      : failedCount > 0
-        ? t("run.finished_with_errors", { error_count: failedCount })
-        : t("node_state.done");
+  const lost = run?.status === "connection_lost" || run?.status === "run_not_found";
+  const finishedText = lost
+    ? t("run.connection_lost")
+    : failedCount > 0
+      ? t("run.finished_with_errors", { error_count: failedCount })
+      : t("run.finished", {
+          duration: formatDuration((run?.endedAt ?? Date.now()) - (run?.startedAt ?? Date.now())),
+        });
 
   const showMe = (nodeId: string | undefined) => {
     if (!nodeId) return;
@@ -56,50 +60,75 @@ export function CheckBar() {
       data-testid="check-bar"
     >
       <div className="checkbar-row">
-        <strong>{t("preflight.title")}:</strong>{" "}
-        {total === 0 ? (
-          <span className="muted">{t("preflight.empty")}</span>
-        ) : validating && !validation ? (
-          "…"
-        ) : errors.length + warnings.length === 0 ? (
-          <span className="ok">✓ {t("preflight.summary_ok")}</span>
+        {run ? (
+          // While running / after a run, the bar reports the run instead of the pre-flight (r2 #2).
+          <>
+            {running && (
+              <span data-testid="run-progress">{progress ?? t("node_state.queued")}</span>
+            )}
+            {run.done && (
+              <>
+                <span className={failedCount > 0 || lost ? "run-result bad" : "run-result"}>
+                  {failedCount > 0 || lost ? "✕" : "✓"} {finishedText}
+                </span>{" "}
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() =>
+                    window.dispatchEvent(new CustomEvent("vlm:navigate", { detail: "runs" }))
+                  }
+                >
+                  {t("run.view_results")}
+                </button>
+              </>
+            )}
+          </>
         ) : (
-          <span>
-            {t("preflight.summary", {
-              ok_count: total - badNodes.size,
-              total_count: total,
-              error_count: errors.length,
-              warning_count: warnings.length,
-            })}
-          </span>
-        )}
-        {est && (
-          <span className="muted">
-            {" "}
-            ·{" "}
-            {est.source === "unknown" ||
-            (est.duration_min == null && est.ram_gb_peak == null && est.disk_gb == null)
-              ? t("estimate.source.unknown_all")
-              : t("preflight.estimate_line", {
-                  time: formatEstimate(est.duration_min, "minutes", est.source),
-                  ram: formatEstimate(est.ram_gb_peak, "ram_gb", est.source),
-                  disk: formatEstimate(est.disk_gb, "disk_gb", est.source),
+          <>
+            <strong>{t("preflight.title")}:</strong>{" "}
+            {total === 0 ? (
+              <span className="muted">{t("preflight.empty")}</span>
+            ) : validating && !validation ? (
+              "…"
+            ) : errors.length + warnings.length === 0 ? (
+              <span className="ok">✓ {t("preflight.summary_ok")}</span>
+            ) : (
+              <span>
+                {t("preflight.summary", {
+                  ok_count: total - badNodes.size,
+                  total_count: total,
+                  error_count: errors.length,
+                  warning_count: warnings.length,
                 })}
-          </span>
-        )}
-        {(errors.length > 0 || warnings.length > 0) && (
-          <button
-            type="button"
-            className="link"
-            aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
-          >
-            {t("preflight.show_details")}
-          </button>
+              </span>
+            )}
+            {est && (
+              <span className="muted">
+                {" "}
+                ·{" "}
+                {est.source === "unknown" ||
+                (est.duration_min == null && est.ram_gb_peak == null && est.disk_gb == null)
+                  ? t("estimate.source.unknown_all")
+                  : t("preflight.estimate_line", {
+                      time: formatEstimate(est.duration_min, "minutes", est.source),
+                      ram: formatEstimate(est.ram_gb_peak, "ram_gb", est.source),
+                      disk: formatEstimate(est.disk_gb, "disk_gb", est.source),
+                    })}
+              </span>
+            )}
+            {(errors.length > 0 || warnings.length > 0) && (
+              <button
+                type="button"
+                className="link"
+                aria-expanded={open}
+                onClick={() => setOpen((o) => !o)}
+              >
+                {t("preflight.show_details")}
+              </button>
+            )}
+          </>
         )}
         <span className="spacer" />
-        {running && progress && <span data-testid="run-progress">{progress}</span>}
-        {run?.done && <span>{finishedText}</span>}
         {running ? (
           <button type="button" className="primary" onClick={() => void cancelRun()}>
             ■ {t("run.stop")}

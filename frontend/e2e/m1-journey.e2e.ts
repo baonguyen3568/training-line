@@ -114,11 +114,12 @@ test("M1 journey: build, run, save, reopen", async ({ page }, testInfo) => {
 });
 
 test("work survives a page reload (autosave)", async ({ page }) => {
-  // Expected to fail until autosave lands (bao-design M1 review r1). Like a strict xfail: when it starts
-  // passing, Playwright reports it so the marker gets removed and this becomes a regression guard.
-  test.fail(true, "no autosave yet: a reload loses the workflow");
+  // Regression guard for autosave (bao-design M1 review r1, K1). UX approved by design: after a reload the
+  // app asks to restore the draft (draft.restore_prompt) and "Khôi phục" reopens the canvas.
   await buildGraph(page);
+  await page.waitForTimeout(1_500); // autosave is debounced 1s
   await page.reload();
+  await page.getByRole("button", { name: tr("draft.restore") }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(3, { timeout: 5_000 });
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
 });

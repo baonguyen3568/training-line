@@ -33,7 +33,14 @@ interface WorkflowState {
   past: Workflow[];
   future: Workflow[];
   /** Live per-node state of the current run (node_status events). */
-  run: { id: string; nodes: Record<string, NodeRunState>; done: boolean; status?: string } | null;
+  run: {
+    id: string;
+    nodes: Record<string, NodeRunState>;
+    done: boolean;
+    status?: string;
+    startedAt: number;
+    endedAt?: number;
+  } | null;
   loadCatalog(): Promise<void>;
   openTemplate(id: string): Promise<void>;
   newWorkflow(): void;
@@ -287,7 +294,7 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       const { run_id } = await api.startRun(wf);
       const nodes: Record<string, NodeRunState> = {};
       for (const n of wf.nodes) nodes[n.id] = { status: "pending" };
-      set({ run: { id: run_id, nodes, done: false } });
+      set({ run: { id: run_id, nodes, done: false, startedAt: Date.now() } });
       unsubscribe = api.watchRun(run_id, (ev) => {
         const run = get().run;
         if (!run || run.id !== run_id) return;
@@ -299,9 +306,9 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
         } else if (ev.type === "run_status") {
           if (ev.status === "running") return;
           // Terminal (completed/failed/cancelled/interrupted/invalid): nodes never started stay as they are.
-          set({ run: { ...run, done: true, status: ev.status } });
+          set({ run: { ...run, done: true, status: ev.status, endedAt: Date.now() } });
         } else if (ev.type === "run_not_found" || ev.type === "connection_lost") {
-          set({ run: { ...run, done: true, status: ev.type } });
+          set({ run: { ...run, done: true, status: ev.type, endedAt: Date.now() } });
         }
       });
     },
