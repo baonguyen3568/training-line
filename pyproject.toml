@@ -116,7 +116,7 @@ strict = true
 module = [
     "torch.*", "transformers.*", "nemo_automodel.*", "megatron.*", "modelopt.*", "tensorrt_llm.*", "vllm.*",
     "nemo_rl.*", "datasets.*", "peft.*", "accelerate.*", "triton.*", "flash_attn.*", "transformer_engine.*",
-    "bitsandbytes.*",
+    "bitsandbytes.*", "numpy", "numpy.*",
 ]
 ignore_missing_imports = true
 
