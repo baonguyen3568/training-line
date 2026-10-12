@@ -816,7 +816,7 @@ run_monitor:
 run:
   stop: Stop
   stop_confirm: Stop this run? The step in progress will stop; finished steps are kept.
-  progress: Step {done_count}/{total_count} · {node}
+  progress: Running step {current_step}/{total_count} · {node}
   locked_while_running: Running — stop to edit the workflow
   finished: Finished in {duration}
   finished_with_errors: Finished with {error_count} failed steps

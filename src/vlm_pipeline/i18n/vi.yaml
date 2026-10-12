@@ -816,7 +816,7 @@ run_monitor:
 run:
   stop: Dừng
   stop_confirm: Dừng lần chạy này? Bước đang chạy sẽ dừng lại; các bước đã xong vẫn được giữ.
-  progress: Bước {done_count}/{total_count} · {node}
+  progress: Đang chạy bước {current_step}/{total_count} · {node}
   locked_while_running: Đang chạy — dừng lại để sửa workflow
   finished: Chạy xong sau {duration}
   finished_with_errors: Chạy xong, có {error_count} bước lỗi
