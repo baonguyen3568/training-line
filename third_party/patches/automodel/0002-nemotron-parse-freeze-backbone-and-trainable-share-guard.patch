@@ -14,7 +14,7 @@ diff --git a/nemo_automodel/components/models/nemotron_parse/model.py b/nemo_aut
 diff --git a/nemo_automodel/components/utils/model_utils.py b/nemo_automodel/components/utils/model_utils.py
 --- a/nemo_automodel/components/utils/model_utils.py
 +++ b/nemo_automodel/components/utils/model_utils.py
-@@ -304,6 +304,16 @@
+@@ -304,6 +304,21 @@
      except Exception:
          logging.info(f"{name} summary: <unavailable>")
  
@@ -22,7 +22,12 @@ diff --git a/nemo_automodel/components/utils/model_utils.py b/nemo_automodel/com
 +    # nothing trained 100% of Nemotron-Parse). The runner sets VLM_EXPECTED_TRAINABLE_PCT="<lo>:<hi>".
 +    expected = os.environ.get("VLM_EXPECTED_TRAINABLE_PCT")
 +    if expected and total_params > 0:
-+        low, high = (float(x) for x in expected.split(":"))
++        try:
++            low, high = (float(x) for x in expected.split(":"))
++        except ValueError:
++            raise ValueError(f'VLM_EXPECTED_TRAINABLE_PCT must be "<lo>:<hi>" percentages, got {expected!r}') from None
++        if not 0.0 <= low <= high <= 100.0:
++            raise ValueError(f"VLM_EXPECTED_TRAINABLE_PCT needs 0 <= lo <= hi <= 100, got {expected!r}")
 +        pct = 100.0 * trainable_params / total_params
 +        if not low <= pct <= high:
 +            raise RuntimeError(
@@ -31,7 +36,7 @@ diff --git a/nemo_automodel/components/utils/model_utils.py b/nemo_automodel/com
      return trainable_params, total_params
  
  
-@@ -374,6 +384,11 @@
+@@ -374,6 +389,11 @@
          - freeze_language_model: bool (default False)
          - freeze_video_embedder: bool (default False)
      """
@@ -43,7 +48,7 @@ diff --git a/nemo_automodel/components/utils/model_utils.py b/nemo_automodel/com
      freeze_vision_tower = freeze_config.get("freeze_vision_tower", True)
      freeze_audio_tower = freeze_config.get("freeze_audio_tower", False)
      freeze_language_model = freeze_config.get("freeze_language_model", False)
-@@ -382,6 +397,16 @@
+@@ -382,6 +402,16 @@
      # Freeze vision tower
      if freeze_vision_tower:
          _freeze_module_by_attribute_and_patterns(model, "vision_tower", ["vision", "visual", "image_encoder"])
@@ -52,7 +57,7 @@ diff --git a/nemo_automodel/components/utils/model_utils.py b/nemo_automodel/com
 +        prefixes = getattr(model, "_vlm_frozen_vision_prefixes", ())
 +        frozen = 0
 +        for pname, param in model.named_parameters():
-+            if any(("." + pname).find("." + p) != -1 for p in prefixes):
++            if any(f".{p}" in f".{pname}" for p in prefixes):
 +                param.requires_grad_(False)
 +                frozen += 1
 +        if prefixes and frozen == 0:

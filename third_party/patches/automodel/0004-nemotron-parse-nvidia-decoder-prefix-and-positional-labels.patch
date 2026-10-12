@@ -1,0 +1,52 @@
+diff --git a/nemo_automodel/components/datasets/vlm/collate_fns.py b/nemo_automodel/components/datasets/vlm/collate_fns.py
+--- a/nemo_automodel/components/datasets/vlm/collate_fns.py
++++ b/nemo_automodel/components/datasets/vlm/collate_fns.py
+@@ -1075,22 +1075,40 @@
+         images.append(image)
+         targets.append(assistant_text)
+ 
+-    texts = [f"{task_prompt}{target}" for target in targets]
++    # PATCH(vlm): match the decoder prefix of NVIDIA's reference (README / test_golden: add_special_tokens=False),
++    # i.e. decoder input starts `</s><s><predict_bbox>...` = [2, 0, 50004, 50008, 50001]; the tokenizer's own BOS
++    # gave [0, 2, 0, ...] in training only. EOS is appended explicitly so the model still learns to stop.
++    tokenizer = getattr(processor, "tokenizer", processor)
++    eos = getattr(tokenizer, "eos_token", None) or "</s>"
++    texts = [f"{task_prompt}{target}{eos}" for target in targets]
+ 
+-    batch = processor(images=images, text=texts, padding=True, return_tensors="pt")
++    batch = processor(images=images, text=texts, padding=True, return_tensors="pt", add_special_tokens=False)
+ 
+     if "pixel_values" in batch:
+         batch["pixel_values"] = batch["pixel_values"].to(torch.bfloat16)
+ 
+-    labels = build_labels_from_template(
+-        batch["input_ids"],
+-        conversations,
+-        processor,
+-    )
++    # PATCH(vlm): labels by position instead of the chat-template BPE fallback (Parse has no chat template): mask the
++    # task prompt (from the first real token, so left padding works too) and padding; target + EOS are learned.
++    prompt_ids = tokenizer(task_prompt, add_special_tokens=False, padding=False)["input_ids"]
++    prompt_len = len(prompt_ids)
++    labels = batch["input_ids"].clone()
++    attention = batch.get("attention_mask")
++    for row in range(labels.shape[0]):
++        real = (attention[row] == 1).nonzero() if attention is not None else None
++        start = int(real[0]) if real is not None and len(real) else 0
++        # The mask is positional: refuse to train if the prompt did not tokenize to the same ids inside the sample
++        # (BPE merge across the prompt/target boundary, tokenizer change) instead of silently learning the prompt.
++        if batch["input_ids"][row, start : start + prompt_len].tolist() != prompt_ids:
++            raise ValueError(
++                f"Nemotron-Parse collate_fn: sample {row} does not start with the task prompt ids {prompt_ids}; "
++                "the positional label mask would be wrong."
++            )
++        labels[row, : start + prompt_len] = -100
++    if attention is not None:
++        labels[attention == 0] = -100
+ 
+     batch["labels"] = labels[:, 1:]
+ 
+-    tokenizer = getattr(processor, "tokenizer", processor)
+     pad_token_id = getattr(tokenizer, "pad_token_id", None)
+     decoder_start_token_id = getattr(tokenizer, "decoder_start_token_id", None) or getattr(
+         tokenizer, "bos_token_id", None

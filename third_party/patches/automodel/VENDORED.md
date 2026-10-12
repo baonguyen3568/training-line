@@ -57,12 +57,41 @@ MemAvailable to 6.34 GB.
 2. **Unknown `freeze_config` keys were ignored** (e.g. `freeze_embeddings`): now a `ValueError`.
 3. **Trainable share guard**: `print_trainable_parameters` raises `VLM_TRAINABLE_PCT_MISMATCH` when the share is
    outside `VLM_EXPECTED_TRAINABLE_PCT="<lo>:<hi>"` (set by our runner from the recipe catalog; unset = no check).
+   A malformed value (not two numbers, `lo > hi`, outside 0..100) is a `ValueError` naming the variable, so a typo
+   cannot disable the guard (regenerated 2026-10-12 after bao-cleancode's review; prefix match is now
+   `f".{p}" in f".{pname}"`, same behaviour).
 
 Not a bug (measured, so not patched): RADIO attention is already `fused_attn=True` (timm default with SDPA), and the
 Parse label mask is correct (prompt and padding masked, target + EOS learned) despite the "BPE pattern-match"
 warning — both locked by tests.
 Regression tests: `tests/integration/automodel/test_nemotron_parse_freeze.py` — 4 FAIL on 26.08-2 (behavioural), all
-5 PASS with 0001+0002; 0001+0002 apply cleanly on the pristine NGC base.
+PASS with 0001+0002; the 5 malformed-env cases FAIL on 26.08-3 (old 0002) and PASS with this 0002.
 
-Pending for the next regeneration of 0002 (review bao-cleancode, no behaviour change): `f".{p}" in f".{pname}"` for
-the boundary match; validate `VLM_EXPECTED_TRAINABLE_PCT` format/`lo <= hi` with a clear message.
+## 0003-nemotron-parse-generate-without-kv-cache.patch (on top of 0001+0002) — BUG-001
+File: `nemo_automodel/components/models/nemotron_parse/model.py`
+`NemotronParseDecoder` ignores the KV cache (layers get `past_key_values=None, use_cache=False`, it returns
+`past_key_values=None`). `generate()` with the default `use_cache=True` fed only the newest token at position 0 each
+step -> `<x_0.3906>` repeated forever (golden gate (b) on 26.08-2). Fix: `generation_config.use_cache=False` by
+default and `prepare_inputs_for_generation` always feeds the whole decoder sequence (O(n^2), correct). Proper KV-cache
+support is upstream work (tech debt, see `.team/BOARD.md` "KV cache for the Parse decoder"). Cost: each step
+re-runs the decoder over the whole prefix; the wall-clock of a 50-token / full-page generate on GB10 is recorded by
+bao-backend at golden gate (b) on 26.08-4 and must be noted here before eval budgets rely on it. Tests: `test_nemotron_parse_generate.py` (2 FAIL on 26.08-3, PASS patched); end-to-end
+proof = golden gate (b) on GPU.
+
+## 0004-nemotron-parse-nvidia-decoder-prefix-and-positional-labels.patch — decoder prefix parity
+File: `nemo_automodel/components/datasets/vlm/collate_fns.py` (`nemotron_parse_collate_fn`)
+Training let the tokenizer add its BOS: decoder input `[0, 2, 0, 50004, 50008, 50001, ...]`, while NVIDIA's reference
+(README, test_golden.py, decoder_start_token_id = 2) uses `add_special_tokens=False`:
+`[2, 0, 50004, 50008, 50001]` (bao-tester; decision 001a §10.5: fix training, not serving). Fix: encode
+`task_prompt + target + </s>` with `add_special_tokens=False` and build labels by position (mask the prompt from the
+first real token, mask padding) instead of the chat-template BPE fallback. Because the mask is positional, the collate
+raises `ValueError` if a sample does not start with the task prompt ids (review bao-cleancode); the prompt is encoded
+with `padding=False` (Parse 2.0's `tokenizer.json` enables padding to 9000). Tests: `test_nemotron_parse_prefix.py`
+(3 FAIL on 26.08-3, PASS patched) + bao-tester's `test_parse_prefix_parity.py` (xfail removed); label lock tests
+unchanged and green. Measured: the prompt ids are `[2, 0, 50004, 50008, 50001]` in v1.1 **and** 2.0 (vocab 72249),
+and stay the same when joined with a target.
+
+**Known limitation (bao-security review):** the target text is tokenized with special tokens enabled, so a target
+containing the literal strings `</s>`, `<s>`, `<predict_bbox>`, … becomes those special tokens (a fake EOS / task
+token inside the label). CORD/synthetic data never contains them; for user datasets, tokenize the target with
+`split_special_tokens=True` or reject/escape these strings at data validation (owner: data validate node).

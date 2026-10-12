@@ -1,2 +1,4 @@
 14ef0bf840598d948fa4da150c09f9a9e356007afcc041c6b2e82baf9cc639e4  0001-nemotron-parse-normalize-flag-and-tied-embeddings.patch
-136ac59f9eccfbe127b9e8e4c6bdeceee4f5fa5890a3e3c2b6078dc50161e06c  0002-nemotron-parse-freeze-backbone-and-trainable-share-guard.patch
+a9c4d3506d9f95c112e57d102692d755fc0e2f27d0e9d74a7e7c64c093a8f46c  0002-nemotron-parse-freeze-backbone-and-trainable-share-guard.patch
+4865de4ecab82630c03dcc4b5c947bb15d1c555bf55e82e54f352cd6a3b4da40  0003-nemotron-parse-generate-without-kv-cache.patch
+ad2315e2c0520c898025e355c610bd53a5b20eff768cd038681e15c7763c979b  0004-nemotron-parse-nvidia-decoder-prefix-and-positional-labels.patch

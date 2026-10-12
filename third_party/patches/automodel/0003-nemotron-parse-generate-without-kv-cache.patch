@@ -1,0 +1,29 @@
+diff --git a/nemo_automodel/components/models/nemotron_parse/model.py b/nemo_automodel/components/models/nemotron_parse/model.py
+--- a/nemo_automodel/components/models/nemotron_parse/model.py
++++ b/nemo_automodel/components/models/nemotron_parse/model.py
+@@ -537,6 +537,10 @@
+ 
+         self.class_token_indx_start = getattr(config, "class_token_start_idx", 50000)
+         self.post_init()
++        # PATCH(vlm): BUG-001 - the decoder ignores the KV cache (layers get past_key_values=None, use_cache=False),
++        # so cached generation fed one token at position 0 and looped. Generate without a cache by default.
++        if self.generation_config is not None:
++            self.generation_config.use_cache = False
+ 
+     def get_encoder(self):
+         return self.encoder
+@@ -651,6 +655,14 @@
+             out["hidden_states"] = final_hidden_states
+         return out
+ 
++    def prepare_inputs_for_generation(self, input_ids, next_sequence_length=None, past_key_values=None, **kwargs):
++        # PATCH(vlm): BUG-001 - always feed the whole decoder sequence: this decoder has no KV cache, so the default
++        # slicing to the newest token (next_sequence_length) would lose all history. O(n^2), but correct.
++        kwargs["use_cache"] = False
++        return super().prepare_inputs_for_generation(
++            input_ids, next_sequence_length=None, past_key_values=None, **kwargs
++        )
++
+     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
+         return shift_tokens_right(labels, self.config.pad_token_id, self.config.decoder_start_token_id)
+ 

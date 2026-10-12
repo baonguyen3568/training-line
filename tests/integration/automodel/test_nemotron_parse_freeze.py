@@ -95,6 +95,17 @@ def test_trainable_share_outside_expectation_fails_fast(monkeypatch: pytest.Monk
     print_trainable_parameters(model)  # 50 %: inside the range, no error
 
 
+@pytest.mark.parametrize("value", ["30", "30:abc", "31.4:29.4", "-1:30", "30:101"])
+def test_malformed_trainable_share_expectation_is_an_error(value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A typo in the runner's env must not disable the guard or surface as an unrelated unpacking error."""
+    import torch
+    from nemo_automodel.components.utils.model_utils import print_trainable_parameters
+
+    monkeypatch.setenv("VLM_EXPECTED_TRAINABLE_PCT", value)
+    with pytest.raises(ValueError, match="VLM_EXPECTED_TRAINABLE_PCT"):
+        print_trainable_parameters(torch.nn.Linear(10, 10))
+
+
 def test_label_mask_keeps_exactly_the_target_plus_eos() -> None:
     """The collate warns "Falling back to BPE pattern-match labels" but masks correctly; lock that behaviour."""
     if not PREPARED_V11.is_dir():
