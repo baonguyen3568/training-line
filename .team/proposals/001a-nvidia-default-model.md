@@ -258,3 +258,16 @@ Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ 
 ### 10.4 Giữ checkpoint của P-3 (bao-cleanup, 05:20)
 - YAML P-3 đã đặt `max_recent_checkpoints: 3` + `save_consolidated: every`. **Cần backend xác nhận** đường `vlm_pipeline.train.smoke --config` dùng YAML nguyên trạng, không ghi đè 2 field này. Đường app (`train/recipe.py`) thì ghi đè thành `final` / 2.
 - Sau run: `touch outputs/runs/<run>/KEEP` (giữ cả run) trong lúc tester chấm F1. Chốt preset xong thì gỡ KEEP của run và đặt `checkpoints/epoch_*_step_<N>/KEEP` cho đúng checkpoint được chọn; phần còn lại theo retention ADR-005 (LATEST + LOWEST_VAL, 7 ngày). run.json phải có status=completed thì retention mới dọn.
+
+### 10.5 Lệch prefix decoder do `<s>` thừa (bao-tester bắt được ở P-2 pipeline-check, 05:40), quyết định của research
+- Prefix lúc train (collate của AutoModel) = `[0, 2, 0, 50004, 50008, 50001]` = `<s></s><s><predict_bbox><predict_classes><output_markdown>`. Processor mặc định `add_special_tokens=True` tự thêm `<s>` vào trước task_prompt.
+- **Quy ước của NVIDIA** (`example.py`, README, `test_golden.py` trong snapshot đã pin): `processor(..., add_special_tokens=False)` + `decoder_start_token_id = 2`, nên prefix = **`[2, 0, 50004, 50008, 50001]`**. Đây là prefix model được pretrain và là prefix golden test kiểm.
+- Eval chạy `generate()` mặc định thì tự chèn thêm 2 → `[2,0,2,0,…]`, lệch cả train lẫn NVIDIA.
+- **Quyết định: sửa PHÍA TRAIN cho khớp quy ước NVIDIA.** Không chiều theo prefix lệch ở eval/serve. Lý do:
+  1. model base được pretrain với `[2,0,…]`. Fine-tune với prefix lệch thì tốn dung lượng học lại prefix, và zero-shot không còn so được với fine-tune;
+  2. mọi đường serve chuẩn (HF example, vLLM `test_vllm_golden.py` của NVIDIA) đều dùng quy ước này. Chiều theo prefix lệch thì phải vá **từng** đường serve, kể cả các đường tương lai;
+  3. golden test của NVIDIA thành một nguồn sự thật duy nhất cho cả train lẫn serve.
+- Việc cần làm:
+  - (fixcode) adapter collate Parse tokenize task_prompt + đích với `add_special_tokens=False`, sao cho `decoder_input_ids` bắt đầu đúng `[2, 0, 50004, 50008, 50001]`. Test: so từng id với prefix của `test_golden.py`; label mask vẫn đúng (§10.2).
+  - (tester) gate parity (b) so **decoder ids thật** của 3 đường: train-collate, eval-worker, prefix NVIDIA golden. Cả 3 phải bằng nhau.
+  - (backend) O-1 đang chạy với collate cũ: dùng nó để kiểm đường ống (worker đã pin prefix). **Sau khi vá collate, chạy lại O-1 (O-1b, ~15') rồi mới tới P-3.** Không chạy P-3 trên collate cũ.
