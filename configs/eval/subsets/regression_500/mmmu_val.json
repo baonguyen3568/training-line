@@ -1,0 +1,2135 @@
+{
+ "benchmark": "mmmu_val",
+ "repo": "lmms-lab/MMMU",
+ "revision": "364f2e2eb107b36e07ff4c5a15f5947a759cef47",
+ "split_glob": "data/validation-*.parquet",
+ "seed": 20261012,
+ "n_questions": 500,
+ "n_rows": 500,
+ "population_rows": 900,
+ "method": "stratified proportional (largest remainder), groups kept whole",
+ "strata": {
+  "Accounting": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Agriculture": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Architecture_and_Engineering": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Art": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Art_Theory": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Basic_Medical_Science": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Biology": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Chemistry": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Clinical_Medicine": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Computer_Science": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Design": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Diagnostics_and_Laboratory_Medicine": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Economics": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Electronics": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Energy_and_Power": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Finance": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Geography": {
+   "population": 30,
+   "sampled": 17
+  },
+  "History": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Literature": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Manage": {
+   "population": 30,
+   "sampled": 17
+  },
+  "Marketing": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Materials": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Math": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Mechanical_Engineering": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Music": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Pharmacy": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Physics": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Psychology": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Public_Health": {
+   "population": 30,
+   "sampled": 16
+  },
+  "Sociology": {
+   "population": 30,
+   "sampled": 16
+  }
+ },
+ "samples": [
+  {
+   "row": 0,
+   "id": "validation_Accounting_1"
+  },
+  {
+   "row": 1,
+   "id": "validation_Accounting_2"
+  },
+  {
+   "row": 2,
+   "id": "validation_Accounting_3"
+  },
+  {
+   "row": 5,
+   "id": "validation_Accounting_6"
+  },
+  {
+   "row": 6,
+   "id": "validation_Accounting_7"
+  },
+  {
+   "row": 11,
+   "id": "validation_Accounting_12"
+  },
+  {
+   "row": 14,
+   "id": "validation_Accounting_15"
+  },
+  {
+   "row": 15,
+   "id": "validation_Accounting_16"
+  },
+  {
+   "row": 17,
+   "id": "validation_Accounting_18"
+  },
+  {
+   "row": 18,
+   "id": "validation_Accounting_19"
+  },
+  {
+   "row": 19,
+   "id": "validation_Accounting_20"
+  },
+  {
+   "row": 21,
+   "id": "validation_Accounting_22"
+  },
+  {
+   "row": 22,
+   "id": "validation_Accounting_23"
+  },
+  {
+   "row": 25,
+   "id": "validation_Accounting_26"
+  },
+  {
+   "row": 26,
+   "id": "validation_Accounting_27"
+  },
+  {
+   "row": 27,
+   "id": "validation_Accounting_28"
+  },
+  {
+   "row": 28,
+   "id": "validation_Accounting_29"
+  },
+  {
+   "row": 33,
+   "id": "validation_Agriculture_4"
+  },
+  {
+   "row": 35,
+   "id": "validation_Agriculture_6"
+  },
+  {
+   "row": 37,
+   "id": "validation_Agriculture_8"
+  },
+  {
+   "row": 38,
+   "id": "validation_Agriculture_9"
+  },
+  {
+   "row": 39,
+   "id": "validation_Agriculture_10"
+  },
+  {
+   "row": 42,
+   "id": "validation_Agriculture_13"
+  },
+  {
+   "row": 44,
+   "id": "validation_Agriculture_15"
+  },
+  {
+   "row": 46,
+   "id": "validation_Agriculture_17"
+  },
+  {
+   "row": 47,
+   "id": "validation_Agriculture_18"
+  },
+  {
+   "row": 48,
+   "id": "validation_Agriculture_19"
+  },
+  {
+   "row": 49,
+   "id": "validation_Agriculture_20"
+  },
+  {
+   "row": 50,
+   "id": "validation_Agriculture_21"
+  },
+  {
+   "row": 51,
+   "id": "validation_Agriculture_22"
+  },
+  {
+   "row": 52,
+   "id": "validation_Agriculture_23"
+  },
+  {
+   "row": 54,
+   "id": "validation_Agriculture_25"
+  },
+  {
+   "row": 55,
+   "id": "validation_Agriculture_26"
+  },
+  {
+   "row": 59,
+   "id": "validation_Agriculture_30"
+  },
+  {
+   "row": 62,
+   "id": "validation_Architecture_and_Engineering_3"
+  },
+  {
+   "row": 66,
+   "id": "validation_Architecture_and_Engineering_7"
+  },
+  {
+   "row": 68,
+   "id": "validation_Architecture_and_Engineering_9"
+  },
+  {
+   "row": 71,
+   "id": "validation_Architecture_and_Engineering_12"
+  },
+  {
+   "row": 72,
+   "id": "validation_Architecture_and_Engineering_13"
+  },
+  {
+   "row": 73,
+   "id": "validation_Architecture_and_Engineering_14"
+  },
+  {
+   "row": 74,
+   "id": "validation_Architecture_and_Engineering_15"
+  },
+  {
+   "row": 76,
+   "id": "validation_Architecture_and_Engineering_17"
+  },
+  {
+   "row": 78,
+   "id": "validation_Architecture_and_Engineering_19"
+  },
+  {
+   "row": 79,
+   "id": "validation_Architecture_and_Engineering_20"
+  },
+  {
+   "row": 81,
+   "id": "validation_Architecture_and_Engineering_22"
+  },
+  {
+   "row": 82,
+   "id": "validation_Architecture_and_Engineering_23"
+  },
+  {
+   "row": 84,
+   "id": "validation_Architecture_and_Engineering_25"
+  },
+  {
+   "row": 86,
+   "id": "validation_Architecture_and_Engineering_27"
+  },
+  {
+   "row": 87,
+   "id": "validation_Architecture_and_Engineering_28"
+  },
+  {
+   "row": 88,
+   "id": "validation_Architecture_and_Engineering_29"
+  },
+  {
+   "row": 89,
+   "id": "validation_Architecture_and_Engineering_30"
+  },
+  {
+   "row": 93,
+   "id": "validation_Art_4"
+  },
+  {
+   "row": 95,
+   "id": "validation_Art_6"
+  },
+  {
+   "row": 96,
+   "id": "validation_Art_7"
+  },
+  {
+   "row": 98,
+   "id": "validation_Art_9"
+  },
+  {
+   "row": 102,
+   "id": "validation_Art_13"
+  },
+  {
+   "row": 104,
+   "id": "validation_Art_15"
+  },
+  {
+   "row": 105,
+   "id": "validation_Art_16"
+  },
+  {
+   "row": 107,
+   "id": "validation_Art_18"
+  },
+  {
+   "row": 108,
+   "id": "validation_Art_19"
+  },
+  {
+   "row": 109,
+   "id": "validation_Art_20"
+  },
+  {
+   "row": 110,
+   "id": "validation_Art_21"
+  },
+  {
+   "row": 111,
+   "id": "validation_Art_22"
+  },
+  {
+   "row": 112,
+   "id": "validation_Art_23"
+  },
+  {
+   "row": 113,
+   "id": "validation_Art_24"
+  },
+  {
+   "row": 115,
+   "id": "validation_Art_26"
+  },
+  {
+   "row": 116,
+   "id": "validation_Art_27"
+  },
+  {
+   "row": 118,
+   "id": "validation_Art_29"
+  },
+  {
+   "row": 120,
+   "id": "validation_Art_Theory_1"
+  },
+  {
+   "row": 122,
+   "id": "validation_Art_Theory_3"
+  },
+  {
+   "row": 123,
+   "id": "validation_Art_Theory_4"
+  },
+  {
+   "row": 124,
+   "id": "validation_Art_Theory_5"
+  },
+  {
+   "row": 125,
+   "id": "validation_Art_Theory_6"
+  },
+  {
+   "row": 126,
+   "id": "validation_Art_Theory_7"
+  },
+  {
+   "row": 127,
+   "id": "validation_Art_Theory_8"
+  },
+  {
+   "row": 128,
+   "id": "validation_Art_Theory_9"
+  },
+  {
+   "row": 130,
+   "id": "validation_Art_Theory_11"
+  },
+  {
+   "row": 132,
+   "id": "validation_Art_Theory_13"
+  },
+  {
+   "row": 133,
+   "id": "validation_Art_Theory_14"
+  },
+  {
+   "row": 138,
+   "id": "validation_Art_Theory_19"
+  },
+  {
+   "row": 139,
+   "id": "validation_Art_Theory_20"
+  },
+  {
+   "row": 141,
+   "id": "validation_Art_Theory_22"
+  },
+  {
+   "row": 144,
+   "id": "validation_Art_Theory_25"
+  },
+  {
+   "row": 146,
+   "id": "validation_Art_Theory_27"
+  },
+  {
+   "row": 148,
+   "id": "validation_Art_Theory_29"
+  },
+  {
+   "row": 152,
+   "id": "validation_Basic_Medical_Science_3"
+  },
+  {
+   "row": 154,
+   "id": "validation_Basic_Medical_Science_5"
+  },
+  {
+   "row": 158,
+   "id": "validation_Basic_Medical_Science_9"
+  },
+  {
+   "row": 159,
+   "id": "validation_Basic_Medical_Science_10"
+  },
+  {
+   "row": 160,
+   "id": "validation_Basic_Medical_Science_11"
+  },
+  {
+   "row": 161,
+   "id": "validation_Basic_Medical_Science_12"
+  },
+  {
+   "row": 162,
+   "id": "validation_Basic_Medical_Science_13"
+  },
+  {
+   "row": 163,
+   "id": "validation_Basic_Medical_Science_14"
+  },
+  {
+   "row": 164,
+   "id": "validation_Basic_Medical_Science_15"
+  },
+  {
+   "row": 166,
+   "id": "validation_Basic_Medical_Science_17"
+  },
+  {
+   "row": 167,
+   "id": "validation_Basic_Medical_Science_18"
+  },
+  {
+   "row": 168,
+   "id": "validation_Basic_Medical_Science_19"
+  },
+  {
+   "row": 169,
+   "id": "validation_Basic_Medical_Science_20"
+  },
+  {
+   "row": 172,
+   "id": "validation_Basic_Medical_Science_23"
+  },
+  {
+   "row": 173,
+   "id": "validation_Basic_Medical_Science_24"
+  },
+  {
+   "row": 174,
+   "id": "validation_Basic_Medical_Science_25"
+  },
+  {
+   "row": 177,
+   "id": "validation_Basic_Medical_Science_28"
+  },
+  {
+   "row": 181,
+   "id": "validation_Biology_2"
+  },
+  {
+   "row": 183,
+   "id": "validation_Biology_4"
+  },
+  {
+   "row": 186,
+   "id": "validation_Biology_7"
+  },
+  {
+   "row": 187,
+   "id": "validation_Biology_8"
+  },
+  {
+   "row": 188,
+   "id": "validation_Biology_9"
+  },
+  {
+   "row": 189,
+   "id": "validation_Biology_10"
+  },
+  {
+   "row": 191,
+   "id": "validation_Biology_12"
+  },
+  {
+   "row": 192,
+   "id": "validation_Biology_13"
+  },
+  {
+   "row": 193,
+   "id": "validation_Biology_14"
+  },
+  {
+   "row": 195,
+   "id": "validation_Biology_16"
+  },
+  {
+   "row": 198,
+   "id": "validation_Biology_19"
+  },
+  {
+   "row": 199,
+   "id": "validation_Biology_20"
+  },
+  {
+   "row": 203,
+   "id": "validation_Biology_24"
+  },
+  {
+   "row": 205,
+   "id": "validation_Biology_26"
+  },
+  {
+   "row": 206,
+   "id": "validation_Biology_27"
+  },
+  {
+   "row": 208,
+   "id": "validation_Biology_29"
+  },
+  {
+   "row": 209,
+   "id": "validation_Biology_30"
+  },
+  {
+   "row": 211,
+   "id": "validation_Chemistry_2"
+  },
+  {
+   "row": 212,
+   "id": "validation_Chemistry_3"
+  },
+  {
+   "row": 216,
+   "id": "validation_Chemistry_7"
+  },
+  {
+   "row": 217,
+   "id": "validation_Chemistry_8"
+  },
+  {
+   "row": 219,
+   "id": "validation_Chemistry_10"
+  },
+  {
+   "row": 223,
+   "id": "validation_Chemistry_14"
+  },
+  {
+   "row": 225,
+   "id": "validation_Chemistry_16"
+  },
+  {
+   "row": 226,
+   "id": "validation_Chemistry_17"
+  },
+  {
+   "row": 229,
+   "id": "validation_Chemistry_20"
+  },
+  {
+   "row": 230,
+   "id": "validation_Chemistry_21"
+  },
+  {
+   "row": 231,
+   "id": "validation_Chemistry_22"
+  },
+  {
+   "row": 232,
+   "id": "validation_Chemistry_23"
+  },
+  {
+   "row": 233,
+   "id": "validation_Chemistry_24"
+  },
+  {
+   "row": 234,
+   "id": "validation_Chemistry_25"
+  },
+  {
+   "row": 235,
+   "id": "validation_Chemistry_26"
+  },
+  {
+   "row": 236,
+   "id": "validation_Chemistry_27"
+  },
+  {
+   "row": 238,
+   "id": "validation_Chemistry_29"
+  },
+  {
+   "row": 240,
+   "id": "validation_Clinical_Medicine_1"
+  },
+  {
+   "row": 241,
+   "id": "validation_Clinical_Medicine_2"
+  },
+  {
+   "row": 244,
+   "id": "validation_Clinical_Medicine_5"
+  },
+  {
+   "row": 245,
+   "id": "validation_Clinical_Medicine_6"
+  },
+  {
+   "row": 246,
+   "id": "validation_Clinical_Medicine_7"
+  },
+  {
+   "row": 247,
+   "id": "validation_Clinical_Medicine_8"
+  },
+  {
+   "row": 248,
+   "id": "validation_Clinical_Medicine_9"
+  },
+  {
+   "row": 251,
+   "id": "validation_Clinical_Medicine_12"
+  },
+  {
+   "row": 252,
+   "id": "validation_Clinical_Medicine_13"
+  },
+  {
+   "row": 253,
+   "id": "validation_Clinical_Medicine_14"
+  },
+  {
+   "row": 256,
+   "id": "validation_Clinical_Medicine_17"
+  },
+  {
+   "row": 259,
+   "id": "validation_Clinical_Medicine_20"
+  },
+  {
+   "row": 260,
+   "id": "validation_Clinical_Medicine_21"
+  },
+  {
+   "row": 261,
+   "id": "validation_Clinical_Medicine_22"
+  },
+  {
+   "row": 263,
+   "id": "validation_Clinical_Medicine_24"
+  },
+  {
+   "row": 267,
+   "id": "validation_Clinical_Medicine_28"
+  },
+  {
+   "row": 268,
+   "id": "validation_Clinical_Medicine_29"
+  },
+  {
+   "row": 270,
+   "id": "validation_Computer_Science_1"
+  },
+  {
+   "row": 271,
+   "id": "validation_Computer_Science_2"
+  },
+  {
+   "row": 272,
+   "id": "validation_Computer_Science_3"
+  },
+  {
+   "row": 275,
+   "id": "validation_Computer_Science_6"
+  },
+  {
+   "row": 277,
+   "id": "validation_Computer_Science_8"
+  },
+  {
+   "row": 278,
+   "id": "validation_Computer_Science_9"
+  },
+  {
+   "row": 281,
+   "id": "validation_Computer_Science_12"
+  },
+  {
+   "row": 282,
+   "id": "validation_Computer_Science_13"
+  },
+  {
+   "row": 284,
+   "id": "validation_Computer_Science_15"
+  },
+  {
+   "row": 285,
+   "id": "validation_Computer_Science_16"
+  },
+  {
+   "row": 286,
+   "id": "validation_Computer_Science_17"
+  },
+  {
+   "row": 287,
+   "id": "validation_Computer_Science_18"
+  },
+  {
+   "row": 289,
+   "id": "validation_Computer_Science_20"
+  },
+  {
+   "row": 290,
+   "id": "validation_Computer_Science_21"
+  },
+  {
+   "row": 293,
+   "id": "validation_Computer_Science_24"
+  },
+  {
+   "row": 297,
+   "id": "validation_Computer_Science_28"
+  },
+  {
+   "row": 298,
+   "id": "validation_Computer_Science_29"
+  },
+  {
+   "row": 303,
+   "id": "validation_Design_4"
+  },
+  {
+   "row": 304,
+   "id": "validation_Design_5"
+  },
+  {
+   "row": 310,
+   "id": "validation_Design_11"
+  },
+  {
+   "row": 311,
+   "id": "validation_Design_12"
+  },
+  {
+   "row": 314,
+   "id": "validation_Design_15"
+  },
+  {
+   "row": 316,
+   "id": "validation_Design_17"
+  },
+  {
+   "row": 317,
+   "id": "validation_Design_18"
+  },
+  {
+   "row": 318,
+   "id": "validation_Design_19"
+  },
+  {
+   "row": 321,
+   "id": "validation_Design_22"
+  },
+  {
+   "row": 322,
+   "id": "validation_Design_23"
+  },
+  {
+   "row": 323,
+   "id": "validation_Design_24"
+  },
+  {
+   "row": 324,
+   "id": "validation_Design_25"
+  },
+  {
+   "row": 325,
+   "id": "validation_Design_26"
+  },
+  {
+   "row": 326,
+   "id": "validation_Design_27"
+  },
+  {
+   "row": 327,
+   "id": "validation_Design_28"
+  },
+  {
+   "row": 328,
+   "id": "validation_Design_29"
+  },
+  {
+   "row": 329,
+   "id": "validation_Design_30"
+  },
+  {
+   "row": 330,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_1"
+  },
+  {
+   "row": 331,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_2"
+  },
+  {
+   "row": 334,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_5"
+  },
+  {
+   "row": 337,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_8"
+  },
+  {
+   "row": 338,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_9"
+  },
+  {
+   "row": 339,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_10"
+  },
+  {
+   "row": 340,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_11"
+  },
+  {
+   "row": 341,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_12"
+  },
+  {
+   "row": 343,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_14"
+  },
+  {
+   "row": 344,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_15"
+  },
+  {
+   "row": 345,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_16"
+  },
+  {
+   "row": 348,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_19"
+  },
+  {
+   "row": 349,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_20"
+  },
+  {
+   "row": 354,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_25"
+  },
+  {
+   "row": 356,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_27"
+  },
+  {
+   "row": 358,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_29"
+  },
+  {
+   "row": 359,
+   "id": "validation_Diagnostics_and_Laboratory_Medicine_30"
+  },
+  {
+   "row": 360,
+   "id": "validation_Economics_1"
+  },
+  {
+   "row": 361,
+   "id": "validation_Economics_2"
+  },
+  {
+   "row": 362,
+   "id": "validation_Economics_3"
+  },
+  {
+   "row": 363,
+   "id": "validation_Economics_4"
+  },
+  {
+   "row": 364,
+   "id": "validation_Economics_5"
+  },
+  {
+   "row": 366,
+   "id": "validation_Economics_7"
+  },
+  {
+   "row": 368,
+   "id": "validation_Economics_9"
+  },
+  {
+   "row": 369,
+   "id": "validation_Economics_10"
+  },
+  {
+   "row": 370,
+   "id": "validation_Economics_11"
+  },
+  {
+   "row": 372,
+   "id": "validation_Economics_13"
+  },
+  {
+   "row": 373,
+   "id": "validation_Economics_14"
+  },
+  {
+   "row": 377,
+   "id": "validation_Economics_18"
+  },
+  {
+   "row": 378,
+   "id": "validation_Economics_19"
+  },
+  {
+   "row": 380,
+   "id": "validation_Economics_21"
+  },
+  {
+   "row": 384,
+   "id": "validation_Economics_25"
+  },
+  {
+   "row": 388,
+   "id": "validation_Economics_29"
+  },
+  {
+   "row": 389,
+   "id": "validation_Economics_30"
+  },
+  {
+   "row": 391,
+   "id": "validation_Electronics_2"
+  },
+  {
+   "row": 392,
+   "id": "validation_Electronics_3"
+  },
+  {
+   "row": 393,
+   "id": "validation_Electronics_4"
+  },
+  {
+   "row": 396,
+   "id": "validation_Electronics_7"
+  },
+  {
+   "row": 399,
+   "id": "validation_Electronics_10"
+  },
+  {
+   "row": 400,
+   "id": "validation_Electronics_11"
+  },
+  {
+   "row": 402,
+   "id": "validation_Electronics_13"
+  },
+  {
+   "row": 403,
+   "id": "validation_Electronics_14"
+  },
+  {
+   "row": 404,
+   "id": "validation_Electronics_15"
+  },
+  {
+   "row": 405,
+   "id": "validation_Electronics_16"
+  },
+  {
+   "row": 406,
+   "id": "validation_Electronics_17"
+  },
+  {
+   "row": 408,
+   "id": "validation_Electronics_19"
+  },
+  {
+   "row": 409,
+   "id": "validation_Electronics_20"
+  },
+  {
+   "row": 411,
+   "id": "validation_Electronics_22"
+  },
+  {
+   "row": 412,
+   "id": "validation_Electronics_23"
+  },
+  {
+   "row": 416,
+   "id": "validation_Electronics_27"
+  },
+  {
+   "row": 418,
+   "id": "validation_Electronics_29"
+  },
+  {
+   "row": 420,
+   "id": "validation_Energy_and_Power_1"
+  },
+  {
+   "row": 423,
+   "id": "validation_Energy_and_Power_4"
+  },
+  {
+   "row": 424,
+   "id": "validation_Energy_and_Power_5"
+  },
+  {
+   "row": 425,
+   "id": "validation_Energy_and_Power_6"
+  },
+  {
+   "row": 427,
+   "id": "validation_Energy_and_Power_8"
+  },
+  {
+   "row": 429,
+   "id": "validation_Energy_and_Power_10"
+  },
+  {
+   "row": 430,
+   "id": "validation_Energy_and_Power_11"
+  },
+  {
+   "row": 433,
+   "id": "validation_Energy_and_Power_14"
+  },
+  {
+   "row": 436,
+   "id": "validation_Energy_and_Power_17"
+  },
+  {
+   "row": 437,
+   "id": "validation_Energy_and_Power_18"
+  },
+  {
+   "row": 438,
+   "id": "validation_Energy_and_Power_19"
+  },
+  {
+   "row": 439,
+   "id": "validation_Energy_and_Power_20"
+  },
+  {
+   "row": 441,
+   "id": "validation_Energy_and_Power_22"
+  },
+  {
+   "row": 442,
+   "id": "validation_Energy_and_Power_23"
+  },
+  {
+   "row": 446,
+   "id": "validation_Energy_and_Power_27"
+  },
+  {
+   "row": 447,
+   "id": "validation_Energy_and_Power_28"
+  },
+  {
+   "row": 449,
+   "id": "validation_Energy_and_Power_30"
+  },
+  {
+   "row": 454,
+   "id": "validation_Finance_5"
+  },
+  {
+   "row": 457,
+   "id": "validation_Finance_8"
+  },
+  {
+   "row": 459,
+   "id": "validation_Finance_10"
+  },
+  {
+   "row": 461,
+   "id": "validation_Finance_12"
+  },
+  {
+   "row": 462,
+   "id": "validation_Finance_13"
+  },
+  {
+   "row": 464,
+   "id": "validation_Finance_15"
+  },
+  {
+   "row": 465,
+   "id": "validation_Finance_16"
+  },
+  {
+   "row": 466,
+   "id": "validation_Finance_17"
+  },
+  {
+   "row": 468,
+   "id": "validation_Finance_19"
+  },
+  {
+   "row": 469,
+   "id": "validation_Finance_20"
+  },
+  {
+   "row": 470,
+   "id": "validation_Finance_21"
+  },
+  {
+   "row": 471,
+   "id": "validation_Finance_22"
+  },
+  {
+   "row": 472,
+   "id": "validation_Finance_23"
+  },
+  {
+   "row": 473,
+   "id": "validation_Finance_24"
+  },
+  {
+   "row": 474,
+   "id": "validation_Finance_25"
+  },
+  {
+   "row": 477,
+   "id": "validation_Finance_28"
+  },
+  {
+   "row": 478,
+   "id": "validation_Finance_29"
+  },
+  {
+   "row": 481,
+   "id": "validation_Geography_2"
+  },
+  {
+   "row": 482,
+   "id": "validation_Geography_3"
+  },
+  {
+   "row": 483,
+   "id": "validation_Geography_4"
+  },
+  {
+   "row": 484,
+   "id": "validation_Geography_5"
+  },
+  {
+   "row": 485,
+   "id": "validation_Geography_6"
+  },
+  {
+   "row": 486,
+   "id": "validation_Geography_7"
+  },
+  {
+   "row": 487,
+   "id": "validation_Geography_8"
+  },
+  {
+   "row": 492,
+   "id": "validation_Geography_13"
+  },
+  {
+   "row": 494,
+   "id": "validation_Geography_15"
+  },
+  {
+   "row": 495,
+   "id": "validation_Geography_16"
+  },
+  {
+   "row": 496,
+   "id": "validation_Geography_17"
+  },
+  {
+   "row": 497,
+   "id": "validation_Geography_18"
+  },
+  {
+   "row": 498,
+   "id": "validation_Geography_19"
+  },
+  {
+   "row": 501,
+   "id": "validation_Geography_22"
+  },
+  {
+   "row": 503,
+   "id": "validation_Geography_24"
+  },
+  {
+   "row": 506,
+   "id": "validation_Geography_27"
+  },
+  {
+   "row": 508,
+   "id": "validation_Geography_29"
+  },
+  {
+   "row": 511,
+   "id": "validation_History_2"
+  },
+  {
+   "row": 512,
+   "id": "validation_History_3"
+  },
+  {
+   "row": 513,
+   "id": "validation_History_4"
+  },
+  {
+   "row": 514,
+   "id": "validation_History_5"
+  },
+  {
+   "row": 516,
+   "id": "validation_History_7"
+  },
+  {
+   "row": 518,
+   "id": "validation_History_9"
+  },
+  {
+   "row": 520,
+   "id": "validation_History_11"
+  },
+  {
+   "row": 523,
+   "id": "validation_History_14"
+  },
+  {
+   "row": 524,
+   "id": "validation_History_15"
+  },
+  {
+   "row": 525,
+   "id": "validation_History_16"
+  },
+  {
+   "row": 526,
+   "id": "validation_History_17"
+  },
+  {
+   "row": 529,
+   "id": "validation_History_20"
+  },
+  {
+   "row": 530,
+   "id": "validation_History_21"
+  },
+  {
+   "row": 534,
+   "id": "validation_History_25"
+  },
+  {
+   "row": 537,
+   "id": "validation_History_28"
+  },
+  {
+   "row": 538,
+   "id": "validation_History_29"
+  },
+  {
+   "row": 539,
+   "id": "validation_History_30"
+  },
+  {
+   "row": 541,
+   "id": "validation_Literature_2"
+  },
+  {
+   "row": 542,
+   "id": "validation_Literature_3"
+  },
+  {
+   "row": 543,
+   "id": "validation_Literature_4"
+  },
+  {
+   "row": 546,
+   "id": "validation_Literature_7"
+  },
+  {
+   "row": 547,
+   "id": "validation_Literature_8"
+  },
+  {
+   "row": 548,
+   "id": "validation_Literature_9"
+  },
+  {
+   "row": 550,
+   "id": "validation_Literature_11"
+  },
+  {
+   "row": 553,
+   "id": "validation_Literature_14"
+  },
+  {
+   "row": 554,
+   "id": "validation_Literature_15"
+  },
+  {
+   "row": 557,
+   "id": "validation_Literature_18"
+  },
+  {
+   "row": 558,
+   "id": "validation_Literature_19"
+  },
+  {
+   "row": 560,
+   "id": "validation_Literature_21"
+  },
+  {
+   "row": 563,
+   "id": "validation_Literature_24"
+  },
+  {
+   "row": 565,
+   "id": "validation_Literature_26"
+  },
+  {
+   "row": 566,
+   "id": "validation_Literature_27"
+  },
+  {
+   "row": 567,
+   "id": "validation_Literature_28"
+  },
+  {
+   "row": 568,
+   "id": "validation_Literature_29"
+  },
+  {
+   "row": 571,
+   "id": "validation_Manage_2"
+  },
+  {
+   "row": 572,
+   "id": "validation_Manage_3"
+  },
+  {
+   "row": 575,
+   "id": "validation_Manage_6"
+  },
+  {
+   "row": 576,
+   "id": "validation_Manage_7"
+  },
+  {
+   "row": 578,
+   "id": "validation_Manage_9"
+  },
+  {
+   "row": 580,
+   "id": "validation_Manage_11"
+  },
+  {
+   "row": 583,
+   "id": "validation_Manage_14"
+  },
+  {
+   "row": 586,
+   "id": "validation_Manage_17"
+  },
+  {
+   "row": 587,
+   "id": "validation_Manage_18"
+  },
+  {
+   "row": 589,
+   "id": "validation_Manage_20"
+  },
+  {
+   "row": 590,
+   "id": "validation_Manage_21"
+  },
+  {
+   "row": 592,
+   "id": "validation_Manage_23"
+  },
+  {
+   "row": 593,
+   "id": "validation_Manage_24"
+  },
+  {
+   "row": 594,
+   "id": "validation_Manage_25"
+  },
+  {
+   "row": 597,
+   "id": "validation_Manage_28"
+  },
+  {
+   "row": 598,
+   "id": "validation_Manage_29"
+  },
+  {
+   "row": 599,
+   "id": "validation_Manage_30"
+  },
+  {
+   "row": 601,
+   "id": "validation_Marketing_2"
+  },
+  {
+   "row": 603,
+   "id": "validation_Marketing_4"
+  },
+  {
+   "row": 604,
+   "id": "validation_Marketing_5"
+  },
+  {
+   "row": 606,
+   "id": "validation_Marketing_7"
+  },
+  {
+   "row": 613,
+   "id": "validation_Marketing_14"
+  },
+  {
+   "row": 614,
+   "id": "validation_Marketing_15"
+  },
+  {
+   "row": 615,
+   "id": "validation_Marketing_16"
+  },
+  {
+   "row": 616,
+   "id": "validation_Marketing_17"
+  },
+  {
+   "row": 617,
+   "id": "validation_Marketing_18"
+  },
+  {
+   "row": 618,
+   "id": "validation_Marketing_19"
+  },
+  {
+   "row": 619,
+   "id": "validation_Marketing_20"
+  },
+  {
+   "row": 621,
+   "id": "validation_Marketing_22"
+  },
+  {
+   "row": 623,
+   "id": "validation_Marketing_24"
+  },
+  {
+   "row": 624,
+   "id": "validation_Marketing_25"
+  },
+  {
+   "row": 625,
+   "id": "validation_Marketing_26"
+  },
+  {
+   "row": 628,
+   "id": "validation_Marketing_29"
+  },
+  {
+   "row": 630,
+   "id": "validation_Materials_1"
+  },
+  {
+   "row": 632,
+   "id": "validation_Materials_3"
+  },
+  {
+   "row": 638,
+   "id": "validation_Materials_9"
+  },
+  {
+   "row": 640,
+   "id": "validation_Materials_11"
+  },
+  {
+   "row": 643,
+   "id": "validation_Materials_14"
+  },
+  {
+   "row": 644,
+   "id": "validation_Materials_15"
+  },
+  {
+   "row": 645,
+   "id": "validation_Materials_16"
+  },
+  {
+   "row": 646,
+   "id": "validation_Materials_17"
+  },
+  {
+   "row": 647,
+   "id": "validation_Materials_18"
+  },
+  {
+   "row": 648,
+   "id": "validation_Materials_19"
+  },
+  {
+   "row": 651,
+   "id": "validation_Materials_22"
+  },
+  {
+   "row": 652,
+   "id": "validation_Materials_23"
+  },
+  {
+   "row": 653,
+   "id": "validation_Materials_24"
+  },
+  {
+   "row": 655,
+   "id": "validation_Materials_26"
+  },
+  {
+   "row": 658,
+   "id": "validation_Materials_29"
+  },
+  {
+   "row": 659,
+   "id": "validation_Materials_30"
+  },
+  {
+   "row": 661,
+   "id": "validation_Math_2"
+  },
+  {
+   "row": 663,
+   "id": "validation_Math_4"
+  },
+  {
+   "row": 664,
+   "id": "validation_Math_5"
+  },
+  {
+   "row": 666,
+   "id": "validation_Math_7"
+  },
+  {
+   "row": 667,
+   "id": "validation_Math_8"
+  },
+  {
+   "row": 672,
+   "id": "validation_Math_13"
+  },
+  {
+   "row": 673,
+   "id": "validation_Math_14"
+  },
+  {
+   "row": 674,
+   "id": "validation_Math_15"
+  },
+  {
+   "row": 675,
+   "id": "validation_Math_16"
+  },
+  {
+   "row": 676,
+   "id": "validation_Math_17"
+  },
+  {
+   "row": 678,
+   "id": "validation_Math_19"
+  },
+  {
+   "row": 679,
+   "id": "validation_Math_20"
+  },
+  {
+   "row": 680,
+   "id": "validation_Math_21"
+  },
+  {
+   "row": 681,
+   "id": "validation_Math_22"
+  },
+  {
+   "row": 682,
+   "id": "validation_Math_23"
+  },
+  {
+   "row": 689,
+   "id": "validation_Math_30"
+  },
+  {
+   "row": 690,
+   "id": "validation_Mechanical_Engineering_1"
+  },
+  {
+   "row": 692,
+   "id": "validation_Mechanical_Engineering_3"
+  },
+  {
+   "row": 695,
+   "id": "validation_Mechanical_Engineering_6"
+  },
+  {
+   "row": 696,
+   "id": "validation_Mechanical_Engineering_7"
+  },
+  {
+   "row": 697,
+   "id": "validation_Mechanical_Engineering_8"
+  },
+  {
+   "row": 698,
+   "id": "validation_Mechanical_Engineering_9"
+  },
+  {
+   "row": 700,
+   "id": "validation_Mechanical_Engineering_11"
+  },
+  {
+   "row": 701,
+   "id": "validation_Mechanical_Engineering_12"
+  },
+  {
+   "row": 702,
+   "id": "validation_Mechanical_Engineering_13"
+  },
+  {
+   "row": 705,
+   "id": "validation_Mechanical_Engineering_16"
+  },
+  {
+   "row": 707,
+   "id": "validation_Mechanical_Engineering_18"
+  },
+  {
+   "row": 709,
+   "id": "validation_Mechanical_Engineering_20"
+  },
+  {
+   "row": 710,
+   "id": "validation_Mechanical_Engineering_21"
+  },
+  {
+   "row": 714,
+   "id": "validation_Mechanical_Engineering_25"
+  },
+  {
+   "row": 717,
+   "id": "validation_Mechanical_Engineering_28"
+  },
+  {
+   "row": 719,
+   "id": "validation_Mechanical_Engineering_30"
+  },
+  {
+   "row": 722,
+   "id": "validation_Music_3"
+  },
+  {
+   "row": 723,
+   "id": "validation_Music_4"
+  },
+  {
+   "row": 724,
+   "id": "validation_Music_5"
+  },
+  {
+   "row": 725,
+   "id": "validation_Music_6"
+  },
+  {
+   "row": 728,
+   "id": "validation_Music_9"
+  },
+  {
+   "row": 729,
+   "id": "validation_Music_10"
+  },
+  {
+   "row": 735,
+   "id": "validation_Music_16"
+  },
+  {
+   "row": 736,
+   "id": "validation_Music_17"
+  },
+  {
+   "row": 738,
+   "id": "validation_Music_19"
+  },
+  {
+   "row": 742,
+   "id": "validation_Music_23"
+  },
+  {
+   "row": 744,
+   "id": "validation_Music_25"
+  },
+  {
+   "row": 745,
+   "id": "validation_Music_26"
+  },
+  {
+   "row": 746,
+   "id": "validation_Music_27"
+  },
+  {
+   "row": 747,
+   "id": "validation_Music_28"
+  },
+  {
+   "row": 748,
+   "id": "validation_Music_29"
+  },
+  {
+   "row": 749,
+   "id": "validation_Music_30"
+  },
+  {
+   "row": 750,
+   "id": "validation_Pharmacy_1"
+  },
+  {
+   "row": 751,
+   "id": "validation_Pharmacy_2"
+  },
+  {
+   "row": 754,
+   "id": "validation_Pharmacy_5"
+  },
+  {
+   "row": 756,
+   "id": "validation_Pharmacy_7"
+  },
+  {
+   "row": 757,
+   "id": "validation_Pharmacy_8"
+  },
+  {
+   "row": 759,
+   "id": "validation_Pharmacy_10"
+  },
+  {
+   "row": 760,
+   "id": "validation_Pharmacy_11"
+  },
+  {
+   "row": 761,
+   "id": "validation_Pharmacy_12"
+  },
+  {
+   "row": 762,
+   "id": "validation_Pharmacy_13"
+  },
+  {
+   "row": 764,
+   "id": "validation_Pharmacy_15"
+  },
+  {
+   "row": 773,
+   "id": "validation_Pharmacy_24"
+  },
+  {
+   "row": 774,
+   "id": "validation_Pharmacy_25"
+  },
+  {
+   "row": 775,
+   "id": "validation_Pharmacy_26"
+  },
+  {
+   "row": 776,
+   "id": "validation_Pharmacy_27"
+  },
+  {
+   "row": 778,
+   "id": "validation_Pharmacy_29"
+  },
+  {
+   "row": 779,
+   "id": "validation_Pharmacy_30"
+  },
+  {
+   "row": 780,
+   "id": "validation_Physics_1"
+  },
+  {
+   "row": 783,
+   "id": "validation_Physics_4"
+  },
+  {
+   "row": 785,
+   "id": "validation_Physics_6"
+  },
+  {
+   "row": 790,
+   "id": "validation_Physics_11"
+  },
+  {
+   "row": 791,
+   "id": "validation_Physics_12"
+  },
+  {
+   "row": 795,
+   "id": "validation_Physics_16"
+  },
+  {
+   "row": 796,
+   "id": "validation_Physics_17"
+  },
+  {
+   "row": 798,
+   "id": "validation_Physics_19"
+  },
+  {
+   "row": 800,
+   "id": "validation_Physics_21"
+  },
+  {
+   "row": 801,
+   "id": "validation_Physics_22"
+  },
+  {
+   "row": 802,
+   "id": "validation_Physics_23"
+  },
+  {
+   "row": 803,
+   "id": "validation_Physics_24"
+  },
+  {
+   "row": 804,
+   "id": "validation_Physics_25"
+  },
+  {
+   "row": 806,
+   "id": "validation_Physics_27"
+  },
+  {
+   "row": 807,
+   "id": "validation_Physics_28"
+  },
+  {
+   "row": 808,
+   "id": "validation_Physics_29"
+  },
+  {
+   "row": 810,
+   "id": "validation_Psychology_1"
+  },
+  {
+   "row": 811,
+   "id": "validation_Psychology_2"
+  },
+  {
+   "row": 812,
+   "id": "validation_Psychology_3"
+  },
+  {
+   "row": 815,
+   "id": "validation_Psychology_6"
+  },
+  {
+   "row": 816,
+   "id": "validation_Psychology_7"
+  },
+  {
+   "row": 817,
+   "id": "validation_Psychology_8"
+  },
+  {
+   "row": 818,
+   "id": "validation_Psychology_9"
+  },
+  {
+   "row": 819,
+   "id": "validation_Psychology_10"
+  },
+  {
+   "row": 820,
+   "id": "validation_Psychology_11"
+  },
+  {
+   "row": 821,
+   "id": "validation_Psychology_12"
+  },
+  {
+   "row": 824,
+   "id": "validation_Psychology_15"
+  },
+  {
+   "row": 832,
+   "id": "validation_Psychology_23"
+  },
+  {
+   "row": 835,
+   "id": "validation_Psychology_26"
+  },
+  {
+   "row": 837,
+   "id": "validation_Psychology_28"
+  },
+  {
+   "row": 838,
+   "id": "validation_Psychology_29"
+  },
+  {
+   "row": 839,
+   "id": "validation_Psychology_30"
+  },
+  {
+   "row": 840,
+   "id": "validation_Public_Health_1"
+  },
+  {
+   "row": 842,
+   "id": "validation_Public_Health_3"
+  },
+  {
+   "row": 843,
+   "id": "validation_Public_Health_4"
+  },
+  {
+   "row": 844,
+   "id": "validation_Public_Health_5"
+  },
+  {
+   "row": 848,
+   "id": "validation_Public_Health_9"
+  },
+  {
+   "row": 849,
+   "id": "validation_Public_Health_10"
+  },
+  {
+   "row": 850,
+   "id": "validation_Public_Health_11"
+  },
+  {
+   "row": 852,
+   "id": "validation_Public_Health_13"
+  },
+  {
+   "row": 853,
+   "id": "validation_Public_Health_14"
+  },
+  {
+   "row": 854,
+   "id": "validation_Public_Health_15"
+  },
+  {
+   "row": 855,
+   "id": "validation_Public_Health_16"
+  },
+  {
+   "row": 860,
+   "id": "validation_Public_Health_21"
+  },
+  {
+   "row": 862,
+   "id": "validation_Public_Health_23"
+  },
+  {
+   "row": 864,
+   "id": "validation_Public_Health_25"
+  },
+  {
+   "row": 865,
+   "id": "validation_Public_Health_26"
+  },
+  {
+   "row": 867,
+   "id": "validation_Public_Health_28"
+  },
+  {
+   "row": 870,
+   "id": "validation_Sociology_1"
+  },
+  {
+   "row": 872,
+   "id": "validation_Sociology_3"
+  },
+  {
+   "row": 873,
+   "id": "validation_Sociology_4"
+  },
+  {
+   "row": 874,
+   "id": "validation_Sociology_5"
+  },
+  {
+   "row": 875,
+   "id": "validation_Sociology_6"
+  },
+  {
+   "row": 878,
+   "id": "validation_Sociology_9"
+  },
+  {
+   "row": 879,
+   "id": "validation_Sociology_10"
+  },
+  {
+   "row": 883,
+   "id": "validation_Sociology_14"
+  },
+  {
+   "row": 885,
+   "id": "validation_Sociology_16"
+  },
+  {
+   "row": 886,
+   "id": "validation_Sociology_17"
+  },
+  {
+   "row": 888,
+   "id": "validation_Sociology_19"
+  },
+  {
+   "row": 890,
+   "id": "validation_Sociology_21"
+  },
+  {
+   "row": 891,
+   "id": "validation_Sociology_22"
+  },
+  {
+   "row": 895,
+   "id": "validation_Sociology_26"
+  },
+  {
+   "row": 898,
+   "id": "validation_Sociology_29"
+  },
+  {
+   "row": 899,
+   "id": "validation_Sociology_30"
+  }
+ ]
+}
