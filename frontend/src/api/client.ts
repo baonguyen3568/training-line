@@ -99,7 +99,8 @@ export const httpApi: Api = {
   runs: () => request("GET", "/api/runs"),
   run: (id) => request("GET", `/api/runs/${encodeURIComponent(id)}`),
   runMetrics: (id, q) => {
-    const qs = new URLSearchParams({ after: String(q.after), limit: String(q.limit) });
+    const qs = new URLSearchParams({ limit: String(q.limit) });
+    if (q.after) qs.set("after", q.after);
     if (q.downsample_to) qs.set("downsample_to", String(q.downsample_to));
     return request("GET", `/api/runs/${encodeURIComponent(id)}/metrics?${qs}`);
   },

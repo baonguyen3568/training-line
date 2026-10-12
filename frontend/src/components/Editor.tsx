@@ -86,6 +86,7 @@ function EditorInner() {
         ports,
         issues: validation?.errors.filter((e) => e.node_id === n.id) ?? [],
         step: steps.get(n.id) ?? 0,
+        params: n.params,
       },
     }));
   }, [workflow, specs, ports, validation, selectedId]);

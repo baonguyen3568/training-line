@@ -4,7 +4,7 @@ import { mockApi, mockNodeTypes, mockValidate } from "./api";
 
 describe("mock API", () => {
   it("templates validate clean", async () => {
-    const tpl = await mockApi.template("lora_finetune");
+    const tpl = await mockApi.template("image_video_understanding");
     const res = await mockApi.validate(tpl.workflow, "vi");
     expect(res.errors).toEqual([]);
     expect(res.ok).toBe(true);

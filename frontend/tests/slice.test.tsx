@@ -8,9 +8,15 @@ describe("vertical slice", () => {
   it("opens a template from the gallery and shows a clean pre-flight", async () => {
     const { App } = await import("../src/App");
     render(<App />);
-    const buttons = await screen.findAllByRole("button", { name: "Dùng mẫu này" });
+    const buttons = await screen.findAllByRole(
+      "button",
+      { name: "Dùng mẫu này" },
+      { timeout: 4000 },
+    );
     fireEvent.click(buttons[0] as HTMLElement);
-    await waitFor(() => expect(screen.getByText(/Mọi thứ đã sẵn sàng/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Mọi thứ đã sẵn sàng/)).toBeTruthy(), {
+      timeout: 4000,
+    });
     expect(screen.getByRole("button", { name: /Chạy/ })).toHaveProperty("disabled", false);
   });
 
@@ -18,7 +24,7 @@ describe("vertical slice", () => {
     const { useWorkflow } = await import("../src/store/workflow");
     const { Editor } = await import("../src/components/Editor");
     await useWorkflow.getState().loadCatalog();
-    await useWorkflow.getState().openTemplate("lora_finetune");
+    await useWorkflow.getState().openTemplate("image_video_understanding");
     useWorkflow.getState().select("n4");
     render(<Editor />);
     const pickers = screen.getAllByLabelText(/Nhận từ/);

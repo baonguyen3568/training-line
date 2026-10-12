@@ -37,6 +37,8 @@ describe("RunMonitor paging", () => {
     const run = {
       schema_version: 1,
       run_id: "big",
+      name: "big run",
+      stage: "train" as const,
       task: "sft",
       status: "completed" as const,
       started_at: 0,
@@ -44,18 +46,19 @@ describe("RunMonitor paging", () => {
     vi.spyOn(api, "run").mockResolvedValue(run);
     const calls: number[] = [];
     vi.spyOn(api, "runMetrics").mockImplementation(async (_id, q) => {
-      calls.push(q.after);
-      const n = Math.min(q.limit, total - q.after);
+      const from = Number(q.after ?? 0);
+      calls.push(from);
+      const n = Math.min(q.limit, total - from);
       const points = Array.from({ length: n }, (_, i) => ({
         schema_version: 1,
-        ts: q.after + i,
-        step: q.after + i,
-        loss: 1 / (q.after + i + 1),
+        ts: from + i,
+        step: from + i,
+        loss: 1 / (from + i + 1),
       }));
       return {
         points,
-        next_cursor: q.after + n,
-        has_more: q.after + n < total,
+        next_cursor: String(from + n),
+        has_more: from + n < total,
         downsampled: false,
       };
     });

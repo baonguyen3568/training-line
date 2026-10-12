@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import type { TemplateMeta } from "../api/types";
-import { t, tp } from "../i18n";
+import { t, tp, tpOptional } from "../i18n";
 import { formatEstimate } from "../lib/format";
+
+/** One "no measurement yet" instead of repeating it per field (design review r4). */
+function estimateLine(it: TemplateMeta): string {
+  const e = it.estimate;
+  if (e.source === "unknown" || (!e.minutes && !e.ram_gb))
+    return `⏱ ${t("estimate.source.unknown")}`;
+  return `⏱ ${formatEstimate(e.minutes, "minutes", e.source)} · ${formatEstimate(e.ram_gb, "ram_gb", e.source)}`;
+}
 
 type Filter = "all" | "finetune" | "quantize" | "eval";
 const FILTERS: Filter[] = ["all", "finetune", "quantize", "eval"];
@@ -62,13 +70,19 @@ export function Gallery({ onOpen }: { onOpen: (id: string) => void }) {
           <li key={it.id} className="card">
             <h2>{tp(it.title_key.split("."))}</h2>
             <p>{tp(it.description_key.split("."))}</p>
-            <p className="meta">
-              ⏱ {formatEstimate(it.estimate.minutes, "minutes", it.estimate.source)} ·{" "}
-              {formatEstimate(it.estimate.ram_gb, "ram_gb", it.estimate.source)}
-            </p>
+            {tpOptional(["template", it.id, "built_on"]) && (
+              <p className="meta">{tpOptional(["template", it.id, "built_on"])}</p>
+            )}
+            <p className="meta">{estimateLine(it)}</p>
             <p className="meta">
               ● {t(`gallery.level_${it.difficulty}`)}
               {it.sample_data && <> · {t("gallery.sample_data_included")} ✓</>}
+              {it.requires_hf_account && (
+                <span className="chip needs-account">
+                  {" "}
+                  🔑 {tp(["template", it.id, "needs_account"])}
+                </span>
+              )}
             </p>
             <button type="button" className="primary" onClick={() => onOpen(it.id)}>
               {t("gallery.use_template")}

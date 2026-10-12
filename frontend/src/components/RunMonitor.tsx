@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
-import type { RunInfo } from "../api/types";
+import type { RunInfo, RunStatus } from "../api/types";
 import { t } from "../i18n";
 import {
   ema,
@@ -23,7 +23,7 @@ const STALE_S = 120;
 
 const fmt = formatNumber;
 
-const STATUS_ICON: Record<RunInfo["status"], string> = {
+const STATUS_ICON: Record<RunStatus, string> = {
   queued: "⧗",
   running: "◐",
   completed: "✓",
@@ -44,7 +44,7 @@ export function RunMonitor({ runId }: { runId: string }) {
 
   useEffect(() => {
     let alive = true;
-    let cursor = 0;
+    let cursor: string | undefined;
     let first = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
@@ -56,7 +56,7 @@ export function RunMonitor({ runId }: { runId: string }) {
         let more = true;
         while (more && alive) {
           const page = await api.runMetrics(runId, {
-            after: cursor,
+            ...(cursor ? { after: cursor } : {}),
             limit: PAGE_ROWS,
             ...(first ? { downsample_to: MAX_POINTS } : {}),
           });
@@ -68,8 +68,8 @@ export function RunMonitor({ runId }: { runId: string }) {
         setNow(Date.now() / 1000);
         setError(false);
         // Tail only while the run is live or waiting.
-        if (alive && (info.status === "running" || info.status === "queued"))
-          timer = setTimeout(tick, POLL_MS);
+        const st = info.status ?? "running";
+        if (alive && (st === "running" || st === "queued")) timer = setTimeout(tick, POLL_MS);
       } catch {
         if (alive) {
           setError(true);
@@ -136,7 +136,8 @@ export function RunMonitor({ runId }: { runId: string }) {
   ];
 
   const last = train.at(-1);
-  const stale = run?.status === "running" && last !== undefined && now - last.ts > STALE_S;
+  const stale =
+    (run?.status ?? "running") === "running" && last !== undefined && now - last.ts > STALE_S;
   const tpsMedian = median(view.tps.filter((v): v is number => v !== null));
   const memPeak = view.mem.reduce<number | null>(
     (m, v) => (v !== null && (m === null || v > m) ? v : m),
@@ -145,13 +146,14 @@ export function RunMonitor({ runId }: { runId: string }) {
 
   if (error && !run) return <p role="alert">{t("app.catalog_load_failed")}</p>;
   if (!run) return <div className="skeleton-grid" aria-busy="true" />;
+  const status: RunStatus = run.status ?? "running"; // schema default
 
   return (
     <main className="run-monitor">
       <header className="run-head">
         <h1>{run.name ?? run.run_id}</h1>
-        <span className={`chip status-${run.status}`}>
-          {STATUS_ICON[run.status]} {t(`run_monitor.status.${run.status}`)}
+        <span className={`chip status-${status}`}>
+          {STATUS_ICON[status]} {t(`run_monitor.status.${status}`)}
         </span>
         {stale && (
           <span className="state warn">

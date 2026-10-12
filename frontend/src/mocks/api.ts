@@ -86,7 +86,13 @@ export const mockNodeTypes: NodeSpec[] = [
       properties: {
         repo: {
           type: "string",
-          enum: ["nvidia/NVIDIA-Nemotron-Parse-v1.1", "Qwen/Qwen3.5-0.8B", "Qwen/Qwen3.5-2B"],
+          enum: [
+            "nvidia/NVIDIA-Nemotron-Parse-v1.1",
+            "nvidia/Cosmos-Reason2-2B",
+            "Qwen/Qwen3.5-0.8B",
+            "Qwen/Qwen3.5-2B",
+          ],
+          "x-ui": { summary: true },
           default: "Qwen/Qwen3.5-0.8B",
         },
       },
@@ -100,7 +106,9 @@ export const mockNodeTypes: NodeSpec[] = [
     outputs: { dataset: { type: "Dataset" } },
     params_schema: {
       type: "object",
-      properties: { path: { type: "string", default: "data/sample-invoices" } },
+      properties: {
+        path: { type: "string", default: "data/sample-invoices", "x-ui": { summary: true } },
+      },
       required: ["path"],
     },
   }),
@@ -214,7 +222,7 @@ export const mockNodeTypes: NodeSpec[] = [
       properties: {
         groups: {
           type: "array",
-          enum: ["documents", "charts", "reasoning", "math"],
+          enum: ["documents", "charts", "reasoning", "perception", "math", "video"],
           default: ["documents"],
           "x-ui": { option_keys: "benchmark_group" },
         },
@@ -295,35 +303,37 @@ const templates: Template[] = [
     },
   },
   {
-    id: "lora_finetune",
-    title_key: "template.lora_finetune.title",
-    description_key: "template.lora_finetune.desc",
+    // Template 2 (ADR-001 amendment 1): Cosmos-Reason2-2B is gated → HF account chip + wizard. Not measured yet.
+    id: "image_video_understanding",
+    title_key: "template.image_video_understanding.title",
+    description_key: "template.image_video_understanding.desc",
     difficulty: "basic",
     tags: ["finetune"],
-    sample_data: true,
+    sample_data: false,
+    requires_hf_account: true,
     estimate: {
-      ram_gb: { lo: 18, hi: 26 },
-      disk_gb: { lo: 4, hi: 8 },
-      minutes: { lo: 20, hi: 45 },
+      ram_gb: null,
+      disk_gb: null,
+      minutes: null,
       gpu_exclusive: true,
-      source: "formula",
+      source: "unknown",
     },
     workflow: {
       format: "vlm-workflow",
       schema_version: 1,
-      name: "lora_finetune",
+      name: "image_video_understanding",
       nodes: [
         {
           id: "n1",
           type: "model.hf_pick",
           version: "1.0.0",
-          params: { repo: "Qwen/Qwen3.5-0.8B" },
+          params: { repo: "nvidia/Cosmos-Reason2-2B" },
         },
         {
           id: "n2",
           type: "data.local_folder",
           version: "1.0.0",
-          params: { path: "data/sample-invoices" },
+          params: { path: "data/my-images" },
         },
         { id: "n3", type: "data.split", version: "1.0.0", params: { val_fraction: 0.1 } },
         {
@@ -333,7 +343,7 @@ const templates: Template[] = [
           params: { preset: "balanced", epochs: 2 },
         },
         { id: "n5", type: "train.merge_lora", version: "1.0.0", params: {} },
-        { id: "n6", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["documents"] } },
+        { id: "n6", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["perception"] } },
       ],
       edges: [
         { from: ["n2", "dataset"], to: ["n3", "dataset"] },
@@ -445,15 +455,17 @@ export function mockValidate(
     }
   }
   const heavy = workflow.nodes.some((n) => byType.get(n.type)?.runner === "container");
+  // Never invent numbers: reuse the template's own estimate (unknown until measured), else unknown.
+  const est = templates.find((x) => x.id === workflow.name)?.estimate;
   return {
     ok: !errors.some((e) => e.severity === "error"),
     errors,
     estimate: {
-      ram_gb_peak: heavy ? { lo: 18, hi: 26 } : null,
-      disk_gb: heavy ? { lo: 4, hi: 8 } : null,
-      duration_min: heavy ? { lo: 20, hi: 45 } : null,
+      ram_gb_peak: est?.ram_gb ?? null,
+      disk_gb: est?.disk_gb ?? null,
+      duration_min: est?.minutes ?? null,
       gpu_exclusive: heavy,
-      source: heavy ? "formula" : "unknown",
+      source: est?.source ?? "unknown",
     },
   };
 }
@@ -485,11 +497,12 @@ export const mockApi: Api = {
   runMetrics: (id, q) => {
     if (id !== s3aRun.run_id) return Promise.reject(new Error(`run ${id} not found`));
     const { points } = parseJsonl(s3aMetrics);
-    const page = points.slice(q.after, q.after + q.limit);
-    const next = q.after + page.length;
+    const from = Number(q.after ?? 0);
+    const page = points.slice(from, from + q.limit);
+    const next = from + page.length;
     return delay({
       points: page,
-      next_cursor: next,
+      next_cursor: String(next),
       has_more: next < points.length,
       downsampled: false,
     });

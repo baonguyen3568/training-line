@@ -2,7 +2,9 @@ import { useState } from "react";
 import type { NodeSpec, ParamSchema, PortType, Workflow } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { nodeDesc, nodeTitle } from "../lib/nodeText";
+import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
+import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 
 interface SourceOption {
@@ -134,10 +136,24 @@ function ParamField({
   );
 }
 
+type FieldProps = Parameters<typeof ParamField>[0];
+
+/** Field + its plain-language help line (node.<type>.param.<name>.help). */
+function ParamRow(props: FieldProps) {
+  const help = tpOptional(["node", props.nodeType, "param", props.name, "help"]);
+  return (
+    <div className="param-row">
+      <ParamField {...props} />
+      {help && <p className="help">{help}</p>}
+    </div>
+  );
+}
+
 export function Inspector() {
   const { workflow, specs, ports, selectedId } = useWorkflow();
   const { setParam, connect, disconnect } = useWorkflow.getState();
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const mode = useUi((s) => s.mode);
+  const [expanded, setExpanded] = useState(false);
   const node = workflow?.nodes.find((n) => n.id === selectedId);
   if (!workflow || !node) {
     return <aside className="inspector muted">{t("inspector.empty_hint")}</aside>;
@@ -150,11 +166,27 @@ export function Inspector() {
   );
   const simple = params.filter(([, s]) => !s["x-ui"]?.advanced);
   const advanced = params.filter(([, s]) => s["x-ui"]?.advanced);
+  // Advanced mode: everything visible + technical id. Simple: advanced params behind a per-node toggle,
+  // but changes made there stay visible as a badge (P010 §10 — no hidden changes).
+  const showAdvanced = mode === "advanced" || expanded;
+  const customized = customizedAdvanced(spec, node.params);
 
   return (
     <aside className="inspector" aria-label={nodeTitle(spec, node.type)}>
       <h2>{nodeTitle(spec, node.type)}</h2>
       <p className="muted">{nodeDesc(spec, node.type)}</p>
+      {mode === "advanced" && (
+        <p className="small">
+          <code>
+            {node.type}@{spec.version}
+          </code>
+        </p>
+      )}
+      {mode === "simple" && customized.length > 0 && (
+        <p className="badge customized">
+          ⚙ {t("canvas.customized", { param_count: customized.length })}
+        </p>
+      )}
 
       {Object.entries(spec.inputs).map(([port, ps]) => {
         const edge = workflow.edges.find((e) => e.to[0] === node.id && e.to[1] === port);
@@ -189,7 +221,7 @@ export function Inspector() {
       })}
 
       {simple.map(([name, schema]) => (
-        <ParamField
+        <ParamRow
           key={name}
           nodeType={node.type}
           name={name}
@@ -198,19 +230,19 @@ export function Inspector() {
           onChange={(v) => setParam(node.id, name, v)}
         />
       ))}
-      {advanced.length > 0 && (
+      {advanced.length > 0 && mode === "simple" && (
         <button
           type="button"
           className="link"
           aria-expanded={showAdvanced}
-          onClick={() => setShowAdvanced((s) => !s)}
+          onClick={() => setExpanded((s) => !s)}
         >
           ▸ {t("canvas.show_advanced", { param_count: advanced.length })}
         </button>
       )}
       {showAdvanced &&
         advanced.map(([name, schema]) => (
-          <ParamField
+          <ParamRow
             key={name}
             nodeType={node.type}
             name={name}

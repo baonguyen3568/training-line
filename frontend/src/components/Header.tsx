@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { SystemStatus } from "../api/types";
 import { t } from "../i18n";
+import { type Mode, useUi } from "../store/ui";
 
 const POLL_MS = 10_000;
 
@@ -9,6 +10,7 @@ export type Nav = "home" | "runs";
 
 export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; active: Nav }) {
   const [sys, setSys] = useState<SystemStatus | null>(null);
+  const { mode, setMode } = useUi();
 
   useEffect(() => {
     let alive = true;
@@ -60,6 +62,19 @@ export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; 
           {t("app.nav_runs")}
         </button>
       </nav>
+      <div className="segmented mode-toggle">
+        {(["simple", "advanced"] as Mode[]).map((m) => (
+          <button
+            key={m}
+            type="button"
+            aria-pressed={mode === m}
+            className={mode === m ? "on" : ""}
+            onClick={() => setMode(m)}
+          >
+            {t(`app.mode_${m}`)}
+          </button>
+        ))}
+      </div>
       <div className="header-status">
         <span className={`chip gpu-${gpuState}`} title={gpuText}>
           {gpuText}

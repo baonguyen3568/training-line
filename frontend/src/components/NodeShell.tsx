@@ -3,8 +3,10 @@ import { memo } from "react";
 import type { NodeSpec, PortType, ValidationIssue } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { nodeTitle } from "../lib/nodeText";
+import { customizedAdvanced } from "../lib/params";
 import { tokenVar } from "../lib/ports";
-import { identifierView } from "../lib/safeText";
+import { identifierView, untrustedText } from "../lib/safeText";
+import { useUi } from "../store/ui";
 
 export interface ShellData extends Record<string, unknown> {
   typeId: string;
@@ -12,6 +14,7 @@ export interface ShellData extends Record<string, unknown> {
   ports: PortType[];
   issues: ValidationIssue[];
   step: number;
+  params: Record<string, unknown>;
 }
 export type ShellNode = Node<ShellData, "vlm">;
 
@@ -41,7 +44,17 @@ function ThirdPartyBadge({ spec }: { spec: NodeSpec }) {
 }
 
 function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
-  const { spec, ports, issues, typeId, step } = data;
+  const { spec, ports, issues, typeId, step, params } = data;
+  const mode = useUi((s) => s.mode);
+  const customized = mode === "simple" ? customizedAdvanced(spec, params) : [];
+  // Key choices on the node face (x-ui.summary), e.g. the chosen model/dataset; repo ids shortened to the name.
+  const summary = Object.entries(spec?.params_schema.properties ?? {})
+    .filter(([, s]) => s["x-ui"]?.summary)
+    .map(([name, s]) => String(params[name] ?? s.default ?? ""))
+    .filter(Boolean)
+    .map((v) =>
+      spec?.origin.kind === "third_party" ? untrustedText(v, 40) : (v.split("/").pop() ?? v),
+    );
   const errors = issues.filter((i) => i.severity === "error");
   const warns = issues.filter((i) => i.severity === "warn");
   const thirdParty = spec?.origin.kind === "third_party";
@@ -77,6 +90,7 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
         </span>
       </div>
       {thirdParty && <ThirdPartyBadge spec={spec} />}
+      {summary.length > 0 && <div className="node-summary">{summary.join(" · ")}</div>}
       {spec.policy_block && (
         <span className="badge blocked">⛔ {t("custom_node.badge.policy_block")}</span>
       )}
@@ -121,6 +135,11 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
             {t(`custom_node.badge_perm.${p.id}`)}
           </span>
         ))}
+        {customized.length > 0 && (
+          <span className="state customized">
+            ⚙ {t("canvas.customized", { param_count: customized.length })}
+          </span>
+        )}
         {errors.length > 0 && (
           <span className="state failed">
             ✕ {t("node_state.failed")} ({errors.length})

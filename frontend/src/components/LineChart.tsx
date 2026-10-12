@@ -88,13 +88,16 @@ export function LineChart({
                 ? { range: (_u, _min, max) => [0, max > 0 ? max * 1.1 : 1] }
                 : {},
           },
+          // Tick labels go through formatNumber so lr 1e-4 never renders as "0" (design review r3/r4 M1).
           axes: [
-            { ...axis, label: xLabel },
-            { ...axis, size: 60 },
+            { ...axis, label: xLabel, values: (_u, ticks) => ticks.map((v) => formatNumber(v)) },
+            { ...axis, size: 64, values: (_u, ticks) => ticks.map((v) => formatNumber(v)) },
           ],
           cursor: syncKey ? { sync: { key: syncKey } } : {},
           legend: { show: series.length > 1, live: true },
           plugins: [markerPlugin],
+          // Show the latest values in the legend before any hover (no "--"), once the plot is ready.
+          hooks: { ready: [(u) => u.setLegend({ idx: x.length - 1 })] },
           series: [
             { label: xLabel },
             ...series.map((s) => ({
@@ -111,7 +114,6 @@ export function LineChart({
         [x, ...series.map((s) => s.values)] as uPlot.AlignedData,
         el,
       );
-      plot.setLegend({ idx: x.length - 1 });
     };
     build();
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");

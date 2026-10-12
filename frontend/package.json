@@ -15,8 +15,10 @@
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run tokens && node scripts/check-run-status.mjs && biome ci . && tsc --noEmit && vitest run",
-    "licenses": "node scripts/list-licenses.mjs"
+    "check": "npm run tokens && npm run schemas:check && biome ci . && tsc --noEmit && vitest run",
+    "licenses": "node scripts/list-licenses.mjs",
+    "schemas": "node scripts/gen-schema-types.mjs",
+    "schemas:check": "npm run schemas && git ls-files --error-unmatch src/generated/schemas.ts >/dev/null && test -z \"$(git status --porcelain -- src/generated/schemas.ts)\" || (echo 'schemas.ts drift: regenerate and commit src/generated/schemas.ts' && exit 1)"
   },
   "dependencies": {
     "@dagrejs/dagre": "3.1.1",
