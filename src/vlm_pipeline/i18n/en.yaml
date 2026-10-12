@@ -428,6 +428,12 @@ node:
   data.hf_load:
     title: Hugging Face dataset
     desc: Use a dataset published on Hugging Face.
+    port:
+      dataset: Data
+    param:
+      repo:
+        label: Dataset
+        help: A dataset on Hugging Face that has been license-checked.
   data.local_folder:
     title: Image folder + Q&A
     desc: Use your own images and questions/answers from the project folder.
@@ -475,6 +481,18 @@ node:
   train.sft_vlm:
     title: Full fine-tune
     desc: Retrain the whole model. Needs more memory and time than LoRA.
+    port:
+      base_model: Base model
+      train_data: Training data
+      val_data: Validation data (optional)
+      model: Complete model
+    param:
+      epochs:
+        label: Training rounds
+        help: How many times the model goes through all data. Too many can cause memorizing.
+      learning_rate:
+        label: Learning rate
+        help: Too high can break the model; keep the default.
   train.grpo_vlm:
     title: Learn from feedback (GRPO)
     desc: Improve the model by scoring its answers. For advanced users.
@@ -623,10 +641,11 @@ run_monitor:
     tps: Speed (tokens/s)
     mem: Job memory (GB)
   status:
+    queued: Queued
     running: Running
     completed: Completed
     failed: Failed
-    killed: Cancelled
+    cancelled: Cancelled
     interrupted: Paused
     evicted: Stopped to free memory
     discarded: Discarded

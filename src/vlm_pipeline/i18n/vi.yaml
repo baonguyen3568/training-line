@@ -428,6 +428,12 @@ node:
   data.hf_load:
     title: Dataset Hugging Face
     desc: Lấy bộ dữ liệu có sẵn trên Hugging Face.
+    port:
+      dataset: Dữ liệu
+    param:
+      repo:
+        label: Bộ dữ liệu
+        help: Bộ dữ liệu có sẵn trên Hugging Face, đã được kiểm tra giấy phép.
   data.local_folder:
     title: Thư mục ảnh + câu hỏi/đáp án
     desc: Dùng ảnh và câu hỏi/đáp án của bạn trong thư mục dự án.
@@ -475,6 +481,18 @@ node:
   train.sft_vlm:
     title: Fine-tune toàn bộ
     desc: Dạy lại toàn bộ model. Tốn nhiều bộ nhớ và thời gian hơn LoRA.
+    port:
+      base_model: Model gốc
+      train_data: Dữ liệu học
+      val_data: Dữ liệu kiểm tra (tuỳ chọn)
+      model: Model hoàn chỉnh
+    param:
+      epochs:
+        label: Số vòng học
+        help: Số lần model đọc hết dữ liệu. Nhiều vòng quá dễ học vẹt.
+      learning_rate:
+        label: Tốc độ học (learning rate)
+        help: Cao quá dễ làm hỏng model; nên giữ mặc định.
   train.grpo_vlm:
     title: Học từ phản hồi (GRPO)
     desc: Cải thiện model bằng cách chấm điểm các câu trả lời. Dành cho người dùng nâng cao.
@@ -623,10 +641,11 @@ run_monitor:
     tps: Tốc độ (token/giây)
     mem: Bộ nhớ của job (GB)
   status:
+    queued: Đang chờ
     running: Đang chạy
     completed: Xong
     failed: Lỗi
-    killed: Đã huỷ
+    cancelled: Đã huỷ
     interrupted: Tạm dừng
     evicted: Bị dừng để nhường bộ nhớ
     discarded: Đã bỏ
