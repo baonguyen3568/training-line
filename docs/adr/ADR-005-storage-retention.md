@@ -16,6 +16,7 @@ Chấp nhận toàn bộ D1–D8 của Proposal 005 v3. Tóm tắt:
 - Ngưỡng bộ nhớ (dùng chung với Proposal 007, 1 code path `common/memguard.py`):
   - Preflight: `MemAvailable ≥ est_peak + max(10GB, 20%×est_peak)`, sàn cứng 20GB, `SwapFree ≥ 2GB`.
   - Runtime watchdog: warn khi `MemAvailable < 14GB`, abort có kiểm soát khi `< 8GB`. Fixcode đo dao động RAM 24-48h rồi hiệu chỉnh theo dữ liệu.
+  - Ngoại lệ khi đang save checkpoint: memguard gia hạn tới 300s (tránh hỏng checkpoint), trừ khi `MemAvailable < 4GB` thì abort ngay.
   - Phân công: bao-fixcode viết `memguard.py`, bao-cleanup viết phần disk/lock + `scripts/cleanup/preflight.py`, review chéo.
 
 ## Điều kiện / mục còn mở
