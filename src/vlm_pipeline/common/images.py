@@ -11,11 +11,13 @@ from typing import ClassVar
 
 from vlm_pipeline.common.errors import VlmPipelineError
 
+APPROVED_MARK = "bao-security APPROVED"
+
 
 class ImageMismatchError(VlmPipelineError):
     """The local image tag no longer points at the image id pinned in docker/IMAGES.lock (tag rebuilt/replaced)."""
 
-    code: ClassVar[str] = "SYS-000"  # TODO(fixcode): dedicated catalog code (image_digest_mismatch, D1/D16)
+    code: ClassVar[str] = "SEC-004"  # IMAGE_DIGEST_MISMATCH
 
 
 def _row(lock_text: str, tag: str) -> list[str] | None:
@@ -35,12 +37,9 @@ def pinned_image_id(lock_text: str, tag: str) -> str | None:
 
 
 def is_approved(lock_text: str, tag: str) -> bool:
-    """Review column (6) says APPROVED (a "PROBE, not approved" row is pinned but not for user jobs)."""
+    """Review column (6) must START with exactly ``bao-security APPROVED`` (our own file: no free-text parsing)."""
     row = _row(lock_text, tag)
-    if row is None or len(row) < 7:
-        return False
-    review = row[6].upper()
-    return "APPROVED" in review and "NOT APPROVED" not in review
+    return row is not None and len(row) > 6 and row[6].startswith(APPROVED_MARK)
 
 
 def check_pinned_image(root: Path, tag: str, actual_id: str | None, *, require_approved: bool = False) -> None:

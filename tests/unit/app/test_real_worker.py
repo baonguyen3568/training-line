@@ -136,10 +136,14 @@ def test_identity_keys_container_nodes_by_image(tmp_path: Path, monkeypatch: pyt
     assert w.identity(pick) == "host/real-1"
 
 
-LOCK = """# header
-vlm-automodel | vlm-automodel:26.08-5 (local build) | (local) | base arm64 sha256:aaa | sha256:111 (rebuilt) | 29GB | bao-security APPROVED
-vlm-automodel | vlm-automodel:26.08-4 (local build) | (local) | base arm64 sha256:aaa | sha256:222 | 29GB | bao-security APPROVED
-"""
+_ROW = "vlm-automodel | {tag} (local) | (local) | base arm64 sha256:aaa | {id} | 29GB | {review} | x"
+LOCK = "\n".join(
+    [
+        "# header",
+        _ROW.format(tag="vlm-automodel:26.08-5", id="sha256:111 (rebuilt)", review="bao-security APPROVED (x)"),
+        _ROW.format(tag="vlm-automodel:26.08-4", id="sha256:222", review="bao-security APPROVED"),
+    ]
+)
 
 
 def test_pinned_image_id_parsing() -> None:
@@ -153,8 +157,9 @@ def test_check_pinned_image(tmp_path: Path) -> None:
     (tmp_path / "docker" / "IMAGES.lock").write_text(LOCK)
     images.check_pinned_image(tmp_path, "vlm-automodel:26.08-5", "sha256:111")
     for actual in ("sha256:999", None):
-        with pytest.raises(images.ImageMismatchError):
+        with pytest.raises(images.ImageMismatchError) as ei:
             images.check_pinned_image(tmp_path, "vlm-automodel:26.08-5", actual)
+        assert ei.value.code == "SEC-004"
     with pytest.raises(images.ImageMismatchError):
         images.check_pinned_image(tmp_path, "vlm-automodel:unpinned", "sha256:111")
 
@@ -167,9 +172,13 @@ def test_real_lock_pins_default_image() -> None:
 
 
 def test_user_jobs_require_approved_image(tmp_path: Path) -> None:
-    lock = (
-        LOCK
-        + "vlm-automodel | vlm-automodel:probe (local) | (local) | base | sha256:333 | 29GB | PROBE, not approved | x\n"
+    lock = "\n".join(
+        [
+            LOCK,
+            _ROW.format(tag="vlm-automodel:probe", id="sha256:333", review="PROBE, not approved"),
+            _ROW.format(tag="vlm-automodel:u", id="sha256:444", review="bao-security UNAPPROVED"),
+            _ROW.format(tag="vlm-automodel:d", id="sha256:555", review="DISAPPROVED by bao-security APPROVED"),
+        ]
     )
     (tmp_path / "docker").mkdir()
     (tmp_path / "docker" / "IMAGES.lock").write_text(lock)
@@ -178,3 +187,5 @@ def test_user_jobs_require_approved_image(tmp_path: Path) -> None:
         images.check_pinned_image(tmp_path, "vlm-automodel:probe", "sha256:333", require_approved=True)
     assert images.is_approved(lock, "vlm-automodel:26.08-5")
     assert not images.is_approved(lock, "vlm-automodel:probe")
+    assert not images.is_approved(lock, "vlm-automodel:u")
+    assert not images.is_approved(lock, "vlm-automodel:d")
