@@ -12,3 +12,10 @@
   - Ngân sách máy chung: ưu tiên cột non-thinking. Thinking-on chỉ chạy MMMU + OCRBench.
 - **G1-harness**: được tải 1 model nhỏ có số trên OpenVLM leaderboard để đối chiếu harness (<20GB, qua security-model-vetting).
 - Perf (G4): đo theo `tester-perf-bench` (/proc/meminfo, không dùng nvidia-smi memory), preset cố định, đo cả FP8 và NVFP4.
+
+## Amendment A1 (2026-10-12) — Run tái lập được
+- Mọi run dùng làm **gate hoặc số công bố** (G1, G3, N-4, P-2/P-3, so sánh template) phải chạy từ **git worktree sạch** ở 1 commit cụ thể.
+  Tạo bằng `git worktree add .worktrees/<run_id> <commit>`; `.worktrees/` nằm trong project và được gitignore. Không động tới working tree chung.
+- Bắt buộc `reproducibility_gaps() == []` (git_commit, git_dirty=false, container_digest đều có). Thiếu → kết quả bị đánh dấu NON-REPRODUCIBLE, không được dùng làm gate.
+- Run từ working tree chung chỉ dùng cho smoke/debug.
+- Dọn worktree sau khi run xong (cleanup quản lý, dry-run trước).

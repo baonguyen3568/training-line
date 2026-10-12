@@ -22,3 +22,4 @@ __pycache__/
 *.ncu-rep
 core.[0-9]*
 *.log
+/.worktrees/
