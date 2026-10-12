@@ -12,6 +12,7 @@ step_scheduler:
   local_batch_size: 1
   ckpt_every_steps: 100
   val_every_steps: 100
+  num_epochs: 3  # explicit: AutoModel default num_epochs=10 silently capped O-1b at 50 of 60 steps
   max_steps: 300
 
 dist_env:

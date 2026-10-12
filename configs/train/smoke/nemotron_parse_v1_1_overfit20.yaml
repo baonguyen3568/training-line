@@ -14,6 +14,7 @@ step_scheduler:
   local_batch_size: 1
   ckpt_every_steps: 60
   val_every_steps: 100000  # no validation
+  num_epochs: 12  # 20 samples / GBS 4 = 5 steps per epoch; default 10 would stop at 50
   max_steps: 60
 
 dist_env:

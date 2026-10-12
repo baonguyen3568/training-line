@@ -286,3 +286,15 @@ Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ 
     - Sửa gốc (fixcode): bước ckpt_complete/export **chép `generation_config.json` của base** vào checkpoint.
     - **Gate gallery mới (đề xuất)**: generation_config của mọi checkpoint/export phải bằng base, trừ các field được phép override (`max_new_tokens`). Đây là cùng loại parity train/serve.
     - O-1b eval hiện tại là baseline **không penalty**. Chạy lại 6 ảnh với penalty 1.1 để so.
+
+### 10.6 Kết quả O-1b (08:10): PASS cho mục đích đường ống
+| | field-F1 | nTED | json_exact | parse_fail | truncated |
+|---|---|---|---|---|---|
+| 20 ảnh train (đã overfit) | 71.6 | 64.8 | 5% | 0% | 5% |
+| 20 ảnh test (đối chứng) | 33.1 | 38.4 | 0% | 0% | 5% |
+Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `benchmarks/eval/o1b-parse-v1.1-cord-overfit20-20261012.json`.
+- Đối chứng đạt: train cao hơn test rõ (+38.5).
+- Research kiểm loss curve (`outputs/runs/20261012-1836-o1b-parse-overfit20-6b22/metrics.jsonl`): loss giảm đều 1.81 → ~0.06–0.13, grad_norm ổn định ~3. Model **đang học đúng nhưng chưa thuộc hết** (loss token ~0.08, chuỗi ~250 token nên greedy hiếm khi đúng trọn). F1 71.6 khớp với mức loss này. Lỗi còn lại (gán nhầm field tổng tiền, 1 ảnh lặp, 1 ảnh thẻ sai cấu trúc) là lỗi model, không phải lỗi hệ thống của đường ống.
+- **Ngưỡng ≥90 research đặt trước là ước lượng sai** cho 50 step, ghi lại công khai, không sửa ngầm.
+- Phát hiện phụ: run chỉ chạy **50/60 step** vì AutoModel mặc định `num_epochs=10`. Đã đặt `num_epochs` tường minh trong YAML O-1 (12) và P-3 (3).
+- ⇒ **Đi tiếp P-3** (300 step, ckpt 100/200/300). Chấm với generation_config gốc của NVIDIA (repetition_penalty 1.1) sau khi tester chạy so sánh 6 ảnh, và báo cả số không penalty để đối chiếu.
