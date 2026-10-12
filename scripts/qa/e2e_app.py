@@ -8,6 +8,7 @@ Usage: E2E_TOKEN=... uv run python scripts/qa/e2e_app.py <port> <static_dir>
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -23,6 +24,9 @@ def main() -> int:
     port, static_dir = int(sys.argv[1]), Path(sys.argv[2]).resolve()
     token = os.environ["E2E_TOKEN"]
     with tempfile.TemporaryDirectory(prefix="vlm-e2e-") as tmp:
+        # Templates live in the repo (configs/templates); the temp workspace gets a copy so the gallery is real.
+        repo = Path(__file__).resolve().parents[2]
+        shutil.copytree(repo / "configs" / "templates", Path(tmp) / "configs" / "templates")
         services = DefaultServices(registry=REGISTRY, root=Path(tmp), worker="fake")
         app = create_app(services, token=token, port=port, static_dir=static_dir)
         uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", access_log=False)

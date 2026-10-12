@@ -147,7 +147,19 @@ test("work survives a page reload (autosave)", async ({ page }) => {
   // Regression guard for autosave (bao-design M1 review r1, K1). UX approved by design: after a reload the
   // app asks to restore the draft (draft.restore_prompt) and "Khôi phục" reopens the canvas.
   await buildGraph(page);
-  await page.waitForTimeout(1_500); // autosave is debounced 1s
+  // Wait for the debounced autosave to actually land (a fixed sleep is flaky on a busy host).
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const raw = localStorage.getItem("vlm.draft.v1"); // src/lib/draft.ts KEY
+          // src/lib/draft.ts stores { savedAt, workflow: <workflow file as a JSON string> }
+          const wf = raw ? JSON.parse(JSON.parse(raw).workflow) : null;
+          return `${wf?.nodes?.length ?? 0} nodes, ${wf?.edges?.length ?? 0} edges`;
+        }),
+      { timeout: 10_000 },
+    )
+    .toBe("3 nodes, 2 edges"); // the LAST edit is saved, not an earlier draft
   await page.reload();
   await page.getByRole("button", { name: tr("draft.restore") }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(3, { timeout: 5_000 });
