@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import functools
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from importlib import resources
 from typing import Annotated, Any, Literal, Protocol, Self
@@ -32,10 +32,16 @@ class _Frozen(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+ParamRef = Literal["node", "node_list", "port", "param", "port_type"]
+
+
 class Param(_Frozen):
     name: str
     type: Literal["any", "enum", "bool"] = "any"
     values: tuple[str, ...] = ()
+    # The raw value is an internal id (node id, port name, param name, port type id): ``display_params`` swaps it
+    # for its localized label before rendering, the raw id stays on the Issue (node_id/port/param) for the UI.
+    ref: ParamRef | None = None
 
     @model_validator(mode="after")
     def _enum_has_values(self) -> Self:
@@ -297,12 +303,50 @@ def already_optimized(error: _ErrorLike, node: NodeContext | None) -> bool:
     return has_memory_actions and not any(a.effect == "memory" for a in offered)
 
 
+@dataclass(frozen=True)
+class Labels:
+    """Resolvers from internal ids to localized labels (wired by the app with i18n + the workflow being shown).
+
+    ``port``/``param`` labels need the node the issue points at (``node_id``); unknown ids fall back to the raw id.
+    """
+
+    node: Callable[[str], str | None]  # node id -> node title, e.g. "Fine-tune nhẹ (LoRA)"
+    port: Callable[[str, str], str | None]  # (node id, port name) -> port label, e.g. "Model gốc"
+    param: Callable[[str, str], str | None]  # (node id, param name) -> param label
+    port_type: Callable[[str], str | None]  # port type id -> label, e.g. "Dữ liệu"
+
+
+def display_params(
+    code: str, params: Mapping[str, object], labels: Labels, *, node_id: str | None
+) -> dict[str, object]:
+    """Params with id-valued entries replaced by labels, for rendering ``error.<code>.*`` (never for the Issue)."""
+    entry = load_catalog().get(code)
+    refs = {p.name: p.ref for p in entry.params if p.ref} if entry else {}
+    out = dict(params)
+    for name, ref in refs.items():
+        raw = out.get(name)
+        if not isinstance(raw, str) or not raw:
+            continue
+        if ref == "node":
+            out[name] = labels.node(raw) or raw
+        elif ref == "node_list":
+            out[name] = ", ".join(labels.node(n.strip()) or n.strip() for n in raw.split(","))
+        elif ref == "port_type":
+            out[name] = labels.port_type(raw) or raw
+        elif node_id is not None:  # port / param: relative to the node the issue points at
+            resolve = labels.port if ref == "port" else labels.param
+            out[name] = resolve(node_id, raw) or raw
+    return out
+
+
 __all__ = [
     "Action",
     "CatalogError",
     "Entry",
+    "Labels",
     "NodeContext",
     "Param",
+    "ParamRef",
     "PatchOp",
     "Range",
     "Variant",
@@ -310,5 +354,6 @@ __all__ = [
     "apply_patch",
     "apply_patches",
     "available_actions",
+    "display_params",
     "load_catalog",
 ]

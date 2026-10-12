@@ -8,7 +8,9 @@
 #   slug                 engineer-only name (logs, tests); UI shows `code`
 #   severity             error | warn | info   (actions required only for `error`)
 #   prevent_in_preflight true when graph validate / preflight can catch it before Run (same code as at runtime)
-#   params               names, or {name, type: enum|bool|..., values} for params used by variants / `when`
+#   params               names, or {name, type: enum|bool|..., values} for params used by variants / `when`;
+#                        `ref: node|node_list|port|param|port_type` = the value is an internal id that
+#                        error_catalog.display_params swaps for its localized label before rendering
 #                        naming: sizes *_gb, counts *_count, lists *_ids, durations *_minutes, times *_at
 #   variant_by / variants  text variants -> error.<code>.what.<value|key>
 #   match                how a raw failure maps to this code: {kind: regex|exit|preflight|validate|api|executor, value}
@@ -285,7 +287,7 @@ CFG-001:
   slug: GRAPH_PORT_TYPE_MISMATCH
   severity: error
   prevent_in_preflight: true
-  params: [a, b, type_a, type_b]
+  params: [{name: a, ref: node}, {name: b, ref: node}, {name: type_a, ref: port_type}, {name: type_b, ref: port_type}]
   match:
     - {kind: validate, value: "edge port types incompatible"}
   actions:
@@ -296,7 +298,7 @@ CFG-002:
   slug: GRAPH_CYCLE
   severity: error
   prevent_in_preflight: true
-  params: [nodes]
+  params: [{name: nodes, ref: node_list}]
   match:
     - {kind: validate, value: "cycle detected"}
   actions:
@@ -306,7 +308,7 @@ CFG-003:
   slug: INPUT_MISSING
   severity: error
   prevent_in_preflight: true
-  params: [node, port]
+  params: [{name: node, ref: node}, {name: port, ref: port}]
   match:
     - {kind: validate, value: "required input port unconnected"}
   actions:
@@ -339,7 +341,7 @@ CFG-005:
   slug: PARAM_INVALID
   severity: error
   prevent_in_preflight: true
-  params: [node, param, value, rule]
+  params: [{name: node, ref: node}, {name: param, ref: param}, value, rule]
   match:
     - {kind: validate, value: "node params ValidationError"}
     # Runtime guard from AutoModel patch 0002: trainable share outside the recipe's expectation (freeze did not

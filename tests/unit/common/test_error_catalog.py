@@ -242,3 +242,58 @@ def test_model_validation_catches_custom_validators() -> None:
     err = SimpleNamespace(code="MEM-003", params={})
     assert "reduce_batch" in available_actions(err, ok)
     assert "reduce_batch" not in available_actions(err, odd)
+
+
+# ------------------------------------------------------- display labels for no-tech users (bao-frontend request)
+
+
+def _labels() -> object:
+    from vlm_pipeline.common.error_catalog import Labels
+
+    nodes = {"n3": "Fine-tune nhẹ (LoRA)", "n1": "Dữ liệu CORD-v2"}
+    ports = {("n3", "base_model"): "Model gốc"}
+    params = {("n3", "max_steps"): "Số bước huấn luyện"}
+    types = {"Dataset": "Dữ liệu", "Model": "Model"}
+    return Labels(
+        node=nodes.get,
+        port=lambda n, p: ports.get((n, p)),
+        param=lambda n, p: params.get((n, p)),
+        port_type=types.get,
+    )
+
+
+def test_cfg003_shows_node_title_and_port_label_not_raw_ids() -> None:
+    from vlm_pipeline.common.error_catalog import display_params
+
+    shown = display_params("CFG-003", {"node": "n3", "port": "base_model"}, _labels(), node_id="n3")  # type: ignore[arg-type]
+    assert shown == {"node": "Fine-tune nhẹ (LoRA)", "port": "Model gốc"}
+
+
+def test_cfg001_and_cfg002_and_cfg005_labels() -> None:
+    from vlm_pipeline.common.error_catalog import display_params
+
+    labels = _labels()
+    cfg001 = display_params(
+        "CFG-001",
+        {"a": "n1", "b": "n3", "type_a": "Dataset", "type_b": "Model"},
+        labels,
+        node_id="n3",  # type: ignore[arg-type]
+    )
+    assert cfg001 == {"a": "Dữ liệu CORD-v2", "b": "Fine-tune nhẹ (LoRA)", "type_a": "Dữ liệu", "type_b": "Model"}
+    assert display_params("CFG-002", {"nodes": "n1, n3"}, labels, node_id="n1") == {  # type: ignore[arg-type]
+        "nodes": "Dữ liệu CORD-v2, Fine-tune nhẹ (LoRA)"
+    }
+    cfg005 = display_params(
+        "CFG-005", {"node": "n3", "param": "max_steps", "rule": "greater_than_equal"}, labels, node_id="n3"
+    )  # type: ignore[arg-type]
+    assert cfg005["param"] == "Số bước huấn luyện"
+    assert cfg005["rule"] == "greater_than_equal"  # non-ref params untouched
+
+
+def test_unknown_ids_fall_back_to_raw_and_input_is_not_mutated() -> None:
+    from vlm_pipeline.common.error_catalog import display_params
+
+    raw = {"node": "ghost", "port": "x"}
+    shown = display_params("CFG-003", raw, _labels(), node_id="ghost")  # type: ignore[arg-type]
+    assert shown == raw
+    assert raw == {"node": "ghost", "port": "x"}
