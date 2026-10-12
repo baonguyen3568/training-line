@@ -144,15 +144,27 @@ def _set_decoding(model: Any, model_dir: Path, args: Any) -> dict[str, Any]:
     if drift and args.require_no_drift:
         raise SystemExit(f"checkpoint generation_config differs from {gen_dir} on {drift}: re-export (ckpt_complete)")
     model.generation_config.max_new_tokens = args.max_new_tokens
-    overrides: dict[str, Any] = {"max_new_tokens": args.max_new_tokens}
+    # Pinned, never inherited: the base config has no use_cache (HF default True) while exports carry False
+    # (patch 0003). P-3 A/B (2026-10-12): no-cache degenerated like cache, so the cache was not the cause of the
+    # loops; exact equivalence (golden ids through remote + cache) is still to be checked.
+    model.generation_config.use_cache = args.use_cache == "true"
+    overrides: dict[str, Any] = {"max_new_tokens": args.max_new_tokens, "use_cache": args.use_cache == "true"}
     if args.repetition_penalty is not None:
         # Protocol comparison (001a): the model's decoding vs train-time greedy; the override is recorded.
         model.generation_config.repetition_penalty = args.repetition_penalty
         overrides["repetition_penalty"] = args.repetition_penalty
     decoding = {
         k: getattr(model.generation_config, k, None)
-        for k in ("do_sample", "num_beams", "repetition_penalty", "no_repeat_ngram_size", "forced_eos_token_id")
+        for k in (
+            "do_sample",
+            "num_beams",
+            "repetition_penalty",
+            "no_repeat_ngram_size",
+            "forced_eos_token_id",
+            "use_cache",
+        )
     }
+    decoding["model_class"] = f"{type(model).__module__}.{type(model).__qualname__}"
     decoding.update(
         {
             "max_new_tokens": args.max_new_tokens,
@@ -188,6 +200,7 @@ def main() -> int:
     # Required: defaulting to the model dir would silently decode an old export without the base's
     # repetition_penalty (O-1b). For the base model itself, pass its own snapshot.
     ap.add_argument("--generation-config", required=True, help="pinned base snapshot dir (generation_config.json)")
+    ap.add_argument("--use-cache", choices=("true", "false"), default="true", help="KV cache in generate (recorded)")
     ap.add_argument(
         "--repetition-penalty",
         type=_positive_float,  # fail at parse time, not in generate() after loading the model under the GPU lock

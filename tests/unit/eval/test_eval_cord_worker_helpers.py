@@ -79,11 +79,16 @@ def test_repetition_penalty_override_is_recorded_and_does_not_hide_drift(
         (d / "generation_config.json").write_text(json.dumps(values))
     model = types.SimpleNamespace()
     args = types.SimpleNamespace(
-        generation_config=str(base), max_new_tokens=1024, repetition_penalty=1.0, require_no_drift=False
+        generation_config=str(base),
+        max_new_tokens=1024,
+        repetition_penalty=1.0,
+        require_no_drift=False,
+        use_cache="false",
     )
     decoding = _worker()._set_decoding(model, ckpt, args)
     assert model.generation_config.repetition_penalty == 1.0  # the override is what generate() will use
-    assert decoding["overrides"] == {"max_new_tokens": 1024, "repetition_penalty": 1.0}
+    assert decoding["overrides"] == {"max_new_tokens": 1024, "use_cache": False, "repetition_penalty": 1.0}
+    assert model.generation_config.use_cache is False  # pinned from the flag, not inherited from either config
     assert decoding["checkpoint_drift"] == ["repetition_penalty"]  # drift is checkpoint vs base, before overrides
     args.require_no_drift = True
     with pytest.raises(SystemExit, match="repetition_penalty"):
