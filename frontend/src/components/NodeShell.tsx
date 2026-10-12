@@ -170,7 +170,7 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
               <span>{portLabel(ports, typeId, name, ps.type)}</span>
               {missing.has(name) && (
                 // Users stumble exactly here (design M1 r1): name what to connect, from CFG-003.
-                <span className="port-hint">← {t("canvas.hint.connect_port")}</span>
+                <span className="port-hint">{t("canvas.hint.connect_port")}</span>
               )}
             </li>
           ))}

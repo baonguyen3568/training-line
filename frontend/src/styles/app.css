@@ -825,3 +825,6 @@ button.link {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.canvas {
+  overflow: hidden;
+} /* nodes panned out of view must never paint over the library */

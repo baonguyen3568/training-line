@@ -72,7 +72,7 @@ function EditorInner() {
     undo,
     redo,
   } = useWorkflow.getState();
-  const { screenToFlowPosition, setCenter, getViewport } = useReactFlow();
+  const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
   const [flashId, setFlashId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLElement>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -303,12 +303,29 @@ function EditorInner() {
       const id = placeInLane(typeId);
       const pos = id && useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.ui;
       if (!id || !pos) return;
-      // A node added off-screen must not be "lost": bring it into view, keep it selected, flash it briefly.
-      setCenter(pos.x + 120, pos.y + 60, { zoom: getViewport().zoom, duration: 250 });
+      // A node added off-screen must not be "lost" (design M1 r1): pan ONLY if it is outside the visible
+      // canvas — panning on every add pushed earlier nodes out of view. Always select + flash it.
+      const vp = getViewport();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      const left = pos.x * vp.zoom + vp.x;
+      const top = pos.y * vp.zoom + vp.y;
+      const visible =
+        !!rect &&
+        left >= 0 &&
+        top >= 0 &&
+        left + 240 * vp.zoom <= rect.width &&
+        top + 120 * vp.zoom <= rect.height;
+      // Off-screen: fit ALL nodes (zoom ≤ 1, ≥ 0.6) instead of centering the new one, so earlier nodes
+      // stay on screen too. Deferred one frame so React Flow has measured the new node.
+      if (!visible)
+        setTimeout(
+          () => void fitView({ maxZoom: 1, minZoom: 0.6, duration: 250, padding: 0.1 }),
+          30,
+        );
       setFlashId(id);
       setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1200);
     },
-    [placeInLane, setCenter, getViewport],
+    [placeInLane, fitView, getViewport],
   );
 
   if (!workflow) return null;
