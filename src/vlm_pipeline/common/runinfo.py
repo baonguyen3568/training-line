@@ -16,9 +16,9 @@ import time
 from collections.abc import Iterable, Iterator, Mapping
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RUN_SCHEMA_VERSION = 1
 METRICS_SCHEMA_VERSION = 1
@@ -40,6 +40,9 @@ class RunStatus(StrEnum):
 
 
 Stage = Literal["data", "train", "quantize", "eval", "bench", "serve", "export"]
+
+
+_DATASET_REF = re.compile(r"@([0-9a-f]{40})(?:#|$)")
 
 
 class RunManifest(BaseModel):
@@ -75,12 +78,20 @@ class RunManifest(BaseModel):
     peak_mem_gb: float | None = None  # host MemAvailable drop during the job (UMA: includes CUDA)
     host_min_available_gb: float | None = None
     trainable_pct: float | None = None  # "Trainable parameters percentage" from the engine log
-    memguard_fast_fall: bool | None = None
+    memguard_fast_fall: bool | None = None  # watchdog killed the job because memory fell too fast
     memguard_abort_gb: float | None = None
-    post_steps: list[dict[str, Any]] = Field(
-        default_factory=list
-    )  # host steps after the job (code sha recorded)  # watchdog killed the job because memory fell too fast
+    post_steps: list[dict[str, Any]] = Field(default_factory=list)  # host steps after the job (code sha recorded)
     tags: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _revision_from_dataset_ref(self) -> Self:
+        """``dataset`` given as ``repo@<sha>[#...]`` (smoke CLI, app artifacts) also pins ``dataset_revision``."""
+        if self.dataset and (m := _DATASET_REF.search(self.dataset)):
+            if self.dataset_revision is None:
+                self.dataset_revision = m.group(1)
+            elif self.dataset_revision != m.group(1):  # a self-contradicting manifest is worse than a missing field
+                raise ValueError(f"dataset_revision {self.dataset_revision} != revision in dataset {self.dataset}")
+        return self
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -110,6 +121,8 @@ def reproducibility_gaps(manifest: RunManifest) -> list[str]:
         gaps.append("git_commit")
     if manifest.git_dirty:
         gaps.append("git_dirty")
+    if manifest.dataset is not None and not _SHA40.match(manifest.dataset_revision or ""):
+        gaps.append("dataset_revision")  # a dataset without a pinned revision cannot be re-read identically
     for step in manifest.post_steps:  # host post-processing must also come from committed code
         if step.get("git_dirty") or not _SHA40.match(str(step.get("git_commit") or "")):
             gaps.append(f"post_steps.{step.get('name', '?')}")

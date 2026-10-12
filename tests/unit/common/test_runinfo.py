@@ -4,12 +4,15 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from vlm_pipeline.common.runinfo import (
     RunManifest,
     RunStatus,
     automodel_to_metrics,
     finite_json_line,
     read_manifest,
+    reproducibility_gaps,
     write_manifest,
 )
 
@@ -101,11 +104,36 @@ def test_concurrent_manifest_writes_from_threads(tmp_path: Path) -> None:
 
 
 def test_post_steps_from_dirty_code_are_reproducibility_gaps() -> None:
-    from vlm_pipeline.common.runinfo import reproducibility_gaps
-
     base = {"run_id": "r", "name": "n", "stage": "train", "task": "sft", "git_commit": "a" * 40, "git_dirty": False,
             "container_digest": "sha256:x", "config_hash": "c", "seed": 1, "base_model_revision": "b" * 40}  # fmt: skip
     clean = RunManifest(**base, post_steps=[{"name": "complete_from_base", "git_commit": "c" * 40, "git_dirty": False}])
     assert reproducibility_gaps(clean) == []
     dirty = RunManifest(**base, post_steps=[{"name": "complete_from_base", "git_commit": "c" * 40, "git_dirty": True}])
     assert reproducibility_gaps(dirty) == ["post_steps.complete_from_base"]
+
+
+@pytest.mark.parametrize(
+    ("dataset", "revision", "gaps"),
+    [
+        ("naver-clova-ix/cord-v2@" + "d" * 40, "d" * 40, []),
+        ("naver-clova-ix/cord-v2@" + "d" * 40 + "#limit=20", "d" * 40, []),
+        ("naver-clova-ix/cord-v2", None, ["dataset_revision"]),
+        ("naver-clova-ix/cord-v2@main", None, ["dataset_revision"]),
+        (None, None, []),
+    ],
+)
+def test_dataset_revision_derived_from_pinned_ref_else_gap(
+    dataset: str | None, revision: str | None, gaps: list[str]
+) -> None:
+    m = RunManifest(run_id="r", name="n", stage="train", task="sft", git_commit="a" * 40, git_dirty=False,
+                    container_digest="sha256:x", config_hash="c", seed=1, base_model_revision="b" * 40,
+                    dataset=dataset)  # fmt: skip
+    assert m.dataset_revision == revision
+    assert reproducibility_gaps(m) == gaps
+
+
+def test_dataset_revision_contradicting_dataset_ref_is_rejected() -> None:
+    with pytest.raises(ValueError, match="dataset_revision"):
+        RunManifest(
+            run_id="r", name="n", stage="train", task="sft", dataset="x/y@" + "d" * 40, dataset_revision="e" * 40
+        )
