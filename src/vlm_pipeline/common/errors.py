@@ -1,8 +1,8 @@
 """Shared error types and process exit codes.
 
-Stdlib only (container workers import ``ExitCode`` via PYTHONPATH). The catalog itself is loaded by
-``common.error_catalog``. Exceptions carry only a catalog ``code`` plus ``params``; user-facing text lives in ``i18n/{vi,en}.yaml`` and is
-rendered at the app edge (Proposal 007 R9). Codes follow ``<GROUP>-<NNN>`` from the error catalog.
+Stdlib only (container workers import ``ExitCode`` via PYTHONPATH); the catalog is loaded by
+``common.error_catalog``. Exceptions carry only a catalog ``code`` plus ``params``; user-facing text lives in
+``i18n/{vi,en}.yaml`` and is rendered at the app edge (Proposal 007 R9). Codes follow ``<GROUP>-<NNN>``.
 """
 
 from __future__ import annotations

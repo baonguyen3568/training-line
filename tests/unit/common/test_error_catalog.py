@@ -6,7 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from vlm_pipeline.common.errors import ExitCode, InsufficientMemoryError, available_actions, load_catalog
+from vlm_pipeline.common import error_catalog
+from vlm_pipeline.common.error_catalog import CatalogError, Entry, available_actions, load_catalog
+from vlm_pipeline.common.errors import ExitCode, InsufficientMemoryError
 
 
 def test_catalog_loads_and_has_fallback() -> None:
@@ -66,3 +68,38 @@ def test_exception_carries_code_and_params_only() -> None:
 
 def test_exit_codes_are_stable() -> None:
     assert [int(c) for c in ExitCode] == [0, 2, 3, 4, 75]
+
+
+def test_typo_in_entry_key_is_rejected() -> None:
+    with pytest.raises(ValueError, match="prevent_in_prefight"):
+        Entry.model_validate(
+            {"code": "X-001", "slug": "XX", "severity": "info", "prevent_in_preflight": True, "prevent_in_prefight": 1}
+        )
+
+
+@pytest.mark.parametrize(
+    ("body", "needle"),
+    [
+        ({"severity": "error", "actions": []}, "at least one action"),
+        (
+            {"severity": "info", "actions": [{"id": "a", "kind": "patch", "confirm": False, "when": {"zz": True}}]},
+            "undeclared",
+        ),
+        ({"severity": "info", "actions": [{"id": "a", "kind": "delete", "confirm": True}]}, "kind"),
+        ({"severity": "info", "variant_by": "nope"}, "variant_by"),
+        ({"severity": "info", "params": [{"name": "r", "type": "enum"}]}, "needs values"),
+    ],
+)
+def test_cross_field_rules(body: dict[str, object], needle: str) -> None:
+    with pytest.raises(ValueError, match=needle):
+        Entry.model_validate({"code": "X-001", "slug": "XX", "prevent_in_preflight": False, **body})
+
+
+def test_malformed_yaml_raises_catalog_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(error_catalog.yaml, "safe_load", lambda _text: {"MEM-001": {"slug": "X", "severity": "boom"}})
+    error_catalog.load_catalog.cache_clear()
+    try:
+        with pytest.raises(CatalogError, match="MEM-001"):
+            error_catalog.load_catalog()
+    finally:
+        error_catalog.load_catalog.cache_clear()

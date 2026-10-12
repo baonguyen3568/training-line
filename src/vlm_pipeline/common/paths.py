@@ -18,9 +18,21 @@ def project_root(start: Path | None = None) -> Path:
     """
     env = os.environ.get(PROJECT_ROOT_ENV)
     if env:
-        return Path(env).resolve()
+        root = Path(env).resolve()
+        # A wrong env var must never point delete/write code at an unrelated directory.
+        if not _is_project_root(root):
+            raise FileNotFoundError(f"${PROJECT_ROOT_ENV}={env} is not the vlm-pipeline repository")
+        return root
     here = (start or Path(__file__)).resolve()
     for parent in (here, *here.parents):
-        if (parent / "pyproject.toml").is_file():
+        if _is_project_root(parent):
             return parent
     raise FileNotFoundError(f"project root not found from {here}; set {PROJECT_ROOT_ENV}")
+
+
+def _is_project_root(path: Path) -> bool:
+    try:
+        text = (path / "pyproject.toml").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return 'name = "vlm-pipeline"' in text
