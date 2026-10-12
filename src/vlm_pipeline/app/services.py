@@ -13,8 +13,9 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
+from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.nodes.spec import Registry
 
 EventSink = Callable[[dict[str, Any]], None]
@@ -23,6 +24,12 @@ _RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 
 class NotAvailableError(RuntimeError):
     """A backing module is not implemented yet (HTTP 501)."""
+
+
+class BadRequestError(VlmPipelineError):
+    """Invalid user input at the API edge (HTTP 400). Params are safe to show (no paths, no internals)."""
+
+    code: ClassVar[str] = "CFG-005"
 
 
 class Services(Protocol):
@@ -97,9 +104,12 @@ class DefaultServices:
     def metrics_page(self, run_id: str, after: str | None, limit: int, downsample_to: int | None) -> dict[str, Any]:
         index = _optional("vlm_pipeline.artifacts.runs_index")
         if not _RUN_ID.fullmatch(run_id) or run_id in {".", ".."}:
-            raise ValueError("invalid run id")
+            raise BadRequestError(params={"param": "run_id", "rule": "format"})
         run_dir = self.root / "outputs" / "runs" / run_id
-        page = index.read_metrics_page(run_dir, after=after, limit=limit, downsample_to=downsample_to)
+        try:
+            page = index.read_metrics_page(run_dir, after=after, limit=limit, downsample_to=downsample_to)
+        except ValueError as exc:  # runs_index only raises ValueError for bad cursor/limit/downsample_to
+            raise BadRequestError(params={"param": "after|limit|downsample_to", "rule": "range"}) from exc
         result: dict[str, Any] = page.model_dump(mode="json")
         return result
 

@@ -52,9 +52,14 @@ class FakeServices:
         return next((r for r in self.list_runs() if r["run_id"] == run_id), None)
 
     def metrics_page(self, run_id: str, after: str | None, limit: int, downsample_to: int | None) -> dict[str, Any]:
+        from vlm_pipeline.app.services import BadRequestError
         from vlm_pipeline.artifacts.runs_index import read_metrics_page
 
-        return read_metrics_page(self.root / "outputs" / "runs" / run_id, after, limit, downsample_to).model_dump()
+        try:
+            page = read_metrics_page(self.root / "outputs" / "runs" / run_id, after, limit, downsample_to)
+        except ValueError as exc:
+            raise BadRequestError(params={"param": "after"}) from exc
+        return page.model_dump()
 
     def system(self) -> dict[str, Any]:
         return {"mem_total_gb": 121.0, "mem_available_gb": 40.0, "disk_free_gb": 2000.0, "gpu_lock": {"held": False}}
@@ -113,9 +118,10 @@ def test_run_streams_events_over_ws_with_backlog(client: TestClient, svc: FakeSe
 def test_unknown_run_ws_closes_4404(client: TestClient) -> None:
     from starlette.websockets import WebSocketDisconnect
 
-    with pytest.raises(WebSocketDisconnect) as ei, client.websocket_connect("/api/runs/nope/events") as ws:
+    with client.websocket_connect("/api/runs/nope/events") as ws:
         assert ws.receive_json() == {"type": "run_not_found", "graph_run_id": "nope"}
-        ws.receive_json()
+        with pytest.raises(WebSocketDisconnect) as ei:
+            ws.receive_json()
     assert ei.value.code == 4404
 
 
@@ -138,3 +144,39 @@ def test_not_available_is_501(client: TestClient) -> None:
 
 def test_system(client: TestClient) -> None:
     assert client.get("/api/system").json()["gpu_lock"] == {"held": False}
+
+
+def test_bus_keeps_state_events_and_drops_oldest_other() -> None:
+    from vlm_pipeline.app.events import EventBus
+
+    bus = EventBus(max_other_events_per_run=3)
+    bus.open("r")
+    bus.publish("r", {"type": "node_status", "node_id": "a", "status": "running"})
+    for i in range(10):
+        bus.publish("r", {"type": "metric", "i": i})
+    bus.publish("r", {"type": "run_status", "status": "completed"})
+    backlog = bus.backlog("r")
+    assert backlog[0] == {"type": "backlog_truncated", "dropped": 7}
+    assert [e.get("i") for e in backlog if e["type"] == "metric"] == [7, 8, 9]
+    assert backlog[1]["type"] == "node_status"
+    assert backlog[-1] == {"type": "run_status", "status": "completed"}
+
+
+def test_bus_forgets_old_closed_runs() -> None:
+    from vlm_pipeline.app.events import EventBus
+
+    bus = EventBus(keep_closed_runs=2)
+    for i in range(5):
+        bus.open(f"r{i}")
+        bus.close(f"r{i}")
+    assert [bus.known(f"r{i}") for i in range(5)] == [False, False, False, True, True]
+
+
+def test_internal_value_error_is_500_without_detail(svc: FakeServices) -> None:
+    def boom() -> dict[str, Any]:
+        raise ValueError("/home/secret/path leaked")
+
+    svc.system = boom  # type: ignore[method-assign]
+    r = TestClient(create_app(svc, secure=False), raise_server_exceptions=False).get("/api/system")
+    assert r.status_code == 500
+    assert "secret" not in r.text

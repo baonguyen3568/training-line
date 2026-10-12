@@ -5,7 +5,9 @@ Text for the user is rendered here (the edge) from i18n keys; domain objects onl
 
 from __future__ import annotations
 
+import logging
 import secrets
+import sys
 import threading
 import time
 from collections.abc import Awaitable, Callable, Mapping
@@ -16,10 +18,11 @@ from fastapi.responses import JSONResponse
 
 from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
-from vlm_pipeline.app.services import NotAvailableError, Services
+from vlm_pipeline.app.services import BadRequestError, NotAvailableError, Services
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 Workflow = Annotated[dict[str, Any], Body()]
+_log = logging.getLogger(__name__)
 MAX_LIMIT = 10_000  # = artifacts.runs_index.MAX_LIMIT
 
 
@@ -62,6 +65,7 @@ def _start_graph_run(services: Services, bus: EventBus, workflow: dict[str, Any]
         try:
             services.run_graph(workflow, graph_run_id, emit)
         except Exception as exc:  # noqa: BLE001 - surfaced to the UI as a run_status event
+            _log.exception("graph run %s failed", graph_run_id)
             code = getattr(exc, "code", "SYS-000")
             emit(
                 {
@@ -159,6 +163,8 @@ def create_app(
     secure: bool = True,
 ) -> FastAPI:
     """Build the app (D13 security on by default). ``secure=False`` only for unit tests of the API itself."""
+    if not secure and "pytest" not in sys.modules:
+        raise RuntimeError("create_app(secure=False) is only allowed under pytest")
     if services is None:
         from vlm_pipeline.app.services import DefaultServices
         from vlm_pipeline.common.paths import project_root
@@ -184,9 +190,9 @@ def create_app(
     async def _not_available(_request: Any, exc: NotAvailableError) -> JSONResponse:
         return JSONResponse(status_code=501, content={"code": "SYS-000", "detail": str(exc)})
 
-    @app.exception_handler(ValueError)
-    async def _bad_request(_request: Any, exc: ValueError) -> JSONResponse:
-        return JSONResponse(status_code=400, content={"code": "CFG-005", "detail": str(exc)})
+    @app.exception_handler(BadRequestError)
+    async def _bad_request(_request: Any, exc: BadRequestError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"code": exc.code, "params": exc.params})
 
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
