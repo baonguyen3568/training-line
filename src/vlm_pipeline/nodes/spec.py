@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from vlm_pipeline.common.params import Params, ui
+from vlm_pipeline.common.params import LOCAL_PATH_FORMAT, LocalPath, Params, ui
 
 Category = Literal["source", "data", "train", "test", "quantize", "eval", "export", "util"]
 Runner = Literal["host", "container"]
@@ -166,9 +166,11 @@ class Registry:
 
 
 __all__ = [
+    "LOCAL_PATH_FORMAT",
     "PORT_TYPES",
     "Category",
     "EmptyParams",
+    "LocalPath",
     "NodeSpec",
     "PortSpec",
     "PortType",

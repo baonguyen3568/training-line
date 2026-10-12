@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from pathlib import PurePosixPath
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 
 class Params(BaseModel):
@@ -19,3 +20,19 @@ def ui(**hints: object) -> dict[str, Any]:
     Keys (frontend ``UiHint``): widget, order, preset, advanced, option_keys, summary.
     """
     return {"x-ui": hints}
+
+
+LOCAL_PATH_FORMAT = "local-path"
+
+
+def _relative_inside(value: str) -> str:
+    # Syntactic check only (relative, no '..', no backslash). graph.validate re-checks every `local-path` param
+    # against the workspace (percent-encoding, symlinks) and reports SEC-001; the worker checks again at run time.
+    path = PurePosixPath(value)
+    if not value or path.is_absolute() or ".." in path.parts or "\\" in value:
+        raise ValueError("path must be relative to the project and must not contain '..'")
+    return value
+
+
+# A path inside the project. The `format` marker tells graph.validate (SEC-001) and the editor (file picker) apart.
+LocalPath = Annotated[str, AfterValidator(_relative_inside), Field(json_schema_extra={"format": LOCAL_PATH_FORMAT})]

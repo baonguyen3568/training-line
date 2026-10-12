@@ -95,7 +95,7 @@ def test_image_must_be_digest_pinned() -> None:
         _spec(runner="container", image="vlm-automodel:latest")
 
 
-@pytest.mark.parametrize("path", ["/etc", "../outside", "data/../../x", "a\\b"])
+@pytest.mark.parametrize("path", ["", "/etc", "../outside", "data/../../x", "a\\b"])
 def test_local_folder_path_must_stay_inside_project(path: str) -> None:
     with pytest.raises(ValidationError):
         REGISTRY.get("data.local_folder").validate_params({"path": path})  # type: ignore[union-attr]
@@ -106,3 +106,9 @@ def test_lora_batch_sizes_must_divide() -> None:
     assert spec is not None
     with pytest.raises(ValidationError, match="multiple"):
         spec.validate_params({"global_batch_size": 6, "local_batch_size": 4})
+
+
+def test_local_path_params_are_marked_for_sec_001() -> None:
+    spec = REGISTRY.get("data.local_folder")
+    assert spec is not None
+    assert spec.params_schema()["properties"]["path"]["format"] == "local-path"
