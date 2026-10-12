@@ -20,7 +20,8 @@ COPY docker/automodel/extras.lock.txt /tmp/vlm/extras.lock.txt
 RUN /opt/venv/bin/python -m pip install --isolated --no-cache-dir --index-url https://pypi.org/simple \
       --only-binary=:all: --require-hashes --no-deps -r /tmp/vlm/extras.lock.txt \
  && /opt/venv/bin/python -m pip check \
- && /opt/venv/bin/python -c "import albumentations, cv2; print(albumentations.__version__, cv2.__version__)"
+ && /opt/venv/bin/python -c "import albumentations, cv2; print(albumentations.__version__, cv2.__version__, cv2.__file__)" \
+ && [[ "$(/opt/venv/bin/python -m pip list 2>/dev/null | grep -ciE '^opencv-')" -eq 1 ]]
 
 # 2) AutoModel source patches (bao-fixcode). Fail the build unless hashes match and every patch applies cleanly.
 COPY third_party/patches/automodel/ /tmp/vlm/patches/
@@ -29,10 +30,14 @@ WORKDIR /tmp/vlm/patches
 RUN sha256sum -c PATCHES.sha256 \
  && diff <(awk '{print $2}' PATCHES.sha256 | sort) <(find . -maxdepth 1 -name '*.patch' -printf '%f\n' | sort)
 WORKDIR /opt/Automodel
-RUN while read -r _ name; do \
-      patch -p1 --forward --dry-run < "/tmp/vlm/patches/${name}" && patch -p1 --forward < "/tmp/vlm/patches/${name}"; \
-    done < /tmp/vlm/patches/PATCHES.sha256 \
- && rm -rf /tmp/vlm
+RUN applied=0; \
+    while read -r _ name || [[ -n "${name}" ]]; do \
+      patch -p1 --forward --dry-run < "/tmp/vlm/patches/${name}" && patch -p1 --forward < "/tmp/vlm/patches/${name}" \
+      && applied=$((applied + 1)); \
+    done < /tmp/vlm/patches/PATCHES.sha256; \
+    expected=$(grep -c . /tmp/vlm/patches/PATCHES.sha256); \
+    [[ "${applied}" -eq "${expected}" ]] || { echo "applied ${applied}/${expected} patches" >&2; exit 1; }; \
+    rm -rf /tmp/vlm
 
 RUN chmod -R o+rX /opt/Automodel
 USER 1000:1000
