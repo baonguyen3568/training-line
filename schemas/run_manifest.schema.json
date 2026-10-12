@@ -198,6 +198,18 @@
       "default": null,
       "title": "Max Steps"
     },
+    "memguard_abort_gb": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Memguard Abort Gb"
+    },
     "memguard_fast_fall": {
       "anyOf": [
         {

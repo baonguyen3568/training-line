@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
 from vlm_pipeline.app.services import BadRequestError, NotAvailableError, Services
+from vlm_pipeline.common.error_catalog import Labels, display_params
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 Workflow = Annotated[dict[str, Any], Body()]
@@ -27,10 +28,31 @@ _log = logging.getLogger(__name__)
 MAX_LIMIT = 10_000  # = artifacts.runs_index.MAX_LIMIT
 
 
-def _render_issue(issue: Mapping[str, Any], locale: str) -> dict[str, Any]:
+def _labels(workflow: Mapping[str, Any], registry: Any, locale: str) -> Labels:
+    """Resolve node/port/param/port-type ids of the workflow being shown to localized labels (never crashes)."""
+    raw_nodes = workflow.get("nodes")
+    nodes: list[Any] = raw_nodes if isinstance(raw_nodes, list) else []
+    type_of = {str(n.get("id")): str(n.get("type")) for n in nodes if isinstance(n, Mapping)}
+    port_keys = {pt.id: pt.label_key for pt in registry.port_types}
+
+    def tr(key: str) -> str | None:
+        text = i18n.t(key, locale)
+        return None if text == key else text
+
+    return Labels(
+        node=lambda nid: tr(f"node.{type_of[nid]}.title") if nid in type_of else None,
+        port=lambda nid, p: tr(f"node.{type_of[nid]}.port.{p}") if nid in type_of else None,
+        param=lambda nid, p: tr(f"node.{type_of[nid]}.param.{p}.label") if nid in type_of else None,
+        port_type=lambda pt: tr(port_keys[pt]) if pt in port_keys else None,
+    )
+
+
+def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None = None) -> dict[str, Any]:
     code = str(issue.get("code", "SYS-000"))
-    params = dict(issue.get("params") or {})
-    out = dict(issue)
+    raw = dict(issue.get("params") or {})
+    node_id = issue.get("node_id")
+    params = display_params(code, raw, labels, node_id=node_id if isinstance(node_id, str) else None) if labels else raw
+    out = dict(issue)  # node_id / port / param / params stay raw for the UI
     texts = i18n.load(locale)
     for part in ("title", "what", "why"):
         key = f"error.{code}.{part}"
@@ -90,7 +112,8 @@ def _register_graph_routes(app: FastAPI, services: Services, bus: EventBus) -> N
 
     @app.post("/api/graphs/validate")
     def validate(workflow: Workflow, locale: Locale = i18n.DEFAULT_LOCALE) -> dict[str, Any]:
-        return {"errors": [_render_issue(i, locale) for i in services.validate(workflow)]}
+        labels = _labels(workflow, services.registry, locale)
+        return {"errors": [_render_issue(i, locale, labels) for i in services.validate(workflow)]}
 
     @app.post("/api/runs", status_code=202)
     def start_run(workflow: Workflow) -> dict[str, Any]:

@@ -23,6 +23,9 @@ def render() -> dict[str, str]:
         "run_manifest.schema.json": RunManifest.model_json_schema(mode="serialization"),
         "metrics_page.schema.json": MetricsPage.model_json_schema(mode="serialization"),
     }
+    from vlm_pipeline.nodes import REGISTRY
+
+    schemas["node_types.snapshot.json"] = REGISTRY.to_api()  # locale-neutral: keys only, no resolved text
     return {name: json.dumps(body, indent=2, sort_keys=True) + "\n" for name, body in schemas.items()}
 
 
