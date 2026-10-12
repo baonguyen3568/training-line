@@ -3,7 +3,8 @@ three paths: the training collate, the P-2 eval worker, and NVIDIA's own convent
 ``tokenizer(task_prompt, add_special_tokens=False)`` with ``decoder_start_token_id`` 2).
 
 Before the collate patch the training prefix was ``[0, 2, 0, ...]`` (processor-added ``<s>``) and HF generate()
-prepended 2 at eval: found by the P-2 pipeline check (run 20261012-1809-p2check-500e). CPU only, offline.
+prepended 2 at eval: found by the P-2 pipeline check (run 20261012-1809-p2check-500e); fixed by patch 0004
+(image vlm-automodel:26.08-4, sha256:d4a1c774...). CPU only, offline.
 """
 
 from __future__ import annotations
@@ -64,7 +65,6 @@ def test_nvidia_golden_prefix(processor: Any) -> None:
     assert golden[0] == config["decoder_start_token_id"]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="collate patch pending (fixcode, 001a §10.5)")
 def test_training_and_eval_prefix_equal_nvidia(processor: Any) -> None:
     prefix, _ = _worker().train_decoder_prefix(_conversation(), processor)
     assert prefix.tolist() == EXPECTED, f"training/eval prefix {prefix.tolist()} != NVIDIA {EXPECTED}"

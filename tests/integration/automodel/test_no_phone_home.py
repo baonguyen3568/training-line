@@ -92,15 +92,23 @@ def test_variables_silence_the_library(name: str) -> None:
     assert count == 0, f"{name}: still looks up the network with {env} ({line}): report to bao-security"
 
 
-IMAGE_HAS_BLOCK = all(
-    os.environ.get(k, "").lower() in {"1", "true"}
-    for k in ("NO_ALBUMENTATIONS_UPDATE", "HF_HUB_OFFLINE", "HF_HUB_DISABLE_TELEMETRY")
+def _env_has(keys: dict[str, str]) -> bool:
+    return all(os.environ.get(k, "").lower() in {"1", "true"} for k in keys)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # Each library only xfails while ITS variables are missing from the environment the test runs in. Image ENV
+        # (26.08-4) sets NO_ALBUMENTATIONS_UPDATE / HF_HUB_DISABLE_TELEMETRY / DO_NOT_TRACK / WANDB_MODE; HF_HUB_OFFLINE
+        # is set by the job runner at run time, so the HF cases pass when run the way jobs run.
+        pytest.param(
+            n, marks=pytest.mark.xfail(not _env_has(CASES[n][1]), strict=True, reason=f"env lacks {CASES[n][1]}")
+        )
+        for n in sorted(CASES)
+    ],
 )
-
-
-@pytest.mark.xfail(not IMAGE_HAS_BLOCK, strict=True, reason="image env lacks the no-phone-home block (backend)")
-@pytest.mark.parametrize("name", sorted(CASES))
-def test_image_env_silences_the_library(name: str) -> None:
+def test_runtime_env_silences_the_library(name: str) -> None:
     action, _ = CASES[name]
     count, line = _lookups(action, dict(os.environ))
     assert count == 0, line
