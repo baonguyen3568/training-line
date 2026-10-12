@@ -153,6 +153,7 @@ Lọc: [tất cả | sẽ xoá | strip optim | giữ]                [copy: uv r
 ```
 - 3 action tách bạch: `● keep` (text muted) · `✂ strip optim` (warning — giữ weights, chỉ bỏ optimizer) · `⌫ delete` (critical). Icon + chữ, không chỉ màu.
 - Chip vai trò hiện đủ, thứ tự KEEP > LATEST > BEST. Run running/failed/interrupted: dòng mờ, không action; `blocked_by` hiện ở tooltip.
+- Mục đã xoá: đọc event `checkpoint_pruned` trong events.jsonl → dòng gạch ngang "đã xoá lúc X bởi Y" (khép vòng lặp).
 - UI chỉ cung cấp lệnh **dry-run** để copy; lệnh `--apply` **không** có nút copy — xoá thật đi qua quy trình phê duyệt PM/user (CLAUDE.md).
 
 ## A4. Trạng thái & badge dùng chung

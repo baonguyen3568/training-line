@@ -97,3 +97,7 @@ Nguồn: https://build.nvidia.com/spark/vlm-finetuning/troubleshooting ; https:/
 - [ ] Đã chạy dry-run, có tổng dung lượng
 - [ ] > 20GB hoặc artifact "release" → PM + security đồng ý
 - [ ] Ghi log vào `.team/log/<ngày>.md` (đã xoá gì, bao nhiêu GB)
+
+## 10. RESET — app no-code node-graph (2026-10-12)
+- ComfyUI cache mode: classic (mặc định, dọn mạnh), `--cache-lru N` (giữ N output node), `--cache-none`, RAM-pressure (`--cache-ram`, ngân sách mặc định ~16GB); in-memory, chỉ dọn sau khi prompt chạy xong. Nguồn: mirror execution.py (https://huggingface.co/vidfom/LTX-2-S/blob/main/ComfyUI/execution.py), https://mintlify.wiki/Comfy-Org/ComfyUI/concepts/execution. Cờ phụ thuộc phiên bản, cần kiểm lại trên repo chính thức.
+- Áp vào dự án: output node nặng (GB) → cache trên disk, content-addressed, LRU, có trần; RAM cache chỉ cho output nhỏ. Xem P005 §6.

@@ -42,6 +42,7 @@ du -sh outputs/runs/*/checkpoints/*/optim 2>/dev/null   # optimizer state ≈ 2x
 docker ps -a --filter name=^vlm- --format '{{.Names}}\t{{.Status}}\t{{.Size}}'
 docker images --filter label=project=vlm-training --format '{{.Repository}}:{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}'
 docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}' | grep -E '^vlm-'
+grep -v '^#' docker/IMAGES.lock 2>/dev/null | awk -F' \\| ' '{print $2, $6, $9}'   # pinned NGC base images (no label) — count toward footprint
 docker volume ls --filter label=project=vlm-training
 docker buildx du --builder vlm-builder 2>/dev/null | tail -3
 ```

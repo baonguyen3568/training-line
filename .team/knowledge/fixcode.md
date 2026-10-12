@@ -32,6 +32,11 @@
 | Mixed torch/transformers/TE/triton drift sau `pip install X` | Bare pip kéo version khác của torch (x86/CUDA12 hoặc CPU-only!) | Luôn `uv pip install --no-deps` cho package có pin torch; check `pip show torch` sau mỗi install; ưu tiên container NGC |
 | `torch.cuda.is_available() == False` trong container | Thiếu `--gpus all` / `--runtime=nvidia`, hoặc torch CPU wheel bị kéo đè | `python -c "import torch;print(torch.__version__, torch.version.cuda)"` — có `+cpu` là bị đè |
 
+**Đo thực tế trên máy này (2026-10-12, bao-fixcode)** — `nvcr.io/nvidia/pytorch:25.11-py3` (torch 2.10.0a0 nv25.11, CUDA 13.0, Triton 3.5.0, cap (12,1)), chạy native trên driver 580.142:
+- Image đã **tự set `TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas`** (ptxas CUDA 13.0) → Triton `@jit`, `torch.compile` (Inductor), SDPA bf16 đều OK, không gặp lỗi `sm_121a`.
+- ⚠️ **`TRITON_PTXAS_PATH=""` (set nhưng rỗng) làm Triton crash**: `PermissionError: [Errno 13] Permission denied: ''` ở `triton/knobs.py`. Trong compose/docker `-e TRITON_PTXAS_PATH=$VAR` với VAR rỗng là dính lỗi này → chỉ set khi có giá trị, hoặc để image tự lo.
+- Probe: `scratchpad triton_probe/probe.py` (add kernel + torch.compile + SDPA), ~1 phút, `--memory=8g`.
+
 ### 2.2 Bộ nhớ hợp nhất (UMA) — lớp lỗi nguy hiểm nhất
 - **`nvidia-smi` không báo memory** (Not Supported) — đúng thiết kế [OFF]. Đo bằng `/proc/meminfo` (`MemAvailable`, `SwapFree`), `free -g`, `torch.cuda.memory_allocated/reserved`.
 - **`cudaMemGetInfo` / `torch.cuda.mem_get_info()` báo THIẾU** vì không tính bộ nhớ có thể reclaim (page cache, swap) [OFF]. Ước lượng đúng: `MemAvailable` (không swap) hoặc `MemAvailable + SwapFree` (có swap). NVIDIA khuyên không dựa riêng vào cudaMemGetInfo [OFF].

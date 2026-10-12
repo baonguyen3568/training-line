@@ -189,3 +189,18 @@ Nguồn: [Retype — Mermaid](https://retype.com/components/mermaid/) ·
 - bao-frontend: stack (Next.js vs Streamlit/Gradio vs nhúng MLflow UI) — ảnh hưởng mức độ tuỳ biến design system.
 - bao-cleanup: ngưỡng RAM an toàn trên máy dùng chung.
 - bao-pm/user: ai dùng dashboard, truy cập từ đâu (localhost / LAN), có cần auth không (→ bao-security).
+
+---
+## 11. Bổ sung sau RESET (2026-10-12): UX no-code node-graph
+Spec đầy đủ: `.team/proposals/010-nocode-ux.md`; skill: `design-nocode-node-ux`.
+- ComfyUI: cổng/dây cùng màu theo kiểu, chỉ nối cùng màu; reroute native; subgraph gom node + expose widget cho template; lỗi missing node hiện
+  trước khi queue nhưng có thể thành chuỗi dialog kẹt UI → bài học: không modal chain. ([links](https://docs.comfy.org/development/core-concepts/links),
+  [subgraphs](https://blog.comfy.org/p/subgraphs-are-coming-to-comfyui), [troubleshooting](https://www.rundiffusion.com/troubleshooting-workflows-in-comfyui))
+- Unreal Blueprint: exec pin trắng quyết định thứ tự, data pin màu theo kiểu; màu chỉ là gợi ý, cùng màu vẫn có thể không tương thích.
+  ([UE 4.26 scripting](https://docs.unrealengine.com/4.26/ProgrammingAndScripting/Blueprints/Scripting), [forum](https://forums.unrealengine.com/t/ue4-node-lines-colour-meanings/404255))
+- LlamaBoard: form 4 tab Train/Eval/Chat/Export, zero-code — đơn giản nhưng không có graph/lineage. ([docs](https://llamafactory.readthedocs.io/en/latest/getting_started/webui.html))
+- Novice & VPL: blank canvas là rào cản lớn (InstructPipe 2024, [arXiv 2312.09672](https://arxiv.org/pdf/2312.09672)); novice làm tốt hơn với control-flow
+  ([Brunel](https://bura.brunel.ac.uk/handle/2438/9217)) → bù bằng số thứ tự bước + làn bước.
+- Lỗi: ngôn ngữ thường, chỉ rõ vấn đề, gợi ý xây dựng, không đổ lỗi ([NN/g](https://www.nngroup.com/videos/error-message-communication-guidelines/));
+  inline validation ~500 ms. Progressive disclosure cho Simple/Advanced, người dùng chủ động & đảo được ([NN/g](https://www.nngroup.com/videos/progressive-disclosure/)).
+- Màu cổng: validator → chỉ 3 hue an toàn all-pairs; cổng dùng 4 họ (3 màu + ink) + hình dạng + nhãn luôn hiện.

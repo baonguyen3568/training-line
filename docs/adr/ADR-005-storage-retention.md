@@ -11,7 +11,7 @@ Chấp nhận toàn bộ D1–D8 của Proposal 005 v3. Tóm tắt:
 - Layout `outputs/runs/<run_id>/` theo D2; file contract của dashboard nằm trong whitelist không bao giờ xoá.
 - Checkpoint: giữ 2 bản gần nhất + bản consolidated cuối. Chỉ strip optim khi `status=completed`.
 - Docker: label `project=vlm-training`, prefix `vlm-`, builder riêng `vlm-builder`. Image NGC chỉ xoá theo quy trình 2 bước trong D7.10.
-- Quota warn 500GB / critical 800GB; **tạm thời, user có thể đổi**.
+- Quota warn 500GB / critical 800GB (user xác nhận 2026-10-12).
 - Pre-flight D8 là bắt buộc trước khi lấy GPU_LOCK. Không `drop_caches`/sudo; khi từ chối chạy thì báo PM.
 - Ngưỡng bộ nhớ (dùng chung với Proposal 007, 1 code path `common/memguard.py`):
   - Preflight: `MemAvailable ≥ est_peak + max(10GB, 20%×est_peak)`, sàn cứng 20GB, `SwapFree ≥ 2GB`.

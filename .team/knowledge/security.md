@@ -163,3 +163,26 @@ Nguyên tắc: mục tiêu dùng (research nội bộ vs thương mại) phải 
 | Image CVE/SBOM | trivy / grype / syft | chạy bằng container pin digest |
 | Pickle scan (lớp phụ) | modelscan / fickling / picklescan | `uvx modelscan -p <path>` — **không** thay cho chính sách safetensors-only |
 | Docker lint | hadolint | `docker run --rm -i hadolint/hadolint < Dockerfile` |
+
+---
+
+## 11. Bổ sung sau RESET (app no-code node-graph) — 2026-10-12
+
+**ComfyUI ecosystem (bài học trực tiếp)**
+- Custom node độc hại: ComfyUI_LLMVISION (06/2024, wheel giả openai/anthropic, đánh cắp credential); ultralytics bị chiếm (12/2024) lan qua node. Comfy Registry sau đó cấm `eval/exec`, cấm pip install lúc runtime, cấm obfuscation. [Comfy blog 01/2025](https://blog.comfy.org/p/comfyui-2025-jan-security-update), [Registry standards](https://docs.comfy.org/registry/standards)
+- ComfyUI-Manager: CVE-2025-67303 (fix ≥3.38) bị botnet đào coin khai thác năm 2026 để tự cài node; CVE-2026-22777 (bypass security level → RCE, fix 3.39.2 / 4.0.5). [Censys](https://censys.com/blog/comfyui-servers-cryptomining-proxy-botnet/), [CSA](https://labs.cloudsecurityalliance.org/research/csa-research-note-ai-workload-exposure-cryptomining-20260408/)
+- License: ComfyUI + ComfyUI_frontend **GPL-3.0**; litegraph.js, xyflow, Langflow MIT; LLaMA-Factory Apache-2.0; Flowise Apache-2.0 trừ `packages/server/src/enterprise`. (Xác minh từ file LICENSE ngày 2026-10-12.)
+
+**App web local**
+- DNS rebinding: Ollama CVE-2024-28224 (fix: kiểm Host header); NemoClaw 2026 (bind 0.0.0.0 bỏ qua kiểm Host). [NCC](https://www.nccgroup.com/research/technical-advisory-ollama-dns-rebinding-attack-cve-2024-28224/), [Cyera](https://www.cyera.com/research/nemoclaw-one-website-visit-to-hijack-your-ai-agent)
+- Phòng thủ: bind 127.0.0.1, allowlist Host, kiểm Origin (cả WS), header CSRF, không bật CORS, auth bằng token khởi động → cookie HttpOnly SameSite=Strict, redact token trong access log.
+
+**vLLM mới**
+- GHSA-h3rc-6mm3-gc2m (06/10/2026, High): RCE qua `code_revision` trong `mm_processor_kwargs` khi trust_remote_code=True + processor dùng auto_map. `/tokenize` không auth kể cả khi set `--api-key`. Ảnh hưởng 0.7.3 ≤ v < 0.31.0 (máy đang có 0.27.1). [advisory](https://github.com/vllm-project/vllm/security/advisories/GHSA-h3rc-6mm3-gc2m)
+- Nhiều advisory DoS trên đường xử lý multimodal/video trong 09-10/2026 (max_frames, processor cache, cache_salt). Serve cho end-user phải pin bản mới nhất và giới hạn input.
+
+**License model (xác minh 2026-10-12)**
+- Qwen3.5 / 3.6 / 3.8: Apache-2.0, kiến trúc native, không remote code.
+- Nemotron-3-Nano-Omni: remote code **bắc cầu** — `vision_config.auto_map` trỏ `nvidia/C-RADIOv4-H` (không pin revision). Bài học chung: khi review remote code phải kiểm `auto_map` trong **mọi sub-config**, không chỉ config gốc. Hồ sơ: `.team/security-reviews/2026-10-12-nemotron-3-nano-omni.md`.
+- Gemma 4: **Apache-2.0, commercial=yes**. Gemma Terms of Use (sửa 2026-04-01) chỉ áp dụng cho các model trong Appendix (Gemma 1→3n…), ghi rõ "For Gemma 4 terms, see the Gemma 4 license" (/gemma/apache_2). Prohibited Use Policy gắn với ToU nên không ràng buộc Gemma 4 về license. [ToU](https://ai.google.dev/gemma/terms)
+- NVIDIA Open Model Agreement (v. 2026-03-09): được dùng thương mại và làm derivative. Khi phân phối phải kèm license + câu "Licensed by NVIDIA Corporation under the NVIDIA Open Model Agreement". License chấm dứt nếu kiện NVIDIA về IP. Nemotron-3-Nano-Omni cần remote code.

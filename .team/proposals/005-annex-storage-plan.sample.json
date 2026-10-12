@@ -1,0 +1,197 @@
+{
+  "_comment": "ILLUSTRATIVE SAMPLE (P005 §6 R3, Plan JSON v2). Hand-written by bao-cleanup for frontend/design fixtures; values are fake. Real output comes from retention.plan() via GET /api/storage/plan. Confirm rule (pending design/PM): typed confirm only if non-regenerable or redownload > 20GB; max one typed confirm per dialog (riskiest item). Naming: display_name = raw user/model-given name (else null); system-generated labels use display_key + display_params (copy in src/vlm_pipeline/i18n/{vi,en}.yaml). needs_approval depends on server config storage.approval_policy: none (personal install) → always false; threshold (shared project dev machine, default 20GB) → true above threshold. This sample = personal install (none). threshold_gb = approval_threshold_gb when policy=threshold, else null.",
+  "schema_version": 2,
+  "plan_id": "pln_20261012T1630_7f3a",
+  "ts": "2026-10-12T16:30:00+07:00",
+  "expires_at": "2026-10-12T16:40:00+07:00",
+  "mode": "dry_run",
+  "scope": "all",
+  "reason": "DISK_FULL",
+  "total_reclaim_gb": 51.2,
+  "needs_approval": false,
+  "approval_reason": null,
+  "confirm_required": true,
+  "confirm_text": "Qwen3-VL-32B-NVFP4",
+  "items": [
+    {
+      "item_id": "itm_hf_qwen3vl32b_nvfp4",
+      "group": "downloaded_model",
+      "display_name": "Qwen3-VL-32B-NVFP4",
+      "display_key": null,
+      "display_params": {},
+      "size_gb": 27.0,
+      "last_used": "2026-10-01T09:12:00+07:00",
+      "used_by": [
+        "Đọc hoá đơn"
+      ],
+      "action": "delete",
+      "regenerable": true,
+      "regen_estimate_min": null,
+      "redownload_gb": 27.0,
+      "locked": false,
+      "lock_reason_code": null,
+      "consequence_code": "WILL_REDOWNLOAD",
+      "consequence_params": {
+        "workflow": "Đọc hoá đơn",
+        "gb": 27.0
+      },
+      "confirm_required": true,
+      "event_type": "hf_model_removed",
+      "advanced": {
+        "path": ".cache/hf/hub/models--example--Qwen3-VL-32B-NVFP4",
+        "revision": "abc1234"
+      }
+    },
+    {
+      "item_id": "itm_run_sft0412_ckpt",
+      "group": "temp_result",
+      "display_name": null,
+      "display_key": "storage.item.temp_result_of_run",
+      "display_params": {
+        "run_name": "sft-0412"
+      },
+      "size_gb": 22.0,
+      "last_used": "2026-10-04T21:40:00+07:00",
+      "used_by": [],
+      "action": "delete",
+      "regenerable": true,
+      "regen_estimate_min": 60,
+      "redownload_gb": null,
+      "locked": false,
+      "lock_reason_code": null,
+      "consequence_code": "WILL_RECOMPUTE",
+      "consequence_params": {
+        "minutes": 60
+      },
+      "confirm_required": false,
+      "event_type": "cache_evicted",
+      "advanced": {
+        "run_id": "20261004-2100-sft-qwen3vl2b-a1b2",
+        "path": "outputs/runs/20261004-2100-sft-qwen3vl2b-a1b2/checkpoints",
+        "rule": "R1.cache_lru",
+        "roles": []
+      }
+    },
+    {
+      "item_id": "itm_ds_sample_old",
+      "group": "dataset",
+      "display_name": "sample-v1",
+      "display_key": null,
+      "display_params": {},
+      "size_gb": 2.2,
+      "last_used": "2026-09-20T10:00:00+07:00",
+      "used_by": [],
+      "action": "delete",
+      "regenerable": true,
+      "regen_estimate_min": 5,
+      "redownload_gb": null,
+      "locked": false,
+      "lock_reason_code": null,
+      "consequence_code": "WILL_RECOMPUTE",
+      "consequence_params": {
+        "minutes": 5
+      },
+      "confirm_required": false,
+      "event_type": "dataset_removed",
+      "advanced": {
+        "path": "data/processed/sample-v1"
+      }
+    },
+    {
+      "item_id": "itm_trained_lora_invoice",
+      "group": "trained_model",
+      "display_name": "LoRA Đọc hoá đơn v2",
+      "display_key": null,
+      "display_params": {},
+      "size_gb": 0.4,
+      "last_used": "2026-10-11T15:00:00+07:00",
+      "used_by": [
+        "Đọc hoá đơn"
+      ],
+      "action": "keep",
+      "regenerable": false,
+      "regen_estimate_min": null,
+      "redownload_gb": null,
+      "locked": true,
+      "lock_reason_code": "IN_USE_BY_RUNNING_WORKFLOW",
+      "consequence_code": null,
+      "consequence_params": {},
+      "confirm_required": true,
+      "event_type": "checkpoint_pruned",
+      "advanced": {
+        "run_id": "20261011-1400-lora-qwen3vl2b-c3d4",
+        "path": "outputs/runs/20261011-1400-lora-qwen3vl2b-c3d4/export",
+        "roles": [
+          "KEEP"
+        ]
+      }
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261004-2100-sft-qwen3vl2b-a1b2",
+      "status": "completed",
+      "keep": false,
+      "items": [
+        {
+          "path": "checkpoints/epoch_0_step_500",
+          "kind": "checkpoint",
+          "roles": [
+            "LATEST",
+            "BEST"
+          ],
+          "action": "strip_optim",
+          "reclaim_gb": 10.1,
+          "rule": "D3.latest_after_7d",
+          "reason": "LATEST > 7 days, strip optimizer only",
+          "blocked_by": null
+        },
+        {
+          "path": "checkpoints/epoch_0_step_400",
+          "kind": "checkpoint",
+          "roles": [],
+          "action": "delete",
+          "reclaim_gb": 11.9,
+          "rule": "D3.non_latest_7d",
+          "reason": "older than 7d, not LATEST/BEST",
+          "blocked_by": null
+        }
+      ]
+    },
+    {
+      "run_id": "20261012-1500-lora-qwen3vl2b-e5f6",
+      "status": "running",
+      "keep": false,
+      "items": [
+        {
+          "path": "checkpoints/epoch_0_step_100",
+          "kind": "checkpoint",
+          "roles": [
+            "LATEST"
+          ],
+          "action": "keep",
+          "reclaim_gb": 0,
+          "rule": "D3.status_gate",
+          "reason": "run not completed",
+          "blocked_by": "RUN_RUNNING"
+        }
+      ]
+    }
+  ],
+  "lock_reason_codes": [
+    "IN_USE_BY_RUNNING_WORKFLOW",
+    "PINNED_OR_KEEP",
+    "REQUIRED_PARENT_AT_LOAD",
+    "SECURITY_PROTECTED",
+    "WHITELIST",
+    "RUN_NOT_FINISHED"
+  ],
+  "consequence_codes": [
+    "WILL_REDOWNLOAD",
+    "WILL_RECOMPUTE",
+    "PERMANENT_LOSS",
+    "RESUME_IMPOSSIBLE"
+  ],
+  "approval_policy": "none",
+  "threshold_gb": null
+}

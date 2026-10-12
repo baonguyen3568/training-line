@@ -29,10 +29,10 @@ try:
 except FileExistsError:
     sys.exit("GPU_LOCK held: " + open(p).read())
 os.write(fd, json.dumps({"who": "bao-backend", "job": "JOB_DESC", "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                         "pid": None, "container": "vlm-JOBNAME"}, indent=1).encode()); os.close(fd)
+                         "host_pid": os.getppid(), "container": "vlm-JOBNAME"}, indent=1).encode()); os.close(fd)
 PY
 ```
-After launching, update `pid` (host PID of `docker run` or `docker inspect -f '{{.State.Pid}}' vlm-JOBNAME`).
+`host_pid` must be the HOST PID of the process that holds the lock for the whole job (the orchestrator / your shell), never a PID inside the container — the dashboard uses it for stale detection. Once `common/gpu_lock.py` exists (P008), use it instead of this snippet (tmp file + os.link, token).
 Tell bao-tester (they sample /proc/meminfo during spikes) and log a line in `.team/log/<date>.md`.
 
 ## 3. Run the container (conventions)

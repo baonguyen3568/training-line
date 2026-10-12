@@ -1,0 +1,69 @@
+# DRAFT copy for the "Dung lượng / Storage" panel (P010 §9, P005 Plan JSON v2).
+# Owner: bao-design. Will move into src/vlm_pipeline/i18n/{vi,en}.yaml once ADR for P009/P010 is accepted.
+# Placeholders in {braces} come from item.consequence_params / item fields. Keep titles short, no blame, absolute GB.
+
+group:
+  downloaded_model: {vi: "Model đã tải", en: "Downloaded models"}
+  trained_model:    {vi: "Model bạn đã train", en: "Your trained models"}
+  dataset:          {vi: "Dữ liệu", en: "Datasets"}
+  temp_result:      {vi: "Kết quả tạm (có thể tính lại)", en: "Temporary results (can be regenerated)"}
+
+lock_reason:
+  IN_USE_BY_RUNNING_WORKFLOW:
+    vi: "Workflow \"{workflow}\" đang chạy và cần mục này. Chờ chạy xong rồi xoá."
+    en: "Workflow \"{workflow}\" is running and needs this. Delete it after it finishes."
+  PINNED_OR_KEEP:
+    vi: "Đã được ghim để giữ lại. Bỏ ghim nếu bạn muốn xoá."
+    en: "Pinned to keep. Unpin it if you want to delete it."
+  REQUIRED_PARENT_AT_LOAD:
+    vi: "Phần học thêm (LoRA) \"{child}\" vẫn cần model này để chạy. Xoá phần học thêm trước."
+    en: "The add-on (LoRA) \"{child}\" still needs this model to run. Delete the add-on first."
+  SECURITY_PROTECTED:
+    vi: "Được bảo vệ theo quy định an toàn của dự án. Liên hệ quản trị viên nếu cần xoá."
+    en: "Protected by the project's safety rules. Contact an admin if it must be removed."
+  RUN_NOT_FINISHED:
+    vi: "Run \"{run}\" chưa xong hoặc đang tạm dừng — cần mục này để chạy tiếp."
+    en: "Run \"{run}\" is unfinished or paused — it needs this to continue."
+  WHITELIST:  # usually hidden in Simple mode
+    vi: "Lịch sử chạy (nhật ký, số đo) luôn được giữ lại."
+    en: "Run history (logs, metrics) is always kept."
+
+consequence:
+  WILL_REDOWNLOAD:
+    vi: "Workflow \"{workflow}\" sẽ phải tải lại {gb} GB ở lần chạy sau."
+    en: "Workflow \"{workflow}\" will need to download {gb} GB again next time."
+    vi_no_workflow: "Sẽ phải tải lại {gb} GB nếu bạn cần dùng lại."
+    en_no_workflow: "You will need to download {gb} GB again if you use it later."
+  WILL_RECOMPUTE:
+    vi: "Có thể tạo lại, mất khoảng {minutes} phút."
+    en: "Can be regenerated in about {minutes} minutes."
+  PERMANENT_LOSS:
+    vi: "\"{name}\" sẽ mất vĩnh viễn — không khôi phục hay tạo lại y hệt được."
+    en: "\"{name}\" will be lost permanently — it cannot be restored or recreated exactly."
+  RESUME_IMPOSSIBLE:
+    vi: "Model vẫn dùng được, nhưng không thể train tiếp run \"{run}\" từ điểm này."
+    en: "The model still works, but run \"{run}\" can no longer continue training from this point."
+
+dialog:
+  title:          {vi: "Xoá {count} mục, giải phóng {gb} GB?", en: "Delete {count} items and free {gb} GB?"}
+  typed_confirm:  {vi: "Gõ  {confirm_text}  để xác nhận", en: "Type  {confirm_text}  to confirm"}
+  typed_reason_permanent: {vi: "Mục này không tạo lại được.", en: "This item cannot be recreated."}
+  typed_reason_redownload: {vi: "Phải tải lại {gb} GB.", en: "{gb} GB would have to be downloaded again."}
+  cancel:         {vi: "Huỷ", en: "Cancel"}
+  confirm:        {vi: "Xoá vĩnh viễn", en: "Delete permanently"}
+  plan_expired:   {vi: "Danh sách đã cũ (quá 10 phút). Đang kiểm tra lại…", en: "This list is out of date (over 10 minutes). Checking again…"}
+  # Only shown when plan.needs_approval=true (storage.approval_policy=threshold, shared dev machine). Personal installs: policy=none, never shown.
+  approval_needed: {vi: "Tổng dung lượng xoá lớn hơn {threshold_gb} GB nên cần quản trị viên duyệt trước.", en: "This deletes more than {threshold_gb} GB, so an admin must approve it first."}
+
+error_apply:
+  APPROVAL_REQUIRED: {vi: "Cần quản trị viên duyệt trước khi xoá {gb} GB. Danh sách đã được giữ nguyên, chưa xoá gì.", en: "An admin must approve before {gb} GB can be deleted. Nothing has been deleted yet."}
+
+event_done:  # "Đã xoá lúc X" for hf_model_removed | dataset_removed | cache_evicted | checkpoint_pruned
+  vi: "Đã xoá lúc {time} bởi {who}"
+  en: "Deleted at {time} by {who}"
+
+preflight_hint:
+  free_temp: {vi: "Giải phóng {gb} GB từ kết quả tạm", en: "Free {gb} GB from temporary results"}
+
+item:  # system-generated display names (display_key = storage.item.<key>)
+  temp_result_of_run: {vi: "Kết quả tạm của run {run_name}", en: "Temporary results of run {run_name}"}

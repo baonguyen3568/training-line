@@ -1,0 +1,4 @@
+# Pinned container images for the project. Use the @sha256 reference, never the bare tag.
+# Columns: name | tag | index digest (multi-arch) | linux/arm64 manifest digest | local image id | size | vetted-by | date | status
+nemo-automodel | nvcr.io/nvidia/nemo-automodel:26.08 | sha256:b0bd0e50b29cb0a3ec69c3cbbb49652d3c1aabedbfe22ee0fa6d053b6bb33aee | sha256:70b4e9df8dd23ef451372b25952cffe24ad29c17f5b9de5fd1b244caf4e7b55a | sha256:2be11371c4f290592b10ba1a4684dd195be0c2ce180409e8f5f571e8bccb634e | 29.4GB | bao-security APPROVED | 2026-10-12 | CANDIDATE — pulled, NOT verified to run: CUDA 13.3 > 13.1 limit for host driver 580 (user decision 2026-10-12: keep driver 580 → default images must be CUDA <= 13.1)
+# DEFAULT (to be confirmed with bao-research, not pulled yet): nemo-automodel:26.02 (CUDA 13.0) + nemo_automodel pinned commit if newer VLM recipes needed

@@ -30,7 +30,7 @@ Cập nhật: 2026-10-12. Nguồn ở cuối file. Ký hiệu: ✅ đã đo/xác
 | nemo-automodel:26.08 (= v0.6.0) | 13.3.0 | 610.43 | 2.13 | ❓ rủi ro cao |
 | nemo:26.08 | 13.3.0 | 610.43 | 2.13 | ❓ rủi ro cao |
 | nemo-rl:v0.7.0 | 13.2.0 | 595.45 | — | ❓ rủi ro cao |
-| pytorch:25.11-py3 | 13.0.2 | 580.95 | 2.10 | ✅ đã chạy (matmul+SDPA) |
+| pytorch:25.11-py3 | 13.0.2 | 580.95 | 2.10 | ✅ đã chạy (matmul+SDPA; Triton 3.5.0 @jit + torch.compile PASS — bao-fixcode) |
 | pytorch:26.01-py3 | 13.1.1 | 590.48 | 2.10 | ✅ dự kiến (forward-compat) |
 | vllm:25.12.post1-py3 | 13.1.0 | 590.44 | 2.10 | ✅ đã chạy (forward-compat) |
 | vllm:26.01-py3 (vLLM 0.13) | 13.1.1 | 590.48 | — | ✅ dự kiến |

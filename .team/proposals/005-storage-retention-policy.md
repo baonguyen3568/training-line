@@ -81,6 +81,7 @@ LoRA: adapter có cả trong `checkpoints/epoch_*/model/` và `export/` → tín
 - Build bằng builder riêng: `docker buildx create --name vlm-builder --driver docker-container` → prune chỉ builder này.
 - Dọn (dry-run → apply): container exited `vlm-*` > 72h; dangling image label dự án > 7 ngày; image tag cũ không còn trong ADR (kiểm tra `docker ps -a --filter ancestor=` không có container ngoài dự án).
 - Base NGC image (20-30GB): chỉ giữ tag đang pin trong ADR-001 + 1 tag trước (rollback).
+- **Image dự án hiện có** (theo `docker/IMAGES.lock`, security APPROVED): `nvcr.io/nvidia/nemo-automodel:26.08` @ `sha256:b0bd0e50…` (arm64 `sha256:70b4e9df…`), 29.4 GB — **giữ**; tính vào footprint dự án; không có label → nhận diện qua IMAGES.lock (D7 mục 10).
 
 ### D6. Quota & cảnh báo
 | Chỉ số | Warn → PM | Critical |
@@ -112,7 +113,7 @@ LoRA: adapter có cả trong `checkpoints/epoch_*/model/` và `export/` → tín
 1. Dry-run mặc định; `--apply` mới xoá; in danh sách + tổng GB.
 2. `realpath` phải nằm dưới project root; từ chối symlink trỏ ra ngoài.
 3. Bỏ qua: `KEEP`, target `LATEST`/`LOWEST_VAL`, file đang mở (`fuser`), run đang giữ `.team/GPU_LOCK`, checkpoint có file `.tmp`/đang async save.
-4. Tổng > 20GB hoặc có `export/` → cần xác nhận PM + bao-security (flag `--approved-by`).
+4. Tổng > 20GB hoặc có `export/` → cần xác nhận PM + bao-security (flag `--approved-by`). *Trong app: theo `storage.approval_policy` (§6 R2) — máy dev chung của dự án = `threshold` (giữ nguyên luật này); bản cài cá nhân = `none`.*
 5. Mọi lần `--apply` append log `.team/log/YYYY-MM-DD.md` + `outputs/system/cleanup.jsonl`.
 6. **Whitelist không bao giờ xoá** (yêu cầu bao-frontend): `run.json`, `metrics.jsonl`, `system.jsonl`, `events.jsonl`, `logs/`, toàn bộ `benchmarks/`.
 7. Mỗi lần prune checkpoint/export → append vào `outputs/runs/<run_id>/events.jsonl`: `{"event":"checkpoint_pruned","path":...,"action":"strip_optim|delete","bytes":...,"ts":...,"by":...,"approved_by":...}` để dashboard hiển thị "đã xoá" thay vì link hỏng.
@@ -124,7 +125,8 @@ LoRA: adapter có cả trong `checkpoints/epoch_*/model/` và `export/` → tín
 ## 3. Deliverables (Phase 2, sau ADR)
 - `scripts/cleanup/disk_report.py`, `scripts/cleanup/retention.py` (pure Python, stdlib + pydantic config `configs/cleanup/retention.yaml`), unit test với thư mục giả (tmp_path) — nhờ bao-tester review.
 - `.env.example` cache vars; snippet LABEL cho Dockerfile (bao-backend áp dụng).
-- `retention.py` dry-run xuất JSON (schema_version 1): `runs[].items[]` với `roles`, `action` (keep|strip_optim|delete), `reclaim_gb`, `rule`, `reason`, `blocked_by`; top-level `total_reclaim_gb`, `needs_approval`. Dùng cho view retention của bao-design (P006 v1.1).
+- `retention.py` dry-run xuất JSON (schema_version 1): `runs[].items[]` với `roles`, `action` (keep|strip_optim|delete), `reclaim_gb`, `rule`, `reason`, `blocked_by`; top-level `total_reclaim_gb`, `needs_approval` (theo `storage.approval_policy` của deployment — xem §6 R2). Dùng cho view retention của bao-design (P006 v1.1).
+- Plan JSON v2 (để phục vụ panel no-tech, P010 §9): thêm `items[]` phẳng bên cạnh `runs[]`, mỗi item: `item_id`, `group` (downloaded_model|trained_model|dataset|temp_result), `display_name` (chỉ tên raw do user/model đặt, else null) | `display_key` + `display_params` (nhãn hệ thống sinh, i18n), `size_gb`, `last_used`, `used_by[]` (tên workflow), `action`, `regenerable`, `regen_estimate_min`, `redownload_gb`, `locked`, `lock_reason_code`, `consequence_code` + params (UI dịch sang lời), `confirm_required`, `confirm_text`, `event_type` (checkpoint_pruned|cache_evicted|hf_model_removed|dataset_removed).
 - Kiểm tra định kỳ git index (yêu cầu security): file >5MB hoặc `.env*` bị stage/commit → báo security + PM (`git ls-files -s` + `git diff --cached --name-only`).
 - Pre-commit `check-added-large-files --maxkb=1000` (chốt trong Proposal 004 §4).
 
@@ -139,3 +141,53 @@ LoRA: adapter có cả trong `checkpoints/epoch_*/model/` và `export/` → tín
 - **Dùng HF cache global**: tiết kiệm tải trùng nhưng không dọn được an toàn, footprint không đo được → loại.
 - **Giữ tất cả checkpoint** (mặc định AutoModel): model 8B full-FT ~ 50GB/checkpoint với optim → vài chục bản = TB → loại.
 - **Cron tự xoá không cần người**: rủi ro cao trên máy chung giai đoạn đầu → chỉ tự động phần an toàn (xet cache, `.incomplete`, smoke runs); phần còn lại dry-run + báo cáo.
+
+## 6. Ảnh hưởng của RESET (2026-10-12) — app no-code node-graph
+ADR-005 **giữ nguyên** (scope, dry-run, D7 an toàn, D8 preflight). Mọi quy tắc vẫn áp dụng, chỉ đổi *ai* kích hoạt: người dùng no-tech qua UI thay vì team qua CLI. Bổ sung:
+
+### R1. Node output cache = loại dữ liệu mới (lớn nhất tiềm năng)
+Khác ComfyUI: output node của ta là dataset, checkpoint, model quantized (GB–chục GB), không phải ảnh/latent trong RAM.
+- ComfyUI có 4 chế độ cache (classic / LRU `--cache-lru N` / none / RAM-pressure), tất cả là **in-memory** và chỉ dọn sau khi prompt chạy xong. Trên GB10 (UMA, ~40G thực) giữ output nặng trong RAM = nguy cơ OOM treo host → **không áp dụng nguyên mẫu**.
+- **Chốt với bao-backend (khớp P009 §5)**: cache trên disk, **không nhân đôi dữ liệu**. Output node nặng chỉ nằm ở `outputs/runs/<run_id>/` (mỗi node nặng 1 run dir). Index cache = bảng `artifacts` trong **SQLite `outputs/app.db` (WAL) — nguồn sự thật duy nhất** (cache_key, path, hash manifest, parent ids, `last_hit_at`, `pinned`, `state`, `evicted_at`); không có `entry.json`. `cache_key = H(type_id, version, params_canonical, input artifact hashes, image_digest)`.
+- **Evict = xoá bytes, không xoá lịch sử**: chỉ xoá dữ liệu nặng (`checkpoints/`, `engines/`, output nặng), giữ whitelist D7 (`run.json`, `*.jsonl`, `logs/`) + `export/` do người dùng đặt tên; `run.json.status = evicted` + event `cache_evicted`.
+- **Evict 3 bước** (tránh race với executor): transaction đặt `state=evicting` (executor coi là miss) → xoá file → `state=evicted`. Khi cache hit, executor kiểm path tồn tại + hash manifest; lệch → miss + cảnh báo.
+- **Lineage**: không evict artifact có con còn sống với cạnh `requires_parent_at_load` (vd LoRA adapter → base là output full-FT của node trước). Bản quantized/merged tự chứa → cha evict được.
+- Node tải HF tham chiếu `.cache/hf` (không bản thứ hai). `cacheable=false`: `serve.vllm`/Endpoint, `playground.chat`, `export.*`, nguồn local chưa có manifest hash.
+- Trần 200 GB chỉ tính **run evict được** (không pinned / `KEEP` / export / có con `requires_parent_at_load`).
+- RAM cache in-process chỉ cho output nhỏ (metadata, preview, metrics), giới hạn cứng (vd ≤ 2 GB tổng, LRU).
+- Output "nặng" mà người dùng đã lưu/đặt tên (model đã train, bản quantized dùng để export) **không phải cache** → chuyển thành *artifact* trong `outputs/runs/<run_id>/export/`, theo retention D3 bình thường.
+- Retention cache: LRU theo `last_used`, trần riêng (đề xuất 200 GB, nằm trong quota 500 GB); entry đang được graph mở/đang chạy hoặc `pinned` không bị xoá; xoá cache luôn an toàn về mặt dữ liệu (tính lại được) nhưng tốn thời gian → UI hiển thị "tính lại mất ~X phút".
+- **Điều kiện PM (chốt 2026-10-12)**:
+  1. 200 GB là **trần trên, không phải phần giữ chỗ**. Khi footprint dự án chạm warn (500 GB), cache node là thứ **bị evict LRU đầu tiên**, trước khi đụng tới checkpoint/export. Thứ tự giải phóng: cache node → `.cache/hf/xet` + `hf cache prune` (revision mồ côi) → engines (rebuild được) → eval raw > 14 ngày → mới tới checkpoint theo D3.
+  2. Trần **cấu hình được trong Settings của app** (`storage.node_cache_max_gb`), vì máy của người dùng khác có ổ khác. Mặc định (PM chốt) = min(200 GB, 10% dung lượng trống lúc cài đặt). Validate: không cho đặt vượt quota dự án.
+- Cần thống nhất với bao-backend + bao-frontend (Proposal 009: executor) về định nghĩa cache key và cờ `cacheable` per node type (vd node download HF → cache = HF cache, không nhân đôi).
+
+### R2. Panel "Dung lượng" cho người dùng no-tech
+- Nguồn dữ liệu = `disk_report.json` + `retention.py` dry-run JSON (đã chốt shape với design/frontend) + danh sách cache node.
+- Hiển thị theo ngôn ngữ người dùng: "Model đã tải", "Model bạn đã train", "Dữ liệu", "Kết quả tạm (có thể tính lại)", kèm dung lượng + lần dùng cuối; KHÔNG hiện đường dẫn/khái niệm optim/DCP trừ chế độ nâng cao.
+- **Nút xoá an toàn** (khác dashboard team, nơi chỉ copy lệnh dry-run):
+  1. Bấm xoá → backend chạy dry-run → dialog liệt kê chính xác thứ sẽ bị xoá + dung lượng + hậu quả ("workflow 'LoRA demo' sẽ phải tải lại model 8 GB").
+  2. Gõ tên để xác nhận **chỉ khi** mục không tính lại được (model đã train) hoặc phải tải lại > 20 GB; mục tính lại được (kết quả tạm) chỉ cần nút xác nhận dù lớn. Tối đa 1 ô gõ/dialog, server trả `confirm_text` = mục rủi ro nhất (chốt với design, P010 §9). Model đã train **không khoá mặc định** — người dùng sở hữu dữ liệu của mình.
+  2b. **Duyệt theo deployment** (góp ý bao-frontend): cấu hình server `storage.approval_policy`:
+      `none` (mặc định cho bản cài cá nhân — người dùng là chủ dữ liệu, chỉ cần dialog) | `threshold` (`approval_threshold_gb`, mặc định 20; dùng cho **máy dev dùng chung của dự án**, khớp D7.4 + skill cleanup-safe-delete).
+      Plan JSON trả `approval_policy` + `threshold_gb` (null nếu `none`). Khi `threshold` và plan vượt ngưỡng: `needs_approval=true`, `POST /api/storage/apply` trả `APPROVAL_REQUIRED` trừ khi có `approved_by` hợp lệ (PM/security).
+      Body lỗi: `error_code`, `error_params{gb,threshold_gb}`, `deleted: []`, `approval_request{item_ids, requested_by, requested_at, admin_command}`; admin duyệt bằng CLI `retention.py --items ... --apply --approved-by <tên>` (tính lại plan nên không phụ thuộc plan_id hết hạn). Không bao giờ duyệt từ UI người dùng. Mẫu: `005-annex-storage-plan.threshold.sample.json`. UI hiện banner theo dữ liệu, không hard-code. Policy chỉ đổi được bởi người cài đặt (file config server), không đổi từ UI người dùng.
+  3. Mục được bảo vệ (D7 whitelist, LATEST của run đang chạy/interrupted, base model mà adapter đang phụ thuộc, artifact security) → nút bị khoá kèm lý do dễ hiểu.
+  4. Thực thi = cùng code path `retention.py --apply` (không có đường xoá thứ hai), ghi event `checkpoint_pruned`/`cache_evicted` với `by=<user>`.
+- Gợi ý chủ động: khi preflight (D8) báo thiếu disk → panel đề xuất "Giải phóng X GB từ kết quả tạm" (chỉ cache tính lại được).
+- **Phạm vi máy chung giữ nguyên**: panel chỉ thấy/xoá dữ liệu của app. Không hiện nút xoá cho docker image/HF cache ngoài dự án.
+
+### R3. Những gì đổi trong deliverables
+- Thêm rule LRU cache vào `retention.py`, đọc/ghi index qua `app.db` (API backend hoặc trực tiếp với WAL + transaction).
+- `retention.py` phải có API Python (không chỉ CLI) để backend gọi từ app server:
+  `plan(scope, reason, filters) -> Plan` (thuần, chỉ đọc; JSON shape như mục Deliverables) và `apply(plan_id, item_ids, approved_by) -> ApplyResult`.
+- HTTP (backend sở hữu, P009 §6, 127.0.0.1): `GET /api/storage/plan?scope=run|cache|all&reason=<error_code>&run_id=` → dry-run JSON + `plan_id` (hết hạn 10 phút);
+  `POST /api/storage/apply {plan_id, item_ids[], confirm}` → server **tính lại plan** và chỉ xoá item vẫn còn hợp lệ & nằm trong plan đã xem (chống TOCTOU); item đổi trạng thái → bỏ qua + báo lại.
+  Không có endpoint xoá theo path tuỳ ý. Apply đi qua cùng state `evicting→evicted` trong app.db; item thuộc node đang chạy / đang được cache hit bị loại khi tính lại plan (chốt với backend, P009 §6). `confirm` = tên mục khi item > 20 GB hoặc không tính lại được.
+- Error catalog action "Giải phóng dung lượng / Xoá checkpoint cũ" (DISK_FULL, preflight exit 3) → mở panel Dung lượng với `reason` + filter sẵn; chỉ gợi ý item an toàn trước (cache tính lại được), theo thứ tự giải phóng ở R1.
+- Giai đoạn hiện tại (chỉ reset + setup): không code, không tải gì; chờ Proposal 009 chốt executor rồi viết chi tiết R1.
+
+### Câu hỏi mở thêm
+6. ~~(P009) cache executor~~ → đã chốt với backend (R1, P009 §5).
+7. (design) Panel "Dung lượng" thuộc màn nào trong app no-code; ngôn ngữ nhãn cho người dùng không biết code.
+8. ~~(PM) trần cache 200 GB~~ → đồng ý, kèm 2 điều kiện (R1). ADR-005 cập nhật khi P009 chốt.

@@ -102,3 +102,7 @@ trên 1x DGX Spark GB10 (aarch64, 128GB unified memory, máy dùng chung).
 - NeMo AutoModel API (loggers): https://docs.nvidia.com/nemo/automodel/nemo-automodel/nemo_automodel/components
 - MLflow self-hosting: https://mlflow.org/docs/latest/self-hosting/
 - Lưu ý: một số thông tin (Gradio 6.x chi tiết, DCGM trên GB10) là nguồn thứ cấp/chưa xác minh — sẽ verify khi chốt stack.
+
+## Bổ sung 2026-10-12 (sau RESET)
+- Canvas editor: @xyflow/react 12.12 (MIT) — khuyến nghị; @comfyorg/litegraph **deprecated trên npm** (release cuối 2025-08-06); ComfyUI_frontend GPL-3.0.
+- Pitfall: `npm view <pkg> time.modified` KHÔNG phải ngày phát hành — deprecate cũng đổi modified. Luôn xem `time` theo version + `deprecated`.

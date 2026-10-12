@@ -1,4 +1,11 @@
 # Proposal 006 — Dashboard scope + design system
+
+> ## Ảnh hưởng của RESET (2026-10-12)
+> - UI chính là **canvas node-graph** (xem P009 + `009-annex-frontend-canvas.md`); dashboard này trở thành **các panel trong app** (run monitor, scorecard, Pareto, error analysis, demo).
+> - **Phương án A (Gradio thuần) bị loại** (không làm được canvas). B (FastAPI + React SPA, 127.0.0.1:7870) giữ nguyên và là nền cho editor.
+> - Giữ nguyên: data contract file-based, lớp đọc dữ liệu tách khỏi UI, bảo mật §8, design system/tokens (phụ lục 006).
+> - Thay đổi: §1 "read-only v1" bỏ — app sẽ tạo/chạy workflow qua API backend (P009); metadata benchmark là registry dữ liệu (bao-research), không hard-code.
+
 Tác giả: bao-frontend (stack, kiến trúc, data contract) + bao-design (UX flow, design system, wireframe)
 Trạng thái: DRAFT · 2026-10-12 · Reviewer: bao-pm, bao-backend, bao-security, bao-tester
 
@@ -95,7 +102,7 @@ Badge dùng chung: sanity FAIL · not reproducible · ≠ điều kiện · unve
 - Port 7860/6006/8080/11000 đã bị service khác chiếm → dải dự án 7870-7879.
 
 ## 8. Bảo mật (góp ý sơ bộ của bao-security đã đưa vào; chờ review chính thức)
-- Bind 127.0.0.1 port 7870, SSH tunnel; chưa cần auth ở v1. Kiểm `ss -tln` trước khi chiếm port.
+- Bind 127.0.0.1 port 7870, SSH tunnel. **Auth bắt buộc kể cả localhost** (sửa theo bao-security, P003 D13) — chi tiết ở 009 annex F7. Kiểm `ss -tln` trước khi chiếm port.
 - API key vLLM/TRT-LLM chỉ ở server (FastAPI/Gradio backend), browser không giữ key; không secret phía client.
 - Header: CSP `default-src 'self'; frame-ancestors 'none'` (không inline script nếu được), `X-Content-Type-Options: nosniff`;
   bundle hết, không CDN lúc runtime. CSP tách 2 tầng (bao-security đồng ý): SPA chặt; `/demo` nới tối thiểu — 'unsafe-inline' chỉ khi đo được là cần, tránh 'unsafe-eval',

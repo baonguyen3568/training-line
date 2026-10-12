@@ -16,14 +16,20 @@ outputs/system/disk_report.json   # by bao-cleanup (P005 D6): schema_version, ts
 benchmarks/<model_variant>/<benchmark>.json   # flat records, one per (variant, benchmark, metric)
 ```
 
+## Other sources
+- `outputs/system/meminfo-<ts>.jsonl` (bao-fixcode sampler, schema `vlm.system.meminfo/v1`, 60s): `schema_version, ts, mem_total_gb, mem_available_gb, cached_gb, swap_free_gb, gpu_lock_held` → history for memory widget (use mem_available_gb, never GPU memory).
+- Error records (P007 R9, schema `vlm.error/v0`, samples `.team/knowledge/error-samples-v0.jsonl`; code format `<GROUP>-<NNN>` e.g. MEM-003, `slug` for engineers only; copy from i18n `error.<code>.title|what|why` — `*_vi` in samples are fixture-only): `{schema_version, ts, phase(validate|runtime), code, slug, severity(error|warn|info), node_id, port?, params{}, why_vi, actions[{label_vi, kind(patch|resume|navigate), target, patch?:[{node_id,param,value}], confirm(bool)}], technical_detail}`; same `code` as `/api/graphs/validate` for preflight errors. Status `interrupted` (exit 75) → "resume from checkpoint".
+
 ## Events used by UI
 - `checkpoint_pruned` (bao-cleanup, P005 D7 §7): `{event, path, action(strip_optim|delete), bytes, ts, by, approved_by}` → UI shows "optimizer stripped" vs "deleted at <ts> by <by>".
+- `cache_evicted` (P009 §5 / P005 §6 R1): `{event, run_id, cache_key, bytes, ts, by}`.
 
 ## Records (every file/line carries `schema_version`)
-- run.json: `schema_version, run_id, name, task(sft|lora|grpo|dpo|quantize|eval), base_model, dataset, config_path, config_hash, git_commit, seed, started_at, ended_at, status(running|finished|failed|killed), pid, tags[], stage, parent_run_id (quantize/eval → train run, builds lineage base→sft→fp8/nvfp4), container_image, container_digest`
+- run.json: `schema_version, run_id, name, task(sft|lora|grpo|dpo|quantize|eval), base_model, dataset, config_path, config_hash, git_commit, seed, started_at, ended_at, status(running|finished|failed|killed|interrupted|evicted — evicted: heavy bytes freed, history kept → UI "đã giải phóng, chạy lại để tính lại"), pid, tags[], stage, parent_run_id (quantize/eval → train run, builds lineage base→sft→fp8/nvfp4), container_image, container_digest`
 - metrics.jsonl: `{"schema_version":1,"ts":<unix float>,"step":int,"epoch":float,"split":"train|val","loss":..,"lr":..,"grad_norm":..,"tokens_per_s":..,"samples_per_s":..,"mem_max_alloc_gb":..}` — extra keys allowed (flat, numeric), never nested.
-- system.jsonl: `ts, host_mem_total_gb, host_mem_avail_gb, gpu_util_pct, gpu_clock_mhz, gpu_power_w, gpu_temp_c, job_rss_gb, job_gpu_mem_gb` — null when unsupported (GB10 has no framebuffer total).
-- benchmark record (flat, agreed with bao-research for Proposal 002): `schema_version, model_id, variant(base|sft|lora|...), precision(bf16|fp8|nvfp4|int4_awq), benchmark, split, metric, value, scale, higher_is_better(bool — drives Δ color direction), n_samples, stderr, ci95_low, ci95_high, sanity_gate(pass|fail|null — base-model reproduction gate from bao-tester), source(measured|published), harness, harness_version, prompt_hash, config_hash, git_commit, date, thinking(bool), judge_model(null if rule-scored), max_new_tokens, seed, dataset_revision, container_digest, chat_template_hash, image_cfg_hash (or min_pixels/max_pixels), vision_precision, eval_path(endpoint|inprocess), samples_path (raw outputs for audit), answer_extractor(rule|judge), kernel_backend`
+- system.jsonl: `ts, host_mem_total_gb, host_mem_avail_gb, gpu_util_pct, gpu_clock_mhz, gpu_power_w, gpu_temp_c, job_rss_gb (container cgroup memory.current), job_gpu_mem_gb (per-process from nvidia-smi --query-compute-apps)` — null when unsupported. On UMA CUDA allocations may not be in cgroup → UI "vlm jobs" = job_rss_gb + job_gpu_mem_gb, labelled "estimate".
+- benchmark record (flat, agreed with bao-research for Proposal 002): `schema_version, model_id, variant(base|sft|lora|...), precision(bf16|fp8|nvfp4|int4_awq), benchmark, split, metric, value, scale, higher_is_better(bool — drives Δ color direction), n_samples, stderr, ci95_low, ci95_high, sanity_gate(pass|fail|null — base-model reproduction gate from bao-tester), source(measured|published), harness, harness_version, prompt_hash, config_hash, git_commit, date, thinking(bool), judge_model(null if rule-scored), max_new_tokens, seed, dataset_revision, container_digest, chat_template_hash, image_cfg_hash (or min_pixels/max_pixels), vision_precision, eval_path(endpoint|inprocess), samples_path (raw outputs for audit), answer_extractor(rule|judge), kernel_backend, repeat_spread (max−min over repeated runs of same config, null if not measured), repeat_n, unparseable_rate`
+  - Benchmark metadata (scale, higher_is_better, judge, split, display name) lives in a data **registry** (configs/eval, owned by bao-research), never hard-coded in UI.
   - Paired comparison: optional `compare_to` (record id / variant of baseline), `delta`, `delta_ci95_low`, `delta_ci95_high` — paired CI computed by eval, NOT inferred from overlapping error bars in the UI.
   - UI badge "not reproducible" when any of git_commit, container_digest, config_hash, dataset_revision, harness_version, seed is missing.
   - `value` always on 0-100 scale (OCRBench /1000 → /10, ANLS ×100); `scale` documents it.
@@ -32,8 +38,8 @@ benchmarks/<model_variant>/<benchmark>.json   # flat records, one per (variant, 
   - UI: error bars from ci95_*, warning badge on any number whose base model has `sanity_gate=fail`.
 
 ## Pending (asked bao-backend 2026-10-12)
-- `samples_path` → `predictions.jsonl` per (variant, benchmark): `sample_id, image_ref (relative to data root), question, gt, pred, correct(bool), score, extractor` — needed for Error analysis (P1).
-- `.team/GPU_LOCK` PID must be the **host** PID (container PID namespace differs → false "stale lock").
+- `samples_path` → `predictions.jsonl` per (variant, benchmark): `sample_id, image_ref (relative to data root), question, gt, pred, correct(bool), score, extractor(exact|regex|llm-judge)` — backend writes adapters for lmms-eval (--log_samples) and VLMEvalKit (xlsx/tsv) — needed for Error analysis (P1).
+- `.team/GPU_LOCK` has `host_pid` (orchestrator PID on host, held for the whole job) — agreed in P008.
 
 ## Rules
 1. Additive change (new optional key) → no version bump. Rename/remove/semantics change → bump `schema_version`, dashboard supports N and N-1.

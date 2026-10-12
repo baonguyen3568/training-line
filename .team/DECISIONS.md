@@ -7,3 +7,12 @@
 - 2026-10-12 Ngưỡng bộ nhớ chung P005/P007: preflight margin max(10GB,20%×peak), SwapFree≥2GB, memguard abort MemAvailable<8GB (fixcode được phản biện).
 - 2026-10-12 RESET: sản phẩm là app no-code node-graph (ComfyUI-style) cho no-tech user, hướng NVIDIA. Giai đoạn hiện tại chỉ setup — dừng spike GPU/tải lớn. P006 đổi phạm vi thành node editor; Gradio-only (phương án A) bị loại. ADR-004/005 giữ nguyên.
 - 2026-10-12 Driver 580.142: mặc định pin image NGC CUDA ≤13.1; nâng driver ≥595 là quyết định của user.
+- 2026-10-12 USER: Đồng ý vá nvidia-container-toolkit (user tự chạy sudo; cần sudo password).
+- 2026-10-12 USER: Mục đích = nghiên cứu/phát triển + cho người khác chạy/dùng MIỄN PHÍ, KHÔNG bán. (non-commercial nhưng CÓ phân phối cho người khác)
+- 2026-10-12 USER: HF token đã cung cấp → .env (chmod 600, gitignored). Kiểm tra: HF trả 401 (token không hợp lệ) — chờ user cấp lại.
+- 2026-10-12 USER: Giữ driver 580 (pin image CUDA ≤13.1); nâng driver khi thực sự cần.
+- 2026-10-12 USER: License = xây trên MIT, code Apache-2.0, không fork ComfyUI → ADR-003.
+- 2026-10-12 USER: Custom node bên thứ 3 CHO PHÉP từ v1 (khác khuyến nghị) → phải có sandbox container + manifest quyền.
+- 2026-10-12 USER: UI mặc định tiếng Việt + Simple. Quota 500/800GB chính thức.
+- 2026-10-12 ADR-009 hướng kiến trúc: React Flow + FastAPI/SQLite/docker executor + AutoModel/LLaMA-Factory.
+- 2026-10-12 Storage approval_policy: 'threshold' 20GB trên máy dev dùng chung này; 'none' mặc định cho bản cài cá nhân của end-user.

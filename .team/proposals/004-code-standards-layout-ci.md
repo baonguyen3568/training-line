@@ -158,7 +158,7 @@ Container: `PYTHONPATH=/workspace/src`, repo mount read-only, KHÔNG `pip instal
 - Mọi merge: `scripts/check.sh` xanh + ≥1 reviewer ngoài tác giả (skill `cleancode-review`).
 - File ownership với bao-fixcode: ai đang sửa ghi "đang giữ: <paths>" (BOARD/tin nhắn); bug fix ưu tiên hơn refactor.
 - Bump tool: 1 commit riêng, theo cooldown của 003.
-- Test dạng spec trước khi có code: `pytest.mark.xfail(strict=True, reason="spec: <owner> implements in P2-x")` — strict để tự đỏ khi code đã đúng mà quên gỡ mark.
+- Test dạng spec trước khi có code: `pytest.mark.xfail(strict=True, raises=ImportError, reason="spec: <owner> implements in P2-x")` — strict để tự đỏ khi code đã đúng mà quên gỡ mark; `raises=ImportError` để bug thật sau khi có code là FAIL, không bị che thành xfailed. Spec test luôn dùng `from <module> import <func>` (không truy cập `module.func`), vì không nới sang `AttributeError` — lỗi đó thường đến từ bug thật trong code.
 - Workaround chuẩn (đề nghị bao-fixcode): `# WORKAROUND(BUG-NNN): <why> — remove when <condition/version>`; `grep -rn "WORKAROUND(" src` để rà định kỳ. Test regression của bug gắn cùng ID trong tên test.
 - GPU_LOCK luôn do **tiến trình host** giữ (`run.py` hoặc `check.sh --container`), ghi PID host; code trong container không tự lấy lock (PID namespace khác → stale-check sai). Stale-check chỉ báo, không xoá lock người khác (góp ý bao-fixcode). Xác nhận lock trong container bằng **token** (đề xuất bao-tester): host sinh token ngẫu nhiên → ghi vào `.team/GPU_LOCK` → truyền `VLM_GPU_LOCK_TOKEN` vào container; fixture `gpu` đọc file lock (mount ro) và so token, thiếu/không khớp → fail nhanh. Không dùng cờ env kiểu `..._HELD=1` (dễ kế thừa nhầm).
 - Code chạm torch/NVIDIA: chỉ trong `worker.py`/`_nvidia_compat.py`; host mypy coi các lib đó là `Any` (override `ignore_missing_imports` per-module §4). Hàm public của worker vẫn phải annotate bằng type của ta (pydantic config, `Path`, `RunManifest`) để biên giới có type. `# type: ignore[<code>]` bắt buộc có error code (`ignore-without-code` bật). Không dùng `ignore_errors = true` cho cả module.
@@ -169,3 +169,55 @@ Container: `PYTHONPATH=/workspace/src`, repo mount read-only, KHÔNG `pip instal
 3. Supply chain: cooldown `exclude-newer = "7 days"` (uv 0.11.26 hỗ trợ, đã thử), gitleaks, ruff `S` đầy đủ, ban `pickle.load`/`torch.load`, pip-audit non-blocking (bao-security).
 4. Large files 1MB + allowlist design/ docs/ (cleanup + PM).
 5. Docstring: Google style, bắt buộc ở public API của `common` + config fields (`Field(description=...)`).
+
+---
+## 8. Ảnh hưởng của RESET (2026-10-12) — sản phẩm = app no-code node-graph
+
+**Giữ nguyên (ADR-004 vẫn đúng):** tooling (uv/ruff/mypy/import-linter/pytest/prek/gitleaks/cooldown), host orchestrator ↔ container worker,
+lazy import lib nặng, test 2 tầng, GPU_LOCK token (A2), xfail-spec (A1). Các "stage" cũ trở thành **engine** mà node gọi tới.
+
+### 8.1 Layering mới (đề xuất, chờ P009 xác nhận tên/ranh giới)
+```
+frontend/ (TS, project riêng)  ──HTTP/WS + JSON Schema──►  app/  (API server: FastAPI/WS, auth, job queue view)
+                                                            cli   (`vlm run workflow.json` headless — bắt buộc có)
+                                                              │
+                                                           graph/  (workflow model, validate DAG + port types,
+                                                              │      estimate RAM/disk/time, schedule, execute)
+                                                           nodes/  (node defs: ports, params, estimate(), run())
+                                                              │
+                                     engines: data | train | quantize | eval | serve   (config/run/worker như cũ)
+                                                              │
+                                                           common/
+```
+import-linter contract: `app | cli` > `graph` > `nodes` > `data | train | quantize | eval | serve` (độc lập) > `common`.
+Quy tắc quan trọng:
+1. **`graph` không biết node cụ thể nào** — chỉ biết protocol `NodeSpec` (ports, params schema, estimate, run). Registry là 1 list tường minh trong `nodes/__init__.py` (không plugin/entry-point cho tới khi có custom node của bên thứ 3 — YAGNI).
+2. **Một nguồn sự thật cho tham số**: params của node = pydantic config của engine (hoặc subset của nó). JSON Schema sinh tự động → frontend render form. Cấm định nghĩa tham số 2 lần (node + config).
+3. **Port type** là enum/type nhỏ, đóng (vd `Dataset[VLMChat]`, `Checkpoint[HF]`, `Checkpoint[Quantized]`, `Endpoint`, `Report`), kiểm ở `graph.validate()` *trước khi chạy* — yêu cầu "chặn lỗi trước khi chạy" cho no-tech user nằm ở đây, phải test được thuần (không GPU).
+4. **Workflow file** (JSON, có `schema_version`) là artifact hạng nhất: template = workflow file; `cli` chạy được headless → cùng 1 đường code cho UI, test và tái lập.
+5. **Lỗi thân thiện**: node/engine raise `VlmPipelineError` có `user_message` (tiếng người) + `detail` (kỹ thuật); `app` chỉ hiện `user_message`, log `detail`. Không để stack trace tới UI.
+6. `app/` mỏng: không chứa logic validate/execute (ở `graph`), chỉ HTTP/WS + persistence.
+
+### 8.2 Contract backend ↔ frontend
+- Backend export `schemas/` (OpenAPI + node-spec JSON Schema) bằng 1 lệnh; frontend sinh TS types từ đó. Test "schema drift" trong `check.sh`: export lại rồi `git diff --exit-code`.
+- Tooling frontend (TS strict, lint/format, test) do bao-frontend chọn; tôi chỉ yêu cầu: chạy được qua `check.sh` (bước `frontend`), version pin + cooldown như Python.
+
+### 8.3 Chính sách vendor / fork code bên thứ 3
+**License đã kiểm (GitHub API, 2026-10-12):** ComfyUI **GPL-3.0**, ComfyUI_frontend **GPL-3.0**; LlamaFactory Apache-2.0; xyflow (React Flow) MIT; litegraph.js (cả bản Comfy-Org) MIT; Langflow MIT; Flowise Apache-2.0 trừ `packages/server/src/enterprise` (commercial) — bao-security xác minh từ LICENSE gốc. Phân tích GPL-3 chi tiết: P003 D6b (fork hoặc plugin chạy trong process ComfyUI → app phải GPL-3 khi phân phối; dùng nội bộ không phát sinh nghĩa vụ; security khuyến nghị nền MIT).
+→ **Fork/vendor ComfyUI = toàn bộ app phân phối phải theo GPL-3.0.** Đây là quyết định kinh doanh/pháp lý → bao-security (license) + PM hỏi user, KHÔNG phải quyết định kỹ thuật. Lấy *ý tưởng* (UX, node model) thì không bị ràng buộc.
+
+Thứ tự ưu tiên (ít nợ bảo trì nhất trước):
+1. **Dependency có version pin** (npm/PyPI: vd `@xyflow/react`, litegraph) — không copy code.
+2. **Vendor một phần nhỏ** (file/module) khi lib không publish package: `third_party/<name>/` + `VENDORED.md` (URL, commit SHA, license, danh sách patch), giữ LICENSE gốc.
+3. **Fork toàn bộ** chỉ khi ADR riêng chấp nhận: git subtree/submodule ở `third_party/<name>/`, pin commit, nhánh patch tối thiểu, lịch rebase upstream có owner.
+
+Quy tắc cho mọi code bên thứ 3:
+- Không sửa format/lint/refactor code vendored (để diff được với upstream); exclude khỏi ruff/mypy/biome; patch đánh dấu `# PATCH(vlm): <why>`.
+- Code của ta chỉ chạm code bên thứ 3 qua **1 module adapter** (vd `app/_comfy_compat.py` hoặc `frontend/src/vendor-adapters/`) — import-linter `forbidden` contract chặn import trực tiếp từ nơi khác.
+- License được ghi vào `configs/security/licenses.yaml` với `kind: code` (skill `security-license-check`) trước khi merge — áp cho cả code vendored lẫn package bên thứ 3.
+- Supply chain: cùng cooldown + gitleaks; code vendored cũng đi qua review của security.
+
+### 8.4 Cái sẽ thay đổi trong ADR-004 (cần amendment sau P009)
+- Layer contract (8.1), thêm `forbidden` contract cho third_party.
+- `check.sh` thêm bước `frontend` + schema-drift.
+- Test: thêm "node contract test" — mọi node đã đăng ký: schema export được, default params hợp lệ, `estimate()` chạy không cần GPU; `graph` test với fake nodes.

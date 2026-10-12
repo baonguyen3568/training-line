@@ -123,3 +123,6 @@ Khuyến nghị sơ bộ (sẽ chốt trong Proposal 002 với bao-research):
 ## Câu hỏi mở (cần xác minh)
 - Container `eval-factory/vlmevalkit` có manifest arm64 không? (sẽ `docker manifest inspect`, không pull)
 - Base model chốt (P001) → lấy số công bố + protocol chính xác của họ.
+
+## 9. RESET 2026-10-12: app no-code node-graph
+Xem P002 mục "Ảnh hưởng của RESET". Tóm tắt: các gate phải do app thực thi; test thêm graph executor (topo/cycle/type/cache/resume/migration, property-based bằng hypothesis), mỗi template có validate + smoke CPU + smoke GPU nightly, estimator không được đánh giá thấp RAM, error catalog + fault-injection (không lộ traceback), UI E2E Playwright.

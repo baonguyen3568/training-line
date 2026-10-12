@@ -93,3 +93,41 @@ Subset regression chọn ngẫu nhiên có seed + stratify theo category (bao-re
 ---
 ## Góp ý
 _(ghi `[tên] nội dung`)_
+
+---
+## Ảnh hưởng của RESET (2026-10-12, bao-tester)
+Tầm nhìn mới: app no-code node-graph cho user không biết code. Nội dung P002 vẫn giữ nguyên giá trị. Thay đổi lớn nhất:
+**user không tự đánh giá được một con số, nên các gate phải do app thực thi và hiển thị, không trông vào người đọc.**
+
+### R.1 P002 → node & UI
+| P002 | Trong app |
+|---|---|
+| G0 env smoke | Chạy tự động khi app khởi động / đổi container; fail ⇒ banner "Môi trường chưa sẵn sàng" + nút "Xem chi tiết" |
+| G1 reproduce base | Thuộc tính của template/base model: app ship sẵn kết quả G1 đã kiểm (bảng sanity). Model ngoài danh sách ⇒ nhãn "chưa kiểm chứng" |
+| G2/G3 regression/quant | Node **Benchmark**: mode `Nhanh (smoke)` / `Tiêu chuẩn (regression)` / `Đầy đủ`, hiện ước lượng thời gian. Kết quả là thẻ PASS/CẢNH BÁO/FAIL kèm câu giải thích, Δ ± CI |
+| G4 perf | Node **Benchmark tốc độ**: điều kiện đo cố định theo preset, không cho user chỉnh tự do các thông số làm sai so sánh |
+| G5 leakage | Chạy tự động khi nối node Dataset → Train nếu đồ thị có node Benchmark; trùng ⇒ cảnh báo trước khi chạy |
+| R6 (P007) | Chạy tự động sau mỗi node biến đổi weights (convert/merge/quantize export); fail ⇒ chặn node phía sau |
+
+### R.2 Test strategy bổ sung
+1. **Graph executor** (unit/integration, CPU, worker giả lập):
+   - Thứ tự topo đúng; phát hiện chu trình; node thiếu input bắt buộc ⇒ lỗi khi validate, không phải lúc chạy.
+   - Kiểu kết nối: nối sai kiểu bị chặn cả lúc kéo dây (UI) và lúc load file workflow (backend) ⇒ một bộ test kiểu dùng chung 2 phía.
+   - Cache: cùng (node type, version, config hash, hash input) thì tái dùng; đổi node phía trên ⇒ invalidate đúng các node phía dưới, không hơn không kém.
+   - Resume: dừng giữa chừng (kill, memguard exit 75, mất điện giả lập) ⇒ chạy lại tiếp từ node/checkpoint cuối, không chạy lại node đã xong.
+   - Cancel, lỗi một nhánh không phá nhánh độc lập; hàng đợi tôn trọng GPU lock (chỉ 1 node nặng tại 1 thời điểm).
+   - File workflow: save → load round-trip giống hệt; file schema cũ phải load được (migration test với fixture từng version); file hỏng/lạ ⇒ lỗi dễ hiểu.
+   - Property-based (hypothesis): sinh đồ thị ngẫu nhiên hợp lệ/không hợp lệ ⇒ validator không bao giờ crash, executor không bao giờ chạy đồ thị invalid.
+2. **Template**: mỗi template ship kèm
+   - (a) test validate (schema, tham số trong vùng an toàn, ước lượng RAM/disk/thời gian ≤ ngân sách DGX Spark);
+   - (b) smoke E2E CPU với tiny model / worker giả lập, chạy trong gate thường;
+   - (c) smoke E2E GPU với model nhỏ thật, chạy nightly có GPU lock (sau khi PM mở lại GPU).
+   Template mới không có (a)(b)(c) ⇒ không được merge.
+3. **Pre-run estimator**: so ước lượng RAM/thời gian/disk với số đo thật (từ tester-perf-bench). Ngưỡng đề xuất: RAM ước lượng ≥ thực đo (không được đánh giá thấp) và ≤ +30%. Thời gian ±50%. Ước lượng thấp hơn thực tế là lỗi nghiêm trọng vì có thể làm treo máy chung.
+4. **Thông báo lỗi cho user no-tech**:
+   - Error catalog: mỗi lớp lỗi đã biết (thiếu RAM, OOM/UMA, hết disk, GPU lock đang bận, thiếu token HF/model gated, license chưa chấp nhận, mạng, nối sai kiểu, dataset sai format, NVFP4 không hỗ trợ…) ⇒ mã lỗi + **chuyện gì xảy ra / vì sao / làm gì tiếp** bằng tiếng người, chi tiết kỹ thuật thu gọn.
+   - Test fault-injection: worker giả ném từng lớp lỗi ⇒ assert message hiển thị không chứa traceback/đường dẫn nội bộ/secret, có mã lỗi, có hành động gợi ý. Exception chưa biết ⇒ thông báo chung + mã tham chiếu tới log, và test đếm số lỗi "chưa phân loại" như một chỉ số chất lượng.
+5. **UI E2E** (Playwright, kiểm tra hỗ trợ Chromium linux-arm64): user journey "mở template → chạy → xem kết quả → export", nối sai kiểu bị chặn, lỗi hiển thị đúng. Kèm checklist usability thủ công với persona no-tech, phối hợp bao-design.
+
+### R.3 Giai đoạn hiện tại
+Không chạy job GPU. Việc tester làm: spec test (xfail strict) cho scoring/stats (đã có), cho validator/executor (khi P009 có interface), và error catalog (cùng bao-design + bao-fixcode).

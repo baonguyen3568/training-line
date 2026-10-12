@@ -1,0 +1,22 @@
+# DRAFT error copy (owner: bao-design). Moves into src/vlm_pipeline/i18n/{vi,en}.yaml as error.<CODE>.title|what|why
+# once ADR for P009/P010 is accepted. Codes/match/actions live in fixcode's error_catalog.yaml.
+# Rules: no placeholders in titles (node is highlighted on canvas); title VI ≤10 tokens (split), EN ≤8 words; what+why ≤2 sentences total; no paths/secrets/tracebacks; "bạn", no blame.
+
+error:
+  GPU-001:
+    title: {vi: "Phần mềm không tương thích với GPU của máy", en: "Software doesn't match this GPU"}
+    what:  {vi: "Một thành phần được cài cho phiên bản CUDA khác với bản máy này hỗ trợ.", en: "A component was built for a different CUDA version than this machine supports."}
+  GPU-002:
+    title: {vi: "Chế độ chạy nhanh không khởi động được", en: "Fast mode failed to start"}
+    what:  {vi: "Phần tăng tốc chưa hỗ trợ chip GB10 nên không khởi động được; tắt nó thì bước vẫn chạy, chỉ chậm hơn.", en: "The speed-up component doesn't support the GB10 chip yet; turning it off lets the step run, just slower."}
+  CACHE-001:
+    title: {vi: "Kết quả cũ bị hỏng, sẽ chạy lại", en: "Saved result is damaged, re-running"}
+    what:  {vi: "Kết quả đã lưu của bước \"{node}\" (lúc {saved_at}) không đọc được nên app sẽ chạy lại bước này, mất khoảng {est_minutes} phút.", en: "The saved result of \"{node}\" (from {saved_at}) can't be read, so the app will run this step again, about {est_minutes} minutes."}
+  SYS-003:
+    title: {vi: "Bước này dừng đột ngột", en: "This step stopped unexpectedly"}
+    what:  {vi: "Bước này dừng giữa chừng mà không báo lý do (có thể do máy khởi động lại hoặc tiến trình bị tắt). Tiến độ đến {checkpoint_step} đã được lưu nếu có.", en: "This step stopped midway without reporting why (the machine may have restarted or the process was killed). Progress up to {checkpoint_step} was saved if available."}
+
+action:
+  rerun_step:        {vi: "Chạy lại bước này", en: "Run this step again"}
+  resume_checkpoint: {vi: "Tiếp tục từ chỗ đã lưu", en: "Continue from saved progress"}
+  send_report:       {vi: "Gửi báo cáo lỗi", en: "Send error report"}

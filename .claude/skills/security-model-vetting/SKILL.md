@@ -24,7 +24,8 @@ Knowledge & sources: `.team/knowledge/security.md` §2–§4. Output of this ski
 3. **File inventory check** (from listing above):
    - Has `*.safetensors`? If NO → stop; either reject or convert in a `--network none` sandbox (PM sign-off).
    - Any `*.bin *.pt *.pth *.ckpt *.pkl *.npy(object) *.joblib *.7z *.zip`? → exclude via `allow_patterns`; never load.
-   - Any `*.py` / `auto_map` in `config.json` / `processor_config.json` / `tokenizer_config.json`? → remote code, go to step 4.
+   - Any `*.py` / `auto_map` in `config.json` (INCLUDING nested sub-configs: `vision_config`, `audio_config`, `llm_config`…) / `processor_config.json` / `tokenizer_config.json`? → remote code, go to step 4.
+   - `auto_map` value of form `org/other-repo--module.Class` = code pulled from ANOTHER repo at `main` (unpinned) → vet that repo too, pin by pre-caching + `HF_HUB_OFFLINE=1`.
    - Total size > 20GB → tell PM before download (CLAUDE.md).
 4. **trust_remote_code review** (only if no native `transformers` class exists — check
    `transformers` version in our container first):

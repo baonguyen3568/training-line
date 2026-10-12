@@ -19,6 +19,9 @@ _Cập nhật: 2026-10-12. Nguồn ghi cuối mỗi mục. Đánh dấu: ✅ đ�
 | TensorRT-LLM | v1.2.1 (2026-04-20) | release container multi-arch có arm64 🗣 |
 | vLLM | v0.31.0 (2026-10-05) | |
 
+## ⚠️ Ràng buộc driver (user chốt 2026-10-12)
+Giữ driver 580 → image mặc định phải CUDA ≤ 13.1 (580 chỉ forward-compat tới 13.1 theo research; 13.2+ báo không chạy). automodel 26.08 (13.3) chỉ là CANDIDATE. Mặc định dự kiến: automodel 26.02 (CUDA 13.0), pytorch 25.11, vllm 25.12.post1/26.01, trtllm 1.2.1 (13.1).
+
 ## 2. Train — NeMo AutoModel (khuyến nghị mặc định, HF-native)
 - CLI mới: `automodel <config.yaml> [--nproc-per-node 1]` (chạy qua `examples/.../finetune.py` đã **deprecated**). Override kiểu
   `--step_scheduler.max_steps 20`. 📄
