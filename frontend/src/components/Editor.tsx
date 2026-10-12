@@ -24,6 +24,19 @@ import { NodeShell, type ShellNode } from "./NodeShell";
 import { Toolbar } from "./Toolbar";
 
 const nodeTypes = { vlm: NodeShell };
+const NARROW = "(max-width: 1279px)";
+
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(() => window.matchMedia?.(NARROW).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(NARROW);
+    if (!mq) return;
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
 const VALIDATE_DEBOUNCE_MS = 500;
 
 const LANE_TOP = -4000;
@@ -78,7 +91,10 @@ function EditorInner() {
   const [toast, setToast] = useState<string | null>(null);
   const key = graphKey(workflow);
   // While a run is live the graph structure is locked (design spec M1-5 §7).
-  const locked = !!run && !run.done;
+  const narrow = useNarrow();
+  const runLocked = !!run && !run.done;
+  // Narrow screens (< 1280px) are view-only (P010): structure is locked, but Run/inspection still work.
+  const locked = runLocked || narrow;
 
   // Re-validate on semantic changes only (not on drag), debounced (P010 §6).
   useEffect(() => {
@@ -344,7 +360,12 @@ function EditorInner() {
         }}
         onDrop={onDrop}
       >
-        <Toolbar locked={locked} />
+        <Toolbar locked={locked} running={runLocked} />
+        {narrow && (
+          <p className="readonly-note" role="note">
+            {t("app.read_only_small_screen")}
+          </p>
+        )}
         <ReactFlow
           nodes={nodes}
           edges={edges}

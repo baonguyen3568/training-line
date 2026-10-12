@@ -4,7 +4,7 @@ import { parseWorkflowFile, serializeWorkflow } from "../lib/workflowFile";
 import { useWorkflow } from "../store/workflow";
 
 /** Canvas toolbar: new / open / save (.json) / undo / redo / duplicate / delete (M1-4). */
-export function Toolbar({ locked }: { locked: boolean }) {
+export function Toolbar({ locked, running }: { locked: boolean; running: boolean }) {
   const { workflow, selectedId, past, future } = useWorkflow();
   const { newWorkflow, openWorkflow, undo, redo, duplicateNode, removeNodes } =
     useWorkflow.getState();
@@ -90,7 +90,7 @@ export function Toolbar({ locked }: { locked: boolean }) {
       >
         🗑 {t("workflow.delete")}
       </button>
-      {locked && <span className="muted small">🔒 {t("run.locked_while_running")}</span>}
+      {running && <span className="muted small">🔒 {t("run.locked_while_running")}</span>}
       {error && (
         <span role="alert" className="toolbar-error">
           {error}

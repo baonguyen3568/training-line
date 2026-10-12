@@ -18,6 +18,32 @@ async function nodeId(page: Page, typeId: string): Promise<string> {
   return id;
 }
 
+/** Resolves when the element's box stops moving (two equal reads 150 ms apart). */
+async function waitUntilStill(locator: Locator): Promise<void> {
+  let previous = "";
+  await expect
+    .poll(
+      async () => {
+        const box = JSON.stringify(await locator.boundingBox());
+        const still = box === previous;
+        previous = box;
+        return still;
+      },
+      { intervals: [150], timeout: 5_000 },
+    )
+    .toBe(true);
+}
+
+async function dragHandle(page: Page, from: Locator, to: Locator): Promise<void> {
+  const a = await from.boundingBox();
+  const b = await to.boundingBox();
+  if (!a || !b) throw new Error("handle not visible");
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 12 });
+  await page.mouse.up();
+}
+
 async function addFromLibrary(page: Page, typeId: string, how: "drag" | "dblclick"): Promise<void> {
   const search = page.getByRole("searchbox", { name: tr("library.search") });
   await search.fill(typeId.split(".").pop() ?? typeId);
@@ -43,12 +69,16 @@ async function buildGraph(page: Page): Promise<void> {
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
 
   const [model, data, train] = await Promise.all(NODES.map((t) => nodeId(page, t)));
-  // Wire 1 by dragging handle to handle on the canvas.
-  await page
-    .locator(`[data-id="${model}"] .react-flow__handle.source[data-handleid="model"]`)
-    .dragTo(
-      page.locator(`[data-id="${train}"] .react-flow__handle.target[data-handleid="base_model"]`),
-    );
+  // Wire 1 by dragging handle to handle on the canvas, once any fitView animation has settled (a user drags
+  // a still canvas; measuring mid-animation would aim at a moving target).
+  const source = page.locator(
+    `[data-id="${model}"] .react-flow__handle.source[data-handleid="model"]`,
+  );
+  const target = page.locator(
+    `[data-id="${train}"] .react-flow__handle.target[data-handleid="base_model"]`,
+  );
+  await waitUntilStill(target);
+  await dragHandle(page, source, target);
   // Wire 2 through the inspector ("Nhận từ — <port>"), the keyboard-accessible path.
   await node(page, NODES[2]).click();
   await page.locator("#recv-train_data").selectOption(`${data}:dataset`);
@@ -122,4 +152,16 @@ test("work survives a page reload (autosave)", async ({ page }) => {
   await page.getByRole("button", { name: tr("draft.restore") }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(3, { timeout: 5_000 });
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+});
+
+test("narrow screens can open a template and see the canvas @narrow", async ({ page }) => {
+  // Regression guard: < 1280 px is view-only (P010) but the canvas must stay visible (fixed 2026-10-12).
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: tr("gallery.use_template") })
+    .first()
+    .click();
+  await expect(page.locator(".react-flow")).toBeVisible();
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  await expect(page.getByTestId("check-bar")).toBeVisible();
 });

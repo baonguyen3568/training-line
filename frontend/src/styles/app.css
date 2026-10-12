@@ -413,19 +413,33 @@ button.link {
 }
 
 @media (max-width: 1279px) {
-  /* Editor needs ≥1280px (P010); smaller screens are view-only — inspector stacks below. */
+  /* Editor needs ≥1280px (P010): smaller screens are VIEW-ONLY. The canvas must stay visible (tester found it
+     collapsed to 0px once the library column existed): no library, canvas gets the remaining height,
+     inspector below with a capped height, check bar last. */
   .editor {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto auto;
+    grid-template-rows: minmax(320px, 1fr) auto auto;
+  }
+  .library {
+    display: none;
+  }
+  .canvas {
+    grid-row: 1;
+    grid-column: 1;
   }
   .inspector {
     grid-row: 2;
     grid-column: 1;
     border-left: 0;
     border-top: 1px solid var(--color-grid);
+    max-height: 30vh;
   }
   .checkbar {
+    grid-row: 3;
     grid-column: 1;
+  }
+  .app-header {
+    flex-wrap: wrap;
   }
 }
 
@@ -828,3 +842,15 @@ button.link {
 .canvas {
   overflow: hidden;
 } /* nodes panned out of view must never paint over the library */
+.readonly-note {
+  position: absolute;
+  top: 44px;
+  left: var(--space-8);
+  z-index: 5;
+  margin: 0;
+  padding: 2px var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--color-grid);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-caption);
+}
