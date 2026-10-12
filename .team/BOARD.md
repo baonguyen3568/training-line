@@ -41,7 +41,7 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | S-5 | frontend/ scaffold theo checklist 12 bước (Vite+React+@xyflow/react, tokens, i18n VI/EN) — vertical slice gallery→validate overlay | bao-frontend + bao-design | DONE (64be07f; cleancode+security approve; design review UI còn mở) |
 | S-6 | P001 cập nhật default image 26.08 → ADR-001 | bao-research | DONE (backend+security APPROVED) → PM chốt ADR-001 |
 | S-7 | Security review mọi PR S-1..S-5; xác nhận CORD-v2; review image dẫn xuất | bao-security | DOING (CORD-v2 ✓, Dockerfile vlm-automodel ✓, S-1 ✓, S-4 cleanup+fixcode ✓, retention ✓, S-5 frontend ✓ + CSRF/WS D13, licenses.yaml npm ✓, P001 ✓, NVIDIA models: Qwen3-VL-2B ✓, Parse-v1.1 ✓ có điều kiện, Cosmos chờ gate) |
-| S-9 | Tự vá AutoModel (normalize + tied emb) → image 26.08-2 + regression test; so Parse v1.1 vs 2.0 | bao-fixcode + bao-backend + bao-tester + bao-research | TODO |
+| S-9 | Tự vá AutoModel (normalize + tied emb) → image 26.08-2 + regression test; so Parse v1.1 vs 2.0 | bao-fixcode + bao-backend + bao-tester + bao-research | DOING: critical path cho template mặc định (patch → 26.08-2 → parity → P-1 → P-2) |
 | S-8 | Gom test xfail hiện có vào tests/ theo layout ADR-004 | bao-tester | DONE (cleancode APPROVE sau fix; 103 passed, 217 xfailed) |
 
 ## Phase 2 (cũ) — Build pipeline
