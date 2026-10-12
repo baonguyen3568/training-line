@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import re
 import signal
 import subprocess
 import threading
@@ -185,6 +186,22 @@ def _docker_kill(name: str) -> None:
     subprocess.run(["docker", "kill", name], capture_output=True, check=False)  # noqa: S603,S607
 
 
+_TRAINABLE_RE = re.compile(r"Trainable parameters percentage:\s*([0-9.]+)\s*%")
+
+
+def _trainable_pct(log_path: Path) -> float | None:
+    """Share of trainable parameters printed by AutoModel (shown in the UI; guards against wrong freezing)."""
+    try:
+        with log_path.open("r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = _TRAINABLE_RE.search(line)
+                if m:
+                    return float(m.group(1))
+    except OSError:
+        return None
+    return None
+
+
 def _docker_state(name: str) -> ExitInfo:
     out = subprocess.run(  # noqa: S603
         ["docker", "inspect", "-f", "{{json .State}}", name],  # noqa: S607 - docker from PATH
@@ -318,6 +335,7 @@ def run_job(
                 # Host-level estimate (includes CUDA on UMA, which the container cgroup misses) + shared-host noise.
                 "peak_mem_gb": round(max(0.0, baseline_gb - guard.min_available_gb), 1),
                 "host_min_available_gb": round(guard.min_available_gb, 1),
+                "trainable_pct": _trainable_pct(run_dir / "logs" / "stdout.log"),
             }
         )
         write_manifest(run_dir, manifest)

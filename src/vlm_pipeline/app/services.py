@@ -121,9 +121,13 @@ class DefaultServices:
     def executor(self) -> Any:
         """ONE executor per app: cancel() only sees runs started by the same instance."""
         graph_executor = _optional("vlm_pipeline.graph.executor")
-        if self.worker != "fake":
-            raise NotAvailableError("container worker is not wired yet")
-        worker = _PacedWorker(_optional("vlm_pipeline.graph.testing").FakeWorker(), self.fake_delay_s)
+        worker: Any
+        if self.worker == "fake":
+            worker = _PacedWorker(_optional("vlm_pipeline.graph.testing").FakeWorker(), self.fake_delay_s)
+        else:
+            from vlm_pipeline.app.workers import RealWorker
+
+            worker = RealWorker(self.root)
         return graph_executor.Executor(
             self.registry, worker, self.root / "outputs" / "graph", index=self.index, workspace=self.root
         )

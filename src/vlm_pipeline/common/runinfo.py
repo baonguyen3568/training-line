@@ -72,6 +72,7 @@ class RunManifest(BaseModel):
     ended_at: float | None = None
     peak_mem_gb: float | None = None  # host MemAvailable drop during the job (UMA: includes CUDA)
     host_min_available_gb: float | None = None
+    trainable_pct: float | None = None  # "Trainable parameters percentage" from the engine log
     tags: list[str] = Field(default_factory=list)
 
 

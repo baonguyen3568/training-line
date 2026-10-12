@@ -302,6 +302,18 @@
     "task": {
       "title": "Task",
       "type": "string"
+    },
+    "trainable_pct": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trainable Pct"
     }
   },
   "required": [
