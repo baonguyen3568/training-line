@@ -6,25 +6,29 @@ planned the same way (no time-of-check/time-of-use gap), then logs ``checkpoint_
 (run.json, *.jsonl, logs/, export/, ...) are never candidates: only ``epoch_*_step_*`` directories and their
 ``optim/``, ``dataloader/``, ``rng/`` sub-directories are.
 
-Rules (first match wins, per checkpoint):
+Rules (first match wins, per checkpoint; statuses are ``common.runinfo.RunStatus``):
 1. run has a ``KEEP`` file, or is the run holding the GPU lock, or the lock is unreadable -> keep (blocked)
-2. run status (run.json) is not ``completed``/``discarded`` (incl. missing run.json) -> keep (blocked)
-3. checkpoint has ``.incomplete`` (AutoModel: save never finished) -> delete
-4. target of ``LATEST`` -> keep for ``latest_full_days``, then strip optimizer state
-5. target of ``LOWEST_VAL`` -> strip optimizer state
-6. any other checkpoint -> delete once older than ``other_keep_days``
+2. status is queued/running/interrupted/evicted -> keep (blocked); missing/unknown status -> keep (UNKNOWN_STATUS)
+3. failed/cancelled: nothing before ``failed_grace_days`` after the run's last activity; then ``.incomplete`` and
+   non-LATEST checkpoints are deleted, and LATEST is deleted ``failed_latest_days`` after the last activity.
+   Last activity = max(run.json ``ended_at``, run.json mtime, newest mtime under ``checkpoints/``), so a wrong or
+   back-dated ``ended_at`` can only delay cleanup, never bring it forward.
+4. completed/discarded: checkpoint has ``.incomplete`` (AutoModel: save never finished) -> delete
+5. target of ``LATEST`` -> keep for ``latest_full_days``, then strip optimizer state
+6. target of ``LOWEST_VAL`` -> strip optimizer state
+7. any other checkpoint -> delete once older than ``other_keep_days``
 
 Age is the checkpoint directory mtime. Stripping sub-directories updates that mtime, so a stripped checkpoint
 starts a new window; this errs on the side of keeping data longer.
 
-A run.json status outside ``KNOWN_STATUSES`` is reported as ``UNKNOWN_STATUS`` (not silently kept as
+A run.json status that is not a ``RunStatus`` value is reported as ``UNKNOWN_STATUS`` (not silently kept as
 "not finished"), so a vocabulary mismatch with the run writer shows up in every dry-run.
-TODO(bao-backend, S-2): replace the string sets with the shared ``common.runinfo.RunStatus`` enum.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import time
 import tomllib
@@ -36,6 +40,7 @@ from typing import Literal
 from vlm_pipeline.artifacts.storage import du_bytes
 from vlm_pipeline.common.diskguard import LockStatus, check_lock
 from vlm_pipeline.common.paths import GIB
+from vlm_pipeline.common.runinfo import RunStatus
 
 Action = Literal["keep", "strip_optim", "delete"]
 
@@ -44,9 +49,8 @@ RUNS_REL = Path("outputs") / "runs"
 CKPT_PREFIX = "epoch_"
 ROLE_LINKS = ("LATEST", "LOWEST_VAL")
 STRIP_SUBDIRS = ("optim", "dataloader", "rng")  # resume-only state; model weights stay
-CLEANABLE_STATUSES = frozenset({"completed", "discarded"})
-# statuses that legitimately block cleanup; anything else (or a missing/unreadable run.json) is flagged
-KNOWN_STATUSES = CLEANABLE_STATUSES | {"running", "failed", "interrupted", "killed", "evicted"}
+CLEANABLE_STATUSES = frozenset({RunStatus.COMPLETED, RunStatus.DISCARDED})
+FAILED_STATUSES = frozenset({RunStatus.FAILED, RunStatus.CANCELLED})  # cleaned after a grace period (ADR-005)
 DAY_S = 86_400.0
 PROJECT_NAME = "vlm-pipeline"  # [project].name in pyproject.toml; guards against a wrong VLM_PROJECT_ROOT
 CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
@@ -58,6 +62,8 @@ class RetentionPolicy:
 
     latest_full_days: float = 7.0
     other_keep_days: float = 7.0
+    failed_grace_days: float = 3.0  # failed/cancelled: untouched for this long after the run ended
+    failed_latest_days: float = 7.0  # failed/cancelled: LATEST deleted (not stripped) after this long
     approval_threshold_gb: float = 20.0  # D7.4: above this the CLI needs --approved-by
     approval_window_s: float = DAY_S  # unapproved deletes are summed over this window (no splitting into batches)
 
@@ -142,15 +148,40 @@ class ApplyResult:
         return sum(i.reclaim_bytes for i in self.done)
 
 
-def _run_status(run_dir: Path) -> str:
+def _run_status(run_dir: Path) -> tuple[str, float | None]:
+    """(status, ended_at) from run.json; status is "unknown"/"unreadable" when it cannot be read."""
+    path = run_dir / "run.json"
     try:
-        data = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return "unknown"
+        return "unknown", None
     except (OSError, ValueError):
-        return "unreadable"
-    status = data.get("status") if isinstance(data, dict) else None
-    return str(status) if status else "unknown"
+        return "unreadable", None
+    if not isinstance(data, dict):
+        return "unreadable", None
+    status = data.get("status")
+    ended = data.get("ended_at")
+    ended_at = float(ended) if isinstance(ended, int | float) and not isinstance(ended, bool) else None
+    if ended_at is None:
+        ended_at = path.stat().st_mtime  # runner rewrites run.json when the status changes
+    return (str(status) if status else "unknown"), ended_at
+
+
+def _newest_mtime(path: Path) -> float:
+    """Newest lstat mtime of ``path`` and everything below it (symlinks are not followed)."""
+    try:
+        newest = path.lstat().st_mtime
+    except OSError:
+        return 0.0
+    if path.is_symlink() or not path.is_dir():
+        return newest
+    for dirpath, dirnames, filenames in os.walk(path, onerror=lambda _err: None):
+        for name in (*dirnames, *filenames):
+            try:
+                newest = max(newest, (Path(dirpath) / name).lstat().st_mtime)
+            except OSError:
+                continue
+    return newest
 
 
 def _roles(ckpt_root: Path) -> dict[str, list[str]]:
@@ -171,8 +202,16 @@ def _strip_bytes(ckpt: Path) -> int:
 
 
 def _plan_checkpoint(  # noqa: PLR0911 - one return per ADR-005 D3 rule, kept as a flat decision table
-    run_id: str, ckpt: Path, roles: list[str], *, blocked: str | None, now: float, policy: RetentionPolicy
+    run_id: str,
+    ckpt: Path,
+    roles: list[str],
+    *,
+    blocked: str | None,
+    failed_ended_at: float | None,
+    now: float,
+    policy: RetentionPolicy,
 ) -> PlanItem:
+    """``failed_ended_at`` is the run's last activity, set only for failed/cancelled runs."""
     rel = f"checkpoints/{ckpt.name}"
     age_days = (now - ckpt.lstat().st_mtime) / DAY_S
 
@@ -181,6 +220,15 @@ def _plan_checkpoint(  # noqa: PLR0911 - one return per ADR-005 D3 rule, kept as
 
     if blocked is not None:
         return item("keep", 0, "D7.blocked", f"protected: {blocked}", blocked)
+    if failed_ended_at is not None:
+        ended_days = (now - failed_ended_at) / DAY_S
+        if ended_days < policy.failed_grace_days:
+            return item("keep", 0, "D3.failed_grace", f"failed/cancelled < {policy.failed_grace_days:g} days ago")
+        if "LATEST" in roles and not (ckpt / ".incomplete").exists():
+            if ended_days < policy.failed_latest_days:
+                return item("keep", 0, "D3.failed_latest_wait", f"LATEST kept {policy.failed_latest_days:g} days")
+            return item("delete", du_bytes(ckpt), "D3.failed_latest_delete", "failed/cancelled run: LATEST expired")
+        return item("delete", du_bytes(ckpt), "D3.failed_other", "failed/cancelled run: not LATEST or incomplete")
     if (ckpt / ".incomplete").exists():
         return item("delete", du_bytes(ckpt), "D3.incomplete", "save never finished (.incomplete)")
     if "LATEST" in roles:
@@ -205,9 +253,9 @@ def _blocked_reason(run_dir: Path, run_id: str, status: str, lock: LockStatus | 
         return "PINNED_OR_KEEP"
     if lock is not None and (lock.corrupt or lock.run_id is None or lock.run_id == run_id):
         return "GPU_LOCK_HOLDER"
-    if status not in KNOWN_STATUSES:
-        return "UNKNOWN_STATUS"  # missing/unreadable run.json or a status this module does not understand
-    if status not in CLEANABLE_STATUSES:
+    if status not in {s.value for s in RunStatus}:
+        return "UNKNOWN_STATUS"  # missing/unreadable run.json or a status outside RunStatus
+    if status not in CLEANABLE_STATUSES | FAILED_STATUSES:
         return "RUN_NOT_FINISHED"
     return None
 
@@ -232,8 +280,13 @@ def plan(
     for run_dir in sorted(runs_dir.iterdir()) if runs_dir.is_dir() else []:
         if run_dir.is_symlink() or not run_dir.is_dir() or (run_ids is not None and run_dir.name not in run_ids):
             continue
-        status = _run_status(run_dir)
+        status, ended_at = _run_status(run_dir)
         blocked = _blocked_reason(run_dir, run_dir.name, status, lock)
+        failed_ended_at = None
+        if status in FAILED_STATUSES:
+            failed_ended_at = max(
+                ended_at or 0.0, _newest_mtime(run_dir / "run.json"), _newest_mtime(run_dir / "checkpoints")
+            )
         ckpt_root = run_dir / "checkpoints"
         items: list[PlanItem] = []
         if ckpt_root.is_dir() and not ckpt_root.is_symlink():
@@ -243,7 +296,13 @@ def plan(
                     continue
                 items.append(
                     _plan_checkpoint(
-                        run_dir.name, ckpt, roles.get(ckpt.name, []), blocked=blocked, now=ts, policy=policy
+                        run_dir.name,
+                        ckpt,
+                        roles.get(ckpt.name, []),
+                        blocked=blocked,
+                        failed_ended_at=failed_ended_at,
+                        now=ts,
+                        policy=policy,
                     )
                 )
         runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(items)))

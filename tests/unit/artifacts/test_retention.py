@@ -34,7 +34,7 @@ def _ckpt(run: Path, name: str, *, age_days: float, optim_bytes: int = 1000, inc
     return ckpt
 
 
-def _run(root: Path, run_id: str, *, status: str | None = "completed") -> Path:
+def _run(root: Path, run_id: str, *, status: str | None = "completed", ended_days_ago: float | None = None) -> Path:
     if not (root / "pyproject.toml").exists():
         (root / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
     run = root / "outputs" / "runs" / run_id
@@ -42,7 +42,10 @@ def _run(root: Path, run_id: str, *, status: str | None = "completed") -> Path:
     (run / "logs").mkdir()
     (run / "checkpoints" / "training.jsonl").write_text("{}\n")
     if status is not None:
-        (run / "run.json").write_text(json.dumps({"run_id": run_id, "status": status}))
+        manifest: dict[str, object] = {"run_id": run_id, "status": status}
+        if ended_days_ago is not None:
+            manifest["ended_at"] = NOW - ended_days_ago * DAY
+        (run / "run.json").write_text(json.dumps(manifest))
     return run
 
 
@@ -85,13 +88,13 @@ def test_latest_and_best_same_checkpoint_latest_wins(tmp_path: Path) -> None:
     assert item.action == "keep"  # LATEST rule (kept whole for 7 days) beats best-strip
 
 
-@pytest.mark.parametrize("status", ["running", "failed", "interrupted", "killed"])
+@pytest.mark.parametrize("status", ["queued", "running", "interrupted", "evicted"])
 def test_unfinished_runs_are_never_touched(tmp_path: Path, status: str) -> None:
     _standard_run(tmp_path, status=status)
     assert set(_actions(tmp_path).values()) == {("keep", "RUN_NOT_FINISHED")}
 
 
-@pytest.mark.parametrize("status", [None, "finished", "unknown", "Completed"])
+@pytest.mark.parametrize("status", [None, "finished", "killed", "unknown", "Completed"])
 def test_missing_or_unrecognized_status_is_flagged_not_silent(tmp_path: Path, status: str | None) -> None:
     _standard_run(tmp_path, status=status)
     assert set(_actions(tmp_path).values()) == {("keep", "UNKNOWN_STATUS")}
@@ -235,3 +238,46 @@ def test_apply_refuses_wrong_project_root(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="expected 'vlm-pipeline'"):
         apply(tmp_path, ["r1/checkpoints/epoch_0_step_10"], by="t", now=NOW, lock_reader=no_lock)
     assert (tmp_path / "outputs" / "runs" / "r1" / "checkpoints" / "epoch_0_step_10").exists()
+
+
+@pytest.mark.parametrize("status", ["failed", "cancelled"])
+@pytest.mark.parametrize(
+    ("ended_days_ago", "expected"),
+    [
+        (1, {"epoch_0_step_10": "keep", "epoch_0_step_20": "keep", "epoch_0_step_30": "keep"}),  # grace
+        (4, {"epoch_0_step_10": "delete", "epoch_0_step_20": "delete", "epoch_0_step_30": "keep"}),  # LATEST waits
+        (8, {"epoch_0_step_10": "delete", "epoch_0_step_20": "delete", "epoch_0_step_30": "delete"}),
+    ],
+)
+def test_failed_and_cancelled_runs(
+    tmp_path: Path, status: str, ended_days_ago: float, expected: dict[str, str]
+) -> None:
+    run = _run(tmp_path, "r1", status=status, ended_days_ago=ended_days_ago)
+    for name in ("epoch_0_step_10", "epoch_0_step_20", "epoch_0_step_30"):
+        _ckpt(run, name, age_days=ended_days_ago, incomplete=name == "epoch_0_step_20")
+    (run / "checkpoints" / "LATEST").symlink_to("epoch_0_step_30")
+    _age_tree(run / "checkpoints", ended_days_ago)
+    got = {k: action for k, (action, _blocked) in _actions(tmp_path).items()}
+    assert got == expected
+
+
+def _age_tree(path: Path, days: float) -> None:
+    ts = NOW - days * DAY
+    for p in [path, *path.rglob("*")]:
+        os.utime(p, (ts, ts), follow_symlinks=False)
+
+
+def test_backdated_ended_at_never_brings_cleanup_forward(tmp_path: Path) -> None:
+    run = _run(tmp_path, "r1", status="failed", ended_days_ago=30)
+    _ckpt(run, "epoch_0_step_10", age_days=0)
+    _age_tree(run / "checkpoints", 30)
+    os.utime(run / "checkpoints" / "epoch_0_step_10" / "model", (NOW - 3600, NOW - 3600))  # written 1 h ago
+    assert _actions(tmp_path) == {"epoch_0_step_10": ("keep", None)}
+
+
+def test_failed_run_without_ended_at_uses_run_json_mtime(tmp_path: Path) -> None:
+    run = _run(tmp_path, "r1", status="failed")
+    _ckpt(run, "epoch_0_step_10", age_days=0)
+    ts = NOW - 1 * DAY
+    os.utime(run / "run.json", (ts, ts))
+    assert _actions(tmp_path) == {"epoch_0_step_10": ("keep", None)}  # still in the 3-day grace
