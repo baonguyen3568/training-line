@@ -359,9 +359,25 @@ canvas:
   advanced_only: Bật chế độ Nâng cao để dùng bước này
   drop_wire_search: Thêm bước nhận {port_type}…
   wire_rejected: Cổng "{target}" cần {expected}, bạn đang nối {actual}.
+  empty:
+    drop_here: Kéo "Dữ liệu" vào đây
+    or_click: hoặc bấm để chọn
+    explain: Mỗi workflow bắt đầu từ dữ liệu và một model gốc.
+    see_templates: Xem mẫu có sẵn
+  hint:
+    add_model: Thêm "Chọn model gốc" vào làn ①
+    add_train: Kéo "Fine-tune" vào làn ③ rồi nối dây
+    connect_port: Nối {port_type} vào đây
+    hide: Ẩn gợi ý
+  wire_replaced: Đã thay dây cũ
 library:
   title: Thư viện bước
   search: 'Tìm bước… (vd: nén, LoRA, benchmark)'
+  no_match: Không có bước nào khớp. Thử từ khác.
+  snapped_to_lane: Đã đặt "{node}" vào làn {lane}
+  collapse: Thu gọn thư viện
+  expand: Mở thư viện
+  blocked: Bị chặn
 port:
   dataset: Dữ liệu
   model: Model
@@ -384,6 +400,10 @@ node_state:
   failed: Lỗi
   skipped: Bỏ qua
   blocked_policy: Bị chặn
+  done_with_duration: Xong · {duration}
+  skipped_tooltip: Bước trước bị lỗi nên bước này không chạy
+  cached_tooltip: Không có gì thay đổi nên không chạy lại
+  running_indeterminate: Đang chạy
 preflight:
   title: Kiểm tra trước khi chạy
   summary_ok: Mọi thứ đã sẵn sàng
@@ -653,3 +673,19 @@ run_monitor:
     interrupted: Tạm dừng
     evicted: Bị dừng để nhường bộ nhớ
     discarded: Đã bỏ
+run:
+  stop: Dừng
+  stop_confirm: Dừng lần chạy này? Bước đang chạy sẽ dừng lại; các bước đã xong vẫn được giữ.
+  progress: Bước {done_count}/{total_count} · {node}
+  locked_while_running: Đang chạy — dừng lại để sửa workflow
+  finished: Chạy xong sau {duration}
+  finished_with_errors: Chạy xong, có {error_count} bước lỗi
+  view_results: Xem kết quả
+workflow:
+  save: Lưu workflow
+  open: Mở workflow
+  unsaved: Có thay đổi chưa lưu
+  duplicate: Nhân bản
+  delete: Xoá
+  rename: Đổi tên hiển thị
+  deleted_undo: Đã xoá "{node}"

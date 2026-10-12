@@ -359,9 +359,25 @@ canvas:
   advanced_only: Turn on Advanced mode to use this step
   drop_wire_search: Add a step that takes {port_type}…
   wire_rejected: Port "{target}" needs {expected}, but you connected {actual}.
+  empty:
+    drop_here: Drag "Data" here
+    or_click: or click to choose
+    explain: Every workflow starts with data and a base model.
+    see_templates: See ready-made templates
+  hint:
+    add_model: Add "Choose base model" to lane ①
+    add_train: Drag "Fine-tune" into lane ③ and connect it
+    connect_port: Connect {port_type} here
+    hide: Hide hints
+  wire_replaced: Replaced the previous wire
 library:
   title: Step library
   search: Search steps… (e.g. compress, LoRA, benchmark)
+  no_match: No steps match. Try another word.
+  snapped_to_lane: Placed "{node}" in the {lane} lane
+  collapse: Collapse library
+  expand: Open library
+  blocked: Blocked
 port:
   dataset: Data
   model: Model
@@ -384,6 +400,10 @@ node_state:
   failed: Error
   skipped: Skipped
   blocked_policy: Blocked
+  done_with_duration: Done · {duration}
+  skipped_tooltip: A previous step failed, so this one didn't run
+  cached_tooltip: Nothing changed, so it wasn't run again
+  running_indeterminate: Running
 preflight:
   title: Pre-run check
   summary_ok: Everything is ready
@@ -653,3 +673,19 @@ run_monitor:
     interrupted: Paused
     evicted: Stopped to free memory
     discarded: Discarded
+run:
+  stop: Stop
+  stop_confirm: Stop this run? The step in progress will stop; finished steps are kept.
+  progress: Step {done_count}/{total_count} · {node}
+  locked_while_running: Running — stop to edit the workflow
+  finished: Finished in {duration}
+  finished_with_errors: Finished with {error_count} failed steps
+  view_results: View results
+workflow:
+  save: Save workflow
+  open: Open workflow
+  unsaved: Unsaved changes
+  duplicate: Duplicate
+  delete: Delete
+  rename: Rename
+  deleted_undo: Deleted "{node}"
