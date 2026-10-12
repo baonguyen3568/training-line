@@ -1,0 +1,4 @@
+# Needed by Nemotron-Parse remote processor code (imports albumentations, cv2).
+# Do NOT upgrade to albumentationsx without license review (2.0.8 is the last MIT albumentations).
+albumentations
+opencv-python-headless
