@@ -118,9 +118,6 @@ def test_token_query_param_not_in_access_log(caplog: pytest.LogCaptureFixture) -
     assert TOKEN not in caplog.text
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="needs graph.validate (bao-fixcode M1-2); API answers 501 until then"
-)
 def test_spoofed_package_hint_not_echoed_by_api() -> None:
     """P003 D16: the hint must not appear anywhere in the API response, technical_detail included."""
     import json
@@ -138,14 +135,11 @@ def test_spoofed_package_hint_not_echoed_by_api() -> None:
     assert r.status_code == 200
     body = r.json()
     assert hint not in json.dumps(body)
-    cfg004 = [i for i in body["issues"] if i["code"] == "CFG-004"]
+    cfg004 = [i for i in body["errors"] if i["code"] == "CFG-004"]
     assert cfg004
     assert cfg004[0]["params"]["suggested_package"] is None
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="needs graph.validate (bao-fixcode M1-2); API answers 501 until then"
-)
 def test_session_token_is_not_accepted_as_csrf() -> None:
     c = _client()
     assert _post_validate(c, {**BASE, "X-VLM-CSRF": TOKEN}).status_code == 403

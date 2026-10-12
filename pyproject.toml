@@ -8,9 +8,14 @@ requires-python = ">=3.12,<3.13"
 # Host-safe dependencies only. Heavy runtime libs (torch, transformers, nemo_automodel, modelopt, vllm, ...)
 # live in the NGC container images (docker/IMAGES.lock), never here (ADR-004 D1).
 dependencies = [
+    "fastapi>=0.142.2,<0.143",
     "pydantic>=2.13,<3",
     "pyyaml>=6.0,<7",
+    "uvicorn>=0.54.0,<0.55",
 ]
+
+[project.scripts]
+vlm-app = "vlm_pipeline.app.server:main"
 
 [dependency-groups]
 # Exact pins = newest versions allowed by the 7-day cooldown on 2026-10-12. Bump in a dedicated commit.
@@ -22,6 +27,7 @@ dev = [
     "pytest-cov==7.1.0",
     "prek==0.5.4",
     "types-PyYAML",
+    "httpx==0.28.1",
 ]
 
 [build-system]
