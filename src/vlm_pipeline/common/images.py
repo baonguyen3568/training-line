@@ -18,21 +18,39 @@ class ImageMismatchError(VlmPipelineError):
     code: ClassVar[str] = "SYS-000"  # TODO(fixcode): dedicated catalog code (image_digest_mismatch, D1/D16)
 
 
-def pinned_image_id(lock_text: str, tag: str) -> str | None:
-    """Local image id (column 5) of the IMAGES.lock row whose tag column starts with ``tag``."""
+def _row(lock_text: str, tag: str) -> list[str] | None:
     for line in lock_text.splitlines():
         if line.startswith("#") or "|" not in line:
             continue
         cols = [c.strip() for c in line.split("|")]
         if len(cols) > 4 and cols[1].split(" ")[0] == tag and cols[4].startswith("sha256:"):
-            return cols[4].split(" ")[0]
+            return cols
     return None
 
 
-def check_pinned_image(root: Path, tag: str, actual_id: str | None) -> None:
-    """Refuse to run a project image whose tag drifted from the reviewed, pinned id (bao-security, D1)."""
-    expected = pinned_image_id((root / "docker" / "IMAGES.lock").read_text(encoding="utf-8"), tag)
-    if expected is None or actual_id != expected:
+def pinned_image_id(lock_text: str, tag: str) -> str | None:
+    """Local image id (column 5) of the IMAGES.lock row whose tag column starts with ``tag``."""
+    row = _row(lock_text, tag)
+    return row[4].split(" ")[0] if row else None
+
+
+def is_approved(lock_text: str, tag: str) -> bool:
+    """Review column (6) says APPROVED (a "PROBE, not approved" row is pinned but not for user jobs)."""
+    row = _row(lock_text, tag)
+    if row is None or len(row) < 7:
+        return False
+    review = row[6].upper()
+    return "APPROVED" in review and "NOT APPROVED" not in review
+
+
+def check_pinned_image(root: Path, tag: str, actual_id: str | None, *, require_approved: bool = False) -> None:
+    """Refuse to run a project image whose tag drifted from the reviewed, pinned id (bao-security, D1).
+
+    ``require_approved`` (jobs started from the app for users): a PROBE row is not enough.
+    """
+    lock_text = (root / "docker" / "IMAGES.lock").read_text(encoding="utf-8")
+    expected = pinned_image_id(lock_text, tag)
+    if expected is None or actual_id != expected or (require_approved and not is_approved(lock_text, tag)):
         raise ImageMismatchError(
             "image tag does not match docker/IMAGES.lock",
             params={"image": tag, "expected": expected or "not pinned", "actual": actual_id or "missing"},

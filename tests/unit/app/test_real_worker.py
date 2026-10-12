@@ -137,8 +137,8 @@ def test_identity_keys_container_nodes_by_image(tmp_path: Path, monkeypatch: pyt
 
 
 LOCK = """# header
-vlm-automodel | vlm-automodel:26.08-5 (local build) | (local) | base arm64 sha256:aaa | sha256:111 (rebuilt) | 29GB | ok
-vlm-automodel | vlm-automodel:26.08-4 (local build) | (local) | base arm64 sha256:aaa | sha256:222 | 29GB | ok
+vlm-automodel | vlm-automodel:26.08-5 (local build) | (local) | base arm64 sha256:aaa | sha256:111 (rebuilt) | 29GB | bao-security APPROVED
+vlm-automodel | vlm-automodel:26.08-4 (local build) | (local) | base arm64 sha256:aaa | sha256:222 | 29GB | bao-security APPROVED
 """
 
 
@@ -164,3 +164,17 @@ def test_real_lock_pins_default_image() -> None:
 
     text = (project_root() / "docker" / "IMAGES.lock").read_text()
     assert images.pinned_image_id(text, workers.DEFAULT_TRAIN_IMAGE) is not None
+
+
+def test_user_jobs_require_approved_image(tmp_path: Path) -> None:
+    lock = (
+        LOCK
+        + "vlm-automodel | vlm-automodel:probe (local) | (local) | base | sha256:333 | 29GB | PROBE, not approved | x\n"
+    )
+    (tmp_path / "docker").mkdir()
+    (tmp_path / "docker" / "IMAGES.lock").write_text(lock)
+    images.check_pinned_image(tmp_path, "vlm-automodel:probe", "sha256:333")  # dev/probe path ok
+    with pytest.raises(images.ImageMismatchError):
+        images.check_pinned_image(tmp_path, "vlm-automodel:probe", "sha256:333", require_approved=True)
+    assert images.is_approved(lock, "vlm-automodel:26.08-5")
+    assert not images.is_approved(lock, "vlm-automodel:probe")

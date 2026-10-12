@@ -308,6 +308,7 @@ def run_job(
     gate: bool = False,
     cancel: threading.Event | None = None,
     mem_thresholds: MemThresholds = DEFAULT_THRESHOLDS,
+    require_approved_image: bool = False,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock."""
     from vlm_pipeline.common.preflight import preflight

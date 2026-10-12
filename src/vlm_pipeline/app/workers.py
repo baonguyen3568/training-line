@@ -206,6 +206,7 @@ class RealWorker:
                 est_peak_gb=entry.ram_gb_train,
                 ckpt_gb=entry.disk_gb,
                 cancel=job.cancel,
+                require_approved_image=True,  # user jobs never run on a PROBE image
             )
         except MemoryPreemptedBeforeStartError as exc:
             raise InsufficientMemoryError(str(exc), params={"need_gb": entry.ram_gb_train}) from exc
