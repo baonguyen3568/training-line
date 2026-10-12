@@ -126,6 +126,9 @@ def _docker_state(name: str) -> ExitInfo:
     return ExitInfo(exit_code=int(state.get("ExitCode", -1)), oom_killed=bool(state.get("OOMKilled", False)))
 
 
+_CODE_DIRS = ("src", "configs", "docker", "scripts")
+
+
 def git_state(root: Path) -> tuple[str | None, bool | None]:
     """(HEAD commit, dirty) of the project; (None, None) if git is unavailable."""
     try:
@@ -137,9 +140,14 @@ def git_state(root: Path) -> tuple[str | None, bool | None]:
             ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],  # noqa: S607
             capture_output=True, text=True, check=True,
         ).stdout  # fmt: skip
+        # Untracked code/config is imported or read by runs but absent from HEAD -> also dirty (multi-agent tree).
+        untracked = subprocess.run(  # noqa: S603
+            ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "--", *_CODE_DIRS],  # noqa: S607
+            capture_output=True, text=True, check=True,
+        ).stdout  # fmt: skip
     except (OSError, subprocess.CalledProcessError):
         return None, None
-    return head, bool(status.strip())
+    return head, bool(status.strip() or untracked.strip())
 
 
 def image_digest(image: str) -> str | None:

@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "description": "Response of ``GET /api/runs/{id}/metrics?after=&limit=[&downsample_to=]`` (P009 \u00a76, frontend contract).",
+  "properties": {
+    "downsampled": {
+      "title": "Downsampled",
+      "type": "boolean"
+    },
+    "has_more": {
+      "title": "Has More",
+      "type": "boolean"
+    },
+    "next_cursor": {
+      "title": "Next Cursor",
+      "type": "string"
+    },
+    "points": {
+      "items": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "title": "Points",
+      "type": "array"
+    }
+  },
+  "required": [
+    "points",
+    "next_cursor",
+    "has_more",
+    "downsampled"
+  ],
+  "title": "MetricsPage",
+  "type": "object"
+}

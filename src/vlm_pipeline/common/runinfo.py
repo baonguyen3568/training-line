@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import time
 from collections.abc import Iterable, Iterator, Mapping
 from enum import StrEnum
@@ -60,6 +61,7 @@ class RunManifest(BaseModel):
     git_commit: str | None = None
     git_dirty: bool | None = None
     seed: int | None = None
+    max_steps: int | None = None  # for "step / max_steps" progress in the dashboard
     container_image: str | None = None
     container_digest: str | None = None
     pid: int | None = None  # host PID of the runner holding the GPU lock
@@ -85,6 +87,31 @@ def write_manifest(run_dir: Path, manifest: RunManifest) -> None:
 
 def read_manifest(run_dir: Path) -> RunManifest:
     return RunManifest.model_validate_json((run_dir / "run.json").read_text(encoding="utf-8"))
+
+
+_REPRO_REQUIRED = ("git_commit", "container_digest", "config_hash", "seed", "base_model_revision")
+_SHA40 = re.compile(r"^[0-9a-f]{40}$")
+
+
+def reproducibility_gaps(manifest: RunManifest) -> list[str]:
+    """Field names that make a run not reproducible (empty = OK). Drives the dashboard badge (ADR-002 B2)."""
+    gaps = [name for name in _REPRO_REQUIRED if getattr(manifest, name) is None]
+    if manifest.git_commit is not None and not _SHA40.match(manifest.git_commit) and "git_commit" not in gaps:
+        gaps.append("git_commit")
+    if manifest.git_dirty:
+        gaps.append("git_dirty")
+    return gaps
+
+
+class MetricsPage(BaseModel):
+    """Response of ``GET /api/runs/{id}/metrics?after=&limit=[&downsample_to=]`` (P009 §6, frontend contract)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    points: list[dict[str, float | int | str | list[str] | None]]  # metrics.jsonl records (flat)
+    next_cursor: str  # opaque to the client (byte offset)
+    has_more: bool
+    downsampled: bool
 
 
 # ------------------------------------------------------------------------------------------------ metrics.jsonl
