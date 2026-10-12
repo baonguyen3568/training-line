@@ -61,3 +61,9 @@ Write comparison table + decision + risks into `.team/proposals/001-*.md`; send 
   built at train time. Derive it by running the collate on one sample and cutting at the first labelled token -
   never infer it from the label mask (masked tokens are still in the input; e.g. Nemotron Parse keeps its task
   tokens `</s><s><predict_bbox><predict_classes><output_markdown>` in input but masks them from labels).
+- Precision on ONE GPU: AutoModel skips FSDP2 at world size 1, so `distributed.mp_policy` (bf16 compute / fp32 master)
+  is NEVER applied. `torch_dtype: bfloat16` + `torch.optim.AdamW` = pure bf16 params: Adam steps (~lr) below half a
+  bf16 ulp are rounded away (Parse P-3, lr 1e-5: only 5.3% of decoder elements changed in 300 steps; probe: ~7x update
+  lost). Use TE `FusedAdam` with `master_weights: true, store_param_remainders: true` (upstream pattern). Check
+  "fraction of trainable elements changed vs base" after any run whose quality looks wrong - val_loss alone hides it.
+- Budget sanity: compare samples seen (GBS × steps) with the upstream recipe before setting presets (P-3 = 15% of it).
