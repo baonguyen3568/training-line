@@ -285,6 +285,7 @@ estimate:
     formula: estimated by formula
     declared: declared by the node author, not verified
     unknown: no measurement yet
+    unknown_all: no measurements yet for time, RAM, disk
   range_minutes: ~{lo}–{hi} min
   range_hours: ~{lo}–{hi} h
   range_ram_gb: RAM ~{lo}–{hi} GB
@@ -483,7 +484,7 @@ node:
       adapter: Add-on (LoRA)
   train.sft_vlm:
     title: Full fine-tune
-    desc: Retrain the whole model. Needs more memory and time than LoRA.
+    desc: Teach the model to answer like your data by updating the parts of the model that need to learn.
     port:
       base_model: Base model
       train_data: Training data

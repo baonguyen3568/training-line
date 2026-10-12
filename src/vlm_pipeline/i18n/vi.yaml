@@ -285,6 +285,7 @@ estimate:
     formula: ước lượng theo công thức
     declared: do tác giả node khai, chưa kiểm chứng
     unknown: chưa có số đo
+    unknown_all: chưa có số đo thời gian, RAM, ổ đĩa
   range_minutes: ~{lo}–{hi} phút
   range_hours: ~{lo}–{hi} giờ
   range_ram_gb: RAM ~{lo}–{hi} GB
@@ -483,7 +484,7 @@ node:
       adapter: Phần học thêm (LoRA)
   train.sft_vlm:
     title: Fine-tune toàn bộ
-    desc: Dạy lại toàn bộ model. Tốn nhiều bộ nhớ và thời gian hơn LoRA.
+    desc: Dạy model trả lời theo dữ liệu của bạn bằng cách cập nhật các phần model cần học.
     port:
       base_model: Model gốc
       train_data: Dữ liệu học
