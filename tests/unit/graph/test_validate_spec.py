@@ -164,9 +164,11 @@ def test_every_issue_code_is_in_catalog_with_i18n_text() -> None:
     for issue in issues:
         assert re.fullmatch(r"[A-Z]+-\d{3}", issue.code)
         assert issue.code in catalog
-        for part in ("title", "what", "why"):
+        for part in ("title",):  # `why` is optional and `what` may be split into variants (P010 §7)
             assert f"error.{issue.code}.{part}" in vi
             assert f"error.{issue.code}.{part}" in en
+        for t in (vi, en):  # a bare `what` or at least one variant `what.<key>`
+            assert any(k == f"error.{issue.code}.what" or k.startswith(f"error.{issue.code}.what.") for k in t)
 
 
 # ---- P003 D11 additions requested by bao-security ----------------------------------------------

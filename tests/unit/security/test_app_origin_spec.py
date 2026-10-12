@@ -1,33 +1,45 @@
 """Spec tests for the local web app hardening (P003 D13): Host allowlist, Origin check, session token.
 
-ASSUMED: ``vlm_pipeline.app.create_app(token: str, port: int)`` returns a FastAPI app; tested with
+ASSUMED: ``vlm_pipeline.app.create_app(token: str, port: int, secret: bytes | None = None,
+ws_auth_timeout_s: float = 5.0)`` returns a FastAPI app; tested with
 ``fastapi.testclient.TestClient`` (no network, no real port). Access log goes through the stdlib logger
 ``vlm_pipeline.access`` (app middleware), so it is checkable with ``caplog``. Rename together with bao-backend.
+CSRF (D13, after the S-5 review): the CSRF token is NOT the session token; ``GET /api/session`` returns
+``{"csrf_token": HMAC(secret, session_id)}``. WebSocket: after the handshake the first client message must carry the
+CSRF token (``{"type": "auth", "csrf_token": ...}``); a wrong token, a first message > 4 KB, or silence past
+``ws_auth_timeout_s`` closes with code 4401 (after accept). A handshake with a bad Origin or no session cookie is
+refused with 1008 before accept. Security side: ``app/security.py`` (``install_security``, ``ws_authenticate``).
 """
 
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
-pytestmark = pytest.mark.xfail(
-    strict=True, raises=ImportError, reason="spec: bao-backend implements vlm_pipeline.app (P009/P003 D13) in P2"
-)
+import pytest
 
 TOKEN = "t" * 32
 PORT = 7870
 GOOD_HOST = f"127.0.0.1:{PORT}"
 
 
-def _client():  # type: ignore[no-untyped-def]
+def _client(**kwargs: Any):  # type: ignore[no-untyped-def]
     from fastapi.testclient import TestClient
 
     from vlm_pipeline.app import create_app
 
-    return TestClient(create_app(token=TOKEN, port=PORT), base_url=f"http://{GOOD_HOST}")
+    return TestClient(create_app(token=TOKEN, port=PORT, **kwargs), base_url=f"http://{GOOD_HOST}")
 
 
-def _auth() -> dict[str, str]:
-    return {"Host": GOOD_HOST, "Cookie": f"vlm_session={TOKEN}", "X-VLM-CSRF": TOKEN}
+BASE = {"Host": GOOD_HOST, "Cookie": f"vlm_session={TOKEN}"}
+
+
+def _auth(client: Any) -> dict[str, str]:
+    csrf = client.get("/api/session", headers=BASE).json()["csrf_token"]
+    return {**BASE, "X-VLM-CSRF": csrf}
+
+
+def _post_validate(client: Any, headers: dict[str, str]) -> Any:
+    return client.post("/api/graphs/validate", json={}, headers={**headers, "Origin": f"http://{GOOD_HOST}"})
 
 
 @pytest.mark.parametrize(
@@ -43,23 +55,27 @@ def _auth() -> dict[str, str]:
 )
 def test_wrong_host_header_is_403(host: str) -> None:
     """DNS rebinding defence."""
-    r = _client().get("/api/system", headers={**_auth(), "Host": host})
+    c = _client()
+    r = c.get("/api/system", headers={**_auth(c), "Host": host})
     assert r.status_code == 403
 
 
 @pytest.mark.parametrize("host", [f"127.0.0.1:{PORT}", f"localhost:{PORT}"])
 def test_allowed_hosts(host: str) -> None:
-    r = _client().get("/api/system", headers={**_auth(), "Host": host})
+    c = _client()
+    r = c.get("/api/system", headers={**_auth(c), "Host": host})
     assert r.status_code == 200
 
 
 def test_state_change_with_foreign_origin_is_403() -> None:
-    r = _client().post("/api/graphs/validate", json={}, headers={**_auth(), "Origin": "http://evil.example"})
+    c = _client()
+    r = c.post("/api/graphs/validate", json={}, headers={**_auth(c), "Origin": "http://evil.example"})
     assert r.status_code == 403
 
 
 def test_state_change_without_csrf_header_is_403() -> None:
-    headers = {k: v for k, v in _auth().items() if k != "X-VLM-CSRF"}
+    c = _client()
+    headers = {k: v for k, v in _auth(c).items() if k != "X-VLM-CSRF"}
     r = _client().post("/api/graphs/validate", json={}, headers={**headers, "Origin": f"http://{GOOD_HOST}"})
     assert r.status_code == 403
 
@@ -77,24 +93,22 @@ def test_no_cors_headers() -> None:
     assert "access-control-allow-origin" not in {k.lower() for k in r.headers}
 
 
-def test_websocket_without_cookie_is_rejected() -> None:
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Host": GOOD_HOST, "Origin": f"http://{GOOD_HOST}"},  # no session cookie
+        {**BASE, "Origin": "http://evil.example"},  # foreign Origin
+    ],
+)
+def test_websocket_handshake_is_refused_with_1008(headers: dict[str, str]) -> None:
     from starlette.websockets import WebSocketDisconnect
 
     with (
-        pytest.raises(WebSocketDisconnect),
-        _client().websocket_connect("/api/runs/x/events", headers={"Host": GOOD_HOST, "Origin": f"http://{GOOD_HOST}"}),
+        pytest.raises(WebSocketDisconnect) as refused,
+        _client().websocket_connect("/api/runs/x/events", headers=headers),
     ):
         pass
-
-
-def test_websocket_with_foreign_origin_is_rejected() -> None:
-    from starlette.websockets import WebSocketDisconnect
-
-    with (
-        pytest.raises(WebSocketDisconnect),
-        _client().websocket_connect("/api/runs/x/events", headers={**_auth(), "Origin": "http://evil.example"}),
-    ):
-        pass
+    assert refused.value.code == 1008
 
 
 def test_token_query_param_not_in_access_log(caplog: pytest.LogCaptureFixture) -> None:
@@ -104,6 +118,9 @@ def test_token_query_param_not_in_access_log(caplog: pytest.LogCaptureFixture) -
     assert TOKEN not in caplog.text
 
 
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="needs graph.validate (bao-fixcode M1-2); API answers 501 until then"
+)
 def test_spoofed_package_hint_not_echoed_by_api() -> None:
     """P003 D16: the hint must not appear anywhere in the API response, technical_detail included."""
     import json
@@ -116,10 +133,61 @@ def test_spoofed_package_hint_not_echoed_by_api() -> None:
         "nodes": [{"id": "x", "type": "acme/fake.train", "version": "1.0.0", "params": {}, "package": hint}],
         "edges": [],
     }
-    r = _client().post("/api/graphs/validate", json=wf, headers={**_auth(), "Origin": f"http://{GOOD_HOST}"})
+    c = _client()
+    r = c.post("/api/graphs/validate", json=wf, headers={**_auth(c), "Origin": f"http://{GOOD_HOST}"})
     assert r.status_code == 200
     body = r.json()
     assert hint not in json.dumps(body)
     cfg004 = [i for i in body["issues"] if i["code"] == "CFG-004"]
     assert cfg004
     assert cfg004[0]["params"]["suggested_package"] is None
+
+
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="needs graph.validate (bao-fixcode M1-2); API answers 501 until then"
+)
+def test_session_token_is_not_accepted_as_csrf() -> None:
+    c = _client()
+    assert _post_validate(c, {**BASE, "X-VLM-CSRF": TOKEN}).status_code == 403
+    assert _post_validate(c, _auth(c)).status_code == 200  # sanity: the real CSRF token works
+
+
+def test_csrf_from_another_app_instance_is_rejected() -> None:
+    """A token minted with another secret (e.g. before a restart) must not be accepted."""
+    old = _client(secret=b"a" * 32)
+    new = _client(secret=b"b" * 32)
+    stale = _auth(old)["X-VLM-CSRF"]
+    assert _post_validate(new, {**BASE, "X-VLM-CSRF": stale}).status_code == 403
+
+
+def _ws_close_code(client: Any, first_message: str | None) -> int:
+    from starlette.websockets import WebSocketDisconnect
+
+    with client.websocket_connect("/api/runs/x/events", headers={**BASE, "Origin": f"http://{GOOD_HOST}"}) as ws:
+        if first_message is not None:
+            ws.send_text(first_message)
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_text()
+    return int(closed.value.code)
+
+
+@pytest.mark.parametrize(
+    "first_message",
+    [
+        '{"type": "auth", "csrf_token": "wrong"}',
+        '{"type": "auth", "csrf_token": "' + TOKEN + '"}',  # session token is not the CSRF token
+        '{"type": "auth", "csrf_token": "' + "x" * 5000 + '"}',  # > 4 KB
+        None,  # silence past the auth timeout
+    ],
+)
+def test_websocket_first_message_must_authenticate(first_message: str | None) -> None:
+    assert _ws_close_code(_client(ws_auth_timeout_s=0.2), first_message) == 4401
+
+
+def test_websocket_with_valid_csrf_stays_open() -> None:
+    c = _client(ws_auth_timeout_s=0.2)
+    csrf = _auth(c)["X-VLM-CSRF"]
+    with c.websocket_connect("/api/runs/x/events", headers={**BASE, "Origin": f"http://{GOOD_HOST}"}) as ws:
+        ws.send_text('{"type": "auth", "csrf_token": "' + csrf + '"}')
+        message = ws.receive_json()  # first server message (e.g. snapshot / run_not_found), not a 4401 close
+    assert isinstance(message, dict)
