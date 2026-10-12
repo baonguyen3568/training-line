@@ -254,3 +254,7 @@ Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ 
 - Record gắn `purpose: pipeline_check`; không phải số chất lượng, không đưa vào báo cáo hay catalog.
 - Bổ sung của tester: (1) 20 ảnh **cố định theo id**: `train[:20]` của snapshot đã pin (row index 0–19); record ghi index + sha256 của `ground_truth`, và eval chấm đúng các id đó. (2) Đối chứng: chấm thêm **20 ảnh test**. Kỳ vọng thấp hơn rõ. Nếu test cũng ≥90 thì nghi rò dữ liệu hoặc scorer quá dễ dãi.
 - Checkpoint P-1b (5 step) chỉ dùng để tester kiểm đường eval chạy được.
+
+### 10.4 Giữ checkpoint của P-3 (bao-cleanup, 05:20)
+- YAML P-3 đã đặt `max_recent_checkpoints: 3` + `save_consolidated: every`. **Cần backend xác nhận** đường `vlm_pipeline.train.smoke --config` dùng YAML nguyên trạng, không ghi đè 2 field này. Đường app (`train/recipe.py`) thì ghi đè thành `final` / 2.
+- Sau run: `touch outputs/runs/<run>/KEEP` (giữ cả run) trong lúc tester chấm F1. Chốt preset xong thì gỡ KEEP của run và đặt `checkpoints/epoch_*_step_<N>/KEEP` cho đúng checkpoint được chọn; phần còn lại theo retention ADR-005 (LATEST + LOWEST_VAL, 7 ngày). run.json phải có status=completed thì retention mới dọn.
