@@ -348,10 +348,13 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - torch AdamW bf16: 16.8% phần tử đổi, mean Δ −1.0e-4.
   - TE FusedAdam `master_weights=True`: 100% phần tử đổi, mean Δ −7.1e-4 (giá trị kỳ vọng ≈ −1e-3).
   - ⇒ bf16 thuần làm mất khoảng **7 lần** lượng update.
-- **Sửa**: dùng mẫu upstream `transformer_engine.pytorch.optimizers.fused_adam.FusedAdam` với `master_weights: true, store_param_remainders: true`, moment fp32 (ví dụ examples/vlm_finetune/gemma4/…tp2_cp2.yaml). Compute vẫn bf16. Tốn thêm khoảng 2 B/param train (~0.6 GB). TE 2.14 có sẵn trong image, không thêm dependency.
+- **Sửa**: dùng mẫu upstream `transformer_engine.pytorch.optimizers.fused_adam.FusedAdam` với `master_weights: true, store_param_remainders: true`, moment fp32 (ví dụ examples/vlm_finetune/gemma4/…tp2_cp2.yaml). Compute vẫn bf16. Tốn thêm khoảng 6 B/param train (~1.6 GB, backend tính lại; moment fp32 + remainder). TE 2.14 có sẵn trong image, không thêm dependency.
 - **P-3b-A** (`configs/train/smoke/nemotron_parse_v1_1_p3b_fp32master.yaml`): giống hệt P-3, chỉ đổi optimizer; 100 step (~33 phút).
   - PASS khi val_loss@99 < 0.560 rõ rệt (P-3) **và** tỉ lệ phần tử decoder đổi ≫ 5.3%.
   - Sau đó mới chạy 300 step (hoặc nhiều hơn) rồi chấm.
 - **Hệ quả rộng**: mọi run full-SFT 1 GPU trong app (train.sft_vlm) đều bị lỗi này. LoRA ít bị hơn (lr 1e-4–2e-4, nhưng adapter bf16 vẫn có thể mất một phần update), cần kiểm dtype adapter.
   - Đề xuất: `train/recipe.py` mặc định FusedAdam master fp32 cho SFT. Research sẽ cập nhật 11 template sau khi A/B PASS.
 - Giả thuyết use_cache (§10.8) **vẫn độc lập**: có thể cả hai cùng đúng. Thứ tự: A/B cache (đang chạy) rồi P-3b-A.
+- (backend review P-3b-A: APPROVE) Phát hiện thêm:
+  - AutoModel đã có cảnh báo trong log P-3 ("Detected torch.optim.Adam/AdamW with trainable bf16 model parameters…") mà không ai bắt. Backend sẽ ghi `engine_warnings` vào run.json; gate từ chối các run template có cảnh báo đã biết.
+  - Resume với state FusedAdam chưa được chứng minh: cần smoke kill/resume trước khi đặt làm mặc định trong app.

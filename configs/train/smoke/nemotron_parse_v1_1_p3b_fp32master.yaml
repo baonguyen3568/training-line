@@ -1,0 +1,106 @@
+# P-3b-A (001a §10.9): single-variable A/B against P-3 (nemotron_parse_v1_1_template_run.yaml). ONLY change:
+# optimizer = Transformer Engine FusedAdam with fp32 master weights (master_weights + store_param_remainders).
+# Why: P-3 trained bf16 params with torch.optim.AdamW and no fp32 master copy. At world size 1 AutoModel skips FSDP2, so
+# mp_policy never applies (fsdp2.py parallelize: "World size or FSDP mesh size is 1, skipping parallelization"). Adam
+# steps ~lr=1e-5 are below half a bf16 ulp for |w| >~ 4e-3 and get rounded away: only 5.3% of decoder elements
+# changed after 300 steps (bao-backend byte diff). Pattern taken from upstream examples (e.g.
+# examples/vlm_finetune/gemma4/gemma4_e4b_tulu3_text_tp2_cp2.yaml). Compute stays bf16. Extra memory (trainable params
+# only, frozen RADIO gets no state): fp32 moments +4 B + remainders 2 B per param x ~0.27B = ~1.6 GB (est peak ~22 GB).
+# Resume of FusedAdam state (store_param_remainders) is NOT yet proven - smoke resume before making it the app default.
+# Plan: run 100 steps (1 epoch) first; compare val_loss@99 with P-3 (0.560) and the changed-element fraction.
+# RUN_DIR / PREPARED_MODEL_DIR are substituted by the launcher.
+
+recipe: FinetuneRecipeForVLM
+
+step_scheduler:
+  global_batch_size: 8
+  local_batch_size: 1
+  ckpt_every_steps: 100
+  val_every_steps: 100
+  num_epochs: 3  # explicit: AutoModel default num_epochs=10 silently capped O-1b at 50 of 60 steps
+  max_steps: 100  # A/B: 1 epoch first; extend to 300 only if the A/B passes
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1234
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForImageTextToText.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  torch_dtype: torch.bfloat16
+  use_liger_kernel: false
+  attn_implementation: eager
+  trust_remote_code: true  # required by upstream recipe; code is pinned + offline (see header)
+
+processor:
+  _target_: transformers.AutoProcessor.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  trust_remote_code: true
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: RUN_DIR/checkpoints
+  model_save_format: safetensors
+  save_consolidated: every  # each kept ckpt must be loadable by the eval worker (~2GB each)
+  max_recent_checkpoints: 3  # keep 100/200/300 for the preset decision
+
+distributed:
+  strategy: fsdp2
+  dp_size: none
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+  activation_checkpointing: true
+
+loss_fn:
+  _target_: nemo_automodel.components.models.nemotron_parse.nemotron_parse_loss.NemotronParseLoss
+  coordinate_weight: 10.0
+  class_token_start_idx: 50000
+  num_heads: 1
+  ignore_index: -100
+  fp32_upcast: true
+
+dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: train
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  pin_memory: false  # UMA: pinned host copies only add RAM (001a §9.1 d)
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: validation
+  limit_dataset_samples: 100
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+optimizer:
+  _target_: transformer_engine.pytorch.optimizers.fused_adam.FusedAdam
+  lr: 1.0e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  adam_w_mode: true
+  master_weights: true
+  store_param_remainders: true
+  exp_avg_dtype: torch.float32
+  exp_avg_sq_dtype: torch.float32
+
+freeze_config:  # adapter enforces: freeze encoder.model_encoder (RADIO backbone), neck + decoder + embeddings train (001a §9.3)
+  freeze_vision_tower: true
+  freeze_language_model: false
