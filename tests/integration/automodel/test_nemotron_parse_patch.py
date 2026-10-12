@@ -86,12 +86,18 @@ def test_model_builds_with_correct_normalize_and_tie(version: str, tied: bool, t
     assert shares is tied, f"{version}: lm_head tied={shares}, expected {tied}"
 
 
-def test_disagreeing_flag_names_warn_and_new_name_wins(caplog: pytest.LogCaptureFixture) -> None:
-    from nemo_automodel.components.models.nemotron_parse.model import _resolve_processor_normalizes
+def test_disagreeing_flag_names_new_name_wins_with_warning(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Behaviour through the public config API (fails on 26.08-1 because the flag is dropped, not because a helper
+    is missing). The preflight check (common/config_aliases.py) blocks such configs earlier; this is defence in depth.
+    """
+    from nemo_automodel.components.models.nemotron_parse.model import NemotronParseConfig
 
-    flags = {"processor_normalizes": False, "image_processor_normalizes": True}
+    d = _prepared_config_dir("v1.2", tmp_path)
+    cfg_json = json.loads((d / "config.json").read_text())
+    cfg_json["encoder"]["processor_normalizes"] = False
+    cfg_json["encoder"]["image_processor_normalizes"] = True
+    (d / "config.json").write_text(json.dumps(cfg_json))
     with caplog.at_level("WARNING"):
-        assert _resolve_processor_normalizes(flags.get) is False
+        cfg = NemotronParseConfig.from_pretrained(d, trust_remote_code=True)
+    assert getattr(cfg.encoder, "image_processor_normalizes", None) is False
     assert "disagree" in caplog.text
-    assert _resolve_processor_normalizes({}.get) is False
-    assert _resolve_processor_normalizes({"image_processor_normalizes": True}.get) is True
