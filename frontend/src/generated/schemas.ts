@@ -30,6 +30,7 @@ export type RunManifest = {
   git_dirty?: boolean | null;
   host_min_available_gb?: number | null;
   max_steps?: number | null;
+  memguard_fast_fall?: boolean | null;
   name: string;
   oom_killed?: boolean | null;
   parent_run_id?: string | null;

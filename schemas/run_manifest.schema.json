@@ -198,6 +198,18 @@
       "default": null,
       "title": "Max Steps"
     },
+    "memguard_fast_fall": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Memguard Fast Fall"
+    },
     "name": {
       "title": "Name",
       "type": "string"
