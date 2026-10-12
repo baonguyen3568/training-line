@@ -37,6 +37,10 @@ class ContainerJob:
     env: Mapping[str, str] = field(default_factory=dict)
     workdir: str = CONTAINER_ROOT
     read_only_project: bool = False
+    # Code checkout (git worktree) overlaid read-only on these project dirs, so caches/outputs stay in the main
+    # project while the code that runs is exactly the pinned commit (ADR-002 A1).
+    code_root: Path | None = None
+    code_dirs: tuple[str, ...] = ("src", "configs", "scripts", "docker")
     uid: int = field(default_factory=os.getuid)
     gid: int = field(default_factory=os.getgid)
 
@@ -66,6 +70,10 @@ def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None
     if lock_token is not None:
         env[gpu_lock.TOKEN_ENV] = lock_token
     mount = f"{project_root}:{CONTAINER_ROOT}" + (":ro" if job.read_only_project else "")
+    overlays: list[str] = []
+    if job.code_root is not None:
+        for d in job.code_dirs:
+            overlays += ["-v", f"{job.code_root / d}:{CONTAINER_ROOT}/{d}:ro"]
     args = [
         "docker", "run", "--name", f"vlm-{job.name}",
         "--label", "project=vlm-training",
@@ -74,7 +82,7 @@ def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None
         "--user", f"{job.uid}:{job.gid}",
         "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",
         "--ulimit", "memlock=-1", "--ulimit", "stack=67108864",
-        "-v", mount, "-w", job.workdir,
+        "-v", mount, *overlays, "-w", job.workdir,
     ]  # fmt: skip
     if job.gpu:
         args += ["--gpus", "all"]
@@ -175,10 +183,25 @@ def run_job(
     est_peak_gb: float,
     ckpt_gb: float = 0.0,
     lock_path: Path | None = None,
+    gate: bool = False,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock."""
     from vlm_pipeline.common.preflight import preflight
 
+    if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
+        from vlm_pipeline.common.runinfo import reproducibility_gaps
+
+        commit, dirty = git_state(job.code_root or project_root)
+        probe = manifest.model_copy(
+            update={
+                "git_commit": manifest.git_commit or commit,
+                "git_dirty": dirty,
+                "container_digest": manifest.container_digest or image_digest(job.image),
+            }
+        )
+        gaps = reproducibility_gaps(probe)
+        if gaps:
+            raise RuntimeError(f"gate run refused, not reproducible: missing/invalid {gaps}")
     verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb)
     if not verdict.ok:
         raise RuntimeError(f"preflight refused: {verdict.to_json()}")
@@ -186,7 +209,7 @@ def run_job(
     handle = gpu_lock.acquire(path, who=who, job=manifest.name, run_id=manifest.run_id, host_pid=os.getpid())
     container = f"vlm-{job.name}"
     try:
-        commit, dirty = git_state(project_root)
+        commit, dirty = git_state(job.code_root or project_root)
         manifest = manifest.model_copy(
             update={
                 "status": RunStatus.RUNNING,

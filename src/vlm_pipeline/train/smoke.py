@@ -12,7 +12,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import secrets
+import subprocess
 import time
 from pathlib import Path
 
@@ -35,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--dataset")
     p.add_argument("--task", default="lora", choices=["lora", "sft"])
     p.add_argument("--image", default=DEFAULT_IMAGE)
+    p.add_argument("--worktree", metavar="COMMIT", help="run code from a git worktree at COMMIT (ADR-002 A1)")
+    p.add_argument("--gate", action="store_true", help="refuse to run unless reproducibility_gaps() == []")
     a = p.parse_args(argv)
 
     root = project_root()
@@ -42,7 +46,14 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = root / "outputs" / "runs" / run_id
     (run_dir / "logs").mkdir(parents=True)
     run_dir_c = f"{CONTAINER_ROOT}/outputs/runs/{run_id}"
-    text = (root / a.config).read_text(encoding="utf-8").replace("RUN_DIR", run_dir_c)
+    code_root = None
+    if a.worktree:
+        code_root = root / ".worktrees" / run_id
+        subprocess.run(  # noqa: S603
+            ["git", "-C", str(root), "worktree", "add", "--detach", str(code_root), a.worktree],  # noqa: S607
+            check=True, capture_output=True,
+        )  # fmt: skip
+    text = ((code_root or root) / a.config).read_text(encoding="utf-8").replace("RUN_DIR", run_dir_c)
     if "PREPARED_MODEL_DIR" in text:
         if a.prepared is None:
             p.error("config uses PREPARED_MODEL_DIR: pass --prepared")
@@ -60,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
         dataset=a.dataset,
         config_path=str(a.config),
         config_hash=hashlib.sha256(text.encode()).hexdigest()[:16],
+        seed=int(m.group(1)) if (m := re.search(r"^\s*seed:\s*(\d+)", text, re.M)) else None,
+        max_steps=int(m2.group(1)) if (m2 := re.search(r"^\s*max_steps:\s*(\d+)", text, re.M)) else None,
         container_image=a.image,
         tags=["smoke"],
     )
@@ -69,9 +82,10 @@ def main(argv: list[str] | None = None) -> int:
         image=a.image,
         argv=("automodel", f"{run_dir_c}/config.yaml", "--nproc-per-node", "1"),
         workdir="/opt/Automodel",
+        code_root=code_root,
     )
     final = run_job(job, manifest, run_dir, project_root=root, who="bao-backend", est_peak_gb=a.est_peak_gb,
-                    ckpt_gb=a.ckpt_gb)  # fmt: skip
+                    ckpt_gb=a.ckpt_gb, gate=a.gate)  # fmt: skip
     for src, split in (("training.jsonl", "train"), ("validation.jsonl", "val")):
         path = run_dir / "checkpoints" / src
         if path.exists():

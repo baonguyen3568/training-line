@@ -70,3 +70,11 @@ def test_git_state_outside_repo(tmp_path: Path) -> None:
     from vlm_pipeline.common.jobrun import git_state
 
     assert git_state(tmp_path) == (None, None)
+
+
+def test_worktree_overlays_code_read_only() -> None:
+    args = docker_args(_job(code_root=Path("/repo/.worktrees/r1")), Path("/repo"))
+    joined = " ".join(args)
+    assert "-v /repo:/workspace" in joined
+    for d in ("src", "configs", "scripts", "docker"):
+        assert f"/repo/.worktrees/r1/{d}:/workspace/{d}:ro" in joined
