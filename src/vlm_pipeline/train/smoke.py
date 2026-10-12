@@ -25,6 +25,15 @@ from vlm_pipeline.common.runinfo import RunManifest, automodel_to_metrics, write
 DEFAULT_IMAGE = "vlm-automodel:26.08-1"
 
 
+def _complete_checkpoints(run_dir: Path, base_dir: Path) -> None:
+    """BUG-002: every consolidated export (save_consolidated every|final) gets the tensors consolidation dropped."""
+    from vlm_pipeline.train.ckpt_complete import complete_from_base
+
+    for consolidated in sorted((run_dir / "checkpoints").glob("epoch_*_step_*/model/consolidated")):
+        restored = complete_from_base(base_dir, consolidated)
+        print(json.dumps({"completed_from_base": str(consolidated.relative_to(run_dir)), "restored": restored}))
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m vlm_pipeline.train.smoke")
     p.add_argument("--config", type=Path, required=True)
@@ -107,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
     except RuntimeError as exc:  # preflight refusal / gate refusal
         print(json.dumps({"run_id": run_id, "status": "refused", "detail": str(exc)}))
         return 2
+    if a.prepared is not None and final.status == "completed":
+        _complete_checkpoints(run_dir, root / a.prepared / "model")
     for src, split in (("training.jsonl", "train"), ("validation.jsonl", "val")):
         path = run_dir / "checkpoints" / src
         if path.exists():
