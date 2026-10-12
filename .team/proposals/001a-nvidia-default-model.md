@@ -301,3 +301,16 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
 - (08:30) fixcode 23e6aa6: `complete_from_base` merge generation_config.json của base đè lên export. Allowlist giữ từ export: `use_cache` (bắt buộc False cho patch 0003) và `transformers_version`; còn lại base thắng, lệch thì gate báo lỗi. Có test.
   - **Đính chính tiêu chí "load strict"**: checkpoint gốc của NVIDIA đã có unexpected key `embed_positions` với class remote (fixcode đo). Tiêu chí đúng là **load report của export == load report của base**, không phải "không có missing/unexpected nào".
   - Ghi nhận: `use_cache=False` (patch 0003) nghĩa là đường native hiện **không dùng KV cache**. Đúng rủi ro tốc độ ở §10.5 (07:00). Việc "bật KV cache cho native hoặc dùng vLLM cho Chạy thử" vẫn mở.
+
+### 10.7 Quyết định decoding cho số chính thức CORD (research, 2026-10-12, sau so sánh 6 ảnh của bao-tester)
+- Bằng chứng (tester, worker 1c62cab, 6 ảnh train O-1b): generation_config của base (greedy + repetition_penalty 1.1) cho F1 **77.2 → 40.2**, nTED 70.8 → 59.5. Penalty sửa được 1 ảnh lặp (#5: F1 0 → 16.7), nhưng phá 1 ảnh tốt (#0: 90.9 → 0).
+  - Cơ chế: penalty phạt cả **token cấu trúc lặp hợp lệ** (`<s_menu>` bị thay bằng `<s_menuqty_cnt>` nên menu bị phẳng hoá; "1 x" thành "x"; tên món bị méo). Output JSON/tag của CORD lặp tag theo bản chất, nên 1.1 không hợp với task này. Penalty của NVIDIA được chỉnh cho output markdown/bbox gốc, và không phải một phần của những gì ta fine-tune (train-time = teacher forcing, không penalty).
+- **Quyết định (sửa §10.5):**
+  - **Số chính thức** cho template Parse + CORD = **greedy, repetition_penalty 1.0**, `num_beams=1`, giữ `forced_eos_token_id`. `max_new_tokens` = 1024 (eval), 1280 (Chạy thử). **batch_size 1** (bs3 lệch bs1 ở 3/6 ảnh do bf16 + padding). `--require-no-drift`.
+  - **Số phụ** (bắt buộc báo cùng, cột riêng) = generation_config nguyên bản của model (penalty 1.1). Mục đích: theo dõi và đối chiếu với protocol "theo model".
+  - Ngoại lệ: nếu ở P-3 checkpoint 300 cấu hình penalty 1.1 **hơn** no-penalty ≥2 điểm F1 thì research mở lại quyết định này. Lý do: mẫu 6 ảnh nhỏ, model O-1b chưa học đủ.
+- **Không đổi gate export**: export vẫn giữ nguyên generation_config của base (§10.5, 23e6aa6). Lựa chọn decoding là **của task/template**, không phải của trọng số.
+  - Đề xuất (cần backend + cleancode + design đồng ý): thêm field catalog/template `decode_overrides`. Với Parse+CORD là `{repetition_penalty: 1.0}`. Node Eval/Chạy thử áp field này lên generation_config và ghi vào record.
+  - Allowlist drift chỉ gồm các key được khai báo ở `decode_overrides` + `max_new_tokens`.
+  - Model card/README của export ghi rõ: "dùng repetition_penalty=1.0 cho output JSON".
+- Áp dụng ngay cho P-3 (tester chấm cả 2 cấu hình). Preset "Nhanh/Tiêu chuẩn" (§10.1) tính trên **số chính thức**.
