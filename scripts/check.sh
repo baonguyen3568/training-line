@@ -2,6 +2,7 @@
 # Local CI (ADR-004 D8). CPU-only, never takes the GPU lock.
 #   scripts/check.sh               host gates: lockfile, format, lint, types, import layers, unit tests, secrets
 #   scripts/check.sh --container   integration tests inside the NGC image (owner: bao-backend, S-2)
+#   scripts/check.sh --clean       host unit tests on a pristine worktree of HEAD (catches uncommitted dependencies)
 # Stops at the first failing gate. pip-audit is informational only (ADR-003).
 set -euo pipefail
 
@@ -9,6 +10,19 @@ ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
+
+if [[ "${1:-}" == "--clean" ]]; then
+  # Run the host Python gates on a pristine checkout of HEAD: catches code that depends on uncommitted files.
+  WORKTREE="$(mktemp -d "$ROOT/.cache/check-clean.XXXXXX")"
+  trap 'git worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true' EXIT
+  git worktree add --detach --quiet "$WORKTREE" HEAD
+  step "clean checkout of $(git rev-parse --short HEAD): unit tests + import layers"
+  (cd "$WORKTREE" && VLM_PROJECT_ROOT="$WORKTREE" uv run --quiet lint-imports --no-cache \
+    && VLM_PROJECT_ROOT="$WORKTREE" uv run --quiet pytest -q \
+       -m "not gpu and not slow and not eval and not integration")
+  printf '\n\033[32mClean-checkout gates passed.\033[0m\n'
+  exit 0
+fi
 
 if [[ "${1:-}" == "--container" ]]; then
   CONTAINER_CHECK="scripts/container/check.sh"
