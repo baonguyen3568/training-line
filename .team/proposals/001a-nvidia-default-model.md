@@ -314,3 +314,10 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - Allowlist drift chỉ gồm các key được khai báo ở `decode_overrides` + `max_new_tokens`.
   - Model card/README của export ghi rõ: "dùng repetition_penalty=1.0 cho output JSON".
 - Áp dụng ngay cho P-3 (tester chấm cả 2 cấu hình). Preset "Nhanh/Tiêu chuẩn" (§10.1) tính trên **số chính thức**.
+- (bổ sung, sau góp ý backend) **Chọn decoding trên VALIDATION**, không dùng test: ckpt 299 × 100 ảnh CORD validation × {1.0, 1.1}. Số test chỉ để báo. Field chốt:
+  - `decode_overrides` đặt trong `configs/train/templates/<id>.yaml` (template = model + định dạng output), không đặt ở catalog model.
+  - Schema chặt (extra=forbid): repetition_penalty [1,2], no_repeat_ngram_size ≥0, max_new_tokens [1, base], num_beams [1,4], do_sample, temperature (0,2] (chỉ khi do_sample).
+  - Thứ tự áp: base → template → node param.
+  - Eval record ghi base_generation_config_sha, applied_overrides và effective config.
+  - Gate export `--require-no-drift` giữ nguyên, tách bạch với phần này.
+- Gap ghi metadata (tester bắt): run.json P-3 có `dataset_revision: null`. Dữ liệu thực tế có pin qua path snapshot `cord-v2@7f0115a4…`. Đã giao backend sửa runinfo, và gate phải coi null là gap.
