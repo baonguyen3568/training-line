@@ -30,9 +30,14 @@ Runner = Callable[[Sequence[str]], str | None]
 
 
 def du_gb(path: Path) -> float:
-    """Allocated size under ``path`` like ``du -sx``: no symlink following, same filesystem, hard links once."""
+    """Allocated size under ``path`` in GiB like ``du -sx``: no symlink following, same fs, hard links once."""
+    return du_bytes(path) / GIB
+
+
+def du_bytes(path: Path) -> int:
+    """Allocated bytes under ``path`` (see ``du_gb``)."""
     if not path.exists():
-        return 0.0
+        return 0
     dev = path.stat().st_dev
     seen: set[tuple[int, int]] = set()
     total = 0
@@ -46,7 +51,7 @@ def du_gb(path: Path) -> float:
                 seen.add((st.st_dev, st.st_ino))
                 total += st.st_blocks * 512
         dirnames[:] = [d for d in dirnames if _same_dev(Path(dirpath) / d, dev)]
-    return total / GIB
+    return total
 
 
 def _same_dev(path: Path, dev: int) -> bool:

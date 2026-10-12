@@ -1,0 +1,309 @@
+"""Checkpoint retention for ``outputs/runs/<run_id>/checkpoints`` (ADR-005 D3 + D7).
+
+``plan()`` is read-only and returns what *would* happen. ``apply()`` re-plans and only executes items that are still
+planned the same way (no time-of-check/time-of-use gap), then logs ``checkpoint_pruned`` events. Nothing outside
+``<root>/outputs/runs`` is ever touched, symlinks are never followed or removed, and whitelisted files
+(run.json, *.jsonl, logs/, export/, ...) are never candidates: only ``epoch_*_step_*`` directories and their
+``optim/``, ``dataloader/``, ``rng/`` sub-directories are.
+
+Rules (first match wins, per checkpoint):
+1. run has a ``KEEP`` file, or is the run holding the GPU lock, or the lock is unreadable -> keep (blocked)
+2. run status (run.json) is not ``completed``/``discarded`` (incl. missing run.json) -> keep (blocked)
+3. checkpoint has ``.incomplete`` (AutoModel: save never finished) -> delete
+4. target of ``LATEST`` -> keep for ``latest_full_days``, then strip optimizer state
+5. target of ``LOWEST_VAL`` -> strip optimizer state
+6. any other checkpoint -> delete once older than ``other_keep_days``
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import time
+from collections.abc import Callable, Collection, Iterable
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Literal
+
+from vlm_pipeline.artifacts.storage import du_bytes
+from vlm_pipeline.common.diskguard import LockStatus, check_lock
+from vlm_pipeline.common.paths import GIB
+
+Action = Literal["keep", "strip_optim", "delete"]
+
+PLAN_SCHEMA_VERSION = 1
+RUNS_REL = Path("outputs") / "runs"
+CKPT_PREFIX = "epoch_"
+ROLE_LINKS = ("LATEST", "LOWEST_VAL")
+STRIP_SUBDIRS = ("optim", "dataloader", "rng")  # resume-only state; model weights stay
+CLEANABLE_STATUSES = frozenset({"completed", "discarded"})
+DAY_S = 86_400.0
+
+
+@dataclass(frozen=True)
+class RetentionPolicy:
+    """ADR-005 D3 (team CLI defaults)."""
+
+    latest_full_days: float = 7.0
+    other_keep_days: float = 7.0
+    approval_threshold_gb: float = 20.0  # D7.4: above this the CLI needs --approved-by
+
+
+DEFAULT_POLICY = RetentionPolicy()
+
+
+@dataclass(frozen=True)
+class PlanItem:
+    run_id: str
+    path: str  # relative to the run dir, e.g. "checkpoints/epoch_0_step_9"
+    kind: str
+    roles: tuple[str, ...]
+    action: Action
+    reclaim_bytes: int
+    rule: str
+    reason: str
+    blocked_by: str | None = None
+
+    @property
+    def item_id(self) -> str:
+        return f"{self.run_id}/{self.path}"
+
+    def as_dict(self) -> dict[str, object]:
+        data = asdict(self)
+        data["roles"] = list(self.roles)
+        data["item_id"] = self.item_id
+        data["reclaim_gb"] = round(self.reclaim_bytes / GIB, 3)
+        return data
+
+
+@dataclass(frozen=True)
+class RunPlan:
+    run_id: str
+    status: str
+    keep: bool
+    items: tuple[PlanItem, ...]
+
+
+@dataclass(frozen=True)
+class Plan:
+    ts: float
+    runs: tuple[RunPlan, ...]
+    policy: RetentionPolicy
+    lock: LockStatus | None
+
+    @property
+    def actionable(self) -> list[PlanItem]:
+        return [i for r in self.runs for i in r.items if i.action != "keep" and i.blocked_by is None]
+
+    @property
+    def total_reclaim_bytes(self) -> int:
+        return sum(i.reclaim_bytes for i in self.actionable)
+
+    @property
+    def needs_approval(self) -> bool:
+        return self.total_reclaim_bytes / GIB > self.policy.approval_threshold_gb
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": PLAN_SCHEMA_VERSION,
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(self.ts)),
+            "mode": "dry_run",
+            "total_reclaim_gb": round(self.total_reclaim_bytes / GIB, 3),
+            "needs_approval": self.needs_approval,
+            "approval_reason": "TOTAL_OVER_THRESHOLD" if self.needs_approval else None,
+            "threshold_gb": self.policy.approval_threshold_gb,
+            "runs": [
+                {"run_id": r.run_id, "status": r.status, "keep": r.keep, "items": [i.as_dict() for i in r.items]}
+                for r in self.runs
+            ],
+        }
+
+
+@dataclass
+class ApplyResult:
+    done: list[PlanItem] = field(default_factory=list)
+    skipped: list[tuple[str, str]] = field(default_factory=list)  # (item_id, why)
+
+    @property
+    def freed_bytes(self) -> int:
+        return sum(i.reclaim_bytes for i in self.done)
+
+
+def _run_status(run_dir: Path) -> str:
+    try:
+        data = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return "unknown"
+    except (OSError, ValueError):
+        return "unreadable"
+    status = data.get("status") if isinstance(data, dict) else None
+    return str(status) if status else "unknown"
+
+
+def _roles(ckpt_root: Path) -> dict[str, list[str]]:
+    """Map checkpoint dir name -> role names, from top-level symlinks resolving inside ``ckpt_root``."""
+    roles: dict[str, list[str]] = {}
+    for name in ROLE_LINKS:
+        link = ckpt_root / name
+        if not link.is_symlink():
+            continue
+        target = link.resolve()
+        if target.parent == ckpt_root.resolve():
+            roles.setdefault(target.name, []).append(name)
+    return roles
+
+
+def _strip_bytes(ckpt: Path) -> int:
+    return sum(du_bytes(ckpt / sub) for sub in STRIP_SUBDIRS if (ckpt / sub).is_dir() and not (ckpt / sub).is_symlink())
+
+
+def _plan_checkpoint(  # noqa: PLR0911 - one return per ADR-005 D3 rule, kept as a flat decision table
+    run_id: str, ckpt: Path, roles: list[str], *, blocked: str | None, now: float, policy: RetentionPolicy
+) -> PlanItem:
+    rel = f"checkpoints/{ckpt.name}"
+    age_days = (now - ckpt.lstat().st_mtime) / DAY_S
+
+    def item(action: Action, nbytes: int, rule: str, reason: str, blocked_by: str | None = None) -> PlanItem:
+        return PlanItem(run_id, rel, "checkpoint", tuple(roles), action, nbytes, rule, reason, blocked_by)
+
+    if blocked is not None:
+        return item("keep", 0, "D7.blocked", f"protected: {blocked}", blocked)
+    if (ckpt / ".incomplete").exists():
+        return item("delete", du_bytes(ckpt), "D3.incomplete", "save never finished (.incomplete)")
+    if "LATEST" in roles:
+        if age_days < policy.latest_full_days:
+            return item("keep", 0, "D3.latest_full", f"LATEST kept whole for {policy.latest_full_days:g} days")
+        nbytes = _strip_bytes(ckpt)
+        if nbytes == 0:
+            return item("keep", 0, "D3.latest_stripped", "LATEST, no optimizer state left")
+        return item("strip_optim", nbytes, "D3.latest_after_days", "LATEST older than window: strip optimizer only")
+    if "LOWEST_VAL" in roles:
+        nbytes = _strip_bytes(ckpt)
+        if nbytes == 0:
+            return item("keep", 0, "D3.best_stripped", "best checkpoint, no optimizer state left")
+        return item("strip_optim", nbytes, "D3.best_strip", "best checkpoint: keep weights, strip optimizer")
+    if age_days < policy.other_keep_days:
+        return item("keep", 0, "D3.other_wait", f"younger than {policy.other_keep_days:g} days")
+    return item("delete", du_bytes(ckpt), "D3.other_after_days", "not LATEST/best and older than window")
+
+
+def _blocked_reason(run_dir: Path, run_id: str, status: str, lock: LockStatus | None) -> str | None:
+    if (run_dir / "KEEP").exists():
+        return "PINNED_OR_KEEP"
+    if lock is not None and (lock.corrupt or lock.run_id is None or lock.run_id == run_id):
+        return "GPU_LOCK_HOLDER"
+    if status not in CLEANABLE_STATUSES:
+        return "RUN_NOT_FINISHED"
+    return None
+
+
+def plan(
+    root: Path,
+    *,
+    run_ids: Collection[str] | None = None,
+    policy: RetentionPolicy = DEFAULT_POLICY,
+    now: float | None = None,
+    lock_reader: Callable[[Path], LockStatus | None] = check_lock,
+) -> Plan:
+    """Read-only retention plan for every run (or only ``run_ids``) under ``<root>/outputs/runs``."""
+    ts = time.time() if now is None else now
+    lock = lock_reader(root / ".team" / "GPU_LOCK")
+    runs_dir = root / RUNS_REL
+    runs: list[RunPlan] = []
+    for run_dir in sorted(runs_dir.iterdir()) if runs_dir.is_dir() else []:
+        if run_dir.is_symlink() or not run_dir.is_dir() or (run_ids is not None and run_dir.name not in run_ids):
+            continue
+        status = _run_status(run_dir)
+        blocked = _blocked_reason(run_dir, run_dir.name, status, lock)
+        ckpt_root = run_dir / "checkpoints"
+        items: list[PlanItem] = []
+        if ckpt_root.is_dir() and not ckpt_root.is_symlink():
+            roles = _roles(ckpt_root)
+            for ckpt in sorted(ckpt_root.iterdir()):
+                if ckpt.is_symlink() or not ckpt.is_dir() or not ckpt.name.startswith(CKPT_PREFIX):
+                    continue
+                items.append(
+                    _plan_checkpoint(
+                        run_dir.name, ckpt, roles.get(ckpt.name, []), blocked=blocked, now=ts, policy=policy
+                    )
+                )
+        runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(items)))
+    return Plan(ts=ts, runs=tuple(runs), policy=policy, lock=lock)
+
+
+def _safe_target(root: Path, run_id: str, rel: str) -> Path:
+    runs_dir = (root / RUNS_REL).resolve()
+    target = root / RUNS_REL / run_id / rel
+    if target.is_symlink():
+        raise ValueError(f"refusing symlink: {target}")
+    resolved = target.resolve()
+    if runs_dir not in resolved.parents:
+        raise ValueError(f"outside {runs_dir}: {resolved}")
+    return target
+
+
+def _append_jsonl(path: Path, record: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def apply(
+    root: Path,
+    item_ids: Iterable[str],
+    *,
+    by: str,
+    approved_by: str | None = None,
+    policy: RetentionPolicy = DEFAULT_POLICY,
+    now: float | None = None,
+    lock_reader: Callable[[Path], LockStatus | None] = check_lock,
+) -> ApplyResult:
+    """Execute the given planned items after re-planning; items whose plan changed are skipped.
+
+    Raises:
+        PermissionError: the selected items exceed ``approval_threshold_gb`` and no ``approved_by`` was given.
+    """
+    wanted = set(item_ids)
+    fresh = plan(root, policy=policy, now=now, lock_reader=lock_reader)
+    by_id = {i.item_id: i for i in fresh.actionable}
+    result = ApplyResult()
+    selected = [by_id[i] for i in sorted(wanted) if i in by_id]
+    result.skipped.extend((i, "no longer planned (state changed)") for i in sorted(wanted - by_id.keys()))
+    total_gb = sum(i.reclaim_bytes for i in selected) / GIB
+    if total_gb > policy.approval_threshold_gb and not approved_by:
+        raise PermissionError(f"{total_gb:.1f} GiB > {policy.approval_threshold_gb:g} GiB needs --approved-by")
+    for item in selected:
+        target = _safe_target(root, item.run_id, item.path)
+        if item.action == "delete":
+            shutil.rmtree(target)
+        else:  # strip_optim
+            for sub in STRIP_SUBDIRS:
+                sub_path = target / sub
+                if sub_path.is_dir() and not sub_path.is_symlink():
+                    shutil.rmtree(sub_path)
+        result.done.append(item)
+        event: dict[str, object] = {
+            "event": "checkpoint_pruned",
+            "path": item.path,
+            "action": item.action,
+            "bytes": item.reclaim_bytes,
+            "rule": item.rule,
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "by": by,
+            "approved_by": approved_by,
+        }
+        _append_jsonl(root / RUNS_REL / item.run_id / "events.jsonl", event)
+        _append_jsonl(root / "outputs" / "system" / "cleanup.jsonl", {**event, "run_id": item.run_id})
+    return result
+
+
+__all__ = [
+    "DEFAULT_POLICY",
+    "ApplyResult",
+    "Plan",
+    "PlanItem",
+    "RetentionPolicy",
+    "RunPlan",
+    "apply",
+    "plan",
+]
