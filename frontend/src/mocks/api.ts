@@ -1,8 +1,7 @@
 // In-browser mock of the P009 API for development (VITE_MOCK_API=1) and tests. It mirrors the documented
 // shapes only; the real validation lives in the backend (`POST /api/graphs/validate`) and is the source of truth.
-import { tp } from "../i18n";
-import { isCompatible } from "../lib/ports";
-import type { Api } from "./client";
+
+import type { Api } from "../api/client";
 import type {
   NodeSpec,
   NodeTypesResponse,
@@ -12,7 +11,9 @@ import type {
   ValidationIssue,
   ValidationResult,
   Workflow,
-} from "./types";
+} from "../api/types";
+import { tp } from "../i18n";
+import { isCompatible } from "../lib/ports";
 
 const portTypes: PortType[] = [
   { id: "Dataset", parent: null, color_token: "color.port.dataset", label_key: "port.dataset" },

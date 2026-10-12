@@ -152,7 +152,7 @@ function EditorInner() {
   if (!workflow) return null;
   return (
     <div className="editor">
-      <div className="canvas" aria-label={workflow.name}>
+      <section className="canvas" aria-label={workflow.name}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -177,7 +177,7 @@ function EditorInner() {
             {toast}
           </div>
         )}
-      </div>
+      </section>
       <Inspector />
       <CheckBar />
     </div>

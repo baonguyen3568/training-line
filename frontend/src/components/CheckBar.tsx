@@ -76,8 +76,11 @@ export function CheckBar() {
       </div>
       {open && (
         <ul className="issues">
-          {[...errors, ...warnings].map((e, i) => (
-            <li key={`${e.code}-${e.node_id}-${e.port}-${i}`} className={`issue ${e.severity}`}>
+          {[...errors, ...warnings].map((e) => (
+            <li
+              key={`${e.code}-${e.node_id}-${e.port}-${e.param}-${e.what}`}
+              className={`issue ${e.severity}`}
+            >
               <span aria-hidden="true">{e.severity === "error" ? "✕" : "⚠"}</span>
               {/* Server-rendered copy is plain text; React escapes it. */}
               <span>

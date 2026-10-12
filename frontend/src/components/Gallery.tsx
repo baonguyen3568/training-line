@@ -40,13 +40,12 @@ export function Gallery({ onOpen }: { onOpen: (id: string) => void }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="segmented" role="radiogroup" aria-label="filter">
+        <div className="segmented">
           {FILTERS.map((f) => (
             <button
               key={f}
               type="button"
-              role="radio"
-              aria-checked={filter === f}
+              aria-pressed={filter === f}
               className={filter === f ? "on" : ""}
               onClick={() => setFilter(f)}
             >

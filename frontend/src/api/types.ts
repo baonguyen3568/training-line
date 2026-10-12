@@ -1,3 +1,4 @@
+// INTERIM: hand-written until backend exports schemas/ (P004 §8.2) — replace with src/generated/api.ts.
 // API types for P009 §2–§6. Hand-written until the backend exports `schemas/` (OpenAPI + NodeSpec JSON Schema);
 // then they are replaced by openapi-typescript output in src/generated/ and this file re-exports from there.
 

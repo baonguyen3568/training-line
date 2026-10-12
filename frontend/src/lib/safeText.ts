@@ -3,6 +3,7 @@
 // bidi/control characters ("Trojan Source") and homoglyph identifiers (P003 D16, 009 annex F6d).
 
 // C0/C1 controls (except \t \n), zero-width + LRM/RLM, bidi embeddings/overrides, bidi isolates, BOM.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching control characters is the purpose.
 const INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F​-‏‪-‮⁦-⁩﻿]/g;
 
 const hex = (ch: string) =>

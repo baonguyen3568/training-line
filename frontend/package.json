@@ -12,7 +12,7 @@
     "dev": "npm run tokens && vite --host 127.0.0.1 --port 7875 --strictPort",
     "build": "npm run tokens && tsc --noEmit && vite build",
     "lint": "biome ci .",
-    "format": "biome format --write .",
+    "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run tokens && biome ci . && tsc --noEmit && vitest run",
