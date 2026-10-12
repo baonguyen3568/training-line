@@ -368,6 +368,8 @@ def _unapproved_bytes_since(log: Path, since: float) -> int:
     for line in log.read_text(encoding="utf-8").splitlines():
         try:
             rec = json.loads(line)
+            if rec.get("event") != "checkpoint_pruned":
+                continue  # cache evictions / worktree removals free regenerable data; not part of this quota
             if not rec.get("approved_by") and float(rec.get("ts_epoch", 0)) >= since:
                 total += int(rec.get("bytes", 0))
         except (ValueError, TypeError, AttributeError):
