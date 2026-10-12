@@ -7,6 +7,7 @@ from a fixed permission table, never from user/plugin input. Stdlib + pydantic o
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import signal
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode
+from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
 CONTAINER_ROOT = "/workspace"
@@ -96,12 +98,15 @@ class ExitInfo:
     exit_code: int
     oom_killed: bool
     cancelled_by_executor: bool = False
+    preempted_by_memguard: bool = False  # host watchdog stopped the job (MemAvailable < abort_gb)
 
 
 def classify_exit(info: ExitInfo) -> tuple[RunStatus, str | None]:
     """Status + catalog code (P009 §5, fixcode order). Cancel first; OOM only with evidence; never guess."""
     if info.cancelled_by_executor and info.exit_code in {0, 137, 143, ExitCode.MEM_PREEMPT}:
         return RunStatus.CANCELLED, None
+    if info.preempted_by_memguard and info.exit_code != 0:
+        return RunStatus.INTERRUPTED, "MEM-002"
     if info.exit_code == 0:
         return RunStatus.COMPLETED, None
     if info.exit_code == ExitCode.MEM_PREEMPT:
@@ -123,6 +128,60 @@ def _run_logged(argv: Sequence[str], log_path: Path) -> int:
         except KeyboardInterrupt:
             proc.send_signal(signal.SIGINT)
             return proc.wait()
+
+
+# Host-side memory watchdog for container jobs (P-1 incident 2026-10-12: memguard was never wired; the peak came
+# before step 1, ~1.5 min after start). CUDA on UMA is outside the container cgroup -> host MemAvailable only.
+WATCHDOG_INTERVAL_S = 0.5
+STOP_GRACE_S = 60
+
+
+class MemoryPreemptedBeforeStartError(RuntimeError):
+    """MemAvailable was already below the abort threshold when the job was about to start (not launched)."""
+
+
+def run_guarded(
+    argv: Sequence[str],
+    log_path: Path,
+    *,
+    on_abort: Callable[[], None],
+    hard_exit: Callable[[], None],
+    meminfo_path: Path = Path("/proc/meminfo"),
+    interval_s: float = WATCHDOG_INTERVAL_S,
+    thresholds: MemThresholds = DEFAULT_THRESHOLDS,
+) -> tuple[int, MemGuard]:
+    """Run ``argv`` (logged) under a MemGuard that polls BEFORE the process starts and every ``interval_s``.
+
+    Below ``abort_gb``: ``on_abort`` (graceful stop); after the grace or below ``emergency_gb``: ``hard_exit``.
+    Returns the exit code and the guard (``guard.should_stop`` tells whether the watchdog stopped the job).
+    """
+    guard = MemGuard(
+        thresholds=thresholds,
+        interval_s=interval_s,
+        meminfo_path=meminfo_path,
+        cgroup_root=None,
+        on_abort=on_abort,
+        hard_exit=hard_exit,
+    )
+    guard.start()  # first poll happens here, before anything is launched
+    try:
+        if guard.should_stop.is_set():
+            raise MemoryPreemptedBeforeStartError(f"MemAvailable {guard.min_available_gb:.1f} GB below abort")
+        return _run_logged(argv, log_path), guard
+    finally:
+        guard.stop()
+
+
+def _docker_stop_async(name: str, grace_s: int = STOP_GRACE_S) -> None:
+    # Non-blocking: the watchdog thread must keep polling (emergency kill) while docker waits for the grace period.
+    subprocess.Popen(  # noqa: S603
+        ["docker", "stop", "-t", str(grace_s), name],  # noqa: S607
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )  # fmt: skip
+
+
+def _docker_kill(name: str) -> None:
+    subprocess.run(["docker", "kill", name], capture_output=True, check=False)  # noqa: S603,S607
 
 
 def _docker_state(name: str) -> ExitInfo:
@@ -221,8 +280,14 @@ def run_job(
             }
         )
         write_manifest(run_dir, manifest)
-        _run_logged(docker_args(job, project_root, lock_token=handle.info.token), run_dir / "logs" / "stdout.log")
-        info = _docker_state(container)
+        _, guard = run_guarded(
+            docker_args(job, project_root, lock_token=handle.info.token),
+            run_dir / "logs" / "stdout.log",
+            on_abort=lambda: _docker_stop_async(container),
+            hard_exit=lambda: _docker_kill(container),
+        )
+        state = _docker_state(container)
+        info = dataclasses.replace(state, preempted_by_memguard=guard.should_stop.is_set())
         status, code = classify_exit(info)
         manifest = manifest.model_copy(
             update={

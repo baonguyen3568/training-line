@@ -125,10 +125,17 @@ class MemGuard:
         thresholds: MemThresholds = DEFAULT_THRESHOLDS,
         interval_s: float = 2.0,
         meminfo_path: Path = Path("/proc/meminfo"),
-        cgroup_root: Path = Path("/sys/fs/cgroup"),
+        cgroup_root: Path | None = Path("/sys/fs/cgroup"),
         clock: Callable[[], float] = time.monotonic,
         hard_exit: Callable[[], None] = _hard_exit,
+        on_abort: Callable[[], None] | None = None,
     ) -> None:
+        """Configure the watchdog (it starts with ``start()`` / ``with``).
+
+        ``cgroup_root=None``: host MemAvailable only (host-side watchdog of a container job, where the job's
+        CUDA/UMA memory lives outside any cgroup). ``on_abort`` is called once when the stop is requested (e.g.
+        ``docker stop -t <grace>``); ``hard_exit`` once when the grace expires or memory is below ``emergency_gb``.
+        """
         if not thresholds.emergency_gb < thresholds.abort_gb < thresholds.warn_gb:
             raise ValueError("thresholds must satisfy emergency_gb < abort_gb < warn_gb")
         self.thresholds = thresholds
@@ -140,6 +147,8 @@ class MemGuard:
         self._cgroup_root = cgroup_root
         self._clock = clock
         self._hard_exit = hard_exit
+        self._on_abort = on_abort
+        self.hard_exited = False
         self._stop_requested_at: float | None = None
         self._saving = threading.Event()
         self._halt = threading.Event()
@@ -148,7 +157,8 @@ class MemGuard:
     def poll_once(self) -> MemSnapshot:
         """Read memory once and update state; safe to call without the background thread (tests)."""
         snapshot = read_meminfo(self._meminfo_path)
-        available = effective_available_gb(snapshot, read_cgroup_available_gb(self._cgroup_root))
+        cgroup_gb = read_cgroup_available_gb(self._cgroup_root) if self._cgroup_root is not None else None
+        available = effective_available_gb(snapshot, cgroup_gb)
         self.min_available_gb = min(self.min_available_gb, available)
         if available < self.thresholds.abort_gb:
             if not self.should_stop.is_set():
@@ -159,6 +169,11 @@ class MemGuard:
                 )
                 self._stop_requested_at = self._clock()
                 self.should_stop.set()
+                if self._on_abort is not None:
+                    try:
+                        self._on_abort()
+                    except Exception:
+                        logger.exception("memguard: on_abort failed; hard exit follows after the grace period")
             self.state = "abort"
         elif available < self.thresholds.warn_gb:
             if self.state == "ok":
@@ -168,8 +183,9 @@ class MemGuard:
         elif self.state == "warn":
             self.state = "ok"
         # A stop request is never withdrawn: memory recovering does not make the run safe to continue.
-        if self._stop_requested_at is not None and self._deadline_passed(available):
+        if not self.hard_exited and self._stop_requested_at is not None and self._deadline_passed(available):
             logger.critical("no exit after stop request (MemAvailable %.1f GB): hard exit", available)
+            self.hard_exited = True
             self._hard_exit()
         return snapshot
 
