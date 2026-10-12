@@ -6,6 +6,14 @@
 
 recipe: FinetuneRecipeForVLM
 
+# Decoding for the Eval / "Try it" nodes (001a §10.7): NOT an AutoModel key -> only run this file via
+# train/recipe.py build_recipe (it strips the key), never `automodel <this file>` directly. Applied on top of the base
+# generation_config (base -> template -> node param); the export keeps the base generation_config unchanged.
+# CORD JSON repeats structural tags by design; the base repetition_penalty 1.1 (2.0 @b6742064 ships 1.1 too) penalizes
+# them (F1 77.2 -> 40.2 on 6 imgs, measured on v1.1 only; re-check in the v1.1 vs 2.0 comparison, 001a §8).
+decode_overrides:
+  repetition_penalty: 1.0
+
 step_scheduler:
   global_batch_size: 8
   local_batch_size: 1
