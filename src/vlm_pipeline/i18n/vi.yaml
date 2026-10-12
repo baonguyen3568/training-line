@@ -542,5 +542,6 @@ license:
     prohibited_use_policy_link: Nên đọc chính sách sử dụng có trách nhiệm của nhà phát hành.
     share_alike: Model hoặc dữ liệu bạn tạo ra từ đây phải phát hành cùng giấy phép này.
     non_commercial: Không được dùng cho mục đích thương mại, kể cả model bạn fine-tune từ nó.
+    cc_by_attribution: Một phần của model ({component}) dùng giấy phép CC BY 4.0 — cần ghi nguồn khi chia sẻ.
   policy_link: Xem chính sách
   notice_from_license: (câu ghi công lấy nguyên văn từ giấy phép)

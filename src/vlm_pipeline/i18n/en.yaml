@@ -544,5 +544,6 @@ license:
     prohibited_use_policy_link: We recommend reading the publisher's responsible-use policy.
     share_alike: Models or data you create from this must be released under the same license.
     non_commercial: It can't be used commercially, including models you fine-tune from it.
+    cc_by_attribution: Part of the model ({component}) is under CC BY 4.0 — you must credit the source when sharing.
   policy_link: View policy
   notice_from_license: (credit line quoted from the license)

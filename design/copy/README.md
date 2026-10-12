@@ -17,6 +17,7 @@ The former `*.draft.yaml` files here were merged into it on 2026-10-12 and delet
 - Estimates: style by `Estimate.source` (P010 §6) — measured plain, formula "~", declared italic + ⓘ, unknown text.
 - Permission `level`: info → text.secondary + neutral ✓ (never status.good); warning/critical → color.status.*.
 - `license.obligation.*`: shown **directly** in the model-pick dialog under the license badge (one line each, never hidden in details).
-  `attribution_notice` renders `{notice}` = verbatim text from the license file (untrusted-ish: plain text, never markdown), followed by `license.notice_from_license`.
+  `attribution_notice` renders `{notice}` = verbatim text recorded by security in licenses.yaml at vetting time — never from the model card/HF metadata (can change after vetting); plain text, never markdown, followed by `license.notice_from_license`.
   `prohibited_use_policy_link` is advisory: neutral style (info), with `license.policy_link` to the publisher URL from licenses.yaml (not from the model card).
+  `cc_by_attribution` takes `{component}` (e.g. tokenizer) from licenses.yaml.
   `non_commercial` pairs with the ⛔ badge. `no_guardrail_bypass` uses warning style — it's the one users of a fine-tuning app can actually breach.
