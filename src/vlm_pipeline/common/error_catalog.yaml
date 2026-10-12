@@ -138,6 +138,21 @@ SYS-002:
     - {id: keep_waiting, kind: navigate, target: run_queue, confirm: false}
     - {id: cancel_run, kind: navigate, target: cancel_run, confirm: false}
 
+ENV-001:
+  slug: ENV_MISSING_PACKAGE
+  severity: error
+  prevent_in_preflight: false
+  # The job image lacks a Python package a model needs (typically imports in trust_remote_code files, e.g. a
+  # processor needing albumentations/cv2). Runner order: error event code > this log match > SYS-003.
+  # `packages` = missing module names parsed from the log; image name/digest go to technical_detail only.
+  params: [packages]
+  match:
+    - {kind: regex, value: "This modeling file requires the following packages that were not found in your environment"}
+    - {kind: regex, value: "ModuleNotFoundError: No module named '[^']+'|ImportError: No module named '?[A-Za-z0-9_.]+'?"}
+  actions:
+    - {id: use_app_environment, kind: navigate, target: settings_environment, confirm: false}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
 GPU-001:
   slug: GPU_ENV_INCOMPATIBLE
   severity: error
