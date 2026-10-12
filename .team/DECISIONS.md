@@ -34,3 +34,5 @@
 - 2026-10-12 USER phản hồi: app còn thô, chưa tạo/nối pipeline. PM nhận lỗi ưu tiên; mở MILESTONE M1 'kéo thả → nối → chạy thật' là ưu tiên số 1; giảm overhead review cho code UI/core (1 reviewer).
 - 2026-10-12 Node cache eviction tự động: KHÔNG bao giờ tự evict output của node train (LATEST/best checkpoint, adapter, export). Chỉ tự evict output rẻ/tạo lại được (data đã xử lý, predictions eval, engines) + checkpoint không phải LATEST/best theo D3. Xoá model đã train chỉ qua storage panel có dry-run + xác nhận.
 - 2026-10-12 SỰ CỐ RAM P-1: PM dừng job. GPU tạm đóng tới khi memguard bắt buộc trong jobrun + test fault-injection + est_peak hiệu chỉnh.
+- 2026-10-12 Root cause RAM P-1 (research): freeze không khớp tên 'encoder' → 100% params train; fused_attn RADIO no-op; label mask nghi sai; pin_memory toàn bộ ảnh. Sửa trong adapter → image 26.08-3 (fixcode, sau memguard). Chạy lại 5 step đo, abort <10GB.
+- 2026-10-12 Nguyên tắc chung: mọi node train log + assert "% tham số được train" (hiện trên UI); key config không được engine dùng → lỗi CFG, không bỏ qua im lặng.
