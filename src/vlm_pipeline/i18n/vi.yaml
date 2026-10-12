@@ -307,6 +307,8 @@ app:
   read_only_small_screen: Màn hình nhỏ chỉ xem được. Dùng màn hình rộng từ 1280px để chỉnh sửa.
   catalog_load_failed: Không tải được danh sách bước của app. Kiểm tra app đã khởi động chưa rồi thử lại.
   retry: Thử lại
+  nav_workflows: Workflow
+  nav_runs: Lịch sử chạy
 header:
   gpu_free: GPU · Rảnh
   gpu_busy: 'GPU · Đang bận: {who} chạy {job} từ {since}'
@@ -596,3 +598,35 @@ gated:
   recheck: Kiểm tra lại
   later: Để sau
   continue_template: Tiếp tục mở mẫu
+run_monitor:
+  runs_title: Lịch sử chạy
+  no_runs: Chưa có lần chạy nào. Mở một mẫu và bấm Chạy để bắt đầu.
+  col_name: Tên
+  col_status: Trạng thái
+  col_started: Bắt đầu
+  summary: Tóm tắt
+  step: Bước học
+  loss_last: Sai số gần nhất (loss)
+  tps_median: Tốc độ trung vị (token/giây)
+  mem_peak: Bộ nhớ đỉnh của job
+  smoothing: Làm mượt
+  raw: Gốc
+  smoothed: Đã làm mượt
+  no_data: Chưa có số liệu cho biểu đồ này.
+  table_view: Xem dạng bảng
+  stale: Số liệu chưa cập nhật từ {time}
+  schema_unsupported: Lần chạy này được ghi bằng phiên bản app khác nên chưa hiển thị được.
+  chart:
+    loss: Sai số (loss) — càng thấp càng tốt
+    lr: Tốc độ học (learning rate)
+    grad_norm: Độ lớn gradient (grad norm)
+    tps: Tốc độ (token/giây)
+    mem: Bộ nhớ của job (GB)
+  status:
+    running: Đang chạy
+    completed: Xong
+    failed: Lỗi
+    killed: Đã huỷ
+    interrupted: Tạm dừng
+    evicted: Bị dừng để nhường bộ nhớ
+    discarded: Đã bỏ

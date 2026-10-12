@@ -307,6 +307,8 @@ app:
   read_only_small_screen: Small screens are view-only. Use a screen at least 1280px wide to edit.
   catalog_load_failed: Couldn't load the app's list of steps. Check that the app is running, then try again.
   retry: Try again
+  nav_workflows: Workflows
+  nav_runs: Run history
 header:
   gpu_free: GPU · Free
   gpu_busy: 'GPU · Busy: {who} running {job} since {since}'
@@ -596,3 +598,35 @@ gated:
   recheck: Check again
   later: Later
   continue_template: Continue to template
+run_monitor:
+  runs_title: Run history
+  no_runs: No runs yet. Open a template and click Run to start.
+  col_name: Name
+  col_status: Status
+  col_started: Started
+  summary: Summary
+  step: Training step
+  loss_last: Latest loss
+  tps_median: Median speed (tokens/s)
+  mem_peak: Job peak memory
+  smoothing: Smoothing
+  raw: Raw
+  smoothed: Smoothed
+  no_data: No data for this chart yet.
+  table_view: View as table
+  stale: Data not updated since {time}
+  schema_unsupported: This run was recorded by a different app version and can't be shown yet.
+  chart:
+    loss: Loss — lower is better
+    lr: Learning rate
+    grad_norm: Gradient norm
+    tps: Speed (tokens/s)
+    mem: Job memory (GB)
+  status:
+    running: Running
+    completed: Completed
+    failed: Failed
+    killed: Cancelled
+    interrupted: Paused
+    evicted: Stopped to free memory
+    discarded: Discarded
