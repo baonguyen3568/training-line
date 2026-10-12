@@ -53,7 +53,15 @@ CASES = {
         {"HF_HUB_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1"},
     ),
 }
-SILENCERS = {"NO_ALBUMENTATIONS_UPDATE", "HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE", "HF_HUB_DISABLE_TELEMETRY"}
+SILENCERS = {
+    "NO_ALBUMENTATIONS_UPDATE",
+    "HF_HUB_OFFLINE",
+    "HF_DATASETS_OFFLINE",
+    "TRANSFORMERS_OFFLINE",
+    "HF_HUB_DISABLE_TELEMETRY",
+}
+# Control runs must be online even when the image defaults to offline (26.08-5 sets the *_OFFLINE vars in ENV).
+FORCE_ONLINE = {"HF_HUB_OFFLINE": "0", "HF_DATASETS_OFFLINE": "0", "TRANSFORMERS_OFFLINE": "0"}
 
 
 def _lookups(action: str, env: dict[str, str]) -> tuple[int, str]:
@@ -81,7 +89,7 @@ def _without_silencers() -> dict[str, str]:
 def test_control_probe_sees_the_network_attempt(name: str) -> None:
     """Without the variables the action does try the network: otherwise the gate below would be vacuous."""
     action, _ = CASES[name]
-    count, line = _lookups(action, _without_silencers())
+    count, line = _lookups(action, {**_without_silencers(), **FORCE_ONLINE})
     assert count >= 1, f"{name}: control saw no lookup, the probe cannot prove anything ({line})"
 
 
