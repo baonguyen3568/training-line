@@ -49,7 +49,7 @@ def _wf() -> dict[str, Any]:
             n("d", "test.dataset"),
             n("m", "test.model"),
             n("t", "test.train", max_steps=10),
-            n("m2", "test.model"),
+            n("m2", "test.model", revision="e" * 40),  # differs from m: identical nodes are deduped (cached)
             n("q", "test.quant"),
         ],
         "edges": [

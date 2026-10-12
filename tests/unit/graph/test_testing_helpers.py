@@ -56,3 +56,10 @@ def test_fail_writes_checkpoint_only_when_asked(tmp_path: Path) -> None:
 
 def test_container_exit_is_the_real_class() -> None:
     assert ContainerExit is RealContainerExit
+
+
+def test_outputs_exist_on_disk(tmp_path: Path) -> None:
+    """The executor verifies cache hits against the artifact path, so the fake must create it."""
+    out = FakeWorker().run(_job(tmp_path / "run", "test.train")).outputs["adapter"]
+    assert Path(out.path).is_file()
+    assert Path(out.path).read_text() == out.hash

@@ -111,12 +111,15 @@ class FakeWorker:
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 marker.write_text("1", encoding="utf-8")
             raise copy.copy(self.fail[job.node_id])  # fresh instance: no traceback piling up across runs
-        return NodeResult(
-            outputs={
-                port: ArtifactRef(type=spec.type, path=str(job.run_dir / port), hash=_output_hash(job, port))
-                for port, spec in job.spec.outputs.items()
-            }
-        )
+        # Like a real worker, the artifact exists on disk: the executor verifies cache hits against it.
+        job.run_dir.mkdir(parents=True, exist_ok=True)
+        outputs = {}
+        for port, spec in job.spec.outputs.items():
+            digest = _output_hash(job, port)
+            path = job.run_dir / port
+            path.write_text(digest, encoding="utf-8")
+            outputs[port] = ArtifactRef(type=spec.type, path=str(path), hash=digest)
+        return NodeResult(outputs=outputs)
 
 
 __all__ = ["ContainerExit", "DatasetParams", "FakeWorker", "ModelParams", "TrainParams", "make_test_registry"]
