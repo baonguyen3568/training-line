@@ -4,11 +4,17 @@ The decoder prefix is taken from the training collate itself (``nemotron_parse_c
 up to and including the position that predicts the first labelled token, so eval sees exactly what training saw
 (task tokens included). generate()'s start token is pinned to that prefix, otherwise HF prepends the model's
 ``decoder_start_token_id`` (2 for Parse) and silently shifts the context; an assert checks the result.
-Greedy decoding; a generation that hits ``max_new_tokens`` is flagged ``truncated`` and still scored.
+Decoding follows the model's own generation_config.json (Parse v1.1: greedy, repetition_penalty 1.1), read from
+the required ``--generation-config`` (the pinned base snapshot): an export may carry a regenerated config without
+those keys (AutoModel 26.08 before 23e6aa6); drift is recorded, and fatal with ``--require-no-drift``.
+Only ``max_new_tokens`` and the start token are overridden. A generation that hits ``max_new_tokens`` is flagged
+``truncated`` and still scored. bf16 kernels may depend on the batch size, so compare F1 only across equal
+``batch_size`` (recorded) unless a batch-1 vs batch-N equivalence check passed.
 
 Usage (repo mounted at /workspace):
   python /workspace/scripts/qa/eval_cord_worker.py --model <prepared dir> --data <cord-v2 snapshot dir> --split test \
-      [--ids 0,1,2 | --limit N] --out <predictions.jsonl> [--device cuda] [--max-new-tokens 1536]
+      [--ids 0,1,2 | --limit N] --out <predictions.jsonl> [--device cuda] [--max-new-tokens 1024] \
+      --generation-config <base snapshot dir> [--require-no-drift] [--batch-size 1]
 """
 
 from __future__ import annotations
@@ -55,12 +61,86 @@ def strip_trailing_pad(ids: list[int], pad_id: int | None) -> tuple[list[int], i
     return ids[:end], len(ids) - end
 
 
+def _record(i: int, item: dict[str, Any], new: list[int], *, prefix: Any, tokenizer: Any, args: Any) -> dict[str, Any]:
+    """One prediction record: pad tail dropped at id level, eos/pad text removed, truncation flagged."""
+    new, n_pad = strip_trailing_pad(new, tokenizer.pad_token_id)
+    text = tokenizer.decode(new, skip_special_tokens=False)
+    for special in (tokenizer.eos_token, tokenizer.pad_token):
+        if special:
+            text = text.replace(special, "")
+    return {
+        "index": i,
+        "sequence": text.strip(),
+        "gt_parse": item["gt_parse"],
+        "decoder_prefix_ids": prefix.tolist(),
+        "split": args.split,
+        "batch_size": args.batch_size,
+        "n_new_tokens": len(new),
+        "n_trailing_pad_stripped": n_pad,
+        "truncated": len(new) >= args.max_new_tokens,
+    }
+
+
+def _prepare(chunk: list[int], ds: Any, processor: Any, json2token: Any, expected: list[int]) -> tuple[Any, Any, Any]:
+    """Conversations, training prefixes and pixel values of one chunk; stops on a sample the collate rejects."""
+    items, prefixes, pixels = [], [], []
+    for i in chunk:
+        item = _conversation(ds[i], json2token)
+        try:
+            prefix, batch = train_decoder_prefix(item["conversation"], processor)
+        except ValueError as exc:
+            raise SystemExit(f"[{i}] {exc}") from exc
+        if expected and prefix.tolist() != expected:
+            raise SystemExit(f"[{i}] training prefix {prefix.tolist()} != expected {expected}")
+        items.append(item)
+        prefixes.append(prefix)
+        pixels.append(batch["pixel_values"])
+    return items, prefixes, pixels
+
+
+# Keys that cannot change the generated tokens: cache use, bookkeeping, and extra outputs.
+GENERATION_DRIFT_ALLOWED = frozenset(
+    {"use_cache", "transformers_version", "_from_model_config", "output_attentions", "output_hidden_states"}
+)
+
+
+def generation_config_drift(checkpoint: dict[str, Any], base: dict[str, Any]) -> list[str]:
+    """Decoding keys where the checkpoint's generation config differs from the base's (allowlist excluded)."""
+    keys = (checkpoint.keys() | base.keys()) - GENERATION_DRIFT_ALLOWED
+    return sorted(k for k in keys if checkpoint.get(k) != base.get(k))
+
+
 def _local_dir(path: str, what: str) -> Path:
     """Only pinned local snapshots (prepared + hash-verified, ADR-003): never a hub id resolved to `main`."""
     p = Path(path)
     if not p.is_dir():
         raise SystemExit(f"--{what} must be a local snapshot directory (pinned), got {path!r}")
     return p.resolve()
+
+
+def _set_decoding(model: Any, model_dir: Path, args: Any) -> dict[str, Any]:
+    """Load the base generation config into the model; returns the decoding parameters for the records."""
+    from transformers import GenerationConfig
+
+    gen_dir = _local_dir(args.generation_config, "generation-config")
+    model.generation_config = GenerationConfig.from_pretrained(str(gen_dir))
+    # A checkpoint completed by ckpt_complete (23e6aa6+) carries the base decoding keys. By default drift is only
+    # recorded, so an older export (O-1b) is still evaluated with the base decoding; gate runs pass
+    # --require-no-drift, where drift means the export is broken again.
+    drift = generation_config_drift(
+        GenerationConfig.from_pretrained(str(model_dir)).to_dict(), model.generation_config.to_dict()
+    )
+    if drift and args.require_no_drift:
+        raise SystemExit(f"checkpoint generation_config differs from {gen_dir} on {drift}: re-export (ckpt_complete)")
+    model.generation_config.max_new_tokens = args.max_new_tokens
+    decoding = {
+        k: getattr(model.generation_config, k, None)
+        for k in ("do_sample", "num_beams", "repetition_penalty", "no_repeat_ngram_size", "forced_eos_token_id")
+    }
+    decoding.update(
+        {"max_new_tokens": args.max_new_tokens, "generation_config_dir": str(gen_dir), "checkpoint_drift": drift}
+    )
+    return decoding
 
 
 def main() -> int:
@@ -77,11 +157,20 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="cpu")
-    ap.add_argument("--max-new-tokens", type=int, default=1536)
+    ap.add_argument("--max-new-tokens", type=int, default=1024)  # CORD test target max 829 tokens (+eos)
+    ap.add_argument("--batch-size", type=int, default=1)
     ap.add_argument(
         "--expect-prefix",
         default="",
         help="comma-separated decoder ids the training prefix must equal, e.g. 2,0,50004,50008,50001 (001a §10.5)",
+    )
+    # Required: defaulting to the model dir would silently decode an old export without the base's
+    # repetition_penalty (O-1b). For the base model itself, pass its own snapshot.
+    ap.add_argument("--generation-config", required=True, help="pinned base snapshot dir (generation_config.json)")
+    ap.add_argument(
+        "--require-no-drift",
+        action="store_true",
+        help="fail if the checkpoint's generation config differs from --generation-config (P-3, gates, gallery)",
     )
     args = ap.parse_args()
     expected_prefix = [int(x) for x in args.expect_prefix.split(",") if x]
@@ -93,53 +182,38 @@ def main() -> int:
     tokenizer = processor.tokenizer
     model = AutoModel.from_pretrained(str(model_dir), trust_remote_code=True, dtype=torch.bfloat16)
     model = model.to(args.device).eval()
+    decoding = _set_decoding(model, model_dir, args)
+    print("decoding", json.dumps(decoding), flush=True)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as fh:
-        for i in idx:
-            item = _conversation(ds[i], json2token)
-            try:
-                prefix, batch = train_decoder_prefix(item["conversation"], processor)
-            except ValueError as exc:
-                raise SystemExit(f"[{i}] {exc}") from exc
-            if expected_prefix and prefix.tolist() != expected_prefix:
-                raise SystemExit(f"[{i}] training prefix {prefix.tolist()} != expected {expected_prefix}")
-            # HF generate() prepends generation_config.decoder_start_token_id (2 for Parse) unless the prefix already
-            # starts with it; training's collate starts with <s> (0). Pin the start token to the training prefix so the
-            # eval context is identical to training (verified by the assert below).
+        for chunk_start in range(0, len(idx), args.batch_size):
+            chunk = idx[chunk_start : chunk_start + args.batch_size]
+            items, prefixes, pixels = _prepare(chunk, ds, processor, json2token, expected_prefix)
+            # Batching needs no decoder padding only because every sample shares the same training prefix.
+            if any(p.tolist() != prefixes[0].tolist() for p in prefixes):
+                raise SystemExit(f"{chunk}: samples have different prefixes, use --batch-size 1")
+            prefix = prefixes[0]
+            # HF generate() prepends generation_config.decoder_start_token_id unless the prefix already starts with it;
+            # pin the start token to the training prefix so the eval context equals training (asserted below).
             model.generation_config.decoder_start_token_id = int(prefix[0])
             with torch.no_grad():
                 gen = model.generate(
-                    pixel_values=batch["pixel_values"].to(args.device),
-                    decoder_input_ids=prefix.unsqueeze(0).to(args.device),
-                    max_new_tokens=args.max_new_tokens,
-                    do_sample=False,
-                    num_beams=1,
+                    pixel_values=torch.cat(pixels).to(args.device),
+                    decoder_input_ids=prefix.unsqueeze(0).repeat(len(chunk), 1).to(args.device),
+                    generation_config=model.generation_config,
                 )
-            if gen[0, : prefix.shape[0]].tolist() != prefix.tolist():
-                raise SystemExit(f"[{i}] eval prefix differs from training prefix: {gen[0, :12].tolist()}")
-            new = gen[0, prefix.shape[0] :].tolist()
-            new, n_pad = strip_trailing_pad(new, tokenizer.pad_token_id)
-            text = tokenizer.decode(new, skip_special_tokens=False)
-            for special in (tokenizer.eos_token, tokenizer.pad_token):
-                if special:
-                    text = text.replace(special, "")
-            record = {
-                "index": i,
-                "sequence": text.strip(),
-                "gt_parse": item["gt_parse"],
-                "decoder_prefix_ids": prefix.tolist(),
-                "model_dir": str(model_dir),
-                "data_dir": str(data_dir),
-                "split": args.split,
-                "n_new_tokens": len(new),
-                "n_trailing_pad_stripped": n_pad,
-                "truncated": len(new) >= args.max_new_tokens,
-            }
-            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-            fh.flush()
-            print(f"[{i}] new_tokens={len(new)} truncated={record['truncated']}", flush=True)
+            for row, (i, item) in enumerate(zip(chunk, items, strict=True)):
+                if gen[row, : prefix.shape[0]].tolist() != prefix.tolist():
+                    raise SystemExit(f"[{i}] eval prefix differs from training prefix: {gen[row, :12].tolist()}")
+                record = _record(
+                    i, item, gen[row, prefix.shape[0] :].tolist(), prefix=prefix, tokenizer=tokenizer, args=args
+                )
+                record.update({"model_dir": str(model_dir), "data_dir": str(data_dir), "decoding": decoding})
+                fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+                fh.flush()
+                print(f"[{i}] new_tokens={record['n_new_tokens']} truncated={record['truncated']}", flush=True)
     return 0
 
 
