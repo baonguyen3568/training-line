@@ -151,7 +151,7 @@ class ApplyResult:
         return sum(i.reclaim_bytes for i in self.done)
 
 
-def _run_status(run_dir: Path) -> tuple[str, float | None]:
+def read_run_status(run_dir: Path) -> tuple[str, float | None]:
     """(status, ended_at) from run.json; status is "unknown"/"unreadable" when it cannot be read."""
     path = run_dir / "run.json"
     try:
@@ -300,7 +300,7 @@ def plan(
     for run_dir in sorted(runs_dir.iterdir()) if runs_dir.is_dir() else []:
         if run_dir.is_symlink() or not run_dir.is_dir() or (run_ids is not None and run_dir.name not in run_ids):
             continue
-        status, ended_at = _run_status(run_dir)
+        status, ended_at = read_run_status(run_dir)
         blocked = _blocked_reason(run_dir, run_dir.name, status, lock)
         failed_ended_at = None
         if status in FAILED_STATUSES:
@@ -346,7 +346,7 @@ def _append_jsonl(path: Path, record: dict[str, object]) -> None:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def _check_project_root(root: Path) -> None:
+def check_project_root(root: Path) -> None:
     try:
         name = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["name"]
     except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
@@ -391,7 +391,7 @@ def apply(
     Raises:
         PermissionError: the selected items exceed ``approval_threshold_gb`` and no ``approved_by`` was given.
     """
-    _check_project_root(root)
+    check_project_root(root)
     ts = time.time() if now is None else now
     wanted = set(item_ids)
     fresh = plan(root, policy=policy, now=ts, lock_reader=lock_reader, lock_path=lock_path)
