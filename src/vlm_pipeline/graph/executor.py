@@ -309,6 +309,7 @@ class Executor:
             self.index.record(
                 key,
                 run_id=run_dir.name,  # the node run dir (outputs/graph/runs/<run_id>), not the graph run
+                run_dir=run_dir,  # absolute host path: retention evicts bytes inside it
                 node_type=node.spec.type_id,
                 outputs={p: OutputRef(r.type, r.path, r.hash) for p, r in result.outputs.items()},
                 parents=[keys[src] for src, _, _ in upstream],

@@ -9,7 +9,7 @@ from typing import Any
 from vlm_pipeline.graph.errors import InterruptedByMemguard
 from vlm_pipeline.graph.executor import Executor
 from vlm_pipeline.graph.testing import FakeWorker, make_test_registry
-from vlm_pipeline.graph.worker import NodeJob, NodeResult, worker_identity
+from vlm_pipeline.graph.worker import NodeJob, NodeResult
 
 
 def _wf() -> dict[str, Any]:
@@ -91,9 +91,6 @@ def test_resume_passes_checkpoint_step_to_worker(tmp_path: Path) -> None:
     seen: list[int | None] = []
 
     class Recorder(FakeWorker):
-        def identity(self, spec: Any) -> str:  # same runtime as the FakeWorker that saved the checkpoint
-            return worker_identity(FakeWorker(), spec)
-
         def run(self, job: NodeJob) -> NodeResult:
             if job.node_id == "t":
                 seen.append(job.resume_from_step)
@@ -272,6 +269,7 @@ def test_every_node_run_dir_has_a_run_json_linked_to_the_graph_run(tmp_path: Pat
         assert entry is not None
         run_dir = Path(run.outputs[nid][next(iter(run.outputs[nid]))].path).parent
         assert entry.run_id == run_dir.name
+        assert entry.run_dir == str(run_dir.resolve())
         manifest = read_manifest(run_dir)
         assert manifest.run_id == run_dir.name
         assert manifest.parent_run_id == "g-m"
