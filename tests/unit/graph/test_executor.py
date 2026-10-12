@@ -203,3 +203,22 @@ def test_workflow_file_model_matches_validator_and_round_trips() -> None:
         with pytest.raises(ValidationError):
             WorkflowFile.model_validate(bad)
         assert any(i.code == "CFG-007" for i in validate(bad, make_test_registry())), where
+
+
+def test_checkpoint_marker_formats(tmp_path: Path) -> None:
+    """FakeWorker writes a text step; NeMo AutoModel symlinks LATEST -> epoch_<E>_step_<S> (bao-backend)."""
+    from vlm_pipeline.graph.worker import read_checkpoint_step
+
+    text = tmp_path / "text"
+    (text / "checkpoints").mkdir(parents=True)
+    (text / "checkpoints" / "LATEST").write_text("7")
+    assert read_checkpoint_step(text) == 7
+
+    am = tmp_path / "automodel"
+    ckpts = am / "checkpoints"
+    (ckpts / "epoch_0_step_19").mkdir(parents=True)
+    (ckpts / "LATEST").symlink_to("epoch_0_step_19", target_is_directory=True)
+    assert read_checkpoint_step(am) == 19
+    (ckpts / "epoch_0_step_19" / ".incomplete").touch()  # save still in progress -> not resumable
+    assert read_checkpoint_step(am) is None
+    assert read_checkpoint_step(tmp_path / "none") is None

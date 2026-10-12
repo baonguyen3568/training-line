@@ -2,11 +2,12 @@
 
 A worker runs ONE node and either returns its outputs or raises. It never classifies errors itself: the executor
 maps any exception to a catalog code (``graph.errors.classify``). Checkpoints are detected from disk, never trusted
-from the exception: a node that saved one writes ``<run_dir>/checkpoints/LATEST`` containing the step number.
+from the exception: ``<run_dir>/checkpoints/LATEST`` (see ``read_checkpoint_step``).
 """
 
 from __future__ import annotations
 
+import re
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -55,10 +56,23 @@ class Worker(Protocol):
     def run(self, job: NodeJob) -> NodeResult: ...
 
 
+_AUTOMODEL_CKPT = re.compile(r"^epoch_(\d+)_step_(\d+)$")
+
+
 def read_checkpoint_step(run_dir: Path) -> int | None:
-    """Step of the last complete checkpoint in ``run_dir`` (None if none). Drives ``resumable`` on errors."""
+    """Step of the last COMPLETE checkpoint in ``run_dir`` (None if none). Drives ``resumable`` on errors.
+
+    ``checkpoints/LATEST`` is either a text file holding the step (FakeWorker / simple workers) or, as NeMo AutoModel
+    writes it, a symlink to ``epoch_<E>_step_<S>``; a checkpoint dir that still has ``.incomplete`` does not count.
+    """
     marker = run_dir / CHECKPOINT_MARKER
     try:
+        if marker.is_dir():  # follows the AutoModel symlink
+            target = marker.resolve()
+            match = _AUTOMODEL_CKPT.match(target.name)
+            if match is None or (target / ".incomplete").exists():
+                return None
+            return int(match.group(2))
         return int(marker.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return None
