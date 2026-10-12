@@ -121,3 +121,15 @@ def test_train_failure_raises_container_exit(
         w.run(_job("train.lora_vlm", {}, root / "outputs" / "graph" / "g" / "n", _train_inputs(w)))
     assert ei.value.exit_code == expected_exit
     assert ei.value.cancelled_by_executor is cancelled
+
+
+def test_identity_keys_container_nodes_by_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import vlm_pipeline.common.jobrun as jobrun
+
+    monkeypatch.setattr(jobrun, "image_digest", lambda image: "sha256:abc")
+    w = RealWorker(_root(tmp_path), image="vlm-automodel:26.08-3")
+    train, pick = REGISTRY.get("train.sft_vlm"), REGISTRY.get("model.hf_pick")
+    assert train is not None
+    assert pick is not None
+    assert w.identity(train) == "container/vlm-automodel:26.08-3@sha256:abc"
+    assert w.identity(pick) == "host/real-1"

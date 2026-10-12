@@ -7,6 +7,7 @@ them to catalog codes). Nothing is downloaded: models/datasets must already be i
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import logging
@@ -24,6 +25,7 @@ from vlm_pipeline.common.jobrun import (
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
+from vlm_pipeline.nodes.spec import NodeSpec
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
 
@@ -65,6 +67,18 @@ class RealWorker:
         self.catalog = catalog or load_catalog()
         self.image = image
         self.who = who
+
+    def identity(self, spec: NodeSpec) -> str:
+        """Part of the executor cache key: container nodes are keyed by the exact image (content id)."""
+        if spec.runner != "container":
+            return "host/real-1"
+        return f"container/{self.image}@{self._image_id()}"
+
+    @functools.cache  # noqa: B019 - one worker per app process; the image id does not change while it runs
+    def _image_id(self) -> str:
+        from vlm_pipeline.common.jobrun import image_digest
+
+        return image_digest(self.image) or "unknown"
 
     # ------------------------------------------------------------------------------------------ helpers
     def _container_path(self, host_path: Path) -> str:
