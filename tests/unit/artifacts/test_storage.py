@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from vlm_pipeline.artifacts.storage import (
+    _docker_runner,
     dedup_layers_bytes,
     docker_project_gb,
     du_gb,
@@ -87,3 +88,9 @@ def test_docker_project_gb_skips_unparseable_inspect(inspect_out: str) -> None:
     inspect = ("image", "inspect", "--format", "{{json .RootFS.Layers}}\t{{.Size}}", "id1")
     run = _fake_runner({LISTING: "vlm-a:1\tid1\n", LABELLED: "", inspect: inspect_out})
     assert docker_project_gb(set(), run) == 0.0
+
+
+@pytest.mark.parametrize("argv", [["rmi", "x"], ["rm", "x"], ["image", "rm", "x"], ["system", "prune"], []])
+def test_docker_runner_refuses_non_read_only_commands(argv: list[str]) -> None:
+    with pytest.raises(ValueError, match="read-only"):
+        _docker_runner(argv)

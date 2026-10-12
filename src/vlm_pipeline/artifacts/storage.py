@@ -68,7 +68,14 @@ def pinned_images(lock_file: Path) -> set[str]:
     return refs
 
 
+def _is_read_only_docker(argv: Sequence[str]) -> bool:
+    """Only ``docker images ...`` and ``docker image inspect ...``; deleting goes through the retention module."""
+    return bool(argv) and (argv[0] == "images" or (argv[0] == "image" and len(argv) > 1 and argv[1] == "inspect"))
+
+
 def _docker_runner(argv: Sequence[str]) -> str | None:
+    if not _is_read_only_docker(argv):
+        raise ValueError(f"storage only runs read-only docker queries, got: {list(argv)[:2]}")
     docker = shutil.which("docker")
     if docker is None:
         return None
