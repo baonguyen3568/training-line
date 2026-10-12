@@ -20,3 +20,9 @@
 
 ## Sau vòng này
 Sửa xong I1 thì slice đủ cho T1–T3 của buổi thử. Mình sẽ báo PM.
+
+## Xác minh sau sửa (vòng 5b)
+- I1 ✓. Hai ô "Nhận từ" của Fine-tune liệt kê "Chia dữ liệu học / kiểm tra · Dữ liệu học" và "· Dữ liệu kiểm tra", phân biệt được.
+- Simple ẩn run spike ✓. Lịch sử chạy hiện câu trống `run_monitor.no_runs`.
+  Nhỏ: khi danh sách trống thì ẩn luôn hàng tiêu đề bảng (Tên/Trạng thái/Bắt đầu).
+- Kết luận: **slice đủ cho T1–T3** của buổi thử với người dùng.
