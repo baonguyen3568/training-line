@@ -16,7 +16,8 @@ from nemo_automodel import NeMoAutoModelForImageTextToText
 from test_golden import TASK_PROMPT, make_test_image
 
 model_dir = sys.argv[1]
-budgets = [int(x) for x in sys.argv[2:]] or [50, 1024]
+force = "--force" in sys.argv  # min_new_tokens = budget: measure the length curve even if EOS comes early
+budgets = [int(x) for x in sys.argv[2:] if x != "--force"] or [50, 1024]
 processor = AutoProcessor.from_pretrained(model_dir, trust_remote_code=True)
 model = NeMoAutoModelForImageTextToText.from_pretrained(model_dir, trust_remote_code=True, torch_dtype=torch.bfloat16)
 model = model.to("cuda").eval()
@@ -27,7 +28,8 @@ for n in budgets:
     torch.cuda.synchronize()
     t0 = time.perf_counter()
     with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=n, do_sample=False)
+        extra = {"min_new_tokens": n} if force else {}
+        out = model.generate(**inputs, max_new_tokens=n, do_sample=False, **extra)
     torch.cuda.synchronize()
     dt = time.perf_counter() - t0
     produced = int(out.shape[-1])
