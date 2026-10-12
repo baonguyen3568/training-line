@@ -184,3 +184,22 @@ def test_one_executor_many_runs_each_with_its_own_event_sink(tmp_path: Path) -> 
     assert b
     assert {e["graph_run_id"] for e in a} == {"ga"}
     assert {e["graph_run_id"] for e in b} == {"gb"}
+
+
+def test_workflow_file_model_matches_validator_and_round_trips() -> None:
+    """graph.workflow models are the single source: a valid workflow parses, unknown keys are rejected by both."""
+    import pytest
+    from pydantic import ValidationError
+
+    from vlm_pipeline.graph import validate
+    from vlm_pipeline.graph.workflow import WorkflowFile
+
+    wf = _wf()
+    wf["nodes"][0]["ui"] = {"x": 1, "y": 2}
+    parsed = WorkflowFile.model_validate(wf)
+    assert parsed.model_dump(by_alias=True, exclude_none=True)["edges"][0]["from"] == ("d", "data")
+    assert validate(wf, make_test_registry()) == []
+    for where, bad in (("top", {**wf, "description": "x"}), ("edge", {**wf, "edges": [{**wf["edges"][0], "ui": {}}]})):
+        with pytest.raises(ValidationError):
+            WorkflowFile.model_validate(bad)
+        assert any(i.code == "CFG-007" for i in validate(bad, make_test_registry())), where

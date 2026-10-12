@@ -18,13 +18,14 @@ from urllib.parse import unquote
 
 from pydantic import ValidationError
 
+from vlm_pipeline.graph.workflow import WORKFLOW_FORMAT, WorkflowEdge, WorkflowFile, WorkflowNode, allowed_keys
 from vlm_pipeline.nodes.spec import LOCAL_PATH_FORMAT, NodeSpec, Registry, is_compatible
 
-WORKFLOW_FORMAT = "vlm-workflow"
 SUPPORTED_SCHEMA_VERSIONS = frozenset({1})
-_TOP_KEYS = frozenset({"format", "schema_version", "name", "description", "nodes", "edges", "requires", "ui"})
-_NODE_KEYS = frozenset({"id", "type", "version", "params", "ui", "package"})  # package: registry lookup key only
-_EDGE_KEYS = frozenset({"from", "to", "ui"})
+# Allowed keys come from the workflow file models (single source shared with the frontend via JSON schema).
+_TOP_KEYS = allowed_keys(WorkflowFile)
+_NODE_KEYS = allowed_keys(WorkflowNode)
+_EDGE_KEYS = allowed_keys(WorkflowEdge)
 # Workflow node types (first-party "a.b" and plugin "publisher/pack.node"): ASCII only (P003 D16) so homoglyph,
 # zero-width and bidi tricks are rejected before any lookup or echo.
 _TYPE_ID = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}(/[a-z0-9][a-z0-9_.-]{0,63})?$")
