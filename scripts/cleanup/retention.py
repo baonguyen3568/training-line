@@ -16,6 +16,7 @@ import sys
 import time
 
 from vlm_pipeline.artifacts.retention import apply, plan
+from vlm_pipeline.common.gpu_lock import default_lock_path
 from vlm_pipeline.common.paths import GIB, project_root
 
 
@@ -30,7 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = project_root()
-    current = plan(root, run_ids=args.runs)
+    lock_path = default_lock_path()
+    current = plan(root, run_ids=args.runs, lock_path=lock_path)
     if args.json:
         print(json.dumps(current.as_dict(), ensure_ascii=False, indent=2))
     else:
@@ -52,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ids = args.items.split(",") if args.items else [i.item_id for i in current.actionable]
     try:
-        result = apply(root, ids, by=args.by, approved_by=args.approved_by)
+        result = apply(root, ids, by=args.by, approved_by=args.approved_by, lock_path=lock_path)
     except PermissionError as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 1

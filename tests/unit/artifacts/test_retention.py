@@ -85,10 +85,16 @@ def test_latest_and_best_same_checkpoint_latest_wins(tmp_path: Path) -> None:
     assert item.action == "keep"  # LATEST rule (kept whole for 7 days) beats best-strip
 
 
-@pytest.mark.parametrize("status", [None, "running", "failed", "interrupted", "unknown"])
-def test_unfinished_or_unknown_runs_are_never_touched(tmp_path: Path, status: str | None) -> None:
+@pytest.mark.parametrize("status", ["running", "failed", "interrupted", "killed"])
+def test_unfinished_runs_are_never_touched(tmp_path: Path, status: str) -> None:
     _standard_run(tmp_path, status=status)
     assert set(_actions(tmp_path).values()) == {("keep", "RUN_NOT_FINISHED")}
+
+
+@pytest.mark.parametrize("status", [None, "finished", "unknown", "Completed"])
+def test_missing_or_unrecognized_status_is_flagged_not_silent(tmp_path: Path, status: str | None) -> None:
+    _standard_run(tmp_path, status=status)
+    assert set(_actions(tmp_path).values()) == {("keep", "UNKNOWN_STATUS")}
 
 
 def test_keep_marker_blocks_everything(tmp_path: Path) -> None:

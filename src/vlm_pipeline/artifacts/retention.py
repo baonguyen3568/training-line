@@ -13,6 +13,13 @@ Rules (first match wins, per checkpoint):
 4. target of ``LATEST`` -> keep for ``latest_full_days``, then strip optimizer state
 5. target of ``LOWEST_VAL`` -> strip optimizer state
 6. any other checkpoint -> delete once older than ``other_keep_days``
+
+Age is the checkpoint directory mtime. Stripping sub-directories updates that mtime, so a stripped checkpoint
+starts a new window; this errs on the side of keeping data longer.
+
+A run.json status outside ``KNOWN_STATUSES`` is reported as ``UNKNOWN_STATUS`` (not silently kept as
+"not finished"), so a vocabulary mismatch with the run writer shows up in every dry-run.
+TODO(bao-backend, S-2): replace the string sets with the shared ``common.runinfo.RunStatus`` enum.
 """
 
 from __future__ import annotations
@@ -38,6 +45,8 @@ CKPT_PREFIX = "epoch_"
 ROLE_LINKS = ("LATEST", "LOWEST_VAL")
 STRIP_SUBDIRS = ("optim", "dataloader", "rng")  # resume-only state; model weights stay
 CLEANABLE_STATUSES = frozenset({"completed", "discarded"})
+# statuses that legitimately block cleanup; anything else (or a missing/unreadable run.json) is flagged
+KNOWN_STATUSES = CLEANABLE_STATUSES | {"running", "failed", "interrupted", "killed", "evicted"}
 DAY_S = 86_400.0
 PROJECT_NAME = "vlm-pipeline"  # [project].name in pyproject.toml; guards against a wrong VLM_PROJECT_ROOT
 CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
@@ -196,6 +205,8 @@ def _blocked_reason(run_dir: Path, run_id: str, status: str, lock: LockStatus | 
         return "PINNED_OR_KEEP"
     if lock is not None and (lock.corrupt or lock.run_id is None or lock.run_id == run_id):
         return "GPU_LOCK_HOLDER"
+    if status not in KNOWN_STATUSES:
+        return "UNKNOWN_STATUS"  # missing/unreadable run.json or a status this module does not understand
     if status not in CLEANABLE_STATUSES:
         return "RUN_NOT_FINISHED"
     return None
@@ -208,10 +219,14 @@ def plan(
     policy: RetentionPolicy = DEFAULT_POLICY,
     now: float | None = None,
     lock_reader: Callable[[Path], LockStatus | None] = check_lock,
+    lock_path: Path | None = None,
 ) -> Plan:
-    """Read-only retention plan for every run (or only ``run_ids``) under ``<root>/outputs/runs``."""
+    """Read-only retention plan for every run (or only ``run_ids``) under ``<root>/outputs/runs``.
+
+    ``lock_path`` defaults to ``<root>/.team/GPU_LOCK``; the CLI passes ``gpu_lock.default_lock_path()``.
+    """
     ts = time.time() if now is None else now
-    lock = lock_reader(root / ".team" / "GPU_LOCK")
+    lock = lock_reader(lock_path if lock_path is not None else root / ".team" / "GPU_LOCK")
     runs_dir = root / RUNS_REL
     runs: list[RunPlan] = []
     for run_dir in sorted(runs_dir.iterdir()) if runs_dir.is_dir() else []:
@@ -290,6 +305,7 @@ def apply(
     policy: RetentionPolicy = DEFAULT_POLICY,
     now: float | None = None,
     lock_reader: Callable[[Path], LockStatus | None] = check_lock,
+    lock_path: Path | None = None,
 ) -> ApplyResult:
     """Execute the given planned items after re-planning; items whose plan changed are skipped.
 
@@ -299,7 +315,7 @@ def apply(
     _check_project_root(root)
     ts = time.time() if now is None else now
     wanted = set(item_ids)
-    fresh = plan(root, policy=policy, now=ts, lock_reader=lock_reader)
+    fresh = plan(root, policy=policy, now=ts, lock_reader=lock_reader, lock_path=lock_path)
     by_id = {i.item_id: i for i in fresh.actionable}
     result = ApplyResult()
     selected = [by_id[i] for i in sorted(wanted) if i in by_id]

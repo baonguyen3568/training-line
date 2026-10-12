@@ -46,7 +46,16 @@ docker images --filter label=project=vlm-training                 # tagged: dock
 docker ps -a --filter ancestor=<image>                            # make sure no non-project container uses it
 docker buildx prune --builder vlm-builder --filter until=168h
 ```
-Project retention script (once built): `scripts/cleanup/retention.py` (dry-run default, `--apply` to execute).
+Project tools (built, reviewed):
+```bash
+uv run python scripts/cleanup/disk_report.py                      # footprint + levels -> outputs/system/disk_report.json
+uv run python scripts/cleanup/preflight.py --est-peak-gb N --ckpt-gb M   # before taking GPU_LOCK (exit 0/2/3/4)
+uv run python scripts/cleanup/retention.py [--run ID] [--json]    # checkpoint retention DRY-RUN
+uv run python scripts/cleanup/retention.py --apply --by bao-cleanup [--approved-by bao-pm]   # >20 GiB/24h needs approval
+```
+retention only touches `outputs/runs/*/checkpoints/epoch_*`; anything else (misplaced caches, smoke dirs) = manual delete
+with the checklist above + PM approval, then append an event to `outputs/system/cleanup.jsonl` and `.team/log`.
+Code changes: commit only AFTER review (CLAUDE.md), `git commit -- <your paths>` only.
 
 ## Memory (GB10 unified)
 Do NOT run `drop_caches` (needs sudo, host-wide) — ask PM. Never kill processes not started by this project.
