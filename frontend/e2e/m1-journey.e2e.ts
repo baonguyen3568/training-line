@@ -34,6 +34,22 @@ async function waitUntilStill(locator: Locator): Promise<void> {
     .toBe(true);
 }
 
+/** Resolves when the element's text stops changing (two equal reads 300 ms apart). */
+async function waitUntilSettled(locator: Locator): Promise<void> {
+  let previous = "";
+  await expect
+    .poll(
+      async () => {
+        const text = await locator.innerText();
+        const still = text === previous;
+        previous = text;
+        return still;
+      },
+      { intervals: [300], timeout: 10_000 },
+    )
+    .toBe(true);
+}
+
 async function dragHandle(page: Page, from: Locator, to: Locator): Promise<void> {
   const a = await from.boundingBox();
   const b = await to.boundingBox();
@@ -78,6 +94,7 @@ async function buildGraph(page: Page): Promise<void> {
     `[data-id="${train}"] .react-flow__handle.target[data-handleid="base_model"]`,
   );
   await waitUntilStill(target);
+  await waitUntilSettled(page.getByTestId("check-bar")); // validation re-render must not land mid-drag
   await dragHandle(page, source, target);
   // Wire 2 through the inspector ("Nhận từ — <port>"), the keyboard-accessible path.
   await node(page, NODES[2]).click();
