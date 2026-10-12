@@ -298,3 +298,6 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
 - **Ngưỡng ≥90 research đặt trước là ước lượng sai** cho 50 step, ghi lại công khai, không sửa ngầm.
 - Phát hiện phụ: run chỉ chạy **50/60 step** vì AutoModel mặc định `num_epochs=10`. Đã đặt `num_epochs` tường minh trong YAML O-1 (12) và P-3 (3).
 - ⇒ **Đi tiếp P-3** (300 step, ckpt 100/200/300). Chấm với generation_config gốc của NVIDIA (repetition_penalty 1.1) sau khi tester chạy so sánh 6 ảnh, và báo cả số không penalty để đối chiếu.
+- (08:30) fixcode 23e6aa6: `complete_from_base` merge generation_config.json của base đè lên export. Allowlist giữ từ export: `use_cache` (bắt buộc False cho patch 0003) và `transformers_version`; còn lại base thắng, lệch thì gate báo lỗi. Có test.
+  - **Đính chính tiêu chí "load strict"**: checkpoint gốc của NVIDIA đã có unexpected key `embed_positions` với class remote (fixcode đo). Tiêu chí đúng là **load report của export == load report của base**, không phải "không có missing/unexpected nào".
+  - Ghi nhận: `use_cache=False` (patch 0003) nghĩa là đường native hiện **không dùng KV cache**. Đúng rủi ro tốc độ ở §10.5 (07:00). Việc "bật KV cache cho native hoặc dùng vLLM cho Chạy thử" vẫn mở.
