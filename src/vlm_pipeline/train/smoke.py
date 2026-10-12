@@ -33,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--base-model")
     p.add_argument("--base-revision")
     p.add_argument("--dataset")
+    p.add_argument("--task", default="lora", choices=["lora", "sft"])
     p.add_argument("--image", default=DEFAULT_IMAGE)
     a = p.parse_args(argv)
 
@@ -53,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         run_id=run_id,
         name=f"smoke {a.tag}",
         stage="train",
-        task="lora",
+        task=a.task,
         base_model=a.base_model,
         base_model_revision=a.base_revision,
         dataset=a.dataset,
