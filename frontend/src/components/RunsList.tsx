@@ -19,28 +19,30 @@ export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
     <main className="gallery">
       <h1>{t("run_monitor.runs_title")}</h1>
       {shown.length === 0 && <p className="muted">{t("run_monitor.no_runs")}</p>}
-      <table className="runs-table">
-        <thead>
-          <tr>
-            <th>{t("run_monitor.col_name")}</th>
-            <th>{t("run_monitor.col_status")}</th>
-            <th>{t("run_monitor.col_started")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((r) => (
-            <tr key={r.run_id} className={`run-${r.status ?? "running"}`}>
-              <td>
-                <button type="button" className="link" onClick={() => onOpen(r.run_id)}>
-                  {r.name ?? r.run_id}
-                </button>
-              </td>
-              <td>{t(`run_monitor.status.${r.status ?? "running"}`)}</td>
-              <td>{r.started_at ? new Date(r.started_at * 1000).toLocaleString() : "—"}</td>
+      {shown.length > 0 && (
+        <table className="runs-table">
+          <thead>
+            <tr>
+              <th>{t("run_monitor.col_name")}</th>
+              <th>{t("run_monitor.col_status")}</th>
+              <th>{t("run_monitor.col_started")}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {shown.map((r) => (
+              <tr key={r.run_id} className={`run-${r.status ?? "running"}`}>
+                <td>
+                  <button type="button" className="link" onClick={() => onOpen(r.run_id)}>
+                    {r.name ?? r.run_id}
+                  </button>
+                </td>
+                <td>{t(`run_monitor.status.${r.status ?? "running"}`)}</td>
+                <td>{r.started_at ? new Date(r.started_at * 1000).toLocaleString() : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </main>
   );
 }

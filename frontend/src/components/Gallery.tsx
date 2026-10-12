@@ -7,7 +7,7 @@ import { formatEstimate } from "../lib/format";
 /** One "no measurement yet" instead of repeating it per field (design review r4). */
 function estimateLine(it: TemplateMeta): string {
   const e = it.estimate;
-  if (e.source === "unknown" || (!e.minutes && !e.ram_gb))
+  if (e.source === "unknown" || (e.minutes == null && e.ram_gb == null))
     return `⏱ ${t("estimate.source.unknown")}`;
   return `⏱ ${formatEstimate(e.minutes, "minutes", e.source)} · ${formatEstimate(e.ram_gb, "ram_gb", e.source)}`;
 }

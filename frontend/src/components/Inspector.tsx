@@ -29,7 +29,9 @@ function sourcesFor(
       const pt = ports.find((p) => p.id === ps.type);
       out.push({
         value: `${n.id}:${port}`,
-        label: `${nodeTitle(spec, n.type)} · ${pt ? tp(pt.label_key.split(".")) : ps.type}`,
+        label: `${nodeTitle(spec, n.type)} · ${
+          tpOptional(["node", n.type, "port", port]) ?? (pt ? tp(pt.label_key.split(".")) : ps.type)
+        }`,
       });
     }
   }

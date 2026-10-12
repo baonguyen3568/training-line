@@ -36,4 +36,17 @@ describe("vertical slice", () => {
       },
     );
   });
+
+  it("distinguishes train vs val sources in the 'Nhận từ' picker (design review r5 I1)", async () => {
+    const { useWorkflow } = await import("../src/store/workflow");
+    const { Editor } = await import("../src/components/Editor");
+    await useWorkflow.getState().loadCatalog();
+    await useWorkflow.getState().openTemplate("invoice_to_json");
+    useWorkflow.getState().select("n4");
+    render(<Editor />);
+    const options = [...document.querySelectorAll("select option")].map((o) => o.textContent ?? "");
+    const fromSplit = options.filter((o) => o.startsWith("Chia dữ liệu"));
+    expect(new Set(fromSplit).size).toBe(2); // train and val have different labels
+    expect(screen.getByText(/chưa có số đo thời gian, RAM, ổ đĩa/)).toBeTruthy();
+  });
 });

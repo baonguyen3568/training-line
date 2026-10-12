@@ -124,6 +124,7 @@ export const mockNodeTypes: NodeSpec[] = [
           type: "string",
           enum: ["naver-clova-ix/cord-v2"],
           default: "naver-clova-ix/cord-v2",
+          "x-ui": { summary: true },
         },
       },
       required: ["repo"],
@@ -363,12 +364,13 @@ const templates: Template[] = [
     difficulty: "basic",
     tags: ["quantize", "eval"],
     sample_data: false,
+    // Not measured yet on GB10 → unknown (never show made-up numbers).
     estimate: {
-      ram_gb: { lo: 12, hi: 20 },
-      disk_gb: { lo: 2, hi: 4 },
-      minutes: { lo: 15, hi: 40 },
+      ram_gb: null,
+      disk_gb: null,
+      minutes: null,
       gpu_exclusive: true,
-      source: "formula",
+      source: "unknown",
     },
     workflow: {
       format: "vlm-workflow",

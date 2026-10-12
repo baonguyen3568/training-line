@@ -47,11 +47,14 @@ export function CheckBar() {
           <span className="muted">
             {" "}
             ·{" "}
-            {t("preflight.estimate_line", {
-              time: formatEstimate(est.duration_min, "minutes", est.source),
-              ram: formatEstimate(est.ram_gb_peak, "ram_gb", est.source),
-              disk: formatEstimate(est.disk_gb, "disk_gb", est.source),
-            })}
+            {est.source === "unknown" ||
+            (est.duration_min == null && est.ram_gb_peak == null && est.disk_gb == null)
+              ? t("estimate.source.unknown_all")
+              : t("preflight.estimate_line", {
+                  time: formatEstimate(est.duration_min, "minutes", est.source),
+                  ram: formatEstimate(est.ram_gb_peak, "ram_gb", est.source),
+                  disk: formatEstimate(est.disk_gb, "disk_gb", est.source),
+                })}
           </span>
         )}
         {(errors.length > 0 || warnings.length > 0) && (

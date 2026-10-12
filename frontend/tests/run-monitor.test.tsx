@@ -70,3 +70,21 @@ describe("RunMonitor paging", () => {
     expect(calls).toEqual([0, 5000, 10000]);
   });
 });
+
+describe("RunsList", () => {
+  it("hides engineering spike runs in Simple mode and shows them in Advanced", async () => {
+    const { RunsList } = await import("../src/components/RunsList");
+    const { useUi } = await import("../src/store/ui");
+    const { api } = await import("../src/api");
+    vi.restoreAllMocks();
+    const runsSpy = vi.spyOn(api, "runs");
+    useUi.getState().setMode("simple");
+    const view = render(<RunsList onOpen={() => {}} />);
+    await waitFor(() => expect(runsSpy).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText(/run_monitor.no_runs|Chưa có/)).toBeTruthy());
+    expect(view.container.querySelector(".runs-table")).toBeNull(); // no empty header row
+    expect(screen.queryByText(/MedPix, spike only/)).toBeNull();
+    useUi.getState().setMode("advanced");
+    await waitFor(() => expect(screen.getByText(/MedPix, spike only/)).toBeTruthy());
+  });
+});
