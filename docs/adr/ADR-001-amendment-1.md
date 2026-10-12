@@ -26,3 +26,9 @@ User yêu cầu dùng model của NVIDIA. Security chỉ ra rằng repo gated bu
 ## Ghi chú của PM khi chốt
 - Template mặc định không có node quantize. Tầm nhìn sản phẩm có "nén model", nên **template 2 (Cosmos, kiến trúc Qwen3-VL, ModelOpt FP8 hỗ trợ chính thức) sẽ là template trình diễn đủ chuỗi train → quantize → benchmark**. Research + backend thử ModelOpt FP8 PTQ trên Parse v1.1 như một spike R&D (không chặn template).
 - Gate trước khi Parse v1.1 vào gallery: test build-from-config offline pass (security) + P-2 field-F1 có số thật.
+
+## Bổ sung 2026-10-12 — Gate tiền xử lý (áp dụng cho MỌI template)
+Bối cảnh: Parse v1.1 bị chuẩn hoá ảnh 2 lần trong class native của AutoModel (cờ bị rơi khi merge với RADIOConfig). Hậu quả là lệch giữa train và serve.
+- Template chỉ vào gallery khi có: (a) test số học ảnh trắng tổng hợp PASS (normalize đúng 1 lần); (b) test **train/serve parity**: pixel_values ở đường train (AutoModel) và đường chạy thử/serve (vLLM hoặc HF) khớp tới 1e-3.
+- Parse chạy trên `vlm-automodel:26.08-2` (đã vá). Mọi số chất lượng đo trên 26.08-1 là INVALID.
+- Bài học (đưa vào skill research/tester): kiểm tiền xử lý bằng test số, không suy ra từ việc đọc config.
