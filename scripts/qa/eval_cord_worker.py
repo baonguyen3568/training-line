@@ -20,9 +20,13 @@ Usage (repo mounted at /workspace):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
+
+# Exact worker source per record: a matrix may span worker commits, and run.json's git_commit is the shared tree's.
+WORKER_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
 def _conversation(example: dict[str, Any], json2token: Any) -> dict[str, Any]:
@@ -233,7 +237,14 @@ def main() -> int:
                 record = _record(
                     i, item, gen[row, prefix.shape[0] :].tolist(), prefix=prefix, tokenizer=tokenizer, args=args
                 )
-                record.update({"model_dir": str(model_dir), "data_dir": str(data_dir), "decoding": decoding})
+                record.update(
+                    {
+                        "model_dir": str(model_dir),
+                        "data_dir": str(data_dir),
+                        "decoding": decoding,
+                        "worker_sha256": WORKER_SHA256,
+                    }
+                )
                 fh.write(json.dumps(record, ensure_ascii=False) + "\n")
                 fh.flush()
                 print(f"[{i}] new_tokens={record['n_new_tokens']} truncated={record['truncated']}", flush=True)
