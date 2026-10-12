@@ -361,3 +361,11 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
 - (§10.8 kết luận, tester A/B ckpt 299, 7 ảnh test) Không cache **cũng lặp** y như có cache, nên **đường cache remote KHÔNG phải nguyên nhân**. Nguyên nhân còn lại là thiếu train (§10.9).
   - "Remote + cache ≡ không cache" mới chỉ thấy trên một model đang thoái hoá: hai chuỗi tách nhau sau ~80 ký tự do số học bf16. Cần thêm **golden NVIDIA qua remote + cache trên base** (rẻ) trước khi coi use_cache=True là mặc định đã kiểm.
   - Kết luận penalty (§10.7) vẫn HOÃN, đo lại trên model P-3b.
+- (tester, teacher-forced qua đúng đường eval, 10 ảnh val) P-3 s299: loss 0.238, token acc 94.0%. Base: loss 2.48, acc 58.0%.
+  - ⇒ Đường eval/export/forward đúng. Model học được nhưng còn ~6% token sai (~14 lỗi/chuỗi), nên greedy lệch rồi lặp.
+  - Số test chính thức của P-3 (100 ảnh, mốc của bản lỗi): F1 8.9, truncated 86%.
+- **Gate theo dõi cho P-3b** ở mỗi ckpt:
+  - val_loss;
+  - token acc teacher-forced (10 ảnh val);
+  - greedy F1 + truncated_rate (20 ảnh val).
+  - Ngưỡng tham khảo để đi tiếp lên 300 step: token acc ≥ 97% **và** truncated ≤ 10% trên val. Đây là ước lượng, sẽ ghi công khai nếu sai.
