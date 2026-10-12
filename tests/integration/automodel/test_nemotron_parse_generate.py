@@ -19,6 +19,7 @@ pytest.importorskip("nemo_automodel")
 
 REPO = Path(__file__).resolve().parents[3]
 FIXTURES = REPO / "tests" / "fixtures" / "model_configs" / "nemotron_parse"
+PREPARED_V11 = REPO / ".cache" / "prepared" / "nemotron-parse-v1.1_fd1e3c6b" / "model"
 RADIO_DIR = Path(
     os.environ.get(
         "VLM_CRADIO_V2H_DIR",
@@ -63,3 +64,33 @@ def test_generation_feeds_the_whole_decoder_sequence(model) -> None:  # type: ig
 
 def test_generation_config_defaults_to_no_cache(model) -> None:  # type: ignore[no-untyped-def]
     assert model.generation_config.use_cache is False
+
+
+def test_override_keeps_the_parent_explicit_parameters(model) -> None:  # type: ignore[no-untyped-def]
+    """generate() validates model_kwargs against this signature: dropping a parameter rejects caller inputs."""
+    import inspect
+
+    from transformers.generation.utils import GenerationMixin
+
+    ours = inspect.signature(type(model).prepare_inputs_for_generation).parameters
+    parent = inspect.signature(GenerationMixin.prepare_inputs_for_generation).parameters
+    assert [n for n in parent if n not in ours] == []
+
+
+def test_generate_accepts_everything_the_processor_returns(model) -> None:  # type: ignore[no-untyped-def]
+    """Golden gate (b) on 26.08-4: `generate(**processor(...))` failed with "model_kwargs are not used by the
+    model: ['attention_mask']" because the 0003 override dropped the parent's `attention_mask` parameter."""
+    if not PREPARED_V11.is_dir():
+        pytest.skip("prepared Nemotron-Parse v1.1 dir not found")
+    from PIL import Image
+    from transformers import AutoProcessor
+
+    processor = AutoProcessor.from_pretrained(PREPARED_V11, trust_remote_code=True)
+    inputs = processor(
+        images=[Image.new("RGB", (640, 480), "white")],
+        text=["</s><s><predict_bbox><predict_classes><output_markdown>"],
+        return_tensors="pt",
+        add_special_tokens=False,
+    )
+    assert "attention_mask" in inputs
+    model._validate_model_kwargs(dict(inputs))  # what generate(**inputs) validates first
