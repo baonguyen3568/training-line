@@ -24,7 +24,9 @@ LORA_LR: dict[LrPreset, float] = {"slow": 5e-5, "medium": 1e-4, "fast": 2e-4}
 
 
 class _FinetuneParams(Params):
-    epochs: Epochs = Field(3, json_schema_extra=ui(order=0, widget="segmented", summary=True))
+    epochs: Epochs = Field(
+        3, json_schema_extra=ui(order=0, widget="segmented", summary=True, option_keys="epoch_count")
+    )
     lr_preset: LrPreset = Field(
         "medium", json_schema_extra=ui(order=1, widget="segmented", preset=True, option_keys="lr_preset")
     )

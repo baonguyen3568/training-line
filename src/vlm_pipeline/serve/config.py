@@ -19,7 +19,7 @@ class InferenceParams(Params):
     answer_length: Literal["short", "medium", "long"] = Field(
         "medium", json_schema_extra=ui(order=0, widget="segmented", option_keys="answer_length")
     )
-    engine: Literal["vllm", "hf"] = Field("vllm", json_schema_extra=ui(advanced=True))
+    engine: Literal["vllm", "hf"] = Field("vllm", json_schema_extra=ui(advanced=True, option_keys="serve_engine"))
     temperature: float = Field(0.0, ge=0.0, le=1.5, json_schema_extra=ui(advanced=True))
     top_p: float = Field(1.0, ge=0.1, le=1.0, json_schema_extra=ui(advanced=True))
     gpu_memory_utilization: float = Field(0.3, ge=0.2, le=0.5, json_schema_extra=ui(advanced=True))
