@@ -202,3 +202,55 @@ def test_leased_entry_is_skipped_as_in_use(root: Path, idx: ArtifactIndex) -> No
     res = evict(root, idx, ["input-of-long-job"], by="user", confirmed={"input-of-long-job"})
     assert res.skipped == [("input-of-long-job", "IN_USE_BY_RUNNING_WORKFLOW")]
     assert (run / "checkpoints").exists()
+
+
+def _graph_node(root: Path, idx: ArtifactIndex, name: str, *, run_dir: Path | None = None) -> Path:
+    """Executor layout: outputs/graph/runs/<node dir> with run.json, run_id = node dir, graph id in parent."""
+    node_dir = root / "outputs" / "graph" / "runs" / name
+    make_fake_run(node_dir.parent, FakeRunSpec(name, stage="eval", task="eval", checkpoint_every=10,
+                                               parent_run_id="g-20261012-180000-abc123"))  # fmt: skip
+    out = node_dir / "predictions"
+    out.mkdir()
+    (out / "p.jsonl").write_bytes(b"\0" * KB)
+    idx.record(
+        name,
+        run_id=name,
+        node_type="vlm/eval.benchmark",
+        outputs={"pred": OutputRef("report", str(out), "h")},
+        run_dir=run_dir if run_dir is not None else node_dir,
+    )
+    return node_dir
+
+
+def test_executor_layout_under_outputs_graph_runs_is_evicted(root: Path, idx: ArtifactIndex) -> None:
+    node = _graph_node(root, idx, "e-0123456789abcdef")
+    p = plan_cache(root, idx, cap_gb=0)
+    assert [i.cache_key for i in p.evict] == ["e-0123456789abcdef"]
+    assert p.evict[0].targets == ("checkpoints", "predictions")
+    res = evict(root, idx, ["e-0123456789abcdef"], by="app")
+    assert [i.cache_key for i in res.evicted] == ["e-0123456789abcdef"]
+    assert res.freed_bytes > 0
+    assert not (node / "predictions").exists()
+    assert (node / "run.json").exists()
+    assert read_manifest(node).status is RunStatus.EVICTED
+
+
+def test_run_dir_outside_known_roots_is_never_touched(
+    root: Path, idx: ArtifactIndex, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    elsewhere = tmp_path_factory.mktemp("elsewhere") / "x"
+    node = _graph_node(root, idx, "e-1", run_dir=elsewhere)  # index points outside the project roots
+    elsewhere.mkdir()
+    (elsewhere / "precious.bin").write_bytes(b"x")
+    p = plan_cache(root, idx, cap_gb=0)
+    assert p.evict == ()
+    assert [(i.cache_key, why) for i, why in p.protected] == [("e-1", "MANIFEST_UNREADABLE")]
+    res = evict(root, idx, ["e-1"], by="admin", confirmed={"e-1"})
+    assert res.evicted == []
+    assert (elsewhere / "precious.bin").exists()
+    assert (node / "predictions").exists()
+
+
+def test_relative_run_dir_is_rejected(idx: ArtifactIndex) -> None:
+    with pytest.raises(ValueError, match="run_dir must be absolute"):
+        idx.record("k", run_id="k", node_type="t", outputs={}, run_dir=Path("outputs/graph/runs/k"))

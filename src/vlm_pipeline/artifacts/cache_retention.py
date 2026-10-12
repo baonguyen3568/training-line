@@ -35,6 +35,7 @@ from vlm_pipeline.artifacts.storage import du_bytes
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.common.runinfo import RunStatus, read_manifest, write_manifest
 
+RUN_ROOTS = (RUNS_REL, Path("outputs") / "graph" / "runs")  # node run dirs live directly under one of these
 HEAVY_SUBDIRS = ("checkpoints", "engines")
 KEPT_SUBDIRS = ("export", "logs")
 DEFAULT_CAP_GB = 200.0  # ADR-005: min(200 GB, 10 % of free disk at install); the app passes the configured value
@@ -88,9 +89,24 @@ def _inside(path: Path, parent: Path) -> bool:
     return path == parent or parent in path.parents
 
 
+def entry_run_dir(root: Path, entry: CacheEntry) -> Path | None:
+    """The node's run dir if it is a real directory directly under one of ``RUN_ROOTS``, else None.
+
+    Uses ``entry.run_dir`` (legacy entries: ``outputs/runs/<run_id>``); None means nothing of it may be deleted.
+    """
+    candidate = Path(entry.run_dir) if entry.run_dir else root / RUNS_REL / entry.run_id
+    if candidate.is_symlink() or not candidate.is_dir():
+        return None
+    resolved = candidate.resolve()
+    roots = {(root / r).resolve() for r in RUN_ROOTS}
+    return resolved if resolved.parent in roots else None
+
+
 def _targets(root: Path, entry: CacheEntry) -> tuple[str, ...]:
     """Paths (relative to the run dir) eviction deletes; symlinks and anything outside the run dir are skipped."""
-    run_dir = (root / RUNS_REL / entry.run_id).resolve()
+    run_dir = entry_run_dir(root, entry)
+    if run_dir is None:
+        return ()
     rels: set[str] = {d for d in HEAVY_SUBDIRS if (run_dir / d).is_dir() and not (run_dir / d).is_symlink()}
     for ref in entry.outputs.values():
         out = Path(ref.path)
@@ -108,7 +124,7 @@ def _targets(root: Path, entry: CacheEntry) -> tuple[str, ...]:
 
 
 def _item(root: Path, entry: CacheEntry) -> CacheItem:
-    run_dir = root / RUNS_REL / entry.run_id
+    run_dir = entry_run_dir(root, entry) or root / RUNS_REL / entry.run_id
     targets = _targets(root, entry)
     return CacheItem(
         cache_key=entry.cache_key,
@@ -133,7 +149,10 @@ def protection_reason(root: Path, entry: CacheEntry) -> str | None:
     if entry.trained_model:
         return TRAINED_MODEL
     try:
-        stage = read_manifest(root / RUNS_REL / entry.run_id).stage
+        run_dir = entry_run_dir(root, entry)
+        if run_dir is None:
+            return MANIFEST_UNREADABLE
+        stage = read_manifest(run_dir).stage
     except (OSError, ValueError):
         return MANIFEST_UNREADABLE
     return TRAINED_MODEL if stage == "train" else None
@@ -202,7 +221,6 @@ def evict(
     list is still skipped.
     """
     check_project_root(root)
-    runs_dir = (root / RUNS_REL).resolve()
     result = CacheResult()
     for key in cache_keys:
         entry = index.get(key)
@@ -214,11 +232,12 @@ def evict(
             why = "IN_USE_BY_RUNNING_WORKFLOW" if index.leased_by(key) else "not evictable (pinned, needed or gone)"
             result.skipped.append((key, why))
             continue
-        run_dir = root / RUNS_REL / entry.run_id
-        if run_dir.is_symlink() or not _inside(run_dir.resolve(), runs_dir) or run_dir.resolve() == runs_dir:
+        found = entry_run_dir(root, entry)
+        if found is None:
             index.finish_evict(key, ok=False)
-            result.skipped.append((key, "run dir outside outputs/runs"))
+            result.skipped.append((key, "run dir missing or outside outputs/runs | outputs/graph/runs"))
             continue
+        run_dir = found
         item = _item(root, entry)
         try:
             for rel in item.targets:

@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS artifacts (
     state TEXT NOT NULL CHECK (state IN ('completed', 'evicting', 'evicted', 'invalid')),
     requires_parent_at_load INTEGER NOT NULL DEFAULT 0,
     trained_model INTEGER NOT NULL DEFAULT 0,
+    run_dir TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
     completed_at REAL NOT NULL,
     last_hit_at REAL,
@@ -98,6 +99,7 @@ class CacheEntry:
     pinned: bool
     requires_parent_at_load: bool
     trained_model: bool  # set by the executor from the node registry; never evicted automatically
+    run_dir: str | None  # absolute host path of the node's run directory (None: legacy entry)
 
 
 def _outputs_to_json(outputs: Mapping[str, OutputRef]) -> str:
@@ -125,6 +127,8 @@ class ArtifactIndex:
             columns = {r["name"] for r in self._db.execute("PRAGMA table_info(artifacts)")}
             if "trained_model" not in columns:  # db created before this column existed
                 self._db.execute("ALTER TABLE artifacts ADD COLUMN trained_model INTEGER NOT NULL DEFAULT 0")
+            if "run_dir" not in columns:
+                self._db.execute("ALTER TABLE artifacts ADD COLUMN run_dir TEXT")
 
     def close(self) -> None:
         with self._lock:
@@ -152,20 +156,25 @@ class ArtifactIndex:
         parents: Sequence[str] = (),
         requires_parent_at_load: bool = False,
         trained_model: bool = False,
+        run_dir: Path | None = None,
     ) -> None:
         """Register a completed node output (replaces an invalid/evicted entry with the same key).
 
         ``trained_model``: the node produces a trained model (registry metadata, e.g. a fine-tune node); such entries
-        are only ever evicted by an explicit user choice.
+        are only ever evicted by an explicit user choice. ``run_dir``: absolute host path of the node run directory
+        (``outputs/runs/<id>`` or ``outputs/graph/runs/<id>``); eviction only ever deletes inside it.
         """
         payload = _outputs_to_json(outputs)
+        if run_dir is not None and not run_dir.is_absolute():
+            raise ValueError(f"run_dir must be absolute: {run_dir}")
         with self._tx() as db:
             db.execute(
                 "INSERT INTO artifacts (cache_key, run_id, node_type, outputs_json, state, requires_parent_at_load,"
-                " trained_model, completed_at) VALUES (?, ?, ?, ?, 'completed', ?, ?, ?)"
+                " trained_model, run_dir, completed_at) VALUES (?, ?, ?, ?, 'completed', ?, ?, ?, ?)"
                 " ON CONFLICT(cache_key) DO UPDATE SET run_id=excluded.run_id, node_type=excluded.node_type,"
                 " outputs_json=excluded.outputs_json, state='completed',"
                 " requires_parent_at_load=excluded.requires_parent_at_load, trained_model=excluded.trained_model,"
+                " run_dir=excluded.run_dir,"
                 " completed_at=excluded.completed_at,"
                 " last_hit_at=NULL, evicted_at=NULL",
                 (
@@ -175,6 +184,7 @@ class ArtifactIndex:
                     payload,
                     int(requires_parent_at_load),
                     int(trained_model),
+                    None if run_dir is None else str(run_dir),
                     self._clock(),
                 ),
             )
@@ -307,4 +317,5 @@ class ArtifactIndex:
             pinned=bool(row["pinned"]),
             requires_parent_at_load=bool(row["requires_parent_at_load"]),
             trained_model=bool(row["trained_model"]),
+            run_dir=row["run_dir"],
         )
