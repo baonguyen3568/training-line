@@ -171,7 +171,7 @@ def acquire(
             current = read_lock(path)
         except GpuLockError as exc:
             raise GpuLockError("GPU busy (lock unreadable)", params=exc.params) from None
-        params = _busy_params(current) if current is not None else {**_CORRUPT_PARAMS, "state": "busy"}
+        params = _busy_params(current) if current is not None else dict(_CORRUPT_PARAMS)  # vanished mid-race
         raise GpuLockError("GPU busy", params=params) from None
     finally:
         tmp.unlink(missing_ok=True)

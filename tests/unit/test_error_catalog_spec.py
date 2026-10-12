@@ -26,12 +26,6 @@ from typing import Any
 
 import pytest
 
-# Catalog-only tests run for real (common/error_catalog.yaml + errors.load_catalog exist). Tests that need the
-# i18n loader stay spec until ``vlm_pipeline.i18n.load`` lands (strict xfail, ImportError only).
-NEEDS_I18N = pytest.mark.xfail(
-    strict=True, raises=ImportError, reason="spec: vlm_pipeline.i18n.load not implemented yet (owner: bao-backend)"
-)
-
 LOCALES = ("vi", "en")
 SECRET_RE = re.compile(r"hf_[A-Za-z0-9]{20,}|nvapi-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20,}")
 
@@ -100,7 +94,6 @@ def test_codes_are_well_formed_and_fallback_exists() -> None:
         assert re.fullmatch(r"[A-Z]+-\d{3}", code), code
 
 
-@NEEDS_I18N
 def test_every_code_has_text_in_every_locale() -> None:
     catalog, texts = _load()
     for code, entry in catalog.items():
@@ -116,7 +109,6 @@ def test_every_code_has_text_in_every_locale() -> None:
                 assert t.get(f"action.{action.id}", "").strip(), (loc, code, action.id)
 
 
-@NEEDS_I18N
 def test_display_rules() -> None:
     catalog, texts = _load()
     for code, entry in catalog.items():
@@ -134,7 +126,6 @@ def test_display_rules() -> None:
                 assert len(re.findall(r"[.!?](\s|$)", why.strip())) <= 1, (loc, code, "why is one sentence")
 
 
-@NEEDS_I18N
 def test_no_internals_in_user_text() -> None:
     _, texts = _load()
     for loc, t in texts.items():
@@ -147,7 +138,6 @@ def test_no_internals_in_user_text() -> None:
             assert not SECRET_RE.search(text), (loc, key)
 
 
-@NEEDS_I18N
 def test_declared_params_cover_placeholders() -> None:
     """Every ``{x}`` used in an error text must be declared in the catalog entry's ``params``."""
     catalog, texts = _load()
@@ -158,7 +148,6 @@ def test_declared_params_cover_placeholders() -> None:
                 assert used <= _param_names(entry), (loc, key, used - _param_names(entry))
 
 
-@NEEDS_I18N
 def test_placeholders_match_across_locales() -> None:
     """``{need}``-style placeholders must be identical in vi and en, so rendering never shows a raw ``{x}``."""
     _, texts = _load()
@@ -167,7 +156,6 @@ def test_placeholders_match_across_locales() -> None:
         assert set(re.findall(r"\{(\w+)\}", vi[key])) == set(re.findall(r"\{(\w+)\}", en[key])), key
 
 
-@NEEDS_I18N
 def test_locales_have_same_keys() -> None:
     _, texts = _load()
     assert texts["vi"].keys() == texts["en"].keys()
@@ -237,7 +225,6 @@ def test_variants_cover_every_combination() -> None:
             assert any(matches(v) for v in variants), (code, env)
 
 
-@NEEDS_I18N
 def test_why_is_optional_but_symmetric() -> None:
     """``why`` may be absent; if one locale has it, the other must too (covered for all keys by key parity,
     asserted here explicitly for the error cards)."""
