@@ -12,6 +12,19 @@ function lazyMock(): Api {
     runs: () => load().then((m) => m.runs()),
     run: (id) => load().then((m) => m.run(id)),
     runMetrics: (id, q) => load().then((m) => m.runMetrics(id, q)),
+    startRun: (wf) => load().then((m) => m.startRun(wf)),
+    cancelRun: (id) => load().then((m) => m.cancelRun(id)),
+    watchRun: (id, onEvent) => {
+      let stop: (() => void) | null = null;
+      let cancelled = false;
+      void load().then((m) => {
+        if (!cancelled) stop = m.watchRun(id, onEvent);
+      });
+      return () => {
+        cancelled = true;
+        stop?.();
+      };
+    },
   };
 }
 

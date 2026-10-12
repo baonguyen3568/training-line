@@ -16,6 +16,7 @@ import type {
 import { tp } from "../i18n";
 import { parseJsonl } from "../lib/metrics";
 import { isCompatible } from "../lib/ports";
+import { stepNumbers } from "../lib/topo";
 import s3aMetrics from "./fixtures/s3a.metrics.jsonl?raw";
 import s3aRun from "./fixtures/s3a.run.json";
 
@@ -81,22 +82,73 @@ export const mockNodeTypes: NodeSpec[] = [
     category: "source",
     runner: "host",
     outputs: { model: { type: "Model" } },
+    // Mirrors the real node (afdc074): `model` = catalog id, option_meta per option, Simple hides rnd/baseline.
     params_schema: {
       type: "object",
       properties: {
-        repo: {
+        model: {
           type: "string",
           enum: [
-            "nvidia/NVIDIA-Nemotron-Parse-v1.1",
-            "nvidia/Cosmos-Reason2-2B",
-            "Qwen/Qwen3.5-0.8B",
-            "Qwen/Qwen3.5-2B",
+            "nemotron-parse-v1.1",
+            "cosmos-reason2-2b",
+            "qwen3.5-0.8b",
+            "qwen3.5-2b",
+            "nemotron-parse-2.0",
           ],
-          "x-ui": { summary: true },
-          default: "Qwen/Qwen3.5-0.8B",
+          default: "nemotron-parse-v1.1",
+          "x-ui": {
+            summary: true,
+            option_meta: {
+              "nemotron-parse-v1.1": {
+                label: "NVIDIA Nemotron-Parse v1.1",
+                tier: "default",
+                ram_gb: 24,
+                ram_source: "estimated",
+                gated: false,
+                license: "NVIDIA Open Model License",
+                vendor: "NVIDIA",
+              },
+              "cosmos-reason2-2b": {
+                label: "NVIDIA Cosmos-Reason2 2B",
+                tier: "template",
+                ram_gb: 26,
+                ram_source: "estimated",
+                gated: true,
+                license: "NVIDIA Open Model License",
+                vendor: "NVIDIA",
+              },
+              "qwen3.5-0.8b": {
+                label: "Qwen3.5 0.8B",
+                tier: "baseline",
+                ram_gb: 9,
+                ram_source: "measured",
+                gated: false,
+                license: "Apache-2.0",
+                vendor: "Qwen",
+              },
+              "qwen3.5-2b": {
+                label: "Qwen3.5 2B",
+                tier: "catalog",
+                ram_gb: 18,
+                ram_source: "estimated",
+                gated: false,
+                license: "Apache-2.0",
+                vendor: "Qwen",
+              },
+              "nemotron-parse-2.0": {
+                label: "NVIDIA Nemotron-Parse 2.0",
+                tier: "rnd",
+                ram_gb: 30,
+                ram_source: "estimated",
+                gated: false,
+                license: "NVIDIA Open Model License",
+                vendor: "NVIDIA",
+              },
+            },
+          },
         },
       },
-      required: ["repo"],
+      required: ["model"],
     },
   }),
   spec({
@@ -282,7 +334,7 @@ const templates: Template[] = [
           id: "n1",
           type: "model.hf_pick",
           version: "1.0.0",
-          params: { repo: "nvidia/NVIDIA-Nemotron-Parse-v1.1" },
+          params: { model: "nemotron-parse-v1.1" },
         },
         {
           id: "n2",
@@ -328,7 +380,7 @@ const templates: Template[] = [
           id: "n1",
           type: "model.hf_pick",
           version: "1.0.0",
-          params: { repo: "nvidia/Cosmos-Reason2-2B" },
+          params: { model: "cosmos-reason2-2b" },
         },
         {
           id: "n2",
@@ -377,7 +429,7 @@ const templates: Template[] = [
       schema_version: 1,
       name: "quantize_bench",
       nodes: [
-        { id: "n1", type: "model.hf_pick", version: "1.0.0", params: { repo: "Qwen/Qwen3.5-2B" } },
+        { id: "n1", type: "model.hf_pick", version: "1.0.0", params: { model: "qwen3.5-2b" } },
         { id: "n2", type: "quantize.modelopt_ptq", version: "1.0.0", params: { format: "fp8" } },
         {
           id: "n3",
@@ -476,7 +528,12 @@ const delay = <T>(value: T) =>
   new Promise<T>((r) => setTimeout(() => r(structuredClone(value)), 50));
 
 export const mockApi: Api = {
-  nodeTypes: () => delay<NodeTypesResponse>({ node_types: mockNodeTypes, port_types: portTypes }),
+  // The third-party fixture (acme.*) exists for security tests only; the library must not offer it.
+  nodeTypes: () =>
+    delay<NodeTypesResponse>({
+      node_types: mockNodeTypes.filter((s) => s.origin.kind === "first_party"),
+      port_types: portTypes,
+    }),
   templates: () => delay(templates.map(({ workflow: _w, ...meta }) => meta)),
   template: (id) => {
     const found = templates.find((x) => x.id === id);
@@ -509,4 +566,69 @@ export const mockApi: Api = {
       downsampled: false,
     });
   },
+  // FakeWorker: walks the graph in topological order and emits node_status events like the real executor.
+  startRun: (workflow) => {
+    const id = `mock-${Date.now()}`;
+    fakeRuns.set(id, structuredClone(workflow));
+    return delay({ run_id: id });
+  },
+  cancelRun: (id) => {
+    fakeCancel.get(id)?.();
+    return delay(undefined);
+  },
+  watchRun: (id, onEvent) => {
+    const wf = fakeRuns.get(id);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (!wf) return () => {};
+    const order = [...stepNumbers(wf).entries()]
+      .sort((a, b) => a[1] - b[1])
+      .map(([nodeId]) => nodeId);
+    let t = 200;
+    for (const nodeId of order) {
+      const heavy =
+        mockNodeTypes.find((s) => s.type_id === wf.nodes.find((n) => n.id === nodeId)?.type)
+          ?.runner === "container";
+      const steps = heavy ? 5 : 1;
+      for (let i = 0; i < steps; i++) {
+        const progress = (i + 1) / steps;
+        timers.push(
+          setTimeout(
+            () =>
+              onEvent({
+                type: "node_status",
+                node_id: nodeId,
+                status: "running",
+                progress: i / steps,
+              }),
+            t,
+          ),
+        );
+        t += heavy ? FAKE_STEP_MS : FAKE_STEP_MS / 2;
+        if (progress === 1)
+          timers.push(
+            setTimeout(
+              () =>
+                onEvent({ type: "node_status", node_id: nodeId, status: "completed", progress: 1 }),
+              t,
+            ),
+          );
+      }
+    }
+    timers.push(setTimeout(() => onEvent({ type: "run_status", status: "completed" }), t + 50));
+    fakeCancel.set(id, () => {
+      for (const x of timers) clearTimeout(x);
+      onEvent({ type: "run_status", status: "cancelled" });
+    });
+    return () => {
+      for (const x of timers) clearTimeout(x);
+    };
+  },
 };
+
+const fakeRuns = new Map<string, Workflow>();
+const fakeCancel = new Map<string, () => void>();
+/** Duration of one fake progress step; tests shorten it via setFakeStepMs. */
+let FAKE_STEP_MS = 400;
+export function setFakeStepMs(ms: number): void {
+  FAKE_STEP_MS = ms;
+}

@@ -4,6 +4,7 @@ import { t, tp, tpOptional } from "../i18n";
 import { nodeDesc, nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
+import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 
@@ -38,10 +39,40 @@ function sourcesFor(
   return out;
 }
 
-/** Enum option label from `x-ui.option_keys` (no per-param hard-coding); raw value if no prefix. */
-function optionLabel(schema: ParamSchema, value: string | number): string {
+const RAM_HEADROOM_GB = 10; // design: ram_gb_train + 10 GB must fit in MemAvailable
+
+/**
+ * Enum option label. Catalog options (`x-ui.option_meta`): "{label} — {tagline}" + text badges (gated, RAM fit
+ * against the live MemAvailable). Otherwise `x-ui.option_keys` prefix, else the raw value.
+ */
+function optionLabel(schema: ParamSchema, value: string | number, availGb?: number): string {
+  const meta = schema["x-ui"]?.option_meta?.[String(value)];
+  if (meta) {
+    const tagline = tpOptional(["model_catalog", String(value), "tagline"]);
+    const parts = [tagline ? `${meta.label} — ${tagline}` : meta.label];
+    if (meta.gated) parts.push(`🔑 ${t("model_picker.gated")}`);
+    if (meta.ram_gb !== undefined && availGb !== undefined) {
+      const need = Math.round(meta.ram_gb + RAM_HEADROOM_GB);
+      parts.push(
+        need > availGb
+          ? `⚠ ${t("model_picker.needs_free_ram", { need_gb: need, avail_gb: Math.round(availGb) })}`
+          : `✓ ${t("model_picker.fits")}`,
+      );
+    }
+    return parts.join(" · ");
+  }
   const prefix = schema["x-ui"]?.option_keys;
   return prefix ? tp([...prefix.split("."), String(value)]) : String(value);
+}
+
+/** Simple mode hides research/baseline catalog entries (tier rnd/baseline); Advanced shows all. */
+function visibleOptions(schema: ParamSchema, mode: string, current: unknown): (string | number)[] {
+  const all = schema.enum ?? [];
+  const meta = schema["x-ui"]?.option_meta;
+  if (!meta || mode === "advanced") return all;
+  return all.filter(
+    (v) => v === current || !["rnd", "baseline"].includes(meta[String(v)]?.tier ?? ""),
+  );
 }
 
 function ParamField({
@@ -59,6 +90,8 @@ function ParamField({
 }) {
   const label = tp(["node", nodeType, "param", name, "label"]);
   const id = `param-${name}`;
+  const mode = useUi((s) => s.mode);
+  const availGb = useSystem((s) => s.status?.mem_available_gb);
   const current = value ?? schema.default;
   if (schema.type === "array" && schema.enum) {
     const selected = new Set(Array.isArray(current) ? current : []);
@@ -87,10 +120,17 @@ function ParamField({
     return (
       <div className="field">
         <label htmlFor={id}>{label}</label>
-        <select id={id} value={String(current ?? "")} onChange={(e) => onChange(e.target.value)}>
-          {schema.enum.map((opt) => (
+        <select
+          id={id}
+          value={String(current ?? "")}
+          // Map back to the original enum value so integer enums (epochs 1|3|5) stay numbers.
+          onChange={(e) =>
+            onChange(schema.enum?.find((o) => String(o) === e.target.value) ?? e.target.value)
+          }
+        >
+          {visibleOptions(schema, mode, current).map((opt) => (
             <option key={String(opt)} value={String(opt)}>
-              {optionLabel(schema, opt)}
+              {optionLabel(schema, opt, availGb)}
             </option>
           ))}
         </select>

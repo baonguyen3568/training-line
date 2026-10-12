@@ -15,7 +15,13 @@ function estimateLine(it: TemplateMeta): string {
 type Filter = "all" | "finetune" | "quantize" | "eval";
 const FILTERS: Filter[] = ["all", "finetune", "quantize", "eval"];
 
-export function Gallery({ onOpen }: { onOpen: (id: string) => void }) {
+export function Gallery({
+  onOpen,
+  onBlank,
+}: {
+  onOpen: (id: string) => void;
+  onBlank: () => void;
+}) {
   const [items, setItems] = useState<TemplateMeta[] | null>(null);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
@@ -40,6 +46,9 @@ export function Gallery({ onOpen }: { onOpen: (id: string) => void }) {
     <main className="gallery">
       <h1>{t("gallery.title")}</h1>
       <p className="muted">{t("gallery.subtitle")}</p>
+      <button type="button" onClick={onBlank}>
+        ＋ {t("gallery.blank_workflow")}
+      </button>
       <div className="gallery-tools">
         <input
           type="search"

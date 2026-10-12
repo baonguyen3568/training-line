@@ -57,7 +57,8 @@ describe("untrusted third-party node text", () => {
   it("does not turn markdown links into anchors", () => {
     load(evilSpec());
     const { container } = render(<Editor />);
-    expect(screen.getByText(/\[click\]\(javascript:alert\(1\)\)/)).toBeTruthy();
+    // Inspector + node library both render the description as plain text.
+    expect(screen.getAllByText(/\[click\]\(javascript:alert\(1\)\)/).length).toBeGreaterThan(0);
     expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
   });
 

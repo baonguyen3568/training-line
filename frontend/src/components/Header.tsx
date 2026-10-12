@@ -2,9 +2,19 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { SystemStatus } from "../api/types";
 import { t } from "../i18n";
+import { useSystem } from "../store/system";
 import { type Mode, useUi } from "../store/ui";
 
 const POLL_MS = 10_000;
+
+/** ISO timestamp → local HH:MM (the chip must stay short). */
+function shortTime(iso: string | undefined): string {
+  if (!iso) return "?";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 export type Nav = "home" | "runs";
 
@@ -17,7 +27,11 @@ export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; 
     const load = () =>
       api
         .system()
-        .then((s) => alive && setSys(s))
+        .then((s) => {
+          if (!alive) return;
+          setSys(s);
+          useSystem.getState().set(s);
+        })
         .catch(() => alive && setSys(null));
     load();
     const timer = setInterval(load, POLL_MS);
@@ -36,7 +50,7 @@ export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; 
         ? t("header.gpu_busy", {
             who: lock.who ?? "?",
             job: lock.job ?? "?",
-            since: lock.since ?? "?",
+            since: shortTime(lock.since),
           })
         : t("header.gpu_free");
   const gpuState = !lock ? "unknown" : lock.stale ? "critical" : lock.held ? "busy" : "free";

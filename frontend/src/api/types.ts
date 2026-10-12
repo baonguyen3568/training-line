@@ -39,6 +39,18 @@ export interface UiHint {
   option_keys?: string;
   /** Show this param's value on the node face (e.g. chosen model / dataset). */
   summary?: boolean;
+  /** Per-option metadata (model catalog): label, tier (Simple hides rnd/baseline), RAM, gated, license. */
+  option_meta?: Record<string, OptionMeta>;
+}
+
+export interface OptionMeta {
+  label: string;
+  tier?: "default" | "template" | "catalog" | "baseline" | "rnd";
+  ram_gb?: number;
+  ram_source?: "measured" | "estimated";
+  gated?: boolean;
+  license?: string;
+  vendor?: string;
 }
 
 export interface ParamSchema {
@@ -220,3 +232,40 @@ export interface MetricsQuery {
   limit: number;
   downsample_to?: number;
 }
+
+/**
+ * WS /api/runs/{graph_run_id}/events (backend app/main.py + graph/executor.py): backlog replayed, then live.
+ * Every event carries `graph_run_id` and `ts`.
+ */
+export type NodeRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "cached"
+  | "failed"
+  | "interrupted"
+  | "skipped";
+export interface EventError {
+  code: string;
+  params?: Record<string, unknown>;
+}
+export interface NodeStatusEvent {
+  type: "node_status";
+  node_id: string;
+  status: NodeRunStatus;
+  progress?: number; // 0..1 when the worker reports it
+  error?: EventError;
+}
+export interface RunStatusEvent {
+  type: "run_status";
+  status: "running" | "invalid" | RunStatus;
+  nodes?: string[]; // execution order, on "running"
+  error?: EventError;
+}
+export interface OtherEvent {
+  /** `connection_lost` is synthesized by the client when the event socket closes before the run ends. */
+  type: "warning" | "run_not_found" | "connection_lost";
+  node_id?: string;
+  error?: EventError;
+}
+export type RunEvent = NodeStatusEvent | RunStatusEvent | OtherEvent;

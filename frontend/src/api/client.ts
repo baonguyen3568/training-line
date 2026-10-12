@@ -6,6 +6,7 @@ import type {
   MetricsPage,
   MetricsQuery,
   NodeTypesResponse,
+  RunEvent,
   RunInfo,
   SystemStatus,
   Template,
@@ -87,6 +88,10 @@ export interface Api {
   runs(): Promise<RunInfo[]>;
   run(id: string): Promise<RunInfo>;
   runMetrics(id: string, q: MetricsQuery): Promise<MetricsPage>;
+  startRun(workflow: Workflow): Promise<{ run_id: string }>;
+  cancelRun(id: string): Promise<void>;
+  /** Subscribe to run events; returns an unsubscribe function. */
+  watchRun(id: string, onEvent: (ev: RunEvent) => void): () => void;
 }
 
 export const httpApi: Api = {
@@ -103,5 +108,42 @@ export const httpApi: Api = {
     if (q.after) qs.set("after", q.after);
     if (q.downsample_to) qs.set("downsample_to", String(q.downsample_to));
     return request("GET", `/api/runs/${encodeURIComponent(id)}/metrics?${qs}`);
+  },
+  startRun: async (workflow) => {
+    const res = await request<{ graph_run_id: string }>("POST", "/api/runs", workflow);
+    return { run_id: res.graph_run_id };
+  },
+  cancelRun: (id) => request("POST", `/api/runs/${encodeURIComponent(id)}/cancel`, {}),
+  watchRun: (id, onEvent) => {
+    // Browsers cannot set headers on WebSocket: auth = Origin + session cookie at handshake, then the
+    // first message carries the CSRF token (P003 D13). Server closes with 4401 if missing/invalid.
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(
+      `${proto}//${location.host}/api/runs/${encodeURIComponent(id)}/events`,
+    );
+    let closed = false;
+    ws.onopen = () => {
+      void csrfToken().then((token) =>
+        ws.send(JSON.stringify({ type: "auth", csrf_token: token })),
+      );
+    };
+    let finished = false;
+    ws.onmessage = (m) => {
+      try {
+        const ev = JSON.parse(String(m.data)) as RunEvent;
+        if (ev.type === "run_status" && ev.status !== "running") finished = true;
+        onEvent(ev);
+      } catch {
+        /* ignore malformed frames */
+      }
+    };
+    // Never leave nodes silently "pending": a socket that drops (or never opens) before the run ends is reported.
+    ws.onclose = () => {
+      if (!closed && !finished) onEvent({ type: "connection_lost" });
+    };
+    return () => {
+      if (!closed) ws.close();
+      closed = true;
+    };
   },
 };

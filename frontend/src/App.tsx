@@ -15,7 +15,7 @@ type View = { kind: "home" } | { kind: "runs" } | { kind: "run"; id: string };
 
 export function App() {
   const workflow = useWorkflow((s) => s.workflow);
-  const { loadCatalog, openTemplate, closeWorkflow } = useWorkflow.getState();
+  const { loadCatalog, openTemplate, closeWorkflow, newWorkflow } = useWorkflow.getState();
   const [catalogError, setCatalogError] = useState(false);
   const [view, setView] = useState<View>({ kind: "home" });
 
@@ -47,7 +47,11 @@ export function App() {
       </Suspense>
       {/* First screen is the template gallery, never a blank canvas (P010 §8). */}
       {view.kind === "home" &&
-        (workflow ? <Editor /> : <Gallery onOpen={(id) => void openTemplate(id)} />)}
+        (workflow ? (
+          <Editor />
+        ) : (
+          <Gallery onOpen={(id) => void openTemplate(id)} onBlank={newWorkflow} />
+        ))}
     </div>
   );
 }

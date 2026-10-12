@@ -7,6 +7,7 @@ import { customizedAdvanced } from "../lib/params";
 import { tokenVar } from "../lib/ports";
 import { identifierView, untrustedText } from "../lib/safeText";
 import { useUi } from "../store/ui";
+import type { NodeRunState } from "../store/workflow";
 
 export interface ShellData extends Record<string, unknown> {
   typeId: string;
@@ -15,6 +16,7 @@ export interface ShellData extends Record<string, unknown> {
   issues: ValidationIssue[];
   step: number;
   params: Record<string, unknown>;
+  runState?: NodeRunState | undefined;
 }
 export type ShellNode = Node<ShellData, "vlm">;
 
@@ -43,8 +45,58 @@ function ThirdPartyBadge({ spec }: { spec: NodeSpec }) {
   );
 }
 
+const RUN_ICON: Record<NodeRunState["status"], string> = {
+  pending: "⧗",
+  cached: "↺",
+  running: "◐",
+  completed: "✓",
+  failed: "✕",
+  skipped: "–",
+  interrupted: "⏸",
+};
+// Executor statuses → existing copy keys (node_state.*).
+const RUN_COPY: Record<NodeRunState["status"], string> = {
+  pending: "queued",
+  cached: "cached",
+  running: "running",
+  completed: "done",
+  failed: "failed",
+  skipped: "skipped",
+  interrupted: "interrupted",
+};
+
+/** Run state on the node face: icon + text (never color alone) and a 3px progress bar while running. */
+function RunBadge({ state }: { state: NodeRunState }) {
+  const percent = state.progress === undefined ? undefined : Math.round(state.progress * 100);
+  const text =
+    state.status === "running"
+      ? percent === undefined
+        ? t("node_state.running", { percent: "…" })
+        : t("node_state.running", { percent })
+      : state.status === "cached"
+        ? t("node_state.cached", { time: "" })
+        : t(`node_state.${RUN_COPY[state.status]}`);
+  return (
+    <>
+      <span className={`state run ${state.status}`}>
+        {RUN_ICON[state.status]} {text}
+      </span>
+      {state.status === "running" && (
+        <span
+          className="run-progress"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          style={{ width: `${percent ?? 100}%` }}
+        />
+      )}
+    </>
+  );
+}
+
 function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
-  const { spec, ports, issues, typeId, step, params } = data;
+  const { spec, ports, issues, typeId, step, params, runState } = data;
   const mode = useUi((s) => s.mode);
   const customized = mode === "simple" ? customizedAdvanced(spec, params) : [];
   // Key choices on the node face (x-ui.summary), e.g. the chosen model/dataset; repo ids shortened to the name.
@@ -80,7 +132,11 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
   const inputs = Object.entries(spec.inputs);
   const outputs = Object.entries(spec.outputs);
   return (
-    <div className={classes} data-testid={`node-${typeId}`}>
+    <div
+      className={`${classes}${runState ? ` run-${runState.status}` : ""}`}
+      data-testid={`node-${typeId}`}
+      data-status={runState?.status ?? "idle"}
+    >
       <div className="node-header">
         <span className="step" aria-hidden="true">
           {step}
@@ -148,7 +204,11 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
         {errors.length === 0 && warns.length > 0 && (
           <span className="state warn">⚠ {warns.length}</span>
         )}
-        {issues.length === 0 && <span className="state ready">○ {t("node_state.ready")}</span>}
+        {runState ? (
+          <RunBadge state={runState} />
+        ) : (
+          issues.length === 0 && <span className="state ready">○ {t("node_state.ready")}</span>
+        )}
       </div>
     </div>
   );
