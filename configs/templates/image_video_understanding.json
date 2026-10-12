@@ -1,5 +1,6 @@
 {
   "id": "image_video_understanding",
+  "order": 2,
   "difficulty": "basic",
   "tags": [
     "finetune"

@@ -1,5 +1,6 @@
 {
   "id": "quantize_bench",
+  "order": 3,
   "difficulty": "basic",
   "tags": [
     "quantize",

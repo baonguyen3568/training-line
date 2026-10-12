@@ -21,6 +21,7 @@ class TemplateFile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    order: int = Field(ge=1)  # gallery position (the default template first)
     title_key: str
     description_key: str
     difficulty: str
@@ -48,12 +49,12 @@ def _estimate(workflow: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_templates(root: Path) -> list[dict[str, Any]]:
-    """All templates (full, with workflow), sorted by id. Invalid files raise (caught by tests, not at runtime)."""
+    """All templates (full, with workflow), sorted by ``order`` then id. Invalid files raise (caught by tests, not at runtime)."""
     out = []
-    for path in sorted((root / TEMPLATE_DIR).glob("*.json")):
+    for path in (root / TEMPLATE_DIR).glob("*.json"):
         tpl = TemplateFile.model_validate(json.loads(path.read_text(encoding="utf-8")))
         out.append({**tpl.model_dump(), "estimate": _estimate(tpl.workflow)})
-    return out
+    return sorted(out, key=lambda t: (t["order"], t["id"]))
 
 
 def template_meta(template: dict[str, Any]) -> dict[str, Any]:

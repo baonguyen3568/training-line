@@ -1,5 +1,6 @@
 {
   "id": "invoice_to_json",
+  "order": 1,
   "difficulty": "basic",
   "tags": [
     "finetune"

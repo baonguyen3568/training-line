@@ -18,6 +18,7 @@ ROOT = project_root()
 def test_every_template_is_a_valid_workflow() -> None:
     templates = load_templates(ROOT)
     assert {t["id"] for t in templates} >= {"invoice_to_json", "image_video_understanding", "quantize_bench"}
+    assert templates[0]["id"] == "invoice_to_json"  # default template first (order)
     for t in templates:
         issues = validate(t["workflow"], REGISTRY, workspace=ROOT)
         assert [i for i in issues if i.severity == "error"] == [], t["id"]
