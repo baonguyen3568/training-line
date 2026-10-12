@@ -152,6 +152,10 @@ error:
   ENV-001:
     title: Môi trường chạy thiếu thư viện
     what: Môi trường chạy của app thiếu thư viện model này cần ({packages}). Đây không phải lỗi của bạn; app cần được cập nhật môi trường.
+  DISK-003:
+    title: Bộ nhớ đệm đầy, cần bạn chọn mục xoá
+    what: Kết quả lưu tạm đã vượt mức {cap_gb} GB thêm {gb_over} GB, nhưng {protected_count} mục còn lại đều được bảo vệ (model đã train, mục đã ghim, bản xuất) nên app không tự xoá. Bạn chọn mục muốn xoá trong panel Dung
+      lượng.
 action:
   migrate_node: Xem thay đổi và cập nhật
   open_node: Mở bước này

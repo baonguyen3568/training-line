@@ -152,6 +152,10 @@ error:
   ENV-001:
     title: Runtime environment is missing a library
     what: The app's runtime environment is missing a library this model needs ({packages}). This isn't something you did; the app's environment needs an update.
+  DISK-003:
+    title: Cache is full — choose what to remove
+    what: Saved results are {gb_over} GB over the {cap_gb} GB limit, but the {protected_count} remaining items are protected (trained models, pinned items, exports), so the app won't delete anything itself. Choose what to
+      remove in the Storage panel.
 action:
   migrate_node: Review changes and update
   open_node: Open this step
