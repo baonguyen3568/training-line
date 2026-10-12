@@ -379,7 +379,7 @@ canvas:
   hint:
     add_model: Thêm "Chọn model gốc" vào làn ①
     add_train: Kéo "Fine-tune" vào làn ③ rồi nối dây
-    connect_port: Nối {port_type} vào đây
+    connect_port: ← nối vào đây
     hide: Ẩn gợi ý
   wire_replaced: Đã thay dây cũ
 library:

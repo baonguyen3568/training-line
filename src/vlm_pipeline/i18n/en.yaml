@@ -379,7 +379,7 @@ canvas:
   hint:
     add_model: Add "Choose base model" to lane ①
     add_train: Drag "Fine-tune" into lane ③ and connect it
-    connect_port: Connect {port_type} here
+    connect_port: ← connect here
     hide: Hide hints
   wire_replaced: Replaced the previous wire
 library:
