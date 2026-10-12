@@ -76,7 +76,10 @@ class RunManifest(BaseModel):
     host_min_available_gb: float | None = None
     trainable_pct: float | None = None  # "Trainable parameters percentage" from the engine log
     memguard_fast_fall: bool | None = None
-    memguard_abort_gb: float | None = None  # watchdog killed the job because memory fell too fast
+    memguard_abort_gb: float | None = None
+    post_steps: list[dict[str, Any]] = Field(
+        default_factory=list
+    )  # host steps after the job (code sha recorded)  # watchdog killed the job because memory fell too fast
     tags: list[str] = Field(default_factory=list)
 
 
@@ -107,6 +110,9 @@ def reproducibility_gaps(manifest: RunManifest) -> list[str]:
         gaps.append("git_commit")
     if manifest.git_dirty:
         gaps.append("git_dirty")
+    for step in manifest.post_steps:  # host post-processing must also come from committed code
+        if step.get("git_dirty") or not _SHA40.match(str(step.get("git_commit") or "")):
+            gaps.append(f"post_steps.{step.get('name', '?')}")
     return gaps
 
 

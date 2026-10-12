@@ -37,6 +37,9 @@ export type RunManifest = {
   parent_run_id?: string | null;
   peak_mem_gb?: number | null;
   pid?: number | null;
+  post_steps?: {
+    [extra: string]: unknown;
+  }[];
   run_id: string;
   schema_version?: number;
   seed?: number | null;

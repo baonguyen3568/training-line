@@ -274,6 +274,14 @@
       "default": null,
       "title": "Pid"
     },
+    "post_steps": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Post Steps",
+      "type": "array"
+    },
     "run_id": {
       "title": "Run Id",
       "type": "string"

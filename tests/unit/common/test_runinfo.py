@@ -98,3 +98,14 @@ def test_concurrent_manifest_writes_from_threads(tmp_path: Path) -> None:
     assert errors == []
     assert read_manifest(tmp_path).run_id == "r"
     assert [p.name for p in tmp_path.iterdir()] == ["run.json"]
+
+
+def test_post_steps_from_dirty_code_are_reproducibility_gaps() -> None:
+    from vlm_pipeline.common.runinfo import reproducibility_gaps
+
+    base = {"run_id": "r", "name": "n", "stage": "train", "task": "sft", "git_commit": "a" * 40, "git_dirty": False,
+            "container_digest": "sha256:x", "config_hash": "c", "seed": 1, "base_model_revision": "b" * 40}  # fmt: skip
+    clean = RunManifest(**base, post_steps=[{"name": "complete_from_base", "git_commit": "c" * 40, "git_dirty": False}])
+    assert reproducibility_gaps(clean) == []
+    dirty = RunManifest(**base, post_steps=[{"name": "complete_from_base", "git_commit": "c" * 40, "git_dirty": True}])
+    assert reproducibility_gaps(dirty) == ["post_steps.complete_from_base"]

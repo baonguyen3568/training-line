@@ -20,18 +20,28 @@ from pathlib import Path
 
 from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job, tightened_thresholds
 from vlm_pipeline.common.paths import project_root
-from vlm_pipeline.common.runinfo import RunManifest, automodel_to_metrics, write_manifest
+from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest, write_manifest
 
 DEFAULT_IMAGE = "vlm-automodel:26.08-1"
 
 
-def _complete_checkpoints(run_dir: Path, base_dir: Path) -> None:
-    """BUG-002: every consolidated export (save_consolidated every|final) gets the tensors consolidation dropped."""
+def _complete_checkpoints(run_dir: Path, base_dir: Path, root: Path) -> None:
+    """BUG-002: every consolidated export (save_consolidated every|final) gets the tensors consolidation dropped.
+
+    Runs on the host with the CURRENT checkout, so run.json records which code completed the checkpoints (ADR-002 A1).
+    """
+    from vlm_pipeline.common.jobrun import git_state
     from vlm_pipeline.train.ckpt_complete import complete_from_base
 
+    commit, dirty = git_state(root)
+    steps = []
     for consolidated in sorted((run_dir / "checkpoints").glob("epoch_*_step_*/model/consolidated")):
         restored = complete_from_base(base_dir, consolidated)
-        print(json.dumps({"completed_from_base": str(consolidated.relative_to(run_dir)), "restored": restored}))
+        steps.append({"checkpoint": str(consolidated.relative_to(run_dir)), "restored": restored})
+        print(json.dumps({"completed_from_base": steps[-1]["checkpoint"], "restored": restored}))
+    manifest = read_manifest(run_dir)
+    post = {"name": "complete_from_base", "git_commit": commit, "git_dirty": dirty, "checkpoints": steps}
+    write_manifest(run_dir, manifest.model_copy(update={"post_steps": [*manifest.post_steps, post]}))
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -113,11 +123,18 @@ def main(argv: list[str] | None = None) -> int:
     except MemoryPreemptedBeforeStartError as exc:
         print(json.dumps({"run_id": run_id, "status": "failed", "error_code": "MEM-001", "detail": str(exc)}))
         return 2
-    except RuntimeError as exc:  # preflight refusal / gate refusal
+    except RuntimeError as exc:  # preflight / gate refusal: nothing ran -> discard the run, drop the worktree
+        refused = read_manifest(run_dir)
+        if not refused.status.is_terminal:
+            write_manifest(run_dir, refused.model_copy(update={"status": RunStatus.DISCARDED, "ended_at": time.time(),
+                                                                "tags": [*refused.tags, "refused"]}))  # fmt: skip
+        if code_root is not None:
+            subprocess.run(["git", "-C", str(root), "worktree", "remove", "--force", str(code_root)],  # noqa: S603,S607
+                           check=False, capture_output=True)  # fmt: skip
         print(json.dumps({"run_id": run_id, "status": "refused", "detail": str(exc)}))
         return 2
     if a.prepared is not None and final.status == "completed":
-        _complete_checkpoints(run_dir, root / a.prepared / "model")
+        _complete_checkpoints(run_dir, root / a.prepared / "model", root)
     for src, split in (("training.jsonl", "train"), ("validation.jsonl", "val")):
         path = run_dir / "checkpoints" / src
         if path.exists():

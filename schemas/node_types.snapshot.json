@@ -86,7 +86,7 @@
                   "gated": false,
                   "label": "NVIDIA Nemotron Parse v1.1",
                   "license": "nvidia-open-model-license",
-                  "ram_gb": 35.0,
+                  "ram_gb": 20.0,
                   "ram_source": "measured",
                   "tier": "default",
                   "vendor": "nvidia"
