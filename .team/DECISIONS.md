@@ -27,3 +27,4 @@
 - 2026-10-12 USER: "Dùng model NVIDIA" → ưu tiên model VLM của NVIDIA (Nemotron VL…) làm base/template mặc định. Research + security đánh giá lại catalog (ADR-001 sẽ amendment).
 - 2026-10-12 USER: Template mặc định = Nemotron-Parse-v1.1 (NVIDIA, không gated) + CORD-v2. Cosmos-Reason2-2B = template 2 (gated, có hướng dẫn accept). Gate N-4 vẫn chạy cho Cosmos nhưng hạ ưu tiên.
 - 2026-10-12 Parse-v1.1@fd1e3c6b APPROVED-WITH-CONDITIONS (C-RADIOv2-H@0d8f4c18 pin + test build-from-config offline phải pass). Qwen3-VL-2B@89644892 APPROVED. KHÔNG mirror weights Cosmos (ADR-003: chỉ phân phối code) → dùng wizard onboarding gated.
+- 2026-10-12 RunStatus (PM chốt): queued|running|completed|failed|cancelled|interrupted|evicted|discarded. 'cancelled' thay 'killed' (user dừng; memguard/crash = interrupted). Retention: failed/cancelled sau 3 ngày xoá ckpt không-LATEST + .incomplete; LATEST giữ 7 ngày rồi xoá hẳn; interrupted không đụng.
