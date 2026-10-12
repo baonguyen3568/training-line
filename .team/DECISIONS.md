@@ -37,3 +37,4 @@
 - 2026-10-12 Root cause RAM P-1 (research): freeze không khớp tên 'encoder' → 100% params train; fused_attn RADIO no-op; label mask nghi sai; pin_memory toàn bộ ảnh. Sửa trong adapter → image 26.08-3 (fixcode, sau memguard). Chạy lại 5 step đo, abort <10GB.
 - 2026-10-12 Nguyên tắc chung: mọi node train log + assert "% tham số được train" (hiện trên UI); key config không được engine dùng → lỗi CFG, không bỏ qua im lặng.
 - 2026-10-12 Root cause memguard (fixcode): jobrun chỉ gọi preflight, MemGuard CHƯA BAO GIỜ được khởi động. Ngưỡng đúng ADR (8/14/4). PM đã nói nhầm '6GB' — đính chính. Fix: watchdog host quanh docker run, poll 0.5s, stop -t 60 → kill; test replay đường cong P-1.
+- 2026-10-12 M1a ĐẠT: E2E tạo trống → kéo → nối → chạy (FakeWorker) → lưu/mở PASS trên app thật. M1 đầy đủ còn: 1 node train chạy thật trong container từ canvas (chờ 26.08-3 + container Worker).
