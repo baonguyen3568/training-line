@@ -23,6 +23,7 @@ from typing import ClassVar
 
 from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
+from vlm_pipeline.common.images import check_pinned_image
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
@@ -325,6 +326,9 @@ def run_job(
         gaps = reproducibility_gaps(probe)
         if gaps:
             raise RuntimeError(f"gate run refused, not reproducible: missing/invalid {gaps}")
+    check_pinned_image(
+        project_root, job.image, image_digest(job.image)
+    )  # before preflight/lock: cheap, no side effects
     verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb)
     if not verdict.ok:
         raise RuntimeError(f"preflight refused: {verdict.to_json()}")
