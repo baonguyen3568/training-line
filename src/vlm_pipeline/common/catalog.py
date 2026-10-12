@@ -49,7 +49,6 @@ class CatalogEntry(BaseModel):
     attn: Literal["eager", "sdpa"]
     loss: Literal["masked_ce", "nemotron_parse"]
     freeze_vision_tower: bool
-    freeze_embeddings: bool
     min_pixels: int = Field(ge=0)
     max_pixels: int = Field(ge=0)
     fixed_image_hw: Annotated[tuple[int, int] | None, BeforeValidator(_empty_as_none)] = None
