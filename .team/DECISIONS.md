@@ -31,3 +31,4 @@
 - 2026-10-12 Gate security Parse-v1.1 PASS (P-0 offline build, commit 80f0efd). configs/models/pinned/ do security sở hữu. Còn gate P-2 field-F1.
 - 2026-10-12 USER: Tự vá AutoModel (normalize 2 lần + tied embeddings Parse 2.0), không chờ upstream. Patch ở third_party/patches/automodel/ (PATCH(vlm)), image vlm-automodel:26.08-2; 26.08-1 giữ để rollback. Nếu Parse 2.0 tốt hơn rõ → đề xuất nâng template.
 - 2026-10-12 PHÁT HIỆN: Parse v1.1 CŨNG bị normalize 2 lần qua AutoModel native (NemotronParseConfig chỉ copy key RADIOConfig có sẵn). Image 26.08-2 (patch) thành critical path cho template mặc định. Số chất lượng Parse trên 26.08-1 = INVALID; P-1 chỉ lấy RAM/tốc độ. Issue upstream ON HOLD, viết lại theo root cause.
+- 2026-10-12 USER phản hồi: app còn thô, chưa tạo/nối pipeline. PM nhận lỗi ưu tiên; mở MILESTONE M1 'kéo thả → nối → chạy thật' là ưu tiên số 1; giảm overhead review cho code UI/core (1 reviewer).

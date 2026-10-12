@@ -31,6 +31,24 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | P1-9 | Spike NVIDIA containers trên GB10 (AutoModel 26.08 VLM, ModelOpt, vLLM) + Proposal 008: backend runtime (host orchestrator ↔ container worker, job runner, GPU lock/memguard, RunManifest) | bao-backend | PAUSED (RESET: spike hoãn; P008 giữ hướng, chờ ghép vào P009) |
 | P1-7 | PM tổng hợp → ADR-001..00N, chốt với user | bao-pm | TODO |
 
+## 🎯 MILESTONE M1 — "Kéo thả → nối → Chạy thật" (ƯU TIÊN SỐ 1, user phản hồi 2026-10-12: app còn thô, chưa tạo/nối pipeline được)
+Definition of Done: user mở app → tạo workflow TRỐNG → kéo node từ thư viện vào canvas → nối dây → bấm Chạy →
+backend thật thực thi graph (FakeWorker cho node nhanh, job container thật cho 1 node train nhỏ) → thấy tiến độ/kết quả
+từng node trên canvas → lưu/mở lại file workflow. Template chỉ là workflow dựng sẵn bằng chính cơ chế này.
+Quy tắc tốc độ cho M1: code UI/core chỉ cần 1 reviewer (cleancode HOẶC người liên quan). Security chỉ review bắt buộc phần
+Docker/deps/network/secrets/xoá file/plugin. Không viết proposal mới cho M1, chỉ làm theo P009/P010 đã có.
+| ID | Task | Owner | Status |
+|----|------|-------|--------|
+| M1-1 | `nodes/`: NodeSpec + registry cho ~8 node v1: Dataset (CORD-v2 / thư mục ảnh), Model (từ catalog), Fine-tune, Evaluate, Chạy thử (inference), Quantize FP8, Benchmark, Export | bao-cleancode + bao-research (params từ recipe) | TODO |
+| M1-2 | `graph/`: validate (type/cycle/thiếu input) + executor (topo, cache fingerprint, chạy node → job, event stream, cancel/resume cơ bản) | bao-fixcode (dùng spec xfail của tester) | TODO |
+| M1-3 | `app/`: FastAPI GET /api/nodes, POST /api/graphs/validate, POST /api/runs, GET runs/metrics, WS events, auth token (D13); FakeWorker | bao-backend | TODO |
+| M1-4 | Frontend: thư viện node (sidebar, tìm kiếm, kéo thả vào canvas), workflow trống, nối dây kéo-thả, xoá/nhân bản node, lưu/mở file workflow (.json), trạng thái chạy từng node trên canvas, nối API thật | bao-frontend | TODO |
+| M1-5 | UX thư viện node + trạng thái node khi chạy (spec nhanh, review UI) | bao-design | TODO |
+| M1-6 | E2E Playwright: tạo trống → kéo 3 node → nối → chạy FakeWorker → thấy kết quả; chuyển spec xfail graph/executor sang pass | bao-tester | TODO |
+| M1-7 | Review security tối thiểu cho app/ (auth, CORS/Host, WS) | bao-security | TODO |
+| M1-8 | Node cache retention + dọn worktree; hỗ trợ backend FakeWorker fixtures | bao-cleanup | TODO |
+S-9 (patch 26.08-2 → P-1/P-2) chạy song song, không chặn M1.
+
 ## Phase 2 — MỞ 2026-10-12 (user): scaffold + GPU smoke nhỏ. Tải >20GB phải hỏi PM. Mọi job GPU qua GPU_LOCK + preflight.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
