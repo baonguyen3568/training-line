@@ -8,8 +8,11 @@ yet makes only its endpoints answer 501, never the whole app.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import importlib
+import os
 import re
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,7 +40,7 @@ class Services(Protocol):
 
     def validate(self, workflow: Mapping[str, Any]) -> list[dict[str, Any]]: ...
     def run_graph(self, workflow: Mapping[str, Any], graph_run_id: str, on_event: EventSink) -> None: ...
-    def cancel(self, graph_run_id: str) -> None: ...
+    def cancel(self, graph_run_id: str) -> bool: ...
     def list_runs(self) -> list[dict[str, Any]]: ...
     def get_run(self, run_id: str) -> dict[str, Any] | None: ...
     def metrics_page(self, run_id: str, after: str | None, limit: int, downsample_to: int | None) -> dict[str, Any]: ...
@@ -56,6 +59,32 @@ def _issue_to_dict(issue: object) -> dict[str, Any]:
     raise TypeError(f"unsupported issue type {type(issue).__name__}")
 
 
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+class _PacedWorker:
+    """Delays a (fake) worker so node states are observable in the UI; honours cancellation while waiting."""
+
+    def __init__(self, inner: Any, delay_s: float) -> None:
+        self._inner = inner
+        self._delay = delay_s
+
+    def run(self, job: Any) -> Any:
+        cancel = getattr(job, "cancel", None)
+        if cancel is not None:
+            cancel.wait(self._delay)
+        else:
+            time.sleep(self._delay)
+        return self._inner.run(job)
+
+
 def _optional(module: str) -> Any:
     try:
         return importlib.import_module(module)
@@ -70,16 +99,34 @@ class DefaultServices:
     registry: Registry
     root: Path
     worker: str = "fake"  # "fake" (FakeWorker, demo/E2E) | "container" (real jobs)
+    fake_delay_s: float = 0.8  # per node, so the canvas visibly animates in demo/E2E
 
-    def _executor(self, on_event: EventSink) -> Any:
+    @functools.cached_property
+    def index(self) -> Any:
+        """The single cache index shared by executor, retention and the storage panel."""
+        artifacts_index = _optional("vlm_pipeline.artifacts.index")
+        idx = artifacts_index.ArtifactIndex(artifacts_index.default_index_path(self.root))
+        idx.release_all_except(self._active_external_runs())  # leases left by a crashed app process
+        return idx
+
+    def _active_external_runs(self) -> list[str]:
+        """run_ids still queued/running with a live pid (graphs started outside this app must keep their leases)."""
+        from vlm_pipeline.artifacts.runs_index import list_runs
+
+        return [
+            m.run_id for m in list_runs(self.root) if m.status in {"queued", "running"} and m.pid and _pid_alive(m.pid)
+        ]
+
+    @functools.cached_property
+    def executor(self) -> Any:
+        """ONE executor per app: cancel() only sees runs started by the same instance."""
         graph_executor = _optional("vlm_pipeline.graph.executor")
-        if self.worker == "fake":
-            worker = _optional("vlm_pipeline.graph.testing").FakeWorker()
-        else:
+        if self.worker != "fake":
             raise NotAvailableError("container worker is not wired yet")
-        state_dir = self.root / "outputs" / "graph"
-        state_dir.mkdir(parents=True, exist_ok=True)
-        return graph_executor.Executor(self.registry, worker, state_dir, on_event=on_event)
+        worker = _PacedWorker(_optional("vlm_pipeline.graph.testing").FakeWorker(), self.fake_delay_s)
+        return graph_executor.Executor(
+            self.registry, worker, self.root / "outputs" / "graph", index=self.index, workspace=self.root
+        )
 
     def validate(self, workflow: Mapping[str, Any]) -> list[dict[str, Any]]:
         graph = _optional("vlm_pipeline.graph")
@@ -89,10 +136,10 @@ class DefaultServices:
         return [_issue_to_dict(i) for i in validate(dict(workflow), self.registry, workspace=self.root)]
 
     def run_graph(self, workflow: Mapping[str, Any], graph_run_id: str, on_event: EventSink) -> None:
-        self._executor(on_event).run(dict(workflow), graph_run_id=graph_run_id)
+        self.executor.run(dict(workflow), graph_run_id=graph_run_id, on_event=on_event)
 
-    def cancel(self, graph_run_id: str) -> None:
-        raise NotAvailableError("cancel is wired with the executor instance (todo)")
+    def cancel(self, graph_run_id: str) -> bool:
+        return bool(self.executor.cancel(graph_run_id))
 
     def list_runs(self) -> list[dict[str, Any]]:
         index = _optional("vlm_pipeline.artifacts.runs_index")

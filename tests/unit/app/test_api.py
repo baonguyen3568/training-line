@@ -40,7 +40,7 @@ class FakeServices:
         self.gate.wait(5)
         on_event({"type": "run_status", "status": "completed"})
 
-    def cancel(self, graph_run_id: str) -> None:
+    def cancel(self, graph_run_id: str) -> bool:
         raise NotAvailableError("todo")
 
     def list_runs(self) -> list[dict[str, Any]]:

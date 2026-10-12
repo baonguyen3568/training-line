@@ -100,7 +100,8 @@ def _register_graph_routes(app: FastAPI, services: Services, bus: EventBus) -> N
 
     @app.post("/api/runs/{graph_run_id}/cancel", status_code=202)
     def cancel(graph_run_id: str) -> dict[str, Any]:
-        services.cancel(graph_run_id)
+        if not services.cancel(graph_run_id):
+            raise HTTPException(status_code=404, detail={"code": "CFG-004", "params": {}})
         return {"graph_run_id": graph_run_id}
 
 
@@ -152,6 +153,17 @@ def _register_ws(app: FastAPI, bus: EventBus, ws_auth: Callable[[WebSocket], Awa
             return
 
 
+def _register_storage(app: FastAPI, services: Services) -> None:
+    """Storage panel (bao-cleanup's app/storage.py) on the same index instance the executor uses."""
+    root = getattr(services, "root", None)
+    if root is None or not hasattr(services, "index"):
+        return  # test doubles without a project root
+    from vlm_pipeline.app import storage
+
+    api = storage.StorageApi(root, services.index, storage.StorageSettings.from_env(root))
+    storage.register_storage_routes(app, api)
+
+
 def create_app(
     services: Services | None = None,
     *,
@@ -194,6 +206,7 @@ def create_app(
     async def _bad_request(_request: Any, exc: BadRequestError) -> JSONResponse:
         return JSONResponse(status_code=400, content={"code": exc.code, "params": exc.params})
 
+    _register_storage(app, services)
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
     _register_ws(app, bus, ws_auth)
