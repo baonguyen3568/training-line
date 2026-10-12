@@ -3,7 +3,7 @@ Severity: major for downstream runtimes (HF remote / vLLM / export load RADIO's 
 harmless on the native AutoModel path (recomputed in __init__)
 Found by: bao-tester (O-1b parity, run 20261012-1930-o1b-parity-ae1a, image 26.08-4)   Date: 2026-10-12
 Component: train export (AutoModel consolidated save)   Owner: bao-fixcode
-Status: FIXED, pending bao-tester confirmation (7b671f2 + generation config; wired by bao-backend in RealWorker and smoke CLI)
+Status: CLOSED 2026-10-12 (bao-tester confirmed: load report of export == base, conditioner = native, parity_ok)
 
 ## Symptom
 Strict load of `checkpoints/LATEST/model/consolidated` against NVIDIA's checkpoint: 665 vs 668 keys. Missing:
