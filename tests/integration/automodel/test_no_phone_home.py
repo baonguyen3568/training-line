@@ -1,9 +1,13 @@
-"""Gate (bao-security, 2026-10-12): importing the Parse processor's dependencies must not open network connections.
+"""Gate (bao-security, 2026-10-12): Python libraries in the worker image must not open network connections once the
+"no phone home" env block is set (NO_ALBUMENTATIONS_UPDATE, HF_HUB_OFFLINE, HF_HUB_DISABLE_TELEMETRY, DO_NOT_TRACK,
+WANDB_MODE=offline).
 
-albumentations 2.0.8 checks PyPI for updates on import unless NO_ALBUMENTATIONS_UPDATE is "1"/"true"; the image
-and runner set it with the other "no phone home" env vars. The check counts socket.connect calls in a fresh
-interpreter (and DNS lookups, which come first and are all that happens under --network none), so it holds with
-or without a network (timing would not: --network none fails DNS instantly).
+Method: run the action in a fresh interpreter whose socket.getaddrinfo / connect / connect_ex are replaced by
+counters that refuse. DNS is counted because under --network none it is the ONLY step that happens (connect is never
+reached). Every case has a control run without the variable that must show >= 1 lookup, so a gate can never pass
+because the probe saw nothing. Timing is not used: with --network none DNS fails instantly either way.
+Limitation: wandb >= 0.18 does its networking in the Go ``wandb-core`` process, invisible to this probe; for wandb we
+only assert the run really is offline (the container's --network none is the actual barrier).
 """
 
 from __future__ import annotations
@@ -14,50 +18,105 @@ import sys
 
 import pytest
 
-pytest.importorskip("albumentations")
+pytest.importorskip("huggingface_hub")
 
 pytestmark = pytest.mark.integration
 
-PROBE = """
+PROBE_HEADER = """
 import socket
 calls = []
-_orig = socket.socket.connect
-def _connect(self, address):
-    calls.append(repr(address))
+def _refuse(*args, **kwargs):
+    calls.append(repr(args[:2]))
     raise OSError("network disabled by test")
-socket.socket.connect = _connect
+socket.getaddrinfo = _refuse
+socket.socket.connect = lambda self, address: _refuse(address)
 socket.socket.connect_ex = lambda self, address: calls.append(repr(address)) or 1
-_orig_gai = socket.getaddrinfo
-def _getaddrinfo(host, *args, **kwargs):  # DNS comes first: with --network none it fails before any connect()
-    calls.append(repr(host))
-    raise OSError("network disabled by test")
-socket.getaddrinfo = _getaddrinfo
-import albumentations  # noqa: F401
-import cv2  # noqa: F401
-print("CONNECT_CALLS", len(calls), calls[:3])
+def report():
+    print("LOOKUPS", len(calls), calls[:3])
+try:
 """
 
-NO_PHONE_HOME = os.environ.get("NO_ALBUMENTATIONS_UPDATE", "").lower() in {"1", "true"}
+PARSE = "nvidia/NVIDIA-Nemotron-Parse-v1.1"
+CASES = {
+    # name: (action, env that must silence it)
+    "albumentations": ("import albumentations, cv2", {"NO_ALBUMENTATIONS_UPDATE": "1"}),
+    "huggingface_hub": (
+        f"import huggingface_hub as h\n    h.model_info({PARSE!r})",
+        {"HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1"},
+    ),
+    "transformers": (
+        f"from transformers import AutoConfig\n    AutoConfig.from_pretrained({PARSE!r})",
+        {"HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1"},
+    ),
+    "datasets": (
+        "from datasets import load_dataset\n    load_dataset('naver-clova-ix/cord-v2', split='test[:1]')",
+        {"HF_HUB_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1"},
+    ),
+}
+SILENCERS = {"NO_ALBUMENTATIONS_UPDATE", "HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE", "HF_HUB_DISABLE_TELEMETRY"}
 
 
-def _run(env: dict[str, str]) -> str:
+def _lookups(action: str, env: dict[str, str]) -> tuple[int, str]:
+    code = PROBE_HEADER + f"    {action}\nexcept Exception:\n    pass\nreport()\n"
     out = subprocess.run(  # noqa: S603 - fixed interpreter + constant probe code
-        [sys.executable, "-c", PROBE], env=env, capture_output=True, text=True, timeout=120, check=True
+        [sys.executable, "-c", code],
+        env=env,  # HOME comes from the caller (container sets it)
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=True,
     )
-    return out.stdout + out.stderr
+    text = out.stdout + out.stderr
+    line = next((ln for ln in text.splitlines() if ln.startswith("LOOKUPS ")), "")
+    if not line:
+        raise AssertionError(f"probe printed no result:\n{text[-2000:]}")
+    return int(line.split()[1]), line
 
 
-@pytest.mark.xfail(not NO_PHONE_HOME, strict=True, reason="image env lacks NO_ALBUMENTATIONS_UPDATE (backend)")
-def test_image_env_imports_without_network() -> None:
-    output = _run(dict(os.environ))
-    assert "CONNECT_CALLS 0 " in output, output
-    assert "Error fetching version info" not in output
+def _without_silencers() -> dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k not in SILENCERS}
 
 
-def test_env_var_is_what_disables_the_check() -> None:
-    """Control: the same import WITHOUT the variable does try to connect (so the gate above is not vacuous)."""
-    env = {k: v for k, v in os.environ.items() if k != "NO_ALBUMENTATIONS_UPDATE"}
-    with_check = _run(env)
-    without_check = _run({**env, "NO_ALBUMENTATIONS_UPDATE": "1"})
-    assert "CONNECT_CALLS 0 " not in with_check, with_check
-    assert "CONNECT_CALLS 0 " in without_check, without_check
+@pytest.mark.parametrize("name", sorted(CASES))
+def test_control_probe_sees_the_network_attempt(name: str) -> None:
+    """Without the variables the action does try the network: otherwise the gate below would be vacuous."""
+    action, _ = CASES[name]
+    count, line = _lookups(action, _without_silencers())
+    assert count >= 1, f"{name}: control saw no lookup, the probe cannot prove anything ({line})"
+
+
+@pytest.mark.parametrize("name", sorted(CASES))
+def test_variables_silence_the_library(name: str) -> None:
+    action, env = CASES[name]
+    count, line = _lookups(action, {**_without_silencers(), **env})
+    assert count == 0, f"{name}: still looks up the network with {env} ({line}): report to bao-security"
+
+
+IMAGE_HAS_BLOCK = all(
+    os.environ.get(k, "").lower() in {"1", "true"}
+    for k in ("NO_ALBUMENTATIONS_UPDATE", "HF_HUB_OFFLINE", "HF_HUB_DISABLE_TELEMETRY")
+)
+
+
+@pytest.mark.xfail(not IMAGE_HAS_BLOCK, strict=True, reason="image env lacks the no-phone-home block (backend)")
+@pytest.mark.parametrize("name", sorted(CASES))
+def test_image_env_silences_the_library(name: str) -> None:
+    action, _ = CASES[name]
+    count, line = _lookups(action, dict(os.environ))
+    assert count == 0, line
+
+
+def test_wandb_offline_mode_is_really_offline(tmp_path: object) -> None:
+    pytest.importorskip("wandb")
+    code = (
+        "import os, wandb\n"
+        "run = wandb.init(mode=os.environ['WANDB_MODE'], project='gate', dir=os.environ['WANDB_DIR'])\n"
+        "print('OFFLINE', run.settings._offline, 'NOOP', run.settings._noop)\n"
+        "run.finish()\n"
+    )
+    env = {**os.environ, "WANDB_MODE": "offline", "WANDB_DIR": str(tmp_path), "WANDB_SILENT": "true"}
+    env.pop("WANDB_API_KEY", None)
+    out = subprocess.run(  # noqa: S603 - fixed interpreter + constant code
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=180, check=True
+    )
+    assert "OFFLINE True" in out.stdout, out.stdout + out.stderr[-1000:]
