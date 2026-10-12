@@ -17,6 +17,10 @@
 #                        resume = continue a run; navigate = open a screen/node (destructive ops ALWAYS navigate
 #                        to a dry-run screen, never patch). `when: {param: value}` filters available_actions().
 #                        `resumable` is set by the executor from a REAL checkpoint, never guessed.
+#                        `effect: memory` marks memory-reducing actions. With the failing node's params + NodeSpec
+#                        bounds, a patch is offered only if it would really change the node; when no memory action
+#                        is left the server sets `already_optimized: true` in the error record
+#                        (UI: error_card.already_optimized).
 # Codes are never renamed or reused; retire with `deprecated: true`.
 
 MEM-001:
@@ -27,11 +31,13 @@ MEM-001:
   match:
     - {kind: preflight, value: NO_MEM}
   actions:
-    - {id: use_lora, kind: patch, patch: [{param: method, op: set, value: lora}], confirm: false}
-    - {id: use_qlora, kind: patch, patch: [{param: method, op: set, value: qlora}], confirm: false}
-    - {id: reduce_image_size, kind: patch, patch: [{param: max_pixels, op: scale, value: 0.5}], confirm: false}
-    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false}
+    - {id: use_lora, kind: patch, patch: [{param: method, op: set, value: lora}], confirm: false, effect: memory}
+    - {id: use_qlora, kind: patch, patch: [{param: method, op: set, value: qlora}], confirm: false, effect: memory}
+    - {id: reduce_image_size, kind: patch, patch: [{param: max_pixels, op: scale, value: 0.5}], confirm: false, effect: memory}
+    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false, effect: memory}
     - {id: smaller_model, kind: navigate, target: "node:model", confirm: false}
+    - {id: queue_until_memory, kind: navigate, target: queue_until_memory, confirm: false}
+    - {id: see_memory_usage, kind: navigate, target: memory_panel, confirm: false}
 
 MEM-002:
   slug: MEM_PREEMPTED
@@ -42,7 +48,7 @@ MEM-002:
     - {kind: exit, value: "75"}
   actions:
     - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
-    - {id: resume_lighter, kind: resume, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: true, when: {resumable: true}}
+    - {id: resume_lighter, kind: resume, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: true, when: {resumable: true}, effect: memory}
 
 MEM-003:
   slug: UMA_OOM
@@ -53,10 +59,12 @@ MEM-003:
     - {kind: regex, value: "torch\\.OutOfMemoryError|CUDA out of memory|NV_ERR_NO_MEMORY|cudaErrorMemoryAllocation"}
     - {kind: exit, value: "137+oom_killed"}
   actions:
-    - {id: reduce_max_length, kind: patch, patch: [{param: max_seq_len, op: scale, value: 0.5}], confirm: false}
-    - {id: enable_grad_checkpointing, kind: patch, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: false}
-    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false}
+    - {id: reduce_max_length, kind: patch, patch: [{param: max_seq_len, op: scale, value: 0.5}], confirm: false, effect: memory}
+    - {id: enable_grad_checkpointing, kind: patch, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: false, effect: memory}
+    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false, effect: memory}
     - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
+    - {id: queue_until_memory, kind: navigate, target: queue_until_memory, confirm: false}
+    - {id: see_memory_usage, kind: navigate, target: memory_panel, confirm: false}
 
 MEM-004:
   slug: SERVE_MEM_TOO_HIGH
@@ -67,8 +75,8 @@ MEM-004:
     - {kind: validate, value: "serve.gpu_memory_utilization > 0.3"}
     - {kind: regex, value: "No available memory for the cache blocks"}
   actions:
-    - {id: safe_serving_default, kind: patch, patch: [{param: gpu_memory_utilization, op: set, value: 0.25}], confirm: false}
-    - {id: reduce_max_length, kind: patch, patch: [{param: max_model_len, op: scale, value: 0.5}], confirm: false}
+    - {id: safe_serving_default, kind: patch, patch: [{param: gpu_memory_utilization, op: set, value: 0.25}], confirm: false, effect: memory}
+    - {id: reduce_max_length, kind: patch, patch: [{param: max_model_len, op: scale, value: 0.5}], confirm: false, effect: memory}
 
 DISK-001:
   slug: DISK_FULL

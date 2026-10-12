@@ -3,11 +3,24 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Literal
 
 import pytest
+from pydantic import BaseModel, Field
 
 from vlm_pipeline.common import error_catalog
-from vlm_pipeline.common.error_catalog import CatalogError, Entry, available_actions, load_catalog
+from vlm_pipeline.common.error_catalog import (
+    CatalogError,
+    Entry,
+    NodeContext,
+    PatchOp,
+    Range,
+    already_optimized,
+    apply_patch,
+    apply_patches,
+    available_actions,
+    load_catalog,
+)
 from vlm_pipeline.common.errors import ExitCode, InsufficientMemoryError
 
 
@@ -103,3 +116,129 @@ def test_malformed_yaml_raises_catalog_error(monkeypatch: pytest.MonkeyPatch) ->
             error_catalog.load_catalog()
     finally:
         error_catalog.load_catalog.cache_clear()
+
+
+# ------------------------------------------------- applicability against the failing node (bao-design request)
+
+
+class _ParseParams(BaseModel):
+    """Shape of the Nemotron-Parse v1.1 NodeSpec (default template = full fine-tune; PEFT untested for Parse)."""
+
+    method: Literal["full"] = "full"
+    micro_batch_size: int = Field(1, ge=1)
+    gradient_checkpointing: bool = True
+    max_seq_len: int = Field(9000, ge=9000, le=9000)  # fixed 2048x1648 images -> fixed token budget
+
+
+PARSE_TEMPLATE = NodeContext.from_schema(
+    {"method": "full", "micro_batch_size": 1, "gradient_checkpointing": True, "max_seq_len": 9000},
+    _ParseParams.model_json_schema(),
+)
+
+
+@pytest.mark.parametrize("code", ["MEM-001", "MEM-003"])
+def test_parse_template_only_offers_waiting_options(code: str) -> None:
+    err = SimpleNamespace(code=code, params={})
+    actions = set(available_actions(err, PARSE_TEMPLATE))
+    assert {"queue_until_memory", "see_memory_usage"} <= actions
+    for useless in ("use_lora", "use_qlora", "reduce_batch", "reduce_image_size", "enable_grad_checkpointing"):
+        assert useless not in actions, useless
+    assert already_optimized(err, PARSE_TEMPLATE)
+
+
+def test_lora_offered_only_when_nodespec_allows_it() -> None:
+    class Params(BaseModel):
+        method: Literal["full", "lora", "qlora"] = "full"
+
+    node = NodeContext.from_schema({"method": "full"}, Params.model_json_schema())
+    actions = available_actions(SimpleNamespace(code="MEM-001", params={}), node)
+    assert {"use_lora", "use_qlora"} <= set(actions)
+    assert not already_optimized(SimpleNamespace(code="MEM-001", params={}), node)
+
+
+def test_scaling_respects_int_floor_and_bounds() -> None:
+    err = SimpleNamespace(code="MEM-003", params={})
+    big = NodeContext(params={"micro_batch_size": 4, "max_seq_len": 8192}, ranges={"micro_batch_size": Range(1)})
+    assert {"reduce_batch", "reduce_max_length"} <= set(available_actions(err, big))
+    one = NodeContext(params={"micro_batch_size": 1}, ranges={"micro_batch_size": Range(1)})
+    assert "reduce_batch" not in available_actions(err, one)  # floor(0.5) = 0 < min 1
+
+
+def test_without_node_context_nothing_is_filtered_by_patch() -> None:
+    err = SimpleNamespace(code="MEM-001", params={})
+    assert "use_lora" in available_actions(err)
+    assert not already_optimized(err, None)
+
+
+def test_codes_without_memory_actions_are_never_already_optimized() -> None:
+    assert not already_optimized(SimpleNamespace(code="CFG-002", params={}), NodeContext(params={}))
+
+
+def test_scale_never_takes_positive_int_below_one_even_without_bounds() -> None:
+    # bao-cleancode repro: batch=1, no bounds passed -> must NOT offer "reduce batch" to 0
+    err = SimpleNamespace(code="MEM-003", params={})
+    assert "reduce_batch" not in available_actions(err, NodeContext(params={"micro_batch_size": 1}))
+    op = PatchOp(param="b", op="scale", value=0.5)
+    assert apply_patch(op, 1) == 1
+    assert apply_patch(op, 3) == 1
+    assert apply_patch(op, 8) == 4
+    assert apply_patch(op, 0.8) == pytest.approx(0.4)
+
+
+def test_bounds_come_from_pydantic_schema() -> None:
+    class Params(BaseModel):
+        micro_batch_size: int = Field(4, ge=2)
+        max_seq_len: int = Field(4096, gt=1024, le=8192)
+
+    node = NodeContext.from_schema({"micro_batch_size": 2, "max_seq_len": 2048}, Params.model_json_schema())
+    assert node.ranges == {
+        "micro_batch_size": Range(2),
+        "max_seq_len": Range(1024, 8192, low_exclusive=True),
+    }
+    actions = available_actions(SimpleNamespace(code="MEM-003", params={}), node)
+    assert "reduce_batch" not in actions  # 2 -> 1 < ge=2
+    assert "reduce_max_length" not in actions  # 2048 -> 1024, not > 1024
+
+
+def test_apply_patches_matches_what_was_offered() -> None:
+    action = next(a for a in load_catalog()["MEM-003"].actions if a.id == "reduce_batch")
+    assert apply_patches(action, {"micro_batch_size": 8, "other": "x"}) == {"micro_batch_size": 4, "other": "x"}
+
+
+class _OptionalImageParams(BaseModel):
+    max_pixels: int | None = Field(1024, ge=256)  # None = model default
+    micro_batch_size: int = Field(4, ge=1)
+
+
+@pytest.mark.parametrize("build", ["model", "schema"])
+def test_optional_field_constraints_are_respected(build: str) -> None:
+    # bao-cleancode repro: Optional[int] with ge=256 -> anyOf in JSON schema; 300 * 0.5 = 150 violates ge
+    params = {"max_pixels": 300, "micro_batch_size": 4}
+    node = (
+        NodeContext.from_model(params, _OptionalImageParams)
+        if build == "model"
+        else NodeContext.from_schema(params, _OptionalImageParams.model_json_schema())
+    )
+    actions = available_actions(SimpleNamespace(code="MEM-001", params={}), node)
+    assert "reduce_image_size" not in actions
+    assert "reduce_batch" in actions
+
+
+def test_model_validation_catches_custom_validators() -> None:
+    from pydantic import field_validator
+
+    class Params(BaseModel):
+        micro_batch_size: int = 8
+
+        @field_validator("micro_batch_size")
+        @classmethod
+        def _even(cls, v: int) -> int:
+            if v % 2:
+                raise ValueError("must be even")
+            return v
+
+    ok = NodeContext.from_model({"micro_batch_size": 8}, Params)  # 8 -> 4, even
+    odd = NodeContext.from_model({"micro_batch_size": 6}, Params)  # 6 -> 3, rejected by the validator
+    err = SimpleNamespace(code="MEM-003", params={})
+    assert "reduce_batch" in available_actions(err, ok)
+    assert "reduce_batch" not in available_actions(err, odd)

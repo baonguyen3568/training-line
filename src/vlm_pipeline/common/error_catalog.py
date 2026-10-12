@@ -9,7 +9,9 @@ Host-side only (pydantic + pyyaml); container workers use ``common.errors`` whic
 from __future__ import annotations
 
 import functools
+import math
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from importlib import resources
 from typing import Annotated, Any, Literal, Protocol, Self
 
@@ -50,13 +52,23 @@ def _param_from_name(raw: object) -> object:
 When = Mapping[str, bool | str | list[str]]
 
 
+class PatchOp(_Frozen):
+    """One node-param change. ``scale`` multiplies the current value (ints are floored)."""
+
+    param: str
+    op: Literal["set", "scale"]
+    value: bool | int | float | str
+
+
 class Action(_Frozen):
     id: str
     kind: Literal["patch", "resume", "navigate"]
     confirm: bool
     target: str | None = None
-    patch: tuple[Mapping[str, Any], ...] | None = None
+    patch: tuple[PatchOp, ...] | None = None
     when: When = Field(default_factory=dict)
+    # Actions that lower peak memory; when none applies to the node, the error record gets already_optimized=True.
+    effect: Literal["memory"] | None = None
 
 
 class Variant(_Frozen):
@@ -128,16 +140,175 @@ def _matches(when: When, env: Mapping[str, object]) -> bool:
     return True
 
 
-def available_actions(error: _ErrorLike) -> list[str]:
-    """Catalog action ids offered for ``error`` (filtered by each action's ``when``).
+@dataclass(frozen=True)
+class Range:
+    """Allowed numeric range of a node param; ``*_exclusive`` mirrors ``Field(gt=..)`` / ``Field(lt=..)``."""
 
-    ``resumable`` comes from the error object (set by the executor from a real checkpoint) and defaults to False,
-    so ``resume_checkpoint`` is never offered without one. Unknown codes get the ``SYS-000`` actions.
+    low: float | None = None
+    high: float | None = None
+    low_exclusive: bool = False
+    high_exclusive: bool = False
+
+    def contains(self, value: float) -> bool:
+        if self.low is not None and (value <= self.low if self.low_exclusive else value < self.low):
+            return False
+        return not (self.high is not None and (value >= self.high if self.high_exclusive else value > self.high))
+
+
+@dataclass(frozen=True)
+class NodeContext:
+    """Current params of the failing node plus the constraints of its NodeSpec.
+
+    Preferred: ``NodeContext.from_model(params, NodeSpec.params_model)`` -- a patch is offered only if the patched
+    params pass ``params_model.model_validate`` (pydantic is the source of truth: Optional fields, custom validators,
+    multipleOf, ...). ``from_schema`` is the fallback when only the JSON schema is available (e.g. API clients).
     """
+
+    params: Mapping[str, object]
+    ranges: Mapping[str, Range] = field(default_factory=dict)
+    choices: Mapping[str, tuple[object, ...]] = field(default_factory=dict)  # JSON-schema enum / Literal values
+    params_model: type[BaseModel] | None = None
+
+    @classmethod
+    def from_model(cls, params: Mapping[str, object], params_model: type[BaseModel]) -> NodeContext:
+        return cls(params=params, params_model=params_model)
+
+    @classmethod
+    def from_schema(cls, params: Mapping[str, object], json_schema: Mapping[str, Any]) -> NodeContext:
+        ranges: dict[str, Range] = {}
+        choices: dict[str, tuple[object, ...]] = {}
+        defs = json_schema.get("$defs") or {}
+        for name, raw in (json_schema.get("properties") or {}).items():
+            prop = _resolve_schema_prop(raw, defs)
+            if prop is None:  # several non-null alternatives: constraints unknown, leave unconstrained
+                continue
+            if "enum" in prop:
+                choices[name] = tuple(prop["enum"])
+            elif "const" in prop:
+                choices[name] = (prop["const"],)
+            low_ex, high_ex = "exclusiveMinimum" in prop, "exclusiveMaximum" in prop
+            low = prop.get("exclusiveMinimum", prop.get("minimum"))
+            high = prop.get("exclusiveMaximum", prop.get("maximum"))
+            if low is not None or high is not None:
+                ranges[name] = Range(low, high, low_ex, high_ex)
+        return cls(params=params, ranges=ranges, choices=choices)
+
+
+def _resolve_schema_prop(raw: Mapping[str, Any], defs: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Follow ``$ref`` (Enum classes) and unwrap ``Optional[X]`` (``anyOf``/``oneOf`` with one non-null branch)."""
+    for key in ("anyOf", "oneOf"):
+        if key in raw:
+            branches = [b for b in raw[key] if b.get("type") != "null"]
+            if len(branches) != 1:
+                return None
+            raw = {**{k: v for k, v in raw.items() if k != key}, **branches[0]}
+    if "$ref" in raw:
+        raw = {**defs.get(str(raw["$ref"]).rsplit("/", 1)[-1], {}), **raw}
+    return raw
+
+
+def apply_patch(op: PatchOp, current: object) -> object:
+    """New value of one param after ``op``.
+
+    THE ONLY implementation: graph/app must call this when a user applies an action, so "would this button change
+    anything" (``available_actions``) always matches what is really applied.
+
+    ``scale`` floors ints and never takes a positive int below 1 (a batch of 0 is never a valid suggestion);
+    scaling a non-number is a no-op.
+    """
+    if op.op == "set":
+        return op.value
+    if isinstance(current, bool) or not isinstance(current, int | float) or isinstance(op.value, bool | str):
+        return current
+    scaled = current * op.value
+    if isinstance(current, int):
+        floored = math.floor(scaled)
+        return max(floored, 1) if current >= 1 else floored
+    return scaled
+
+
+def apply_patches(action: Action, params: Mapping[str, object]) -> dict[str, object]:
+    """Params after applying every op of ``action`` (unknown params are left untouched)."""
+    out = dict(params)
+    for op in action.patch or ():
+        if op.param in out:
+            out[op.param] = apply_patch(op, out[op.param])
+    return out
+
+
+def _op_applies(op: PatchOp, node: NodeContext) -> bool:
+    """Offered only if the param exists, the value changes, and the new value is allowed by the NodeSpec."""
+    if op.param not in node.params:
+        return False
+    current = node.params[op.param]
+    new = apply_patch(op, current)
+    if new == current:
+        return False
+    allowed = node.choices.get(op.param)
+    if allowed is not None and new not in allowed:  # e.g. method enum ["full"] -> no "use LoRA" button
+        return False
+    rng = node.ranges.get(op.param)
+    return not (
+        rng is not None and isinstance(new, int | float) and not isinstance(new, bool) and not rng.contains(new)
+    )
+
+
+def _applicable(action: Action, node: NodeContext | None) -> bool:
+    if node is None or not action.patch:
+        return True
+    if not all(_op_applies(op, node) for op in action.patch):
+        return False
+    if node.params_model is not None:
+        try:
+            node.params_model.model_validate(apply_patches(action, node.params))
+        except ValidationError:
+            return False
+    return True
+
+
+def _offered(error: _ErrorLike, node: NodeContext | None) -> tuple[Entry, list[Action]]:
     catalog = load_catalog()
     entry = catalog.get(error.code) or catalog[FALLBACK_CODE]
     env: dict[str, object] = {**error.params, "resumable": bool(getattr(error, "resumable", False))}
-    return [a.id for a in entry.actions if _matches(a.when, env)]
+    return entry, [a for a in entry.actions if _matches(a.when, env) and _applicable(a, node)]
 
 
-__all__ = ["Action", "CatalogError", "Entry", "Param", "Variant", "available_actions", "load_catalog"]
+def available_actions(error: _ErrorLike, node: NodeContext | None = None) -> list[str]:
+    """Catalog action ids offered for ``error``.
+
+    Filtered by each action's ``when`` and, when ``node`` is given, by whether its patch would actually change the
+    node (param exists, value differs, within NodeSpec bounds) so the UI never offers a button that does nothing.
+    ``resumable`` comes from the error object (set by the executor from a real checkpoint) and defaults to False,
+    so ``resume_checkpoint`` is never offered without one. Unknown codes get the ``SYS-000`` actions.
+    """
+    return [a.id for a in _offered(error, node)[1]]
+
+
+def already_optimized(error: _ErrorLike, node: NodeContext | None) -> bool:
+    """True when the code has memory-reducing actions but none applies to this node (UI: error_card.already_optimized).
+
+    Computed per error at runtime and sent in the error record; never stored in the catalog. Without a node context
+    (``node=None``) nothing can be judged, so it is always False.
+    """
+    if node is None:
+        return False
+    entry, offered = _offered(error, node)
+    has_memory_actions = any(a.effect == "memory" for a in entry.actions)
+    return has_memory_actions and not any(a.effect == "memory" for a in offered)
+
+
+__all__ = [
+    "Action",
+    "CatalogError",
+    "Entry",
+    "NodeContext",
+    "Param",
+    "PatchOp",
+    "Range",
+    "Variant",
+    "already_optimized",
+    "apply_patch",
+    "apply_patches",
+    "available_actions",
+    "load_catalog",
+]
