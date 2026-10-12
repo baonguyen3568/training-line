@@ -1,0 +1,362 @@
+[
+  {
+    "id": "image_video_understanding",
+    "difficulty": "basic",
+    "tags": [
+      "finetune"
+    ],
+    "sample_data": false,
+    "requires_hf_account": true,
+    "workflow": {
+      "format": "vlm-workflow",
+      "schema_version": 1,
+      "name": "image_video_understanding",
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "model.hf_pick",
+          "version": "1.0.0",
+          "params": {
+            "model": "cosmos-reason2-2b"
+          }
+        },
+        {
+          "id": "n2",
+          "type": "data.local_folder",
+          "version": "1.0.0",
+          "params": {
+            "path": "data/my-images"
+          }
+        },
+        {
+          "id": "n3",
+          "type": "data.split",
+          "version": "1.0.0",
+          "params": {
+            "val_fraction": 0.1
+          }
+        },
+        {
+          "id": "n4",
+          "type": "train.lora_vlm",
+          "version": "1.0.0",
+          "params": {
+            "epochs": 3,
+            "lr_preset": "medium"
+          }
+        },
+        {
+          "id": "n5",
+          "type": "train.merge_lora",
+          "version": "1.0.0",
+          "params": {}
+        },
+        {
+          "id": "n6",
+          "type": "eval.benchmarks",
+          "version": "1.0.0",
+          "params": {
+            "suite": "perception"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "n2",
+            "dataset"
+          ],
+          "to": [
+            "n3",
+            "dataset"
+          ]
+        },
+        {
+          "from": [
+            "n1",
+            "model"
+          ],
+          "to": [
+            "n4",
+            "base_model"
+          ]
+        },
+        {
+          "from": [
+            "n3",
+            "train"
+          ],
+          "to": [
+            "n4",
+            "train_data"
+          ]
+        },
+        {
+          "from": [
+            "n3",
+            "val"
+          ],
+          "to": [
+            "n4",
+            "val_data"
+          ]
+        },
+        {
+          "from": [
+            "n1",
+            "model"
+          ],
+          "to": [
+            "n5",
+            "base_model"
+          ]
+        },
+        {
+          "from": [
+            "n4",
+            "adapter"
+          ],
+          "to": [
+            "n5",
+            "adapter"
+          ]
+        },
+        {
+          "from": [
+            "n5",
+            "model"
+          ],
+          "to": [
+            "n6",
+            "model"
+          ]
+        },
+        {
+          "from": [
+            "n3",
+            "val"
+          ],
+          "to": [
+            "n6",
+            "data"
+          ]
+        }
+      ]
+    },
+    "title_key": "template.image_video_understanding.title",
+    "description_key": "template.image_video_understanding.desc"
+  },
+  {
+    "id": "invoice_to_json",
+    "difficulty": "basic",
+    "tags": [
+      "finetune"
+    ],
+    "sample_data": true,
+    "requires_hf_account": false,
+    "workflow": {
+      "format": "vlm-workflow",
+      "schema_version": 1,
+      "name": "invoice_to_json",
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "model.hf_pick",
+          "version": "1.0.0",
+          "params": {
+            "model": "nemotron-parse-v1.1"
+          }
+        },
+        {
+          "id": "n2",
+          "type": "data.hf_load",
+          "version": "1.0.0",
+          "params": {
+            "repo": "naver-clova-ix/cord-v2"
+          }
+        },
+        {
+          "id": "n3",
+          "type": "data.split",
+          "version": "1.0.0",
+          "params": {
+            "val_fraction": 0.1
+          }
+        },
+        {
+          "id": "n4",
+          "type": "train.sft_vlm",
+          "version": "1.0.0",
+          "params": {
+            "epochs": 3
+          }
+        },
+        {
+          "id": "n5",
+          "type": "eval.benchmarks",
+          "version": "1.0.0",
+          "params": {
+            "suite": "cord_test"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "n2",
+            "dataset"
+          ],
+          "to": [
+            "n3",
+            "dataset"
+          ]
+        },
+        {
+          "from": [
+            "n1",
+            "model"
+          ],
+          "to": [
+            "n4",
+            "base_model"
+          ]
+        },
+        {
+          "from": [
+            "n3",
+            "train"
+          ],
+          "to": [
+            "n4",
+            "train_data"
+          ]
+        },
+        {
+          "from": [
+            "n3",
+            "val"
+          ],
+          "to": [
+            "n4",
+            "val_data"
+          ]
+        },
+        {
+          "from": [
+            "n4",
+            "model"
+          ],
+          "to": [
+            "n5",
+            "model"
+          ]
+        },
+        {
+          "from": [
+            "n3",
+            "val"
+          ],
+          "to": [
+            "n5",
+            "data"
+          ]
+        }
+      ]
+    },
+    "title_key": "template.invoice_to_json.title",
+    "description_key": "template.invoice_to_json.desc"
+  },
+  {
+    "id": "quantize_bench",
+    "difficulty": "basic",
+    "tags": [
+      "quantize",
+      "eval"
+    ],
+    "sample_data": false,
+    "requires_hf_account": false,
+    "workflow": {
+      "format": "vlm-workflow",
+      "schema_version": 1,
+      "name": "quantize_bench",
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "model.hf_pick",
+          "version": "1.0.0",
+          "params": {
+            "model": "nemotron-parse-v1.1"
+          }
+        },
+        {
+          "id": "n2",
+          "type": "data.hf_load",
+          "version": "1.0.0",
+          "params": {
+            "repo": "naver-clova-ix/cord-v2"
+          }
+        },
+        {
+          "id": "n3",
+          "type": "quantize.modelopt_ptq",
+          "version": "1.0.0",
+          "params": {
+            "format": "fp8"
+          }
+        },
+        {
+          "id": "n4",
+          "type": "eval.benchmarks",
+          "version": "1.0.0",
+          "params": {
+            "suite": "cord_test"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "n1",
+            "model"
+          ],
+          "to": [
+            "n3",
+            "model"
+          ]
+        },
+        {
+          "from": [
+            "n2",
+            "dataset"
+          ],
+          "to": [
+            "n3",
+            "calib_data"
+          ]
+        },
+        {
+          "from": [
+            "n3",
+            "quantized"
+          ],
+          "to": [
+            "n4",
+            "model"
+          ]
+        },
+        {
+          "from": [
+            "n2",
+            "dataset"
+          ],
+          "to": [
+            "n4",
+            "data"
+          ]
+        }
+      ]
+    },
+    "title_key": "template.quantize_bench.title",
+    "description_key": "template.quantize_bench.desc"
+  }
+]

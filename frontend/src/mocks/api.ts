@@ -14,6 +14,7 @@ import type {
   Workflow,
 } from "../api/types";
 import registrySnapshot from "../generated/node-types.json";
+import templatesBundle from "../generated/templates.json";
 import { tp } from "../i18n";
 import { parseJsonl } from "../lib/metrics";
 import { isCompatible } from "../lib/ports";
@@ -318,139 +319,11 @@ const unknownEstimate = {
   source: "unknown" as const,
 };
 
-const edge = (from: string, out: string, to: string, inp: string) => ({
-  from: [from, out] as [string, string],
-  to: [to, inp] as [string, string],
-});
-
-// Templates use the REAL registry params (src/generated/node-types.json); estimates are unknown until measured.
-const templates: Template[] = [
-  {
-    // Default template (ADR-001 amendment 1): Nemotron-Parse v1.1 full fine-tune on CORD-v2.
-    id: "invoice_to_json",
-    title_key: "template.invoice_to_json.title",
-    description_key: "template.invoice_to_json.desc",
-    difficulty: "basic",
-    tags: ["finetune"],
-    sample_data: true,
-    estimate: unknownEstimate,
-    workflow: {
-      format: "vlm-workflow",
-      schema_version: 1,
-      name: "invoice_to_json",
-      nodes: [
-        {
-          id: "n1",
-          type: "model.hf_pick",
-          version: "1.0.0",
-          params: { model: "nemotron-parse-v1.1" },
-        },
-        {
-          id: "n2",
-          type: "data.hf_load",
-          version: "1.0.0",
-          params: { repo: "naver-clova-ix/cord-v2" },
-        },
-        { id: "n3", type: "data.split", version: "1.0.0", params: { val_fraction: 0.1 } },
-        { id: "n4", type: "train.sft_vlm", version: "1.0.0", params: { epochs: 3 } },
-        { id: "n5", type: "eval.benchmarks", version: "1.0.0", params: { suite: "cord_test" } },
-      ],
-      edges: [
-        edge("n2", "dataset", "n3", "dataset"),
-        edge("n1", "model", "n4", "base_model"),
-        edge("n3", "train", "n4", "train_data"),
-        edge("n3", "val", "n4", "val_data"),
-        edge("n4", "model", "n5", "model"),
-        edge("n3", "val", "n5", "data"),
-      ],
-    },
-  },
-  {
-    // Template 2 (ADR-001 amendment 1): Cosmos-Reason2-2B is gated → HF account chip + wizard.
-    id: "image_video_understanding",
-    title_key: "template.image_video_understanding.title",
-    description_key: "template.image_video_understanding.desc",
-    difficulty: "basic",
-    tags: ["finetune"],
-    sample_data: false,
-    requires_hf_account: true,
-    estimate: unknownEstimate,
-    workflow: {
-      format: "vlm-workflow",
-      schema_version: 1,
-      name: "image_video_understanding",
-      nodes: [
-        {
-          id: "n1",
-          type: "model.hf_pick",
-          version: "1.0.0",
-          params: { model: "cosmos-reason2-2b" },
-        },
-        {
-          id: "n2",
-          type: "data.local_folder",
-          version: "1.0.0",
-          params: { path: "data/my-images" },
-        },
-        { id: "n3", type: "data.split", version: "1.0.0", params: { val_fraction: 0.1 } },
-        {
-          id: "n4",
-          type: "train.lora_vlm",
-          version: "1.0.0",
-          params: { epochs: 3, lr_preset: "medium" },
-        },
-        { id: "n5", type: "train.merge_lora", version: "1.0.0", params: {} },
-        { id: "n6", type: "eval.benchmarks", version: "1.0.0", params: { suite: "perception" } },
-      ],
-      edges: [
-        edge("n2", "dataset", "n3", "dataset"),
-        edge("n1", "model", "n4", "base_model"),
-        edge("n3", "train", "n4", "train_data"),
-        edge("n3", "val", "n4", "val_data"),
-        edge("n1", "model", "n5", "base_model"),
-        edge("n4", "adapter", "n5", "adapter"),
-        edge("n5", "model", "n6", "model"),
-        edge("n3", "val", "n6", "data"),
-      ],
-    },
-  },
-  {
-    id: "quantize_bench",
-    title_key: "template.quantize_bench.title",
-    description_key: "template.quantize_bench.desc",
-    difficulty: "basic",
-    tags: ["quantize", "eval"],
-    sample_data: false,
-    estimate: unknownEstimate,
-    workflow: {
-      format: "vlm-workflow",
-      schema_version: 1,
-      name: "quantize_bench",
-      nodes: [
-        {
-          id: "n1",
-          type: "model.hf_pick",
-          version: "1.0.0",
-          params: { model: "nemotron-parse-v1.1" },
-        },
-        {
-          id: "n2",
-          type: "data.hf_load",
-          version: "1.0.0",
-          params: { repo: "naver-clova-ix/cord-v2" },
-        },
-        { id: "n3", type: "quantize.modelopt_ptq", version: "1.0.0", params: { format: "fp8" } },
-        { id: "n4", type: "eval.benchmarks", version: "1.0.0", params: { suite: "cord_test" } },
-      ],
-      edges: [
-        edge("n1", "model", "n3", "model"),
-        edge("n2", "dataset", "n3", "calib_data"),
-        edge("n3", "quantized", "n4", "model"),
-        edge("n2", "dataset", "n4", "data"),
-      ],
-    },
-  },
-];
+// Templates come from configs/templates/*.json (same files the backend serves); the server adds estimates.
+const templates: Template[] = (templatesBundle as Omit<Template, "estimate">[]).map((tpl) => ({
+  ...tpl,
+  estimate: unknownEstimate,
+}));
 
 function issue(
   code: string,

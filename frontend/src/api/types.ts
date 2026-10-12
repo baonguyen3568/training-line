@@ -140,6 +140,8 @@ export interface TemplateMeta {
   sample_data: boolean;
   /** Gated model: show the "needs Hugging Face account" chip + gated wizard (P010 §16). */
   requires_hf_account?: boolean;
+  /** Gallery order (lower first); the default template is first. */
+  order?: number;
   estimate: Estimate;
 }
 

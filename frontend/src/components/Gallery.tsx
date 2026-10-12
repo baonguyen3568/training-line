@@ -33,13 +33,15 @@ export function Gallery({
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (items ?? []).filter((it) => {
-      if (filter !== "all" && !it.tags.includes(filter)) return false;
-      if (!q) return true;
-      const text =
-        `${tp(it.title_key.split("."))} ${tp(it.description_key.split("."))}`.toLowerCase();
-      return text.includes(q);
-    });
+    return [...(items ?? [])]
+      .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.id.localeCompare(b.id))
+      .filter((it) => {
+        if (filter !== "all" && !it.tags.includes(filter)) return false;
+        if (!q) return true;
+        const text =
+          `${tp(it.title_key.split("."))} ${tp(it.description_key.split("."))}`.toLowerCase();
+        return text.includes(q);
+      });
   }, [items, filter, query]);
 
   return (

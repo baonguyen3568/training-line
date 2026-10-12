@@ -81,4 +81,16 @@ writeFileSync(outFile, out.join("\n"));
 // drifts from the real nodes (design review M1 r3). Byte-identical copy; committed and drift-checked.
 const snapshot = readFileSync(resolve(schemaDir, "node_types.snapshot.json"), "utf8");
 writeFileSync(resolve(here, "../src/generated/node-types.json"), snapshot);
+
+// Templates: single source configs/templates/<id>.json (backend serves them at /api/templates). Bundled
+// for the mock API in id order; estimates are computed by the server from the catalog, not stored here.
+const tplDir = resolve(here, "../../configs/templates");
+const templates = readdirSync(tplDir)
+  .filter((f) => f.endsWith(".json"))
+  .sort()
+  .map((f) => JSON.parse(readFileSync(resolve(tplDir, f), "utf8")));
+writeFileSync(
+  resolve(here, "../src/generated/templates.json"),
+  `${JSON.stringify(templates, null, 2)}\n`,
+);
 console.log(`schemas: ${emitted.size} types → src/generated/schemas.ts`);
