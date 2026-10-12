@@ -358,3 +358,6 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
 - (backend review P-3b-A: APPROVE) Phát hiện thêm:
   - AutoModel đã có cảnh báo trong log P-3 ("Detected torch.optim.Adam/AdamW with trainable bf16 model parameters…") mà không ai bắt. Backend sẽ ghi `engine_warnings` vào run.json; gate từ chối các run template có cảnh báo đã biết.
   - Resume với state FusedAdam chưa được chứng minh: cần smoke kill/resume trước khi đặt làm mặc định trong app.
+- (§10.8 kết luận, tester A/B ckpt 299, 7 ảnh test) Không cache **cũng lặp** y như có cache, nên **đường cache remote KHÔNG phải nguyên nhân**. Nguyên nhân còn lại là thiếu train (§10.9).
+  - "Remote + cache ≡ không cache" mới chỉ thấy trên một model đang thoái hoá: hai chuỗi tách nhau sau ~80 ký tự do số học bf16. Cần thêm **golden NVIDIA qua remote + cache trên base** (rẻ) trước khi coi use_cache=True là mặc định đã kiểm.
+  - Kết luận penalty (§10.7) vẫn HOÃN, đo lại trên model P-3b.
