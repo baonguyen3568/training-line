@@ -119,6 +119,8 @@ upstream + version), mở issue upstream; hoặc pin revision model dùng tên c
 | Ngày | Bug | Root cause | Fix / commit | Test |
 |---|---|---|---|---|
 | 2026-10-12 | Nemotron-Parse (MỌI version, cả v1.1): ảnh normalize 2 lần với AutoModel native; 2.0 bị từ chối vì tied | `NemotronParseConfig` copy key encoder theo `hasattr(RADIOConfig)` → cờ rơi; v1.2+ đổi tên cờ; class `UNTIED_ONLY` | patch `third_party/patches/automodel/0001` → image 26.08-2 | `tests/integration/automodel/test_nemotron_parse_patch.py` (10 FAIL→PASS) + probe tester |
+| 2026-10-12 | BUG-001: Parse native `generate()` lặp `<x_0.3906>` mãi | decoder bỏ qua KV cache, generate có cache chỉ đưa token mới nhất ở vị trí 0 | patch 0003 (tắt cache, đưa cả chuỗi) f42f91c | `test_nemotron_parse_generate.py` |
+| 2026-10-12 | 0003 v1 làm `generate(**processor(...))` lỗi `model_kwargs are not used: ['attention_mask']` (golden (b) 26.08-4) | override `prepare_inputs_for_generation` khai báo thiếu tham số tường minh của lớp cha; transformers validate kwargs theo **chữ ký** hàm này (+ forward nếu có **kwargs) | 0003 v2 giữ đủ tham số của parent | test so chữ ký với parent + validate đúng output của processor. **Bài học:** override hàm của transformers thì copy nguyên chữ ký parent; test meta phải gọi qua đường validate của generate, không chỉ gọi thẳng hàm |
 
 ## 4. Env fingerprint (dán vào mọi bug report)
 ```bash
