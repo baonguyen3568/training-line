@@ -295,7 +295,7 @@ button.link {
 .vlm-node {
   width: var(--node-width);
   background: var(--color-canvas-node-bg);
-  border: 1px solid var(--color-canvas-node-border);
+  border: 2px solid var(--color-canvas-node-border); /* constant width: state changes recolor, never resize */
   border-radius: var(--node-radius);
   font-size: var(--font-size-caption);
 }
@@ -799,7 +799,18 @@ button.link {
   }
 }
 .port-hint {
-  display: block;
+  /* Floating, OUTSIDE the node's layout: the hint appears when validation returns, and it must not change
+     the node's size — a layout shift moved the handles under a user's in-flight drag (tester, flaky wire). */
+  position: absolute;
+  right: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+  padding: 1px var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--color-status-warning);
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-caption);
   color: var(--color-text-primary);
 }
