@@ -46,6 +46,12 @@ class NodeResult:
 
 
 class Worker(Protocol):
+    """Runs one node.
+
+    Long-running workers (container jobs) MUST watch ``job.cancel``: when it is set, send SIGTERM to the job (grace
+    period so it can save a checkpoint), then raise ``ContainerExit(..., cancelled_by_executor=True)``.
+    """
+
     def run(self, job: NodeJob) -> NodeResult: ...
 
 

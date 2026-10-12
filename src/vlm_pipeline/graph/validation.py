@@ -173,28 +173,24 @@ def _parse_edge(raw: object) -> tuple[str, str, str, str] | None:
 
 
 def _find_cycle(nodes: Iterable[str], edges: Iterable[tuple[str, str]]) -> list[str] | None:
-    graph: dict[str, list[str]] = {n: [] for n in nodes}
+    """Nodes on or behind a cycle (Kahn's algorithm leftovers), in a stable order; None if the graph is acyclic.
+
+    Iterative on purpose: a recursive DFS hits RecursionError on long chains and would be misreported as CFG-007.
+    """
+    indeg: dict[str, int] = dict.fromkeys(nodes, 0)
+    children: dict[str, list[str]] = {n: [] for n in indeg}
     for a, b in edges:
-        graph.setdefault(a, []).append(b)
-    state: dict[str, int] = {}  # 1 = visiting, 2 = done
-    stack: list[str] = []
-
-    def visit(n: str) -> list[str] | None:
-        state[n] = 1
-        stack.append(n)
-        for m in graph.get(n, ()):
-            if state.get(m) == 1:
-                return stack[stack.index(m) :]
-            if m not in state and (found := visit(m)) is not None:
-                return found
-        stack.pop()
-        state[n] = 2
-        return None
-
-    for n in list(graph):
-        if n not in state and (found := visit(n)) is not None:
-            return found
-    return None
+        if a in indeg and b in indeg:
+            children[a].append(b)
+            indeg[b] += 1
+    ready = [n for n, d in indeg.items() if d == 0]
+    while ready:
+        for child in children[ready.pop()]:
+            indeg[child] -= 1
+            if indeg[child] == 0:
+                ready.append(child)
+    left = [n for n, d in indeg.items() if d > 0]
+    return left or None
 
 
 def validate(workflow: object, registry: Registry, workspace: Path | None = None) -> list[Issue]:

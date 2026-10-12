@@ -29,10 +29,6 @@ from typing import Any
 
 import pytest
 
-pytestmark = pytest.mark.xfail(
-    strict=True, raises=ImportError, reason="spec: bao-backend implements vlm_pipeline.graph.executor (P009) in P2"
-)
-
 
 def _wf() -> dict[str, Any]:
     # d ─┐
