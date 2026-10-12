@@ -239,3 +239,7 @@ CORD train 800 ảnh, GBS 8 → 100 step/epoch × ~20 s ≈ **33 phút/epoch** (
 | **Nhanh** (mặc định template) | 1 epoch (100 step) | ~35 phút | kết quả đầu tiên dùng được ❓ (P-2 sẽ cho biết F1 sau 1 epoch) |
 | Tiêu chuẩn | 3 epoch (300 step) | ~1h40 | chất lượng tốt nhất của template |
 Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ "Nhanh" làm mặc định; nếu không thì mặc định "Tiêu chuẩn" và hiện rõ thời gian. Cần đo F1 theo checkpoint ở step 100/200/300 trong cùng run P-3 (ckpt_every 100), không chạy 3 run riêng.
+
+### 10.2 (d) mask label PASS (bao-fixcode, 04:45)
+- 4 mẫu thật, 26.08-3: số token có label = số token đích + 1; `decode(labels) == json2token + "</s>"`. Không có token task (`<predict_bbox>`, `<predict_classes>`, `<output_markdown>`), không có câu hỏi user. Cảnh báo turn markers là vô hại với Parse. Có test khoá hành vi: `test_nemotron_parse_freeze.py::test_label_mask…`.
+- ⚠️ **Hệ quả cho P-2 (train/serve parity về prompt)**: model fine-tune học sinh chuỗi CORD **ngay sau prefix decoder mà collate dùng, không có token task**. Khi eval/chạy thử qua đường HF remote, prefix khởi đầu của decoder phải **giống hệt lúc train**. Không được dùng prompt task mặc định của Parse (`</s><s><predict_bbox><predict_classes><output_markdown>`), vì model sẽ rơi vào chế độ parse markdown của bản gốc và F1 thấp giả tạo. Cần backend/tester lấy đúng `decoder_input_ids` khởi đầu từ `nemotron_parse_collate_fn` và assert nó trước khi chấm.
