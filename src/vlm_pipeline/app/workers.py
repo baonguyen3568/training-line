@@ -161,7 +161,7 @@ class RealWorker:
         text = render_recipe(recipe)
         (run_dir / "config.yaml").write_text(text, encoding="utf-8")
         config_hash = hashlib.sha256(text.encode()).hexdigest()[:16]
-        run_id = f"{run_dir.parent.name}-{job.node_id}"[:120]
+        run_id = run_dir.name[:120]  # executor run dir = <node>-<cache key prefix>: unique, stable on resume
         manifest = RunManifest(
             run_id=run_id,
             name=f"{job.spec.type_id} {entry.display_name}",
