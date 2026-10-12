@@ -125,5 +125,98 @@
         }
       }
     }
+  },
+  "node": {
+    "width": {
+      "$type": "dimension",
+      "$value": {
+        "value": 240,
+        "unit": "px"
+      }
+    },
+    "radius": {
+      "$type": "dimension",
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      }
+    },
+    "header_height": {
+      "$type": "dimension",
+      "$value": {
+        "value": 32,
+        "unit": "px"
+      }
+    },
+    "port_size": {
+      "$type": "dimension",
+      "$value": {
+        "value": 10,
+        "unit": "px"
+      }
+    },
+    "wire_width": {
+      "$type": "dimension",
+      "$value": {
+        "value": 2,
+        "unit": "px"
+      }
+    },
+    "third_party_ring_gap": {
+      "$type": "dimension",
+      "$value": {
+        "value": 2,
+        "unit": "px"
+      }
+    }
+  },
+  "shape": {
+    "port": {
+      "Dataset": {
+        "$type": "string",
+        "$value": "square"
+      },
+      "Model": {
+        "$type": "string",
+        "$value": "circle"
+      },
+      "Adapter": {
+        "$type": "string",
+        "$value": "half-circle"
+      },
+      "QuantizedModel": {
+        "$type": "string",
+        "$value": "double-circle"
+      },
+      "ExportArtifact": {
+        "$type": "string",
+        "$value": "hexagon"
+      },
+      "EvalReport": {
+        "$type": "string",
+        "$value": "diamond"
+      },
+      "BenchReport": {
+        "$type": "string",
+        "$value": "diamond-outline"
+      },
+      "Endpoint": {
+        "$type": "string",
+        "$value": "triangle"
+      },
+      "Value": {
+        "$type": "string",
+        "$value": "dot"
+      }
+    }
+  },
+  "breakpoint": {
+    "editor_min": {
+      "$type": "dimension",
+      "$value": {
+        "value": 1280,
+        "unit": "px"
+      }
+    }
   }
 }

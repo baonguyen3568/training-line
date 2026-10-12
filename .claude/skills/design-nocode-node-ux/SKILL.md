@@ -19,7 +19,7 @@ Persona: "Lan" — knows her task and data, does not code, does not know LoRA/NV
 - [ ] States: ▢ chưa đủ · ○ sẵn sàng · ⧗ chờ · ↺ dùng lại · ◐ chạy x% · ✓ xong · ⏸ tạm dừng · ✕ lỗi · – bỏ qua (color + icon + text)
 
 ## Error copy rules (see `.team/knowledge/error-catalog-draft.md` decisions)
-4 parts: Chuyện gì xảy ra / Vì sao / Cách sửa [buttons] / ▸ Chi tiết kỹ thuật (collapsed).
+3–4 parts: Chuyện gì xảy ra / (Vì sao — only if `why` key exists: concrete runtime cause from params) / Cách sửa [buttons] / ▸ Chi tiết kỹ thuật (collapsed).
 "bạn", no blame, title ≤ 8 words stating the consequence, ≤ 2 sentences, absolute GB numbers, buttons state their effect.
 Param-only fixes apply directly + diff + Undo; costly/irreversible/structural fixes preview then confirm. No modal chains; toast only for drag-drop feedback.
 

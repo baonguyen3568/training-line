@@ -377,3 +377,15 @@ def test_nfc_and_nfd_display_names_compare_equal() -> None:
     nfd = unicodedata.normalize("NFD", name)
     assert nfd != name  # sanity: really different code points
     assert display_names_equal(name, nfd)
+
+
+def test_policy_block_override_requires_fake_worker() -> None:
+    """Usability instance may disable the GPU third-party policy_block, but only with the fake worker."""
+    from vlm_pipeline.plugins.install import effective_policy
+
+    assert (
+        effective_policy({"worker": "fake", "plugins": {"policy_block_gpu_third_party": False}}).gpu_third_party_blocked
+        is False
+    )
+    with pytest.raises(ValueError, match="policy_block"):
+        effective_policy({"worker": "docker", "plugins": {"policy_block_gpu_third_party": False}})

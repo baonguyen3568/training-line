@@ -35,8 +35,16 @@ config_hash, seed, deterministic, versions{torch,transformers,nemo_automodel,mod
 | eval/bench | vLLM OpenAI endpoint (7871) + harness của P002 | so sánh BF16/FP8/NVFP4 cùng 1 harness |
 | serve | vLLM (mặc định) / TRT-LLM (7872) | `gpu_memory_utilization ≤ 0.3` |
 
-## 3. Số đo spike (P1-9) — TODO
-(image digest, recipe, peak mem, s/step, tok/s, startup peak, các lỗi gặp)
+## 3. Số đo spike S-3 (2026-10-12 16:30, PASS)
+- Image `vlm-automodel:26.08-1` (FROM 26.08 arm64 digest + chmod o+rX), driver 580.142 forward-compat, non-root uid 1000, `--network none`, cap-drop ALL, HF offline (model + dataset local snapshot pinned).
+- Recipe `configs/train/smoke/qwen3_5_0p8b_lora_medpix_spike.yaml` (LoRA dim 8/alpha 32, vision frozen, GBS 4 = LBS 1 × grad-acc 4, act. checkpointing, sdpa, triton LoRA) → 20 step, exit 0, OOMKilled=false, wall 310s.
+- Thời gian: load + setup ~25s, **step 0 mất ~2m50s** (JIT Triton kernel LoRA/GatedDeltaNet lần đầu — không cache vì TRITON_CACHE_DIR=/tmp trong container → nên mount cache Triton dự án), sau đó ~2.3–3.5 s/step, **tps 390–690** (median ~550).
+- CUDA mem (AutoModel `mem` = max allocated): **8.14 GiB step 0**, steady 3.1–4.9 GiB. Host RAM: xem số của bao-tester (outputs/perf/s3-20261012/).
+- Loss 2.36 → 1.42 (20 step, nhiễu), grad_norm 9–18.
+- Checkpoint: `checkpoints/epoch_0_step_{9,19}/` {model/adapter_model.safetensors + adapter_config.json + tokenizer/processor, optim/ (DCP), dataloader/, rng/, step_scheduler.pt, losses.json, config.yaml}, 61MB mỗi cái; `LATEST -> epoch_0_step_19` (symlink, cập nhật atomic); `max_recent_checkpoints=2` hoạt động. Với PEFT, `save_consolidated: final` chỉ ra adapter (không merge full model) → merge là node riêng.
+- **Marker hoàn tất**: AutoModel ghi `<ckpt>/.incomplete` khi bắt đầu save, xoá sau khi publish (`lifecycle._publish_checkpoint`: cập nhật LATEST rồi `clear_checkpoint_incomplete`). Resume bỏ qua thư mục còn `.incomplete`.
+- **Metrics local có sẵn**: `checkpoints/training.jsonl` (+ validation.jsonl), mỗi dòng {step, epoch, timestamp, loss, grad_norm, lr, mem, tps, tps_per_gpu, num_tokens_per_step, num_label_tokens} → adapter sang metrics.jsonl (contract frontend) chỉ cần đổi tên key, không cần parse stderr.
+- Câu hỏi mở #2 (save_consolidated final): **đã trả lời — có**. #1 (hook should_stop mỗi step): chưa — cần đọc recipe/callback trong S-2.
 
 ## 4. Không chọn
 - Cài NeMo/ModelOpt lên host venv: wheel aarch64 + CUDA 13 thiếu (TE, bitsandbytes, flash-attn) → mong manh.

@@ -20,6 +20,7 @@ GOOD_HOST = f"127.0.0.1:{PORT}"
 
 def _client():  # type: ignore[no-untyped-def]
     from fastapi.testclient import TestClient
+
     from vlm_pipeline.app import create_app
 
     return TestClient(create_app(token=TOKEN, port=PORT), base_url=f"http://{GOOD_HOST}")

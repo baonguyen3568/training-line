@@ -34,12 +34,12 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 ## Phase 2 — MỞ 2026-10-12 (user): scaffold + GPU smoke nhỏ. Tải >20GB phải hỏi PM. Mọi job GPU qua GPU_LOCK + preflight.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| S-1 | Repo scaffold: pyproject/uv, ruff/mypy/import-linter, pre-commit(prek), gitleaks, scripts/check.sh, LICENSE Apache-2.0 | bao-cleancode | DOING |
+| S-1 | Repo scaffold: pyproject/uv, ruff/mypy/import-linter, pre-commit(prek), gitleaks, scripts/check.sh, LICENSE Apache-2.0 | bao-cleancode | REVIEW (security S-7) |
 | S-2 | Runtime: docker/ (image dẫn xuất vlm-automodel từ 26.08@digest, non-root), IMAGES.lock, common/gpu_lock.py, job runner skeleton | bao-backend | DOING |
 | S-3 | GPU smoke: LoRA 20 step Qwen3.5-0.8B trên 26.08 + đo RAM (tester song song) → hiệu chỉnh catalog P001 | bao-backend + bao-tester + bao-research | DOING (tester: chờ backend báo PID) |
-| S-4 | common/memguard.py + preflight (disk/lock) | bao-fixcode + bao-cleanup | DOING (fixcode: memguard RAM/watchdog + errors.py ExitCode) |
+| S-4 | common/memguard.py + preflight (disk/lock) | bao-fixcode + bao-cleanup | REVIEW (memguard+errors: fixcode ✓, diskguard+storage_report+scripts/cleanup: cleanup ✓; 47 test pass; chờ cleancode+security review) |
 | S-5 | frontend/ scaffold theo checklist 12 bước (Vite+React+@xyflow/react, tokens, i18n VI/EN) — vertical slice gallery→validate overlay | bao-frontend + bao-design | DOING |
-| S-6 | P001 cập nhật default image 26.08 → ADR-001 | bao-research | REVIEW (chờ backend+security approve) |
+| S-6 | P001 cập nhật default image 26.08 → ADR-001 | bao-research | DONE (backend+security APPROVED) → PM chốt ADR-001 |
 | S-7 | Security review mọi PR S-1..S-5; xác nhận CORD-v2; review image dẫn xuất | bao-security | DOING (CORD-v2 ✓, Dockerfile vlm-automodel ✓ hadolint sạch) |
 | S-8 | Gom test xfail hiện có vào tests/ theo layout ADR-004 | bao-tester | TODO (chờ S-1) |
 

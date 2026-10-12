@@ -1,7 +1,9 @@
 """Spec tests for the error catalog + its i18n text.
 
 Single source of truth: ``src/vlm_pipeline/common/error_catalog.yaml`` holds codes/severity/action keys only;
-user text lives in ``src/vlm_pipeline/i18n/{vi,en}.yaml`` under ``error.<code>.title|what|why`` (bao-design/backend).
+user text lives in ``src/vlm_pipeline/i18n/{vi,en}.yaml`` under ``error.<code>.title|what`` + OPTIONAL ``why``
+(bao-design P010 §7: ``why`` only for a run-specific cause computed from params;
+if present: ≤ 1 sentence, both locales).
 Display rules: P010 §6-§7 + ``.team/knowledge/error-catalog-draft.md`` ("Quyết định hiển thị", bao-design):
 title ≤ 10 tokens in vi (``split()`` counts syllables) / ≤ 8 words in en, explanation ≤ 2 sentences,
 ≥ 1 action for severity=error, no placeholder in titles, no traceback / secret / $HOME path in user text.
@@ -24,12 +26,20 @@ from typing import Any
 
 import pytest
 
-pytestmark = pytest.mark.xfail(
-    strict=True, raises=ImportError, reason="spec: bao-fixcode/bao-backend implement common/errors.py + i18n in P2"
+# Catalog-only tests run for real (common/error_catalog.yaml + errors.load_catalog exist). Tests that need the
+# i18n loader stay spec until ``vlm_pipeline.i18n.load`` lands (strict xfail, ImportError only).
+NEEDS_I18N = pytest.mark.xfail(
+    strict=True, raises=ImportError, reason="spec: vlm_pipeline.i18n.load not implemented yet (owner: bao-backend)"
 )
 
 LOCALES = ("vi", "en")
 SECRET_RE = re.compile(r"hf_[A-Za-z0-9]{20,}|nvapi-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{20,}")
+
+
+def _catalog() -> dict[str, Any]:
+    from vlm_pipeline.common.errors import load_catalog
+
+    return load_catalog()
 
 
 def _load() -> tuple[dict[str, Any], dict[str, dict[str, str]]]:
@@ -75,17 +85,22 @@ def _what_keys(code: str, entry: Any) -> list[str]:
     return [f"error.{code}.what.{v}" for v in values]
 
 
-def _text_keys(code: str, entry: Any) -> list[str]:
-    return [f"error.{code}.title", *_what_keys(code, entry), f"error.{code}.why"]
+def _text_keys(code: str, entry: Any, t: dict[str, str] | None = None) -> list[str]:
+    """Required keys, plus ``why`` when the given locale defines it (``why`` is optional)."""
+    keys = [f"error.{code}.title", *_what_keys(code, entry)]
+    if t is not None and f"error.{code}.why" in t:
+        keys.append(f"error.{code}.why")
+    return keys
 
 
 def test_codes_are_well_formed_and_fallback_exists() -> None:
-    catalog, _ = _load()
+    catalog = _catalog()
     assert "SYS-000" in catalog
     for code in catalog:
         assert re.fullmatch(r"[A-Z]+-\d{3}", code), code
 
 
+@NEEDS_I18N
 def test_every_code_has_text_in_every_locale() -> None:
     catalog, texts = _load()
     for code, entry in catalog.items():
@@ -101,6 +116,7 @@ def test_every_code_has_text_in_every_locale() -> None:
                 assert t.get(f"action.{action.id}", "").strip(), (loc, code, action.id)
 
 
+@NEEDS_I18N
 def test_display_rules() -> None:
     catalog, texts = _load()
     for code, entry in catalog.items():
@@ -109,11 +125,16 @@ def test_display_rules() -> None:
             max_tokens = {"vi": 10, "en": 8}[loc]
             assert 0 < len(title.split()) <= max_tokens, (loc, code, title)
             assert not re.search(r"\{\w+\}", title), (loc, code, "no placeholder in titles")
-            for key in [*_what_keys(code, entry), f"error.{code}.why"]:
+            for key in _what_keys(code, entry):
                 text = t[key].strip()
                 assert len(re.findall(r"[.!?](\s|$)", text)) <= 2, (loc, key)
+            why = t.get(f"error.{code}.why")
+            if why is not None:
+                assert why.strip(), (loc, code)
+                assert len(re.findall(r"[.!?](\s|$)", why.strip())) <= 1, (loc, code, "why is one sentence")
 
 
+@NEEDS_I18N
 def test_no_internals_in_user_text() -> None:
     _, texts = _load()
     for loc, t in texts.items():
@@ -126,16 +147,18 @@ def test_no_internals_in_user_text() -> None:
             assert not SECRET_RE.search(text), (loc, key)
 
 
+@NEEDS_I18N
 def test_declared_params_cover_placeholders() -> None:
     """Every ``{x}`` used in an error text must be declared in the catalog entry's ``params``."""
     catalog, texts = _load()
     for code, entry in catalog.items():
         for loc, t in texts.items():
-            for key in _text_keys(code, entry):
+            for key in _text_keys(code, entry, t):
                 used = set(re.findall(r"\{(\w+)\}", t[key]))
                 assert used <= _param_names(entry), (loc, key, used - _param_names(entry))
 
 
+@NEEDS_I18N
 def test_placeholders_match_across_locales() -> None:
     """``{need}``-style placeholders must be identical in vi and en, so rendering never shows a raw ``{x}``."""
     _, texts = _load()
@@ -144,13 +167,14 @@ def test_placeholders_match_across_locales() -> None:
         assert set(re.findall(r"\{(\w+)\}", vi[key])) == set(re.findall(r"\{(\w+)\}", en[key])), key
 
 
+@NEEDS_I18N
 def test_locales_have_same_keys() -> None:
     _, texts = _load()
     assert texts["vi"].keys() == texts["en"].keys()
 
 
 def test_action_when_conditions_reference_declared_params() -> None:
-    catalog, _ = _load()
+    catalog = _catalog()
     for code, entry in catalog.items():
         for action in entry.actions:
             for param in getattr(action, "when", None) or {}:
@@ -194,7 +218,7 @@ def test_variants_cover_every_combination() -> None:
     """Cartesian product of all enum/bool params used in ``variants[].when`` must each match >= 1 variant."""
     import itertools
 
-    catalog, _ = _load()
+    catalog = _catalog()
     for code, entry in catalog.items():
         variants = getattr(entry, "variants", None)
         if not variants:
@@ -211,3 +235,13 @@ def test_variants_cover_every_combination() -> None:
                 return True
 
             assert any(matches(v) for v in variants), (code, env)
+
+
+@NEEDS_I18N
+def test_why_is_optional_but_symmetric() -> None:
+    """``why`` may be absent; if one locale has it, the other must too (covered for all keys by key parity,
+    asserted here explicitly for the error cards)."""
+    catalog, texts = _load()
+    for code in catalog:
+        has = {loc: f"error.{code}.why" in t for loc, t in texts.items()}
+        assert len(set(has.values())) == 1, (code, has)

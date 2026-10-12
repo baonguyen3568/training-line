@@ -21,3 +21,4 @@
 - 2026-10-12 ADR-002 Eval protocol ACCEPTED. ADR-009 A1 plugin sandbox. ADR-004 A3 layering mới.
 - 2026-10-12 Dataset template mặc định: CORD-v2 (CC-BY-4.0, chờ security xác nhận nguồn gốc). MedPix loại khỏi template.
 - 2026-10-12 USER: Host dev dùng chung — cấm plugin bên thứ 3 dùng GPU tới khi vá toolkit; sau vá chỉ plugin đã review ở SHA cố định.
+- 2026-10-12 USER: HF token mới (fine-grained) → .env, whoami OK. Driver giữ bản 580.142 (không cập nhật DGX OS lúc này). Toolkit: vẫn chờ user vá.

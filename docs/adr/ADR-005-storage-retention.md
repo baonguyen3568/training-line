@@ -1,6 +1,6 @@
 # ADR-005 — Storage & Retention Policy
 
-- Trạng thái: **ACCEPTED (có điều kiện)** — 2026-10-12
+- Trạng thái: **ACCEPTED** — 2026-10-12 (2 điều kiện đã đóng)
 - Nguồn: `.team/proposals/005-storage-retention-policy.md` (v3, tác giả bao-cleanup)
 - Đã review: bao-backend, bao-security, bao-research, bao-tester, bao-frontend, bao-cleancode
 - Chốt bởi: bao-pm
@@ -19,7 +19,7 @@ Chấp nhận toàn bộ D1–D8 của Proposal 005 v3. Tóm tắt:
   - Phân công: bao-fixcode viết `memguard.py`, bao-cleanup viết phần disk/lock + `scripts/cleanup/preflight.py`, review chéo.
 
 ## Điều kiện / mục còn mở
-1. bao-backend xác minh ngữ nghĩa `checkpoint.save_consolidated` trong container được pin ở ADR-001. Kết quả cập nhật vào bảng D3.
+1. ~~Xác minh save_consolidated~~ → XONG (S-3, 26.08): `final` được hỗ trợ và là mặc định (`true` = every); max_recent_checkpoints=2 chạy đúng; checkpoint dở có marker `.incomplete`.
 2. ~~Quota 500GB kiểm tra lại theo danh sách model~~ → XONG (P005 §7): ~430GB tối đa kể cả cache node 200GB, nằm dưới mức warn 500GB. Mỗi model 27-35B thêm 55-72GB.
 
 ## Hệ quả

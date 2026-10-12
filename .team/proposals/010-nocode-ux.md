@@ -154,7 +154,9 @@ Chạy liên tục khi sửa graph (debounce ~500 ms), hiển thị ở thanh đ
   - `unknown`: "chưa có số đo".
 
 ## 7. Thông báo lỗi dễ hiểu (khi đang chạy)
-Khuôn 4 phần (theo NN/g: ngôn ngữ người đọc được, chỉ rõ vấn đề, gợi ý xây dựng, không đổ lỗi):
+Khuôn 3–4 phần (theo NN/g: ngôn ngữ người đọc được, chỉ rõ vấn đề, gợi ý xây dựng, không đổ lỗi).
+**`why` là tuỳ chọn (chốt 2026-10-12)**: phần lớn mã đã gộp nguyên nhân chung vào `what` (≤2 câu). `why` chỉ dùng khi có **nguyên nhân cụ thể tính từ params lúc chạy**
+(vd MEM-003: kích thước ảnh × batch). Có key `why` thì thẻ hiện mục "Vì sao", không có thì thẻ còn 3 phần. `why` ≤ 1 câu.
 ```
 ┌ ✕ Fine-tune dừng ở bước 1 240 / 5 000 ─────────────────────────────────────────────┐
 │ Chuyện gì xảy ra: Máy hết bộ nhớ (RAM dùng chung với các dịch vụ khác).             │

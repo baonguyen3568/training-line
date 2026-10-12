@@ -4,7 +4,7 @@ Checks CUDA availability, device info, and runs a bf16 matmul + SDPA. Prints one
 """
 
 import json
-import os
+import subprocess
 import time
 
 import torch
@@ -21,7 +21,10 @@ if out["cuda_available"]:
         device=props.name,
         capability=f"{props.major}.{props.minor}",
         arch_list=torch.cuda.get_arch_list(),
-        driver=os.popen("nvidia-smi --query-gpu=driver_version --format=csv,noheader").read().strip(),
+        driver=subprocess.run(  # fixed argv, no shell
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],  # noqa: S607 - nvidia-smi from container PATH
+            capture_output=True, text=True, check=False,
+        ).stdout.strip(),
     )
     a = torch.randn(4096, 4096, device="cuda", dtype=torch.bfloat16)
     b = torch.randn(4096, 4096, device="cuda", dtype=torch.bfloat16)

@@ -36,6 +36,11 @@
       "brand": {
         "$type": "color",
         "$value": "#76b900"
+      },
+      "focus": {
+        "$type": "color",
+        "$value": "#76b900",
+        "$description": "Focus ring / selection: \u22653:1 vs surface & canvas (light #76b900 is only 2.2:1, so a darker step is used)."
       }
     },
     "status": {
@@ -159,6 +164,110 @@
       "neutral-bg": {
         "$type": "color",
         "$value": "#383835"
+      }
+    },
+    "port": {
+      "$description": "Port/wire colors: 4 display families (P010 \u00a74). Never add a port color \u2014 only 3 hues pass CVD all-pairs; distinguish subtypes by shape + label.",
+      "dataset": {
+        "$type": "color",
+        "$value": "{color.variant.ft2.bf16}"
+      },
+      "model": {
+        "$type": "color",
+        "$value": "{color.variant.base.bf16}"
+      },
+      "report": {
+        "$type": "color",
+        "$value": "{color.variant.ft.bf16}"
+      },
+      "endpoint": {
+        "$type": "color",
+        "$value": "{color.text.secondary}"
+      },
+      "value": {
+        "$type": "color",
+        "$value": "{color.text.muted}"
+      }
+    },
+    "node_state": {
+      "$description": "Node state color; always paired with icon + text (P010 \u00a711).",
+      "not_ready": {
+        "$type": "color",
+        "$value": "{color.text.muted}"
+      },
+      "ready": {
+        "$type": "color",
+        "$value": "{color.text.secondary}"
+      },
+      "queued": {
+        "$type": "color",
+        "$value": "{color.text.secondary}"
+      },
+      "cached": {
+        "$type": "color",
+        "$value": "{color.text.secondary}"
+      },
+      "running": {
+        "$type": "color",
+        "$value": "{color.variant.base.bf16}"
+      },
+      "done": {
+        "$type": "color",
+        "$value": "{color.status.good}"
+      },
+      "interrupted": {
+        "$type": "color",
+        "$value": "{color.status.warning}"
+      },
+      "failed": {
+        "$type": "color",
+        "$value": "{color.status.critical}"
+      },
+      "skipped": {
+        "$type": "color",
+        "$value": "{color.text.muted}"
+      },
+      "blocked_policy": {
+        "$type": "color",
+        "$value": "{color.status.critical}"
+      }
+    },
+    "canvas": {
+      "background": {
+        "$type": "color",
+        "$value": "#121211"
+      },
+      "grid_dot": {
+        "$type": "color",
+        "$value": "#262624"
+      },
+      "lane_band": {
+        "$type": "color",
+        "$value": "#171716"
+      },
+      "lane_label": {
+        "$type": "color",
+        "$value": "{color.text.muted}"
+      },
+      "node_bg": {
+        "$type": "color",
+        "$value": "{color.surface}"
+      },
+      "node_border": {
+        "$type": "color",
+        "$value": "rgba(255,255,255,0.14)"
+      },
+      "selection": {
+        "$type": "color",
+        "$value": "{color.accent.focus}"
+      },
+      "third_party_ring": {
+        "$type": "color",
+        "$value": "{color.text.secondary}"
+      },
+      "placeholder_bg": {
+        "$type": "color",
+        "$value": "#222220"
       }
     }
   },
