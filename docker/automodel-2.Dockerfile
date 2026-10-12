@@ -14,10 +14,14 @@ LABEL project="vlm-training" \
       org.opencontainers.image.base.digest="sha256:70b4e9df8dd23ef451372b25952cffe24ad29c17f5b9de5fd1b244caf4e7b55a"
 
 # No phoning home from libraries (bao-security, pre-approved). Jobs needing W&B online override WANDB_MODE explicitly.
+# Offline by default even when the image is run by hand; a first-party download job overrides HF_HUB_OFFLINE=0.
 ENV NO_ALBUMENTATIONS_UPDATE=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
     DO_NOT_TRACK=1 \
-    WANDB_MODE=offline
+    WANDB_MODE=offline \
+    HF_HUB_OFFLINE=1 \
+    HF_DATASETS_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
 
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
