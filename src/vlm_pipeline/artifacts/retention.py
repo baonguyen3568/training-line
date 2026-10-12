@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+import tomllib
 from collections.abc import Callable, Collection, Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -38,6 +39,8 @@ ROLE_LINKS = ("LATEST", "LOWEST_VAL")
 STRIP_SUBDIRS = ("optim", "dataloader", "rng")  # resume-only state; model weights stay
 CLEANABLE_STATUSES = frozenset({"completed", "discarded"})
 DAY_S = 86_400.0
+PROJECT_NAME = "vlm-pipeline"  # [project].name in pyproject.toml; guards against a wrong VLM_PROJECT_ROOT
+CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,7 @@ class RetentionPolicy:
     latest_full_days: float = 7.0
     other_keep_days: float = 7.0
     approval_threshold_gb: float = 20.0  # D7.4: above this the CLI needs --approved-by
+    approval_window_s: float = DAY_S  # unapproved deletes are summed over this window (no splitting into batches)
 
 
 DEFAULT_POLICY = RetentionPolicy()
@@ -248,6 +252,35 @@ def _append_jsonl(path: Path, record: dict[str, object]) -> None:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def _check_project_root(root: Path) -> None:
+    try:
+        name = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["name"]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
+        raise ValueError(f"{root} is not the {PROJECT_NAME} project root") from exc
+    if name != PROJECT_NAME:
+        raise ValueError(f"{root} is project {name!r}, expected {PROJECT_NAME!r}")
+
+
+def _unapproved_bytes_since(log: Path, since: float) -> int:
+    """Bytes deleted without ``approved_by`` after ``since`` (an unreadable line counts as 0, never as approved).
+
+    This guards against accidentally splitting a large cleanup into small batches, not against someone editing or
+    truncating ``cleanup.jsonl``; that is acceptable for the internal CLI. The app's delete path (P009, D17) uses an
+    authenticated API with a server-side log instead.
+    """
+    if not log.exists():
+        return 0
+    total = 0
+    for line in log.read_text(encoding="utf-8").splitlines():
+        try:
+            rec = json.loads(line)
+            if not rec.get("approved_by") and float(rec.get("ts_epoch", 0)) >= since:
+                total += int(rec.get("bytes", 0))
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return total
+
+
 def apply(
     root: Path,
     item_ids: Iterable[str],
@@ -263,15 +296,22 @@ def apply(
     Raises:
         PermissionError: the selected items exceed ``approval_threshold_gb`` and no ``approved_by`` was given.
     """
+    _check_project_root(root)
+    ts = time.time() if now is None else now
     wanted = set(item_ids)
-    fresh = plan(root, policy=policy, now=now, lock_reader=lock_reader)
+    fresh = plan(root, policy=policy, now=ts, lock_reader=lock_reader)
     by_id = {i.item_id: i for i in fresh.actionable}
     result = ApplyResult()
     selected = [by_id[i] for i in sorted(wanted) if i in by_id]
     result.skipped.extend((i, "no longer planned (state changed)") for i in sorted(wanted - by_id.keys()))
-    total_gb = sum(i.reclaim_bytes for i in selected) / GIB
-    if total_gb > policy.approval_threshold_gb and not approved_by:
-        raise PermissionError(f"{total_gb:.1f} GiB > {policy.approval_threshold_gb:g} GiB needs --approved-by")
+    if not approved_by:
+        recent = _unapproved_bytes_since(root / CLEANUP_LOG_REL, ts - policy.approval_window_s)
+        total_gb = (recent + sum(i.reclaim_bytes for i in selected)) / GIB
+        if total_gb > policy.approval_threshold_gb:
+            raise PermissionError(
+                f"{total_gb:.1f} GiB (incl. {recent / GIB:.1f} GiB deleted without approval in the last "
+                f"{policy.approval_window_s / 3600:g} h) > {policy.approval_threshold_gb:g} GiB needs --approved-by"
+            )
     for item in selected:
         target = _safe_target(root, item.run_id, item.path)
         if item.action == "delete":
@@ -288,12 +328,13 @@ def apply(
             "action": item.action,
             "bytes": item.reclaim_bytes,
             "rule": item.rule,
-            "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(ts)),
+            "ts_epoch": ts,
             "by": by,
             "approved_by": approved_by,
         }
         _append_jsonl(root / RUNS_REL / item.run_id / "events.jsonl", event)
-        _append_jsonl(root / "outputs" / "system" / "cleanup.jsonl", {**event, "run_id": item.run_id})
+        _append_jsonl(root / CLEANUP_LOG_REL, {**event, "run_id": item.run_id})
     return result
 
 

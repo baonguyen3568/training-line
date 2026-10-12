@@ -10,6 +10,7 @@ import pytest
 
 from vlm_pipeline.artifacts.retention import RetentionPolicy, apply, plan
 from vlm_pipeline.common.diskguard import LockStatus
+from vlm_pipeline.common.paths import GIB
 
 NOW = 1_800_000_000.0
 DAY = 86_400.0
@@ -34,6 +35,8 @@ def _ckpt(run: Path, name: str, *, age_days: float, optim_bytes: int = 1000, inc
 
 
 def _run(root: Path, run_id: str, *, status: str | None = "completed") -> Path:
+    if not (root / "pyproject.toml").exists():
+        (root / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
     run = root / "outputs" / "runs" / run_id
     (run / "checkpoints").mkdir(parents=True)
     (run / "logs").mkdir()
@@ -203,3 +206,26 @@ def test_plan_dict_shape(tmp_path: Path) -> None:
     run = d["runs"][0]  # type: ignore[index]
     item = run["items"][0]
     assert {"item_id", "path", "roles", "action", "reclaim_gb", "rule", "reason", "blocked_by"} <= item.keys()
+
+
+def test_splitting_into_small_batches_still_needs_approval(tmp_path: Path) -> None:
+    _standard_run(tmp_path)
+    p = plan(tmp_path, now=NOW, lock_reader=no_lock)
+    first, *rest = sorted(p.actionable, key=lambda i: i.item_id)
+    total = sum(i.reclaim_bytes for i in p.actionable)
+    policy = RetentionPolicy(approval_threshold_gb=(total - 1) / GIB)  # each batch alone is under the threshold
+    apply(tmp_path, [first.item_id], by="t", now=NOW, lock_reader=no_lock, policy=policy)
+    with pytest.raises(PermissionError, match="without approval"):
+        apply(tmp_path, [i.item_id for i in rest], by="t", now=NOW + 60, lock_reader=no_lock, policy=policy)
+    # outside the window the earlier delete no longer counts
+    later = NOW + policy.approval_window_s + 120
+    res = apply(tmp_path, [i.item_id for i in rest], by="t", now=later, lock_reader=no_lock, policy=policy)
+    assert len(res.done) == len(rest)
+
+
+def test_apply_refuses_wrong_project_root(tmp_path: Path) -> None:
+    _standard_run(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "someone-else"\n')
+    with pytest.raises(ValueError, match="expected 'vlm-pipeline'"):
+        apply(tmp_path, ["r1/checkpoints/epoch_0_step_10"], by="t", now=NOW, lock_reader=no_lock)
+    assert (tmp_path / "outputs" / "runs" / "r1" / "checkpoints" / "epoch_0_step_10").exists()
