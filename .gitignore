@@ -1,0 +1,12 @@
+.env
+*.env
+data/
+outputs/
+checkpoints/
+wandb/
+__pycache__/
+.venv/
+*.safetensors
+*.bin
+*.pt
+.team/GPU_LOCK
