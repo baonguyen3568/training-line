@@ -259,20 +259,20 @@ def _docker_state(name: str) -> ExitInfo:
 _CODE_DIRS = ("src", "configs", "docker", "scripts")
 
 
-def git_state(root: Path) -> tuple[str | None, bool | None]:
-    """(HEAD commit, dirty) of the project; (None, None) if git is unavailable."""
+def git_state(root: Path, dirs: tuple[str, ...] = _CODE_DIRS) -> tuple[str | None, bool | None]:
+    """(HEAD commit, dirty under ``dirs``) of the project; (None, None) if git is unavailable."""
     try:
         head = subprocess.run(  # noqa: S603
             ["git", "-C", str(root), "rev-parse", "HEAD"],  # noqa: S607
             capture_output=True, text=True, check=True,
         ).stdout.strip()  # fmt: skip
         status = subprocess.run(  # noqa: S603
-            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],  # noqa: S607
+            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no", "--", *dirs],  # noqa: S607
             capture_output=True, text=True, check=True,
         ).stdout  # fmt: skip
         # Untracked code/config is imported or read by runs but absent from HEAD -> also dirty (multi-agent tree).
         untracked = subprocess.run(  # noqa: S603
-            ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "--", *_CODE_DIRS],  # noqa: S607
+            ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "--", *dirs],  # noqa: S607
             capture_output=True, text=True, check=True,
         ).stdout  # fmt: skip
     except (OSError, subprocess.CalledProcessError):

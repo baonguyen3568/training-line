@@ -15,6 +15,7 @@ import json
 import re
 import secrets
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -29,19 +30,40 @@ def _complete_checkpoints(run_dir: Path, base_dir: Path, root: Path) -> None:
     """BUG-002: every consolidated export (save_consolidated every|final) gets the tensors consolidation dropped.
 
     Runs on the host with the CURRENT checkout, so run.json records which code completed the checkpoints (ADR-002 A1).
+    Only ``src/`` (+ the uv env files) is used by this step, so only those count as dirty. Re-running it
+    (``smoke complete``) replaces the earlier entry of the same step; the replaced entries are kept whole in
+    ``supersedes`` (the step is idempotent: a re-run restores nothing, the first run's ``restored`` lists stay there).
     """
     from vlm_pipeline.common.jobrun import git_state
     from vlm_pipeline.train.ckpt_complete import complete_from_base
 
-    commit, dirty = git_state(root)
+    commit, dirty = git_state(root, ("src", "pyproject.toml", "uv.lock"))
     steps = []
     for consolidated in sorted((run_dir / "checkpoints").glob("epoch_*_step_*/model/consolidated")):
         restored = complete_from_base(base_dir, consolidated)
         steps.append({"checkpoint": str(consolidated.relative_to(run_dir)), "restored": restored})
         print(json.dumps({"completed_from_base": steps[-1]["checkpoint"], "restored": restored}))
     manifest = read_manifest(run_dir)
-    post = {"name": "complete_from_base", "git_commit": commit, "git_dirty": dirty, "checkpoints": steps}
-    write_manifest(run_dir, manifest.model_copy(update={"post_steps": [*manifest.post_steps, post]}))
+    post: dict[str, object] = {"name": "complete_from_base", "git_commit": commit, "git_dirty": dirty,
+                               "checkpoints": steps}  # fmt: skip
+    kept = [s for s in manifest.post_steps if s.get("name") != post["name"]]
+    if replaced := [s for s in manifest.post_steps if s.get("name") == post["name"]]:
+        post["supersedes"] = replaced
+    write_manifest(run_dir, manifest.model_copy(update={"post_steps": [*kept, post]}))
+
+
+def _complete_main(argv: list[str]) -> int:
+    """``smoke complete RUN_DIR --prepared DIR``: (re)run the host post-step of a completed run from this checkout."""
+    p = argparse.ArgumentParser(prog="python -m vlm_pipeline.train.smoke complete")
+    p.add_argument("run_dir", type=Path)
+    p.add_argument("--prepared", type=Path, required=True)
+    a = p.parse_args(argv)
+    root = project_root()
+    run_dir = a.run_dir if a.run_dir.is_absolute() else root / a.run_dir
+    if read_manifest(run_dir).status != RunStatus.COMPLETED:
+        p.error("run is not completed")
+    _complete_checkpoints(run_dir, root / a.prepared / "model", root)
+    return 0
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -65,8 +87,11 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    if args[:1] == ["complete"]:
+        return _complete_main(args[1:])
     p = _parser()
-    a = p.parse_args(argv)
+    a = p.parse_args(args)
 
     root = project_root()
     run_id = f"{time.strftime('%Y%m%d-%H%M')}-{a.tag}-{secrets.token_hex(2)}"

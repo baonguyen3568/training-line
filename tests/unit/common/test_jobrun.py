@@ -120,3 +120,26 @@ def test_graceful_stop_line_detected(tmp_path: Path) -> None:
     log.write_text("step 59\ndone\n")
     assert not _stopped_by_signal(log)
     assert not _stopped_by_signal(tmp_path / "missing.log")
+
+
+def test_git_state_dirty_is_scoped_to_dirs(tmp_path: Path) -> None:
+    import subprocess
+
+    from vlm_pipeline.common.jobrun import git_state
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)  # noqa: S603,S607
+
+    git("init", "-q")
+    git("config", "user.email", "t@example.invalid")
+    git("config", "user.name", "t")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "src" / "a.py").write_text("x = 1\n")
+    git("add", "src/a.py")
+    git("commit", "-q", "-m", "init")
+    (tmp_path / "scripts" / "new.py").write_text("")  # untracked, outside src/
+    assert git_state(tmp_path)[1] is True
+    assert git_state(tmp_path, ("src",))[1] is False
+    (tmp_path / "src" / "a.py").write_text("x = 2\n")
+    assert git_state(tmp_path, ("src",))[1] is True
