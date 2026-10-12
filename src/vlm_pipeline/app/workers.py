@@ -70,8 +70,11 @@ class RealWorker:
     def _container_path(self, host_path: Path) -> str:
         return f"{CONTAINER_ROOT}/{host_path.resolve().relative_to(self.root).as_posix()}"
 
-    def _host_path(self, container_path: str) -> Path:
-        return self.root / container_path.removeprefix(CONTAINER_ROOT + "/")
+    def _host_path(self, path: str) -> Path:
+        """Artifact paths are host paths; container paths (older entries) are mapped back."""
+        if path.startswith(CONTAINER_ROOT + "/"):
+            return self.root / path.removeprefix(CONTAINER_ROOT + "/")
+        return Path(path)
 
     def _entry_for(self, ref: ArtifactRef) -> CatalogEntry:
         for entry in self.catalog.models:
@@ -103,7 +106,7 @@ class RealWorker:
                 raise NotCachedError("prepared snapshot missing", params={"repo": entry.repo, "reason": "not_prepared"})
         else:
             path = _hub_snapshot(self.root, entry.repo, entry.revision, "model")
-        ref = ArtifactRef(type="Model", path=self._container_path(path), hash=f"{entry.repo}@{entry.revision}")
+        ref = ArtifactRef(type="Model", path=str(path.resolve()), hash=f"{entry.repo}@{entry.revision}")
         return NodeResult(outputs={"model": ref})
 
     def _hub_dataset(self, job: NodeJob) -> NodeResult:
@@ -122,7 +125,7 @@ class RealWorker:
             encoding="utf-8",
         )
         digest = f"{repo}@{revision}" + (f"#limit={limit}" if limit else "")
-        ref = ArtifactRef(type="Dataset", path=self._container_path(descriptor), hash=digest)
+        ref = ArtifactRef(type="Dataset", path=str(descriptor.resolve()), hash=digest)
         return NodeResult(outputs={"dataset": ref})
 
     def _dataset_input(self, ref: ArtifactRef) -> tuple[str, int]:
@@ -130,7 +133,7 @@ class RealWorker:
         if ref.path.endswith(".json"):
             desc = json.loads(self._host_path(ref.path).read_text(encoding="utf-8"))
             return str(desc["path"]), int(desc.get("limit", 0))
-        return ref.path, 0
+        return self._container_path(self._host_path(ref.path)), 0
 
     def _train(self, job: NodeJob) -> NodeResult:
         params = job.params
@@ -149,7 +152,7 @@ class RealWorker:
         recipe = build_recipe(
             load_template(template_path(self.root, entry)),
             params,
-            model_dir=base.path,
+            model_dir=self._container_path(self._host_path(base.path)),
             dataset_dir=dataset_dir,
             train_limit=limit or None,
             run_dir=self._container_path(run_dir),
@@ -202,7 +205,7 @@ class RealWorker:
             )
         port, out_type = next(iter(job.spec.outputs.items()))
         out = run_dir / "checkpoints" / "LATEST" / "model"
-        ref = ArtifactRef(type=out_type.type, path=self._container_path(out), hash=f"{run_id}:{config_hash}")
+        ref = ArtifactRef(type=out_type.type, path=str(out), hash=f"{run_id}:{config_hash}")
         return NodeResult(outputs={port: ref})
 
     @staticmethod

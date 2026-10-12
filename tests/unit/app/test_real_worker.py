@@ -49,7 +49,7 @@ def test_model_pick_requires_cached_snapshot(tmp_path: Path) -> None:
     snap = _snap(root, "models", entry.repo, entry.revision)
     out = w.run(_job("model.hf_pick", {"model": "cosmos-reason2-2b"}, root / "r")).outputs["model"]
     assert out.type == "Model"
-    assert out.path == "/workspace/" + snap.relative_to(root).as_posix()
+    assert out.path == str(snap.resolve())  # host path: executor/retention verify it on the host
     assert out.hash == f"{entry.repo}@{entry.revision}"
 
 
@@ -72,8 +72,8 @@ def _train_inputs(w: RealWorker) -> dict[str, ArtifactRef]:
     entry = w.catalog.get("cosmos-reason2-2b")
     assert entry is not None
     return {
-        "base_model": ArtifactRef("Model", "/workspace/m", f"{entry.repo}@{entry.revision}"),
-        "train_data": ArtifactRef("Dataset", "/workspace/d", "naver-clova-ix/cord-v2@x"),
+        "base_model": ArtifactRef("Model", str(w.root / "m"), f"{entry.repo}@{entry.revision}"),
+        "train_data": ArtifactRef("Dataset", str(w.root / "d"), "naver-clova-ix/cord-v2@x"),
     }
 
 
@@ -100,7 +100,7 @@ def test_train_builds_recipe_and_runs_job(tmp_path: Path, monkeypatch: pytest.Mo
     assert seen["kw"]["est_peak_gb"] > 0
     assert isinstance(seen["kw"]["cancel"], threading.Event)
     assert out.type == "Adapter"
-    assert out.path.endswith("checkpoints/LATEST/model")
+    assert out.path == str(run_dir.resolve() / "checkpoints" / "LATEST" / "model")
     assert json.loads((run_dir / "metrics.jsonl").read_text().splitlines()[0])["mem_max_alloc_gb"] == 3.0
 
 
