@@ -101,6 +101,19 @@ DISK-002:
   actions:
     - {id: show_admin_command, kind: navigate, target: admin_command, confirm: false}
 
+DISK-003:
+  slug: STORAGE_CACHE_FULL_PROTECTED
+  severity: warn
+  prevent_in_preflight: false
+  # Node-output cache is over its cap but everything left is protected (trained models, pinned, exports, parents
+  # still needed): the app never deletes those by itself; the user chooses in the Storage panel (dry-run + confirm).
+  # Signal: artifacts.cache_retention.plan_cache(...).shortfall_bytes > 0.
+  params: [gb_over, cap_gb, protected_count]
+  match:
+    - {kind: executor, value: "plan_cache shortfall_bytes > 0"}
+  actions:
+    - {id: free_space, kind: navigate, target: cleanup_dry_run, confirm: false}
+
 SYS-001:
   slug: GPU_LOCK_BUSY
   severity: info
