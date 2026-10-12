@@ -1,0 +1,95 @@
+# O-1 overfit sanity (pipeline check, NOT a quality number): Nemotron-Parse-v1.1 on 20 fixed CORD-v2 train images,
+# then score field-F1 on the SAME 20 images (expect >= 90, parse_fail ~ 0). Proves label mask -> decoder prefix ->
+# generate -> token2json -> scorer end to end before spending ~1h40 on P-3 (001a §10.3).
+# Identical to nemotron_parse_v1_1_cordv2_smoke.yaml except: train limited to the first 20 samples, GBS 4,
+# 60 steps (~12 epochs over the 20 images), lr 5e-5 (memorisation is the goal), no validation, final ckpt only.
+# Needs vlm-automodel:26.08-3. RUN_DIR / PREPARED_MODEL_DIR are substituted by the launcher.
+
+recipe: FinetuneRecipeForVLM
+
+step_scheduler:
+  global_batch_size: 4
+  local_batch_size: 1
+  ckpt_every_steps: 60
+  val_every_steps: 100000  # no validation
+  max_steps: 60
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1234
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForImageTextToText.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  torch_dtype: torch.bfloat16
+  use_liger_kernel: false
+  attn_implementation: eager
+  trust_remote_code: true  # required by upstream recipe; code is pinned + offline (see header)
+
+processor:
+  _target_: transformers.AutoProcessor.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  trust_remote_code: true
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: RUN_DIR/checkpoints
+  model_save_format: safetensors
+  save_consolidated: final
+  max_recent_checkpoints: 2
+
+distributed:
+  strategy: fsdp2
+  dp_size: none
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+  activation_checkpointing: true
+
+loss_fn:
+  _target_: nemo_automodel.components.models.nemotron_parse.nemotron_parse_loss.NemotronParseLoss
+  coordinate_weight: 10.0
+  class_token_start_idx: 50000
+  num_heads: 1
+  ignore_index: -100
+  fp32_upcast: true
+
+dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: train
+  limit_dataset_samples: 20  # first 20 rows of train (deterministic)
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  pin_memory: false  # UMA: pinned host copies only add RAM (001a §9.1 d)
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: validation
+  limit_dataset_samples: 100
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 5.0e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+
+freeze_config:  # adapter enforces: freeze encoder.model_encoder (RADIO backbone), neck + decoder + embeddings train (001a §9.3)
+  freeze_vision_tower: true
+  freeze_language_model: false

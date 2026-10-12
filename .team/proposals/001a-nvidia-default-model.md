@@ -243,3 +243,9 @@ Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ 
 ### 10.2 (d) mask label PASS (bao-fixcode, 04:45)
 - 4 mẫu thật, 26.08-3: số token có label = số token đích + 1; `decode(labels) == json2token + "</s>"`. Không có token task (`<predict_bbox>`, `<predict_classes>`, `<output_markdown>`), không có câu hỏi user. Cảnh báo turn markers là vô hại với Parse. Có test khoá hành vi: `test_nemotron_parse_freeze.py::test_label_mask…`.
 - ⚠️ **Hệ quả cho P-2 (train/serve parity về prompt)**: model fine-tune học sinh chuỗi CORD **ngay sau prefix decoder mà collate dùng, không có token task**. Khi eval/chạy thử qua đường HF remote, prefix khởi đầu của decoder phải **giống hệt lúc train**. Không được dùng prompt task mặc định của Parse (`</s><s><predict_bbox><predict_classes><output_markdown>`), vì model sẽ rơi vào chế độ parse markdown của bản gốc và F1 thấp giả tạo. Cần backend/tester lấy đúng `decoder_input_ids` khởi đầu từ `nemotron_parse_collate_fn` và assert nó trước khi chấm.
+
+### 10.3 O-1 overfit sanity trước P-3 (đề xuất 05:00)
+- Train Parse-v1.1 trên **20 ảnh train cố định**, 60 step (GBS 4, lr 5e-5), rồi chấm F1 trên CHÍNH 20 ảnh đó. Config: `configs/train/smoke/nemotron_parse_v1_1_overfit20.yaml`. Ước ~10–15 phút GPU.
+- PASS: field-F1 ≥ 90, parse_fail ≈ 0. Chứng minh chuỗi label → prefix → generate → token2json → scorer đúng đầu-cuối. FAIL thì lỗi ở đường ống, sửa trước khi chạy P-3 (1h40).
+- Record gắn `purpose: pipeline_check`; không phải số chất lượng, không đưa vào báo cáo hay catalog.
+- Checkpoint P-1b (5 step) chỉ dùng để tester kiểm đường eval chạy được.
