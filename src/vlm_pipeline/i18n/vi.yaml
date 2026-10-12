@@ -888,8 +888,14 @@ model_catalog:
   qwen3.5-4b:
     tagline: Đa năng
   qwen3.5-9b:
-    tagline: Đa năng, lớn — cần máy rảnh
+    tagline: Đa năng, lớn
   gemma-4-e2b-it:
     tagline: Đa năng, nhỏ
   gemma-4-e4b-it:
     tagline: Đa năng
+  nemotron-parse-2.0:
+    tagline: Đọc tài liệu — bản thử nghiệm
+model_picker:
+  needs_free_ram: 'Cần máy rảnh hơn: cần ~{need_gb} GB, đang trống {avail_gb} GB'
+  fits: Vừa với bộ nhớ đang trống
+  gated: Cần tài khoản Hugging Face

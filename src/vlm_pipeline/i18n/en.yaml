@@ -888,8 +888,14 @@ model_catalog:
   qwen3.5-4b:
     tagline: General purpose
   qwen3.5-9b:
-    tagline: General purpose, large — needs a free machine
+    tagline: General purpose, large
   gemma-4-e2b-it:
     tagline: General purpose, small
   gemma-4-e4b-it:
     tagline: General purpose
+  nemotron-parse-2.0:
+    tagline: Reads documents — experimental
+model_picker:
+  needs_free_ram: 'Needs a freer machine: ~{need_gb} GB needed, {avail_gb} GB free'
+  fits: Fits in free memory
+  gated: Needs a Hugging Face account
