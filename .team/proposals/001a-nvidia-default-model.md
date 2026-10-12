@@ -281,3 +281,8 @@ Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ 
   2. đọc đúng giá trị nhưng gán nhầm giữa các field tổng tiền (total/subtotal/change). Đây là ngữ nghĩa chưa học xong, hợp với việc mới train ít.
   - **Quyết định decoding** (dựa vào `generation_config.json` của snapshot NVIDIA đã pin): `do_sample=false, num_beams=1, repetition_penalty=1.1`. Đây là cấu hình chuẩn của model. **Eval P-2/P-3 và node "Chạy thử" dùng nguyên `generation_config.json` của model** (chỉ override `max_new_tokens` = 1024 cho eval, 1280 cho Chạy thử), không tự đặt greedy thuần, không thêm `no_repeat_ngram_size`. Record ghi rõ các tham số decoding. Báo thêm `truncated_rate`.
   - Lưu ý: repetition_penalty có thể phạt cả giá trị lặp hợp lệ (vd nhiều món cùng giá). Theo dõi trong diff lỗi P-2; không tự chỉnh khác NVIDIA nếu không có bằng chứng.
+  - ⚠️ (07:45, bao-tester) Checkpoint do AutoModel export **ghi lại `generation_config.json` từ config**, nên mất `repetition_penalty 1.1`, `forced_eos_token_id 2`, `do_sample/num_beams`, `max_new_tokens`. Đọc generation_config từ checkpoint sẽ âm thầm thành greedy không penalty, cả ở eval lẫn node Chạy thử.
+    - Tạm thời: worker đọc `--generation-config` từ snapshot gốc đã pin.
+    - Sửa gốc (fixcode): bước ckpt_complete/export **chép `generation_config.json` của base** vào checkpoint.
+    - **Gate gallery mới (đề xuất)**: generation_config của mọi checkpoint/export phải bằng base, trừ các field được phép override (`max_new_tokens`). Đây là cùng loại parity train/serve.
+    - O-1b eval hiện tại là baseline **không penalty**. Chạy lại 6 ảnh với penalty 1.1 để so.
