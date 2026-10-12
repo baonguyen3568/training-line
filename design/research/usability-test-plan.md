@@ -60,6 +60,9 @@ Cuối buổi: 3 câu hỏi.
 - T5: có node giữ chỗ, tên lấy từ file được gắn nhãn, ô link để trống, kiểm tra link đòi commit đủ 40 ký tự. Không có nút cài 1 chạm.
 - T5b: màn bị chặn theo chính sách.
 
+## Ghi chú T1 (PM 2026-10-12)
+Nếu buổi thử diễn ra trước khi backend có `POST /api/runs` + FakeWorker thì T1 kết thúc ở bước bấm "Chạy". Tiêu chí thành công của T1 đổi thành: tìm được template, mở được, và bấm Chạy mà không cần trợ giúp.
+
 ## Phụ thuộc
 - Slice S-5 chạy được đến validate overlay. T4 và T5 cần lỗi giả lập và dialog cài; nếu chưa có thì dùng prototype giấy hoặc HTML tĩnh cho 2 nhiệm vụ đó.
 - bao-tester: fixture ở `tests/fixtures/usability/` (t1, t3, t4, t5 + `t5_app_config.json` policy tắt, `t5b_app_config.json` policy bật). Override chỉ được chấp nhận khi `worker: fake` (worker thật → ValueError). Còn thiếu: log sự kiện local (frontend).
