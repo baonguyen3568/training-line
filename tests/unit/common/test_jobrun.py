@@ -143,3 +143,13 @@ def test_git_state_dirty_is_scoped_to_dirs(tmp_path: Path) -> None:
     assert git_state(tmp_path, ("src",))[1] is False
     (tmp_path / "src" / "a.py").write_text("x = 2\n")
     assert git_state(tmp_path, ("src",))[1] is True
+
+
+def test_engine_warning_fixtures_match() -> None:
+    """Each code has a real log line sample (tests/fixtures/engine_warnings/<code>.log) that its pattern matches."""
+    from vlm_pipeline.common.jobrun import ENGINE_WARNINGS, _engine_warnings
+
+    fixtures = Path(__file__).parents[2] / "fixtures" / "engine_warnings"
+    for code in ENGINE_WARNINGS:
+        assert _engine_warnings(fixtures / f"{code}.log") == [code], code
+    assert _engine_warnings(Path("/nonexistent/stdout.log")) == []

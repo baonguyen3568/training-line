@@ -247,6 +247,27 @@ def _trainable_pct(log_path: Path) -> float | None:
     return None
 
 
+# Engine log lines that mean "this run is probably not doing what the recipe intends" -> run.json engine_warnings.
+# Patterns follow the engine's wording: re-check tests/fixtures/engine_warnings/ whenever the image changes.
+# Not scanned when the runner itself fails (engine_warnings stays None = unknown).
+ENGINE_WARNINGS: dict[str, re.Pattern[str]] = {
+    # P-3: bf16 params + torch AdamW, no fp32 master -> most updates rounded away (001a §10.9).
+    "bf16_adam_params": re.compile(r"Detected torch\.optim\.Adam/AdamW with trainable bf16 model parameters"),
+}
+
+
+def _engine_warnings(log_path: Path) -> list[str]:
+    """Known-bad engine warnings found in the job log (codes from ``ENGINE_WARNINGS``, in table order)."""
+    found: set[str] = set()
+    try:
+        with log_path.open("r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                found.update(code for code, rx in ENGINE_WARNINGS.items() if rx.search(line))
+    except OSError:
+        return []
+    return [code for code in ENGINE_WARNINGS if code in found]
+
+
 def _docker_state(name: str) -> ExitInfo:
     out = subprocess.run(  # noqa: S603
         ["docker", "inspect", "-f", "{{json .State}}", name],  # noqa: S607 - docker from PATH
@@ -390,6 +411,7 @@ def run_job(
                 "peak_mem_gb": round(max(0.0, baseline_gb - guard.min_available_gb), 1),
                 "host_min_available_gb": round(guard.min_available_gb, 1),
                 "trainable_pct": _trainable_pct(run_dir / "logs" / "stdout.log"),
+                "engine_warnings": _engine_warnings(run_dir / "logs" / "stdout.log"),
                 "memguard_fast_fall": bool(guard.fast_fall_killed),
                 "memguard_abort_gb": mem_thresholds.abort_gb,
             }

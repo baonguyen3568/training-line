@@ -78,6 +78,8 @@ class RunManifest(BaseModel):
     peak_mem_gb: float | None = None  # host MemAvailable drop during the job (UMA: includes CUDA)
     host_min_available_gb: float | None = None
     trainable_pct: float | None = None  # "Trainable parameters percentage" from the engine log
+    # Known-bad engine warnings (jobrun.ENGINE_WARNINGS). None = log never scanned (older runs, runner failure).
+    engine_warnings: list[str] | None = None
     memguard_fast_fall: bool | None = None  # watchdog killed the job because memory fell too fast
     memguard_abort_gb: float | None = None
     post_steps: list[dict[str, Any]] = Field(default_factory=list)  # host steps after the job (code sha recorded)

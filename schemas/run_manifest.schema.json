@@ -126,6 +126,21 @@
       "default": null,
       "title": "Ended At"
     },
+    "engine_warnings": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Engine Warnings"
+    },
     "error_code": {
       "anyOf": [
         {

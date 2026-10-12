@@ -24,6 +24,7 @@ export type RunManifest = {
   dataset?: string | null;
   dataset_revision?: string | null;
   ended_at?: number | null;
+  engine_warnings?: string[] | null;
   error_code?: string | null;
   exit_code?: number | null;
   git_commit?: string | null;
