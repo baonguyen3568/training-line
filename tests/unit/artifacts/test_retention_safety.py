@@ -81,9 +81,6 @@ def test_latest_link_pointing_outside_the_run_grants_nothing(tmp_path: Path) -> 
     assert foreign.exists()
 
 
-@pytest.mark.xfail(
-    strict=True, raises=ImportError, reason="spec: shared RunStatus enum in common (owner: bao-backend, runner S-2)"
-)
 def test_cleanable_statuses_belong_to_the_shared_run_status_vocabulary() -> None:
     """Retention keys on run.json ``status``. If the writer uses another word (contract says ``finished``,
     ADR-005/retention say ``completed``) retention silently never cleans anything."""

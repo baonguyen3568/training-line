@@ -85,3 +85,22 @@ def test_unknown_cross_repo_reference_left_is_refused(tmp_path: Path, setup: tup
     (model.snapshot_dir / "config.json").write_text(json.dumps(cfg))
     with pytest.raises(PrepareError, match="unpinned cross-repo"):
         prepare_bridged_model(model, [Bridge(radio, "radio_aaaa")], tmp_path / "p" / "x", project_root=tmp_path)
+
+
+def test_source_changed_between_check_and_copy_fails(
+    tmp_path: Path, setup: tuple[PinnedCode, PinnedCode], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vlm_pipeline.train import prepare
+
+    model, radio = setup
+    original = prepare._check_inputs
+
+    def check_then_tamper(*args: object, **kwargs: object) -> None:
+        original(*args, **kwargs)  # type: ignore[arg-type]
+        (radio.snapshot_dir / "hf_model.py").write_text("import os  # swapped after verification\n")
+
+    monkeypatch.setattr(prepare, "_check_inputs", check_then_tamper)
+    out = tmp_path / "p" / "x"
+    with pytest.raises(PrepareError, match="after copy"):
+        prepare_bridged_model(model, [Bridge(radio, "radio_aaaa")], out, project_root=tmp_path)
+    assert not out.exists()

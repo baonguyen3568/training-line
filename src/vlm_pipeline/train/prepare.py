@@ -78,6 +78,16 @@ def verify_code(code: PinnedCode) -> list[str]:
     return problems
 
 
+def _verify_copies(code: PinnedCode, dest: Path) -> list[str]:
+    """Hash the *copies* (what will actually run): the source may change between the check and the copy."""
+    problems = []
+    for name, digest in code.expected().items():
+        copy = dest / name
+        if copy.exists() and _sha256(copy) != digest:
+            problems.append(f"{code.repo_id}: sha256 mismatch after copy {name}")
+    return problems
+
+
 def _copy_py(code: PinnedCode, dest: Path) -> None:
     for name in code.expected():
         src = code.snapshot_dir / name
@@ -173,6 +183,12 @@ def prepare_bridged_model(
         raise PrepareError(f"unpinned cross-repo references remain: {leftover}")
 
     _populate_model_dir(model, model_dir)
+    problems = _verify_copies(model, model_dir)
+    for b in bridges:
+        problems += _verify_copies(b.code, out_dir / b.local_name)
+    if problems:
+        shutil.rmtree(out_dir)
+        raise PrepareError("; ".join(problems))
     (model_dir / "config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     manifest = {
         "schema_version": 1,
