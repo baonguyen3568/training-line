@@ -185,3 +185,14 @@ def test_stale_leases_are_reported_but_still_block(tmp_path: Path) -> None:
     clock.t += 25 * 3600
     assert [(k, r) for k, r, _ in idx.stale_leases()] == [("k", "crashed-graph")]
     assert not idx.begin_evict("k")
+
+
+def test_release_all_except_drops_leases_of_dead_runs(idx: ArtifactIndex, tmp_path: Path) -> None:
+    for k in ("a", "b", "c"):
+        idx.record(k, run_id=k, node_type="t", outputs=_out(tmp_path, k))
+    idx.lease(["a", "b"], run_id="crashed")
+    idx.lease(["c"], run_id="alive")
+    assert idx.release_all_except(["alive"]) == 2
+    assert idx.leased_by("a") == []
+    assert idx.leased_by("c") == ["alive"]
+    assert idx.release_all_except(["alive"]) == 0

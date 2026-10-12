@@ -222,6 +222,16 @@ class ArtifactIndex:
         with self._tx() as db:
             db.execute("DELETE FROM artifact_leases WHERE run_id = ?", (run_id,))
 
+    def release_all_except(self, active_run_ids: Sequence[str]) -> int:
+        """Drop leases of graph runs that are no longer active (call at app startup after a crash); returns count."""
+        active = set(active_run_ids)
+        with self._tx() as db:
+            holders = [r["run_id"] for r in db.execute("SELECT DISTINCT run_id FROM artifact_leases")]
+            dead = [(run_id,) for run_id in holders if run_id not in active]
+            before = db.total_changes
+            db.executemany("DELETE FROM artifact_leases WHERE run_id = ?", dead)
+            return db.total_changes - before
+
     def leased_by(self, cache_key: str) -> list[str]:
         with self._lock:
             rows = self._db.execute(
