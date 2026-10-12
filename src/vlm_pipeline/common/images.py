@@ -6,12 +6,14 @@ A new image that needs a probe gets a row first (status "PROBE, not approved"). 
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import ClassVar
 
 from vlm_pipeline.common.errors import VlmPipelineError
 
 APPROVED_MARK = "bao-security APPROVED"
+_APPROVED_RE = re.compile(re.escape(APPROVED_MARK) + r"(?:$|[\s(])")  # "APPROVED-PENDING" is not approved
 
 
 class ImageMismatchError(VlmPipelineError):
@@ -39,7 +41,7 @@ def pinned_image_id(lock_text: str, tag: str) -> str | None:
 def is_approved(lock_text: str, tag: str) -> bool:
     """Review column (6) must START with exactly ``bao-security APPROVED`` (our own file: no free-text parsing)."""
     row = _row(lock_text, tag)
-    return row is not None and len(row) > 6 and row[6].startswith(APPROVED_MARK)
+    return row is not None and len(row) > 6 and _APPROVED_RE.match(row[6]) is not None
 
 
 def check_pinned_image(root: Path, tag: str, actual_id: str | None, *, require_approved: bool = False) -> None:

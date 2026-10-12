@@ -178,6 +178,7 @@ def test_user_jobs_require_approved_image(tmp_path: Path) -> None:
             _ROW.format(tag="vlm-automodel:probe", id="sha256:333", review="PROBE, not approved"),
             _ROW.format(tag="vlm-automodel:u", id="sha256:444", review="bao-security UNAPPROVED"),
             _ROW.format(tag="vlm-automodel:d", id="sha256:555", review="DISAPPROVED by bao-security APPROVED"),
+            _ROW.format(tag="vlm-automodel:p", id="sha256:666", review="bao-security APPROVED-PENDING"),
         ]
     )
     (tmp_path / "docker").mkdir()
@@ -189,3 +190,4 @@ def test_user_jobs_require_approved_image(tmp_path: Path) -> None:
     assert not images.is_approved(lock, "vlm-automodel:probe")
     assert not images.is_approved(lock, "vlm-automodel:u")
     assert not images.is_approved(lock, "vlm-automodel:d")
+    assert not images.is_approved(lock, "vlm-automodel:p")
