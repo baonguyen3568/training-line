@@ -1,13 +1,15 @@
-# vlm-automodel:26.08-2 = 26.08-1 (chmod o+rX) + pinned extra wheels + fixcode's AutoModel patches.
+# vlm-automodel:26.08-N = NGC 26.08 (chmod o+rX) + pinned extra wheels + fixcode's AutoModel patches (PATCHES.sha256).
+# N = number of reviewed patch sets; pass --build-arg VLM_TAG=26.08-N matching the -t tag.
 # Build from the repo root with the matching .dockerignore (only docker/automodel/ and third_party/patches/automodel/
 # are sent):  docker buildx build --builder vlm-builder --platform linux/arm64 \
 #               -f docker/automodel-2.Dockerfile -t vlm-automodel:26.08-2 --load .
 # Base pinned by digest (arm64 manifest of nemo-automodel:26.08); same chmod as 26.08-1.
 FROM nvcr.io/nvidia/nemo-automodel@sha256:70b4e9df8dd23ef451372b25952cffe24ad29c17f5b9de5fd1b244caf4e7b55a
 
+ARG VLM_TAG=26.08-3
 LABEL project="vlm-training" \
       org.opencontainers.image.title="vlm-automodel" \
-      org.opencontainers.image.version="26.08-2" \
+      org.opencontainers.image.version="${VLM_TAG}" \
       org.opencontainers.image.base.name="nvcr.io/nvidia/nemo-automodel:26.08" \
       org.opencontainers.image.base.digest="sha256:70b4e9df8dd23ef451372b25952cffe24ad29c17f5b9de5fd1b244caf4e7b55a"
 
