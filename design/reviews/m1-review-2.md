@@ -19,3 +19,9 @@ Verdict: **APPROVE** cho luồng M1 "tạo → nối → chạy". Còn 4 chỉnh
 
 ## Việc frontend đang làm tiếp (đã thống nhất)
 Cuộn tới node mới thêm → thẻ lỗi trong inspector → gợi ý cổng bắt buộc chưa nối (CFG-003) → rút gọn mục thư viện.
+
+## Xác minh sau sửa (d535439)
+Cả 4 mục đều đạt, test lại bằng thao tác thật:
+- Tiến độ: "Đang chạy bước 3/4 · Fine-tune toàn bộ ■ Dừng".
+- Xong: "✓ Chạy xong sau 0:05 · Xem kết quả".
+- Banner khôi phục: "…từ 12/10/2026 17:40?".
