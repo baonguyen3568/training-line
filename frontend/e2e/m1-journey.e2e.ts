@@ -154,13 +154,26 @@ test("work survives a page reload (autosave)", async ({ page }) => {
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
 });
 
+// Known gap (2026-10-12): the real app has no GET /api/templates yet, so its gallery shows an error. Passes on the
+// mock tier; remove the condition when the endpoint lands (then it guards the first screen of the real app).
+const NO_TEMPLATES_API = process.env.E2E_TIER === "app";
+
+test("gallery lists templates without an error @narrow", async ({ page }) => {
+  test.fail(NO_TEMPLATES_API, "real app: GET /api/templates not implemented");
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: tr("gallery.use_template") }).first(),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
 test("narrow screens can open a template and see the canvas @narrow", async ({ page }) => {
+  test.fail(NO_TEMPLATES_API, "real app: GET /api/templates not implemented");
   // Regression guard: < 1280 px is view-only (P010) but the canvas must stay visible (fixed 2026-10-12).
   await page.goto("/");
-  await page
-    .getByRole("button", { name: tr("gallery.use_template") })
-    .first()
-    .click();
+  const useTemplate = page.getByRole("button", { name: tr("gallery.use_template") }).first();
+  await expect(useTemplate).toBeVisible({ timeout: 10_000 }); // fail fast: an expected failure must not time out
+  await useTemplate.click();
   await expect(page.locator(".react-flow")).toBeVisible();
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
   await expect(page.getByTestId("check-bar")).toBeVisible();
