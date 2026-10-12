@@ -44,7 +44,7 @@ Docker/deps/network/secrets/xoá file/plugin. Không viết proposal mới cho M
 | M1-3 | `app/`: FastAPI GET /api/nodes, POST /api/graphs/validate, POST /api/runs, GET runs/metrics, WS events, auth token (D13); FakeWorker | bao-backend | REVIEW (ec726ac: API + D13 security live; cancel + container worker chờ executor M1-2) |
 | M1-4 | Frontend: thư viện node (sidebar, tìm kiếm, kéo thả vào canvas), workflow trống, nối dây kéo-thả, xoá/nhân bản node, lưu/mở file workflow (.json), trạng thái chạy từng node trên canvas, nối API thật | bao-frontend | DOING |
 | M1-5 | UX thư viện node + trạng thái node khi chạy (spec nhanh, review UI) | bao-design | DOING |
-| M1-6 | E2E Playwright: tạo trống → kéo 3 node → nối → chạy FakeWorker → thấy kết quả; chuyển spec xfail graph/executor sang pass | bao-tester | DOING (chromium arm64 OK; chờ selector + UI M1-4; dep chờ security) |
+| M1-6 | E2E Playwright: tạo trống → kéo 3 node → nối → chạy FakeWorker → thấy kết quả; chuyển spec xfail graph/executor sang pass | bao-tester | DOING (E2E mock PASS 2/2; chờ review frontend+security để commit; tầng (b) chờ app serve dist) |
 | M1-7 | Review security tối thiểu cho app/ (auth, CORS/Host, WS) | bao-security | DONE (app/security.py ec726ac + fix d87595b; D13 spec 29/29) |
 | M1-8 | Node cache retention + dọn worktree; hỗ trợ backend FakeWorker fixtures | bao-cleanup | REVIEW→DONE phần code: worktrees 42dc8fc, testing+runs_index aba6332, index+cache_retention d162093, lease acadb6f, release_all_except e40d180 (fixcode/security/backend approve). Còn: backend nối app (startup release, panel Dung lượng, DISK-003) |
 S-9 (patch 26.08-2 → P-1/P-2) chạy song song, không chặn M1.
