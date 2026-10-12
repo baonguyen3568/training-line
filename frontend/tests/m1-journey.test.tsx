@@ -150,3 +150,30 @@ describe("Inspector enum handling", () => {
     expect(epochs).toBeTruthy(); // integer input (not an enum in the mock)
   });
 });
+
+describe("cycle and empty-canvas guards (design review M1 K2/K3)", () => {
+  it("rejects wiring a node from its own downstream and hides such sources in 'Nhận từ'", async () => {
+    const wfStore = await setup();
+    const s = () => wfStore.getState();
+    const a = s().addNode("train.sft_vlm", { x: 0, y: 0 }) as string;
+    const b = s().addNode("train.sft_vlm", { x: 300, y: 0 }) as string;
+    expect(s().connect([a, "model"], [b, "base_model"]).ok).toBe(true);
+    expect(s().connect([b, "model"], [a, "base_model"]).ok).toBe(false); // would be a cycle
+    expect(s().connect([a, "model"], [a, "base_model"]).ok).toBe(false); // self
+    s().select(a);
+    const { Inspector } = await import("../src/components/Inspector");
+    const view = render(<Inspector />);
+    const labels = [...view.container.querySelectorAll("option")].map((o) =>
+      o.getAttribute("value"),
+    );
+    expect(labels.some((v) => v?.startsWith(`${a}:`) || v?.startsWith(`${b}:`))).toBe(false);
+  });
+
+  it("shows 'add a step' instead of 'ready' on an empty canvas", async () => {
+    await setup();
+    const { Editor } = await import("../src/components/Editor");
+    render(<Editor />);
+    expect(screen.getByText(/Thêm bước để bắt đầu/)).toBeTruthy();
+    expect(screen.queryByText(/Mọi thứ đã sẵn sàng/)).toBeNull();
+  });
+});

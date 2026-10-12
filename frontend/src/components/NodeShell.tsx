@@ -102,7 +102,10 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
   // Key choices on the node face (x-ui.summary), e.g. the chosen model/dataset; repo ids shortened to the name.
   const summary = Object.entries(spec?.params_schema.properties ?? {})
     .filter(([, s]) => s["x-ui"]?.summary)
-    .map(([name, s]) => String(params[name] ?? s.default ?? ""))
+    .map(([name, s]) => {
+      const v = String(params[name] ?? s.default ?? "");
+      return s["x-ui"]?.option_meta?.[v]?.label ?? v; // catalog id → display name
+    })
     .filter(Boolean)
     .map((v) =>
       spec?.origin.kind === "third_party" ? untrustedText(v, 40) : (v.split("/").pop() ?? v),

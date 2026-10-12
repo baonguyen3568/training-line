@@ -4,6 +4,7 @@ import { t, tp, tpOptional } from "../i18n";
 import { nodeDesc, nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
+import { selfAndDownstream } from "../lib/topo";
 import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
@@ -22,8 +23,9 @@ function sourcesFor(
   inputType: string,
 ): SourceOption[] {
   const out: SourceOption[] = [];
+  const forbidden = selfAndDownstream(wf, selfId); // design review M1 K2: no self / downstream (cycle)
   for (const n of wf.nodes) {
-    if (n.id === selfId) continue;
+    if (forbidden.has(n.id)) continue;
     const spec = specs.get(n.type);
     for (const [port, ps] of Object.entries(spec?.outputs ?? {})) {
       if (!isCompatible(ps.type, inputType, ports)) continue;

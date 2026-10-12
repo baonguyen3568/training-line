@@ -12,6 +12,7 @@ import type {
 import { getLocale } from "../i18n";
 import { laneLayout } from "../lib/lanes";
 import { isCompatible } from "../lib/ports";
+import { selfAndDownstream } from "../lib/topo";
 
 export type ConnectResult = { ok: true } | { ok: false; expected: string; actual: string };
 
@@ -230,7 +231,13 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       const dst = wf.nodes.find((n) => n.id === to[0]);
       const actual = (src && specs.get(src.type)?.outputs[from[1]]?.type) ?? "";
       const expected = (dst && specs.get(dst.type)?.inputs[to[1]]?.type) ?? "";
-      if (!actual || !expected || from[0] === to[0] || !isCompatible(actual, expected, ports)) {
+      // Reject type mismatches and cycles (feeding a node from itself or from its own downstream).
+      if (
+        !actual ||
+        !expected ||
+        selfAndDownstream(wf, to[0]).has(from[0]) ||
+        !isCompatible(actual, expected, ports)
+      ) {
         return { ok: false, expected, actual };
       }
       // One wire per input port (inputs are not `many` in v1): replace any existing wire.

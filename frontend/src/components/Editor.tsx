@@ -15,7 +15,7 @@ import { t, tp } from "../i18n";
 import { LANE_WIDTH, LANES, laneOf, ROW_HEIGHT } from "../lib/lanes";
 import { nodeTitle } from "../lib/nodeText";
 import { isCompatible, tokenVar } from "../lib/ports";
-import { stepNumbers } from "../lib/topo";
+import { selfAndDownstream, stepNumbers } from "../lib/topo";
 import { graphKey, useWorkflow } from "../store/workflow";
 import { CheckBar } from "./CheckBar";
 import { Inspector } from "./Inspector";
@@ -204,7 +204,9 @@ function EditorInner() {
       if (locked) return false;
       const out = typeOf(c.source, c.sourceHandle, "out");
       const inp = typeOf(c.target, c.targetHandle, "in");
-      return !!out && !!inp && c.source !== c.target && isCompatible(out, inp, ports);
+      const wf = useWorkflow.getState().workflow;
+      const cycle = wf ? selfAndDownstream(wf, c.target).has(c.source) : c.source === c.target;
+      return !!out && !!inp && !cycle && isCompatible(out, inp, ports);
     },
     [typeOf, ports, locked],
   );

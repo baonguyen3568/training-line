@@ -190,6 +190,8 @@ export interface SystemStatus {
   mem_available_gb: number;
   gpu_lock: { held: boolean; who?: string; job?: string; since?: string; stale?: boolean };
   disk_free_gb: number;
+  /** Which worker executes nodes; "fake" = simulated (demo banner). */
+  worker?: "fake" | "container";
 }
 
 import type {
@@ -264,7 +266,7 @@ export interface RunStatusEvent {
 }
 export interface OtherEvent {
   /** `connection_lost` is synthesized by the client when the event socket closes before the run ends. */
-  type: "warning" | "run_not_found" | "connection_lost";
+  type: "warning" | "run_not_found" | "connection_lost" | "backlog_truncated";
   node_id?: string;
   error?: EventError;
 }

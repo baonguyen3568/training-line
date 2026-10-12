@@ -28,6 +28,7 @@ export type RunManifest = {
   exit_code?: number | null;
   git_commit?: string | null;
   git_dirty?: boolean | null;
+  host_min_available_gb?: number | null;
   max_steps?: number | null;
   name: string;
   oom_killed?: boolean | null;

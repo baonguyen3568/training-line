@@ -27,3 +27,19 @@ export function stepNumbers(wf: Workflow): Map<string, number> {
   for (const n of wf.nodes) if (!order.has(n.id)) order.set(n.id, 0);
   return order;
 }
+
+/** The node itself plus everything reachable from it — feeding any of these into it would create a cycle. */
+export function selfAndDownstream(wf: Workflow, nodeId: string): Set<string> {
+  const out = new Set([nodeId]);
+  const stack = [nodeId];
+  while (stack.length) {
+    const cur = stack.pop() as string;
+    for (const e of wf.edges) {
+      if (e.from[0] === cur && !out.has(e.to[0])) {
+        out.add(e.to[0]);
+        stack.push(e.to[0]);
+      }
+    }
+  }
+  return out;
+}

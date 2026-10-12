@@ -57,7 +57,9 @@ export function CheckBar() {
     >
       <div className="checkbar-row">
         <strong>{t("preflight.title")}:</strong>{" "}
-        {validating && !validation ? (
+        {total === 0 ? (
+          <span className="muted">{t("preflight.empty")}</span>
+        ) : validating && !validation ? (
           "…"
         ) : errors.length + warnings.length === 0 ? (
           <span className="ok">✓ {t("preflight.summary_ok")}</span>
