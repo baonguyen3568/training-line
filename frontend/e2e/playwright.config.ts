@@ -34,6 +34,17 @@ export default defineConfig({
     video: "off",
     screenshot: "only-on-failure",
   },
+  // Editing is supported from 1280 px wide (P010): edit journeys run at the minimum and a wide size; below that
+  // the app is view-only, so 1024 px only gets a smoke test tagged @narrow.
+  projects: [
+    { name: "desktop-min", use: { viewport: { width: 1280, height: 720 } }, grepInvert: /@narrow/ },
+    {
+      name: "desktop-wide",
+      use: { viewport: { width: 1920, height: 1080 } },
+      grepInvert: /@narrow/,
+    },
+    { name: "narrow-view", use: { viewport: { width: 1024, height: 768 } }, grep: /@narrow/ },
+  ],
   webServer: {
     command: server,
     cwd: "..", // frontend/ root
