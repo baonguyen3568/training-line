@@ -25,7 +25,7 @@ from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
 
-DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-2"
+DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-3"
 # Hub datasets vetted by bao-security, pinned revisions. TODO(research): move into a datasets catalog file.
 HUB_DATASET_REVISIONS = {"naver-clova-ix/cord-v2": "7f0115a4b758a71d6473b8d085751692da2fef98"}
 # Expected trainable-parameter share for full fine-tune with the default freeze (fixcode patch 0002 guard).

@@ -61,6 +61,7 @@ BASE_ENV: Mapping[str, str] = {
     "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
     "PYTHONPATH": f"{CONTAINER_ROOT}/src",
     "VLM_PROJECT_ROOT": CONTAINER_ROOT,
+    "NO_ALBUMENTATIONS_UPDATE": "1",  # albumentations phones home for a version check (network none -> noise)
 }
 _FORBIDDEN_ENV_PREFIXES = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "NGC_", "WANDB_API_KEY")
 
