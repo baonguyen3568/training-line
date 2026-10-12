@@ -1,0 +1,92 @@
+# Train template for catalog id `nemotron-parse-2.0` (owner: bao-research). Read by src/vlm_pipeline/train/recipe.py, which
+# overrides node-controlled fields (paths, batch, epochs, lr preset, seed, ckpt, LoRA/full, freeze); everything
+# else (loss, collate, attn, pixels, pin_memory, val limit) is taken verbatim from here.
+# Model: nvidia/NVIDIA-Nemotron-Parse-2.0@b6742064f4a8cf22a10383ece5e7fbead355ac04 (vetted, configs/catalog/models.yaml). Derived from: configs/train/smoke/nemotron_parse_2_0_cordv2_smoke.yaml.
+# Status: R&D (tier rnd); needs vlm-automodel:26.08-3 adapter (tied lm_head, processor_normalizes alias, encoder freeze); comparison 001a §8
+
+recipe: FinetuneRecipeForVLM
+
+step_scheduler:
+  global_batch_size: 8
+  local_batch_size: 1
+  ckpt_every_steps: 25
+  val_every_steps: 25
+  max_steps: 50
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1234
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForImageTextToText.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  torch_dtype: torch.bfloat16
+  use_liger_kernel: false
+  attn_implementation: eager
+  trust_remote_code: true  # required by upstream recipe; code is pinned + offline (see header)
+
+processor:
+  _target_: transformers.AutoProcessor.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  trust_remote_code: true
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: RUN_DIR/checkpoints
+  model_save_format: safetensors
+  save_consolidated: final
+  max_recent_checkpoints: 2
+
+distributed:
+  strategy: fsdp2
+  dp_size: none
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+  activation_checkpointing: true
+
+loss_fn:
+  _target_: nemo_automodel.components.models.nemotron_parse.nemotron_parse_loss.NemotronParseLoss
+  coordinate_weight: 10.0
+  class_token_start_idx: 52315  # from 2.0 config.json (v1.1 recipe used 50000 for vocab 52327) - verify with fixcode
+  num_heads: 1
+  ignore_index: -100
+  fp32_upcast: true
+
+dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: train
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  pin_memory: true
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: validation
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+
+freeze_config:  # adapter enforces: freeze encoder.model_encoder (RADIO backbone), neck + decoder + embeddings train (001a §9.3)
+  freeze_vision_tower: true
+  freeze_language_model: false
