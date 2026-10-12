@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import random
+import sys
 
 import pytest
 
@@ -31,7 +32,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         return
     skip_gpu = pytest.mark.skip(reason="needs CUDA: run via scripts/check.sh --container")
     for item in items:
-        if "gpu" in item.keywords:
+        if item.get_closest_marker("gpu") is not None:
             item.add_marker(skip_gpu)
 
 
@@ -44,20 +45,21 @@ def _fixed_seed() -> None:
         pass
     else:
         np.random.seed(SEED)
-    return
+    if "torch" in sys.modules:  # seed torch only if a test already imported it; never import it just to seed
+        sys.modules["torch"].manual_seed(SEED)
 
 
 @pytest.fixture(autouse=True)
 def _gpu_lock_held(request: pytest.FixtureRequest) -> None:
-    """For ``gpu`` tests only: verify the lock token through common.gpu_lock (never parse the file here)."""
-    if "gpu" not in request.keywords:
+    """For ``gpu`` tests only: verify the lock token via common.gpu_lock (never parse the file here)."""
+    if request.node.get_closest_marker("gpu") is None:
         return
     token = os.environ.get(GPU_LOCK_ENV_VAR)
     if not token:
         pytest.fail(f"{GPU_LOCK_ENV_VAR} not set: gpu tests must be launched by the host holding .team/GPU_LOCK")
+    from vlm_pipeline.common.gpu_lock import GpuLockError, default_lock_path, verify_token
+
     try:
-        from vlm_pipeline.common.gpu_lock import verify_token
-    except ImportError:
-        pytest.fail("vlm_pipeline.common.gpu_lock.verify_token is not available yet (S-2)")
-    if not verify_token(token):
-        pytest.fail("GPU lock token does not match .team/GPU_LOCK: the lock is not held for this run")
+        verify_token(default_lock_path(), token)
+    except GpuLockError as exc:
+        pytest.fail(f"GPU lock not held for this run ({exc.code}): {exc}")

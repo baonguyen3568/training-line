@@ -15,7 +15,7 @@ Multi-param variants: ``variants: [{when: {param: value | [values]}, key}]`` eva
 of the enum/bool params named in ``when`` must match >= 1 variant; keys live at ``error.<code>.what.<key>``.
 ``action.when: {<param>: <value>}`` ⇒ ``available_actions(err)`` offers the action only when params match.
 Params are names or objects ``{name, type, values?}`` - helper ``_param_names`` accepts both.
-ASSUMED: ``vlm_pipeline.common.errors.load_catalog() -> dict[code, Entry]`` (attribute access);
+ASSUMED: ``vlm_pipeline.common.error_catalog.load_catalog() -> dict[code, Entry]`` (attribute access);
 ``vlm_pipeline.i18n.load(locale) -> dict[str, str]`` (flat keys).
 """
 
@@ -37,13 +37,13 @@ SECRET_RE = re.compile(r"hf_[A-Za-z0-9]{20,}|nvapi-[A-Za-z0-9_-]{20,}|sk-[A-Za-z
 
 
 def _catalog() -> dict[str, Any]:
-    from vlm_pipeline.common.errors import load_catalog
+    from vlm_pipeline.common.error_catalog import load_catalog
 
     return load_catalog()
 
 
 def _load() -> tuple[dict[str, Any], dict[str, dict[str, str]]]:
-    from vlm_pipeline.common.errors import load_catalog
+    from vlm_pipeline.common.error_catalog import load_catalog
     from vlm_pipeline.i18n import load
 
     return load_catalog(), {loc: load(loc) for loc in LOCALES}
@@ -208,7 +208,7 @@ def test_action_when_conditions_reference_declared_params() -> None:
 def test_available_actions_filters_by_when(code: str, params: dict[str, Any], action_id: str, offered: bool) -> None:
     from types import SimpleNamespace
 
-    from vlm_pipeline.common.errors import available_actions
+    from vlm_pipeline.common.error_catalog import available_actions
 
     err = SimpleNamespace(code=code, params=params, resumable=False)
     assert (action_id in available_actions(err)) is offered

@@ -15,7 +15,7 @@ ASSUMED INTERFACE (draft — agree with bao-backend):
   exit 75 → MEM-002 (interrupted);
   exit 137 + OOMKilled → MEM-003; worker error event with a catalog code → that code; non-zero exit without
   event → SYS-003; unknown exception → SYS-000.
-- Runtime errors carry ``resumable: bool``; ``vlm_pipeline.common.errors.available_actions(error) -> list[str]``
+- Runtime errors carry ``resumable: bool``; ``vlm_pipeline.common.error_catalog.available_actions(error) -> list[str]``
   returns the catalog action ids offered for that error, never ``resume_checkpoint`` when ``resumable`` is False.
 - ``vlm_pipeline.graph.errors``: ``InterruptedByMemguard`` (exit 75) and catalog exceptions
   (``OutOfMemoryUMA`` → ``MEM-003``, memguard pause → ``MEM-002``); anything unknown → ``SYS-000``.
@@ -208,7 +208,7 @@ def test_resume_action_depends_on_checkpoint_not_code(
     tmp_path: Path, failure: str, has_checkpoint: bool, resumable: bool
 ) -> None:
     """``resumable`` = a real checkpoint exists (bao-fixcode); FakeWorker(checkpoints=...) simulates saved ckpts."""
-    from vlm_pipeline.common.errors import available_actions
+    from vlm_pipeline.common.error_catalog import available_actions
     from vlm_pipeline.graph.errors import InterruptedByMemguard
     from vlm_pipeline.graph.testing import ContainerExit
 

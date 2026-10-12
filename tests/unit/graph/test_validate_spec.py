@@ -154,7 +154,7 @@ def test_validator_never_raises_on_garbage() -> None:
 
 def test_every_issue_code_is_in_catalog_with_i18n_text() -> None:
     """No-tech UX: every Issue resolves to catalog text in both locales (display rules: test_error_catalog_spec)."""
-    from vlm_pipeline.common.errors import load_catalog
+    from vlm_pipeline.common.error_catalog import load_catalog
     from vlm_pipeline.i18n import load
 
     catalog, vi, en = load_catalog(), load("vi"), load("en")
