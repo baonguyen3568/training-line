@@ -51,3 +51,10 @@ Rules:
 - Requires `trust_remote_code=True` → loop in `bao-security`.
 - Docs "latest" page lags nightly — check both.
 - Docker `--memory` does not cap CUDA allocations on UMA → memory guard must be in code.
+
+## Remote-code bridge check (mandatory for every model; missed twice on 2026-10-12)
+- Walk config.json **recursively**: every `auto_map` and `_name_or_path` at ANY level (encoder/vision_config/text_config/...),
+  not just the root. `org/repo--module.Class` or a foreign `_name_or_path` = code pulled from ANOTHER repo at `main`.
+- Grep the repo's `.py` for `get_class_from_dynamic_module`, `trust_remote_code=True`, `torch.load`, `urlretrieve`.
+- Tool: `python3 -I scripts/research/hf_model_meta.py org/repo` (prints subconfig_auto_map). Gated repos: config unreadable
+  without an accepted token -> verdict must stay CONDITIONAL.

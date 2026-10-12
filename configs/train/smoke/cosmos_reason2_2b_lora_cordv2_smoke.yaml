@@ -1,0 +1,102 @@
+# N-2 smoke: LoRA on NVIDIA Cosmos-Reason2-2B (Qwen3VLForConditionalGeneration, native in transformers 5.12.1,
+# no trust_remote_code) with CORD-v2, NeMo AutoModel 26.08 (vlm-automodel:26.08-1). Proposal 001a.
+# Derived from upstream examples/vlm_finetune/qwen3/qwen3_vl_4b_instruct_rdr.yaml (collate qwen2_5_collate_fn,
+# pixel caps) + S-3 peft/checkpoint blocks; hyperparameters identical to S-3/S-3b for RAM comparability.
+# Pinned snapshots (pending bao-security vet; repo is gated - token must have accepted the license):
+#   nvidia/Cosmos-Reason2-2B@9ce19a195e423419c349abfc86fd07178b230561 (NVIDIA Open Model License, "Built on NVIDIA Cosmos")
+#   naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98 (CC BY 4.0, APPROVED)
+# Measurement: same 4 RAM numbers as S-3b (P002 B5). Paths are container paths; RUN_DIR is substituted by the launcher.
+
+recipe: FinetuneRecipeForVLM
+
+step_scheduler:
+  global_batch_size: 4
+  local_batch_size: 1
+  ckpt_every_steps: 10
+  val_every_steps: 1000
+  num_epochs: 1
+  max_steps: 30
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1234
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForImageTextToText.from_pretrained
+  pretrained_model_name_or_path: /workspace/.cache/hf/hub/models--nvidia--Cosmos-Reason2-2B/snapshots/9ce19a195e423419c349abfc86fd07178b230561
+  backend:
+    _target_: nemo_automodel.components.models.common.BackendConfig
+    attn: sdpa
+    linear: torch
+    rms_norm: torch
+    rope_fusion: false
+  attn_implementation: sdpa
+  torch_dtype: bfloat16
+
+processor:
+  _target_: transformers.AutoProcessor.from_pretrained
+  pretrained_model_name_or_path: /workspace/.cache/hf/hub/models--nvidia--Cosmos-Reason2-2B/snapshots/9ce19a195e423419c349abfc86fd07178b230561
+  min_pixels: 200704  # 256*28*28
+  max_pixels: 1003520  # 1280*28*28
+
+peft:
+  _target_: nemo_automodel.components._peft.lora.PeftConfig
+  match_all_linear: False
+  exclude_modules:
+    - "*vision_tower*"
+    - "*vision*"
+    - "*visual*"
+    - "*image_encoder*"
+    - "*lm_head*"
+    - "*audio*"
+  dim: 8
+  alpha: 32
+  use_triton: True
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: RUN_DIR/checkpoints
+  model_save_format: safetensors
+  save_consolidated: final
+  max_recent_checkpoints: 2
+
+distributed:
+  _target_: nemo_automodel.components.distributed.fsdp2.FSDP2Manager
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 1
+  ep_size: 1
+  sequence_parallel: false
+  activation_checkpointing: true
+
+freeze_config:
+  freeze_vision_tower: true
+  freeze_audio_tower: true
+  freeze_language_model: false
+
+loss_fn:
+  _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
+
+dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: train
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.qwen2_5_collate_fn
+
+optimizer:
+  _target_: torch.optim.AdamW
+  betas: [0.9, 0.95]
+  eps: 1e-8
+  lr: 1.0e-4
+  weight_decay: 0.01

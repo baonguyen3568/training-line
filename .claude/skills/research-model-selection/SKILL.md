@@ -42,3 +42,18 @@ Always pick: **1 tiny dev model (≤4B)** for smoke/CI + **1 main target** + 1 f
 
 ## 5. Output
 Write comparison table + decision + risks into `.team/proposals/001-*.md`; send `bao-security` the license list, `bao-backend` the recipe YAML sketch, `bao-cleanup` the disk estimate.
+
+## Remote-code bridge check (mandatory for every model; missed twice on 2026-10-12)
+- Walk config.json **recursively**: every `auto_map` and `_name_or_path` at ANY level (encoder/vision_config/text_config/...),
+  not just the root. `org/repo--module.Class` or a foreign `_name_or_path` = code pulled from ANOTHER repo at `main`.
+- Grep the repo's `.py` for `get_class_from_dynamic_module`, `trust_remote_code=True`, `torch.load`, `urlretrieve`.
+- Tool: `python3 -I scripts/research/hf_model_meta.py org/repo` (prints subconfig_auto_map). Gated repos: config unreadable
+  without an accepted token -> verdict must stay CONDITIONAL.
+- Preprocessing flags can be silently DROPPED when a model's config builds a sub-config from another repo
+  (e.g. Nemotron Parse: `image_processor_normalizes` lost because RADIOConfig lacks the attr → double normalization).
+  Verify numerically (synthetic white image at patch-embed input: once = (1-m)/s), and check train/serve parity
+  of pixel_values (AutoModel path vs vLLM/HF path) before trusting any accuracy number.
+- Before blaming memory on a component, inspect the BUILT model (meta device is enough): trainable-param count per
+  top-level prefix, which modules got activation checkpointing (AutoModel logs `selected N/N trainable layers`), and
+  attention kernel flags. Docstrings/recipe YAML are not evidence: AutoModel's freeze_config matches module NAMES
+  (`vision_tower`/`vision`/`visual`/`image_encoder`) and silently ignores unknown keys (e.g. `freeze_embeddings`).

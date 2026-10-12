@@ -1,0 +1,104 @@
+# Q-1 smoke (v1.1 vs 2.0 comparison, PM 2026-10-12): fine-tune NVIDIA Nemotron-Parse-2.0 on CORD-v2. Identical to
+# nemotron_parse_v1_1_cordv2_smoke.yaml except model + loss threshold. REQUIRES patched image vlm-automodel:26.08-2
+# (fixcode patch: encoder.processor_normalizes alias + tied word embeddings). Original v1.1 header follows:
+# P-1 smoke (default template candidate, ADR-001 amendment 1): fine-tune NVIDIA Nemotron-Parse-v1.1 on CORD-v2,
+# NeMo AutoModel 26.08 (vlm-automodel:26.08-1). Derived from upstream examples/vlm_finetune/nemotron/nemotron_parse_v1_1.yaml
+# (same loss / collate / freeze policy); Spark changes: local_batch 1, GBS 8, max_steps 50, ckpt/val cadence for smoke.
+# Pinned snapshots (bao-security):
+#   nvidia/NVIDIA-Nemotron-Parse-2.0@b6742064f4a8cf22a10383ece5e7fbead355ac04 (OpenMDW-1.1; tokenizer CC-BY-4.0) - security
+#     APPROVED-WITH-CONDITIONS (same C-RADIOv2-H@0d8f4c18 local pin as v1.1). Config differs from v1.1: vocab 72256,
+#     tie_word_embeddings=true, class_token_start_idx=52315, encoder.processor_normalizes, image_size [2048,1664].
+#     APPROVED-WITH-CONDITIONS: encoder.auto_map + hf_nemotron_parse_config.py pull nvidia/C-RADIOv2-H code at `main`.
+#     -> the launcher's prepare step must point encoder auto_map/_name_or_path at a LOCAL, hash-verified copy of
+#        nvidia/C-RADIOv2-H@0d8f4c18 and run with HF_HUB_OFFLINE=1 (same mechanism as the Omni review).
+#     PREPARED_MODEL_DIR below = that prepared (patched) snapshot.
+#   naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98 (CC BY 4.0, APPROVED)
+# Model is ~0.9B: full fine-tune of the decoder (vision encoder + embeddings frozen, as upstream). No LoRA needed.
+# Paths are container paths; RUN_DIR and PREPARED_MODEL_DIR are substituted by the launcher.
+
+recipe: FinetuneRecipeForVLM
+
+step_scheduler:
+  global_batch_size: 8
+  local_batch_size: 1
+  ckpt_every_steps: 25
+  val_every_steps: 25
+  max_steps: 50
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1234
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForImageTextToText.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  torch_dtype: torch.bfloat16
+  use_liger_kernel: false
+  attn_implementation: eager
+  trust_remote_code: true  # required by upstream recipe; code is pinned + offline (see header)
+
+processor:
+  _target_: transformers.AutoProcessor.from_pretrained
+  pretrained_model_name_or_path: PREPARED_MODEL_DIR
+  trust_remote_code: true
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: RUN_DIR/checkpoints
+  model_save_format: safetensors
+  save_consolidated: final
+  max_recent_checkpoints: 2
+
+distributed:
+  strategy: fsdp2
+  dp_size: none
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+  activation_checkpointing: true
+
+loss_fn:
+  _target_: nemo_automodel.components.models.nemotron_parse.nemotron_parse_loss.NemotronParseLoss
+  coordinate_weight: 10.0
+  class_token_start_idx: 52315  # from 2.0 config.json (v1.1 recipe used 50000 for vocab 52327) - verify with fixcode
+  num_heads: 1
+  ignore_index: -100
+  fp32_upcast: true
+
+dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: train
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  pin_memory: true
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: validation
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+
+freeze_config:  # adapter enforces: freeze encoder.model_encoder (RADIO backbone), neck + decoder + embeddings train (001a §9.3)
+  freeze_vision_tower: true
+  freeze_language_model: false
