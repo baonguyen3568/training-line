@@ -56,6 +56,18 @@ class Worker(Protocol):
     def run(self, job: NodeJob) -> NodeResult: ...
 
 
+def worker_identity(worker: object, spec: NodeSpec) -> str:
+    """What runs ``spec`` on ``worker``; part of the cache key.
+
+    Workers may define ``identity(spec) -> str`` (e.g. ``"container/vlm-automodel@sha256:..."`` with the image they
+    really use for that node type); otherwise the worker class name is used.
+    """
+    ident = getattr(worker, "identity", None)
+    if callable(ident):
+        return str(ident(spec))
+    return f"{type(worker).__module__}.{type(worker).__qualname__}"
+
+
 _AUTOMODEL_CKPT = re.compile(r"^epoch_(\d+)_step_(\d+)$")
 
 
@@ -78,4 +90,12 @@ def read_checkpoint_step(run_dir: Path) -> int | None:
         return None
 
 
-__all__ = ["CHECKPOINT_MARKER", "ArtifactRef", "NodeJob", "NodeResult", "Worker", "read_checkpoint_step"]
+__all__ = [
+    "CHECKPOINT_MARKER",
+    "ArtifactRef",
+    "NodeJob",
+    "NodeResult",
+    "Worker",
+    "read_checkpoint_step",
+    "worker_identity",
+]

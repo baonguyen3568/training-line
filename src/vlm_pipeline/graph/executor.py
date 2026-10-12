@@ -24,7 +24,7 @@ from vlm_pipeline.artifacts.index import ArtifactIndex, CacheEntry, OutputRef
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
 from vlm_pipeline.graph.validation import Issue, validate
-from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, Worker, read_checkpoint_step
+from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, Worker, read_checkpoint_step, worker_identity
 from vlm_pipeline.nodes.spec import NodeSpec, Registry
 
 logger = logging.getLogger(__name__)
@@ -195,12 +195,18 @@ class Executor:
             self._set(run, nid, "skipped")
             return
         inputs = {inp: run.outputs[src][out] for src, out, inp in upstream}
-        key = compute_cache_key(node.spec, node.params, {p: r.hash for p, r in inputs.items()}, node.spec.image_digest)
+        key = compute_cache_key(
+            node.spec,
+            node.params,
+            {p: r.hash for p, r in inputs.items()},
+            node.spec.image_digest,
+            worker=worker_identity(self.worker, node.spec),
+        )
         keys[nid] = key
         if node.spec.cacheable and self._try_cache(run, nid, key):
             return
 
-        run_dir = self.state_dir / "runs" / f"{nid}-{key.removeprefix('ck1-')[:16]}"
+        run_dir = self.state_dir / "runs" / f"{nid}-{key.split('-', 1)[1][:16]}"
         run_dir.mkdir(parents=True, exist_ok=True)
         job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, read_checkpoint_step(run_dir))
         self._set(run, nid, "running", cache_key=key, resume_from_step=job.resume_from_step)

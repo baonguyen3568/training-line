@@ -9,7 +9,7 @@ from typing import Any
 from vlm_pipeline.graph.errors import InterruptedByMemguard
 from vlm_pipeline.graph.executor import Executor
 from vlm_pipeline.graph.testing import FakeWorker, make_test_registry
-from vlm_pipeline.graph.worker import NodeJob, NodeResult
+from vlm_pipeline.graph.worker import NodeJob, NodeResult, worker_identity
 
 
 def _wf() -> dict[str, Any]:
@@ -91,6 +91,9 @@ def test_resume_passes_checkpoint_step_to_worker(tmp_path: Path) -> None:
     seen: list[int | None] = []
 
     class Recorder(FakeWorker):
+        def identity(self, spec: Any) -> str:  # same runtime as the FakeWorker that saved the checkpoint
+            return worker_identity(FakeWorker(), spec)
+
         def run(self, job: NodeJob) -> NodeResult:
             if job.node_id == "t":
                 seen.append(job.resume_from_step)
@@ -222,3 +225,33 @@ def test_checkpoint_marker_formats(tmp_path: Path) -> None:
     (ckpts / "epoch_0_step_19" / ".incomplete").touch()  # save still in progress -> not resumable
     assert read_checkpoint_step(am) is None
     assert read_checkpoint_step(tmp_path / "none") is None
+
+
+class _RealishWorker(FakeWorker):
+    """Same outputs as FakeWorker but a different identity, like the container worker of a real run."""
+
+    def identity(self, spec: Any) -> str:
+        return f"container/vlm-automodel@sha256:{'8' * 64}/{spec.type_id}"
+
+
+def test_fake_artifacts_never_satisfy_a_real_run(tmp_path: Path) -> None:
+    """M1 E2E bug (bao-backend): FakeWorker outputs in a shared cache were reused by a RealWorker run."""
+    Executor(make_test_registry(), FakeWorker(), tmp_path).run(_wf())  # demo run fills the cache
+    real = _RealishWorker()
+    run = Executor(make_test_registry(), real, tmp_path).run(_wf())
+    assert sorted(real.calls) == ["d", "m", "t"]  # nothing taken from the fake run
+    assert "cached" not in set(run.status.values())
+    again = _RealishWorker()
+    assert set(Executor(make_test_registry(), again, tmp_path).run(_wf()).status.values()) == {"cached"}
+    assert again.calls == []  # real artifacts do cache for real runs
+
+
+def test_runtime_image_is_part_of_the_cache_key(tmp_path: Path) -> None:
+    class NewImage(_RealishWorker):
+        def identity(self, spec: Any) -> str:
+            return f"container/vlm-automodel@sha256:{'9' * 64}/{spec.type_id}"
+
+    Executor(make_test_registry(), _RealishWorker(), tmp_path).run(_wf())
+    worker = NewImage()
+    Executor(make_test_registry(), worker, tmp_path).run(_wf())
+    assert sorted(worker.calls) == ["d", "m", "t"]  # new image -> recompute
