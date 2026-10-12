@@ -78,11 +78,12 @@ Tôi đã chạy validator CVD: chỉ **3 màu** an toàn khi mọi cặp có th
 | **Kết quả đo** (Report) | ◆ thoi | orange `#eb6834` / `#d95926` | điểm benchmark, số đo tốc độ |
 | **Dịch vụ chạy thử** (Endpoint) | ▲ tam giác | ink trung tính (text.secondary) | model đang phục vụ để chat thử/đo |
 | Giá trị đơn (số, chữ, ảnh mẫu) | • chấm nhỏ | muted | prompt, ngưỡng |
-- **Map với type system của 009** (8 kiểu backend → 4 họ hiển thị; kiểu con hiện bằng chip + hình biến thể):
+- **Map với type system của 009** (9 kiểu backend → 4 họ hiển thị; kiểu con hiện bằng chip + hình biến thể):
   | Kiểu 009 | Họ | Hình | Nhãn |
   |---|---|---|---|
   | Dataset | Dữ liệu | ■ | "Dữ liệu" |
   | Model | Model | ● | "Model" |
+  | Checkpoint ⊂ Model | Model | ● | "Model hoàn chỉnh" (full SFT / merge LoRA; nối được vào mọi cổng Model) |
   | Adapter | Model | ◐ (nửa tròn) | "Phần học thêm (LoRA)" |
   | QuantizedModel | Model | ◉ (tròn viền đôi) | "Model · đã nén FP8/NVFP4/INT4" |
   | ExportArtifact | Model | ⬢ | "Model đã xuất" |

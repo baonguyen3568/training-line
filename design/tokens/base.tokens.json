@@ -207,6 +207,11 @@
       "Value": {
         "$type": "string",
         "$value": "dot"
+      },
+      "Checkpoint": {
+        "$type": "string",
+        "$value": "circle",
+        "$description": "Checkpoint \u2282 Model (complete model): same shape as Model, distinguished by label chip 'Model ho\u00e0n ch\u1ec9nh'."
       }
     }
   },

@@ -269,6 +269,33 @@
         "$type": "color",
         "$value": "#ecebe6"
       }
+    },
+    "action": {
+      "$description": "Primary CTA & selected segment. NVIDIA green with DARK text (8.2:1); white text on green fails (2.4\u20133.9:1). Links use text.primary + underline (green text fails 4.5:1 on surface).",
+      "primary_bg": {
+        "$type": "color",
+        "$value": "#76b900"
+      },
+      "primary_bg_hover": {
+        "$type": "color",
+        "$value": "#6aa600"
+      },
+      "primary_fg": {
+        "$type": "color",
+        "$value": "#0b0b0b"
+      },
+      "selected_bg": {
+        "$type": "color",
+        "$value": "#76b900"
+      },
+      "selected_fg": {
+        "$type": "color",
+        "$value": "#0b0b0b"
+      },
+      "link": {
+        "$type": "color",
+        "$value": "{color.text.primary}"
+      }
     }
   },
   "chart": {

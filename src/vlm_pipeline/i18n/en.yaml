@@ -84,8 +84,11 @@ error:
     title: Not enough disk space
     what: About {need_gb} GB is needed to save the model and results, but only {avail_gb} GB is left.
   SYS-001:
-    title: The machine is busy with another job
-    what: Only one heavy job can run at a time; {who} has been running "{job}" since {since}.
+    title: The GPU isn't available right now
+    what:
+      busy: Only one heavy job can run at a time; {who} has been running "{job}" since {since}.
+      stale: '{who}''s lock for "{job}" is still there but the process has stopped. The app won''t remove the lock itself; an admin needs to check it.'
+      corrupt: The machine's lock file can't be read, so the app treats the machine as busy for now. Please tell an admin.
   SYS-002:
     title: Waited too long for the machine
     what: The workflow has waited {minutes} minutes but the machine is still busy.
@@ -143,6 +146,9 @@ error:
   SYS-000:
     title: An unrecognized error occurred
     what: The app doesn't recognize this error. Progress was saved if possible; you can send a report so the team can fix it.
+  SYS-004:
+    title: 'App error: GPU step without the lock'
+    what: This is an app error, not something you did. The step was stopped before using the GPU, so the machine and other jobs weren't affected.
 action:
   migrate_node: Review changes and update
   open_node: Open this step
@@ -299,6 +305,8 @@ app:
   copy: Copy
   copied: Copied
   read_only_small_screen: Small screens are view-only. Use a screen at least 1280px wide to edit.
+  catalog_load_failed: Couldn't load the app's list of steps. Check that the app is running, then try again.
+  retry: Try again
 header:
   gpu_free: GPU · Free
   gpu_busy: 'GPU · Busy: {who} running {job} since {since}'
@@ -310,6 +318,7 @@ header:
   ram_segment_cache: Cache (the system can reclaim it)
   ram_segment_free: Free
   disk: Storage
+  disk_free: '{free_gb} GB free'
 gallery:
   title: Quick start
   subtitle: Pick a template, try it right away, then swap in your own data.
@@ -357,6 +366,7 @@ port:
   bench_report: Speed & memory
   endpoint: Model being served
   value: Value
+  checkpoint: Complete model
 node_state:
   not_ready: Incomplete
   ready: Ready
@@ -406,24 +416,59 @@ node:
   model.hf_pick:
     title: Choose base model
     desc: Pick a ready-made model to start from. The list is license-checked.
+    param:
+      repo:
+        label: Base model
+        help: Smaller models run faster; larger ones answer better but need more memory.
+    port:
+      model: Model
   data.hf_load:
     title: Hugging Face dataset
     desc: Use a dataset published on Hugging Face.
   data.local_folder:
     title: Image folder + Q&A
     desc: Use your own images and questions/answers from the project folder.
+    param:
+      path:
+        label: Data folder
+        help: A folder in the project with images and a Q&A file.
+    port:
+      dataset: Data
   data.format_vlm_chat:
     title: Format data as chat
     desc: Arrange images and Q&A into the format the model learns from.
   data.split:
     title: Split train / validation
     desc: Keep part of the data aside to check the model after training.
+    param:
+      val_fraction:
+        label: Share kept for checking
+        help: Share of data kept aside to check the model, not used for learning. Usually 10%.
+    port:
+      dataset: Data
+      train: Training data
+      val: Validation data
   data.preview:
     title: Preview data
     desc: Look at a few samples and common problems before training.
   train.lora_vlm:
     title: Light fine-tune (LoRA)
     desc: Teach the model to answer like your data, using little memory.
+    param:
+      preset:
+        label: Level
+        help: 'Fast: try an idea. Balanced: everyday use. Quality: slower, better results.'
+      epochs:
+        label: Training rounds
+        help: How many times the model goes through all data. Too many can cause memorizing.
+      learning_rate:
+        label: Learning rate
+        help: Too high can break the model; keep the default.
+    port:
+      base_model: Base model
+      train_data: Training data
+      val_data: Validation data (optional)
+      adapter: Add-on (LoRA)
   train.sft_vlm:
     title: Full fine-tune
     desc: Retrain the whole model. Needs more memory and time than LoRA.
@@ -439,9 +484,23 @@ node:
   quantize.modelopt_ptq:
     title: Compress model
     desc: Make the model smaller and faster; quality may drop slightly.
+    param:
+      format:
+        label: Compression type
+        help: FP8 keeps quality best; NVFP4 balances; INT4-AWQ is smallest but may lose more quality.
+    port:
+      model: Model
+      quantized: Compressed model
   eval.benchmarks:
     title: Run benchmarks
     desc: Score the model on standard test sets, grouped by skill.
+    param:
+      groups:
+        label: Skills to test
+        help: Each skill uses a few standard test sets; scores are shown per test set.
+    port:
+      model: Model
+      report: Benchmark scores
   bench.perf:
     title: Measure speed & memory
     desc: Measure how fast the model answers and how much memory it uses.
@@ -451,6 +510,10 @@ node:
   export.merge_lora:
     title: Merge add-on into model
     desc: Combine the LoRA add-on with the base model into one complete model.
+    port:
+      base_model: Base model
+      adapter: Add-on (LoRA)
+      model: Complete model
   export.trtllm:
     title: Export for fast serving (TensorRT-LLM)
     desc: Prepare the model to serve as fast as possible on NVIDIA GPUs.
@@ -460,3 +523,26 @@ node:
   note:
     title: Note
     desc: A note for people reading the workflow; it doesn't run anything.
+template:
+  lora_finetune:
+    title: Teach the model your documents (LoRA)
+    desc: Lightly fine-tune a vision-language model on your images and Q&A. Try it right away with the sample invoice data.
+  quantize_bench:
+    title: Compress a model & re-check scores
+    desc: Make the model smaller and faster, then score it under the same conditions as the original to see how much quality changes.
+inspector:
+  empty_hint: Select a step on the canvas to see and edit its settings.
+license:
+  badge:
+    commercial_ok: Commercial use OK
+    conditional: Allowed, with conditions
+    non_commercial: Research only, no commercial use
+  obligations_title: 'When you use this model, you must:'
+  obligation:
+    attribution_notice: 'Keep this credit line when you share the model or anything you build from it: "{notice}".'
+    no_guardrail_bypass: Don't use it to remove or weaken the model's safety measures, including through fine-tuning; doing so ends your right to use it.
+    prohibited_use_policy_link: We recommend reading the publisher's responsible-use policy.
+    share_alike: Models or data you create from this must be released under the same license.
+    non_commercial: It can't be used commercially, including models you fine-tune from it.
+  policy_link: View policy
+  notice_from_license: (credit line quoted from the license)

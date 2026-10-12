@@ -84,8 +84,11 @@ error:
     title: Không đủ dung lượng ổ đĩa
     what: Cần khoảng {need_gb} GB để lưu model và kết quả nhưng chỉ còn {avail_gb} GB.
   SYS-001:
-    title: Máy đang bận chạy tác vụ khác
-    what: Mỗi lúc chỉ chạy được một tác vụ nặng; {who} đang chạy "{job}" từ {since}.
+    title: Chưa dùng được GPU lúc này
+    what:
+      busy: Mỗi lúc chỉ chạy được một tác vụ nặng; {who} đang chạy "{job}" từ {since}.
+      stale: Khoá máy của {who} cho "{job}" vẫn còn nhưng tiến trình đã dừng. App không tự xoá khoá; cần quản trị viên kiểm tra.
+      corrupt: Không đọc được file khoá máy nên app tạm coi máy là đang bận. Hãy báo quản trị viên.
   SYS-002:
     title: Chờ máy rảnh quá lâu
     what: Workflow đã chờ {minutes} phút nhưng máy vẫn bận với tác vụ khác.
@@ -143,6 +146,9 @@ error:
   SYS-000:
     title: Đã xảy ra lỗi chưa được nhận diện
     what: App chưa biết lỗi này. Tiến độ đã được lưu nếu có; bạn có thể gửi báo cáo để team sửa.
+  SYS-004:
+    title: 'Lỗi của app: chạy GPU khi chưa giữ khoá'
+    what: Đây là lỗi của app, không phải do bạn. Bước này đã được dừng trước khi dùng GPU nên máy và các tác vụ khác không bị ảnh hưởng.
 action:
   migrate_node: Xem thay đổi và cập nhật
   open_node: Mở bước này
@@ -297,6 +303,8 @@ app:
   copy: Sao chép
   copied: Đã sao chép
   read_only_small_screen: Màn hình nhỏ chỉ xem được. Dùng màn hình rộng từ 1280px để chỉnh sửa.
+  catalog_load_failed: Không tải được danh sách bước của app. Kiểm tra app đã khởi động chưa rồi thử lại.
+  retry: Thử lại
 header:
   gpu_free: GPU · Rảnh
   gpu_busy: 'GPU · Đang bận: {who} chạy {job} từ {since}'
@@ -308,6 +316,7 @@ header:
   ram_segment_cache: Bộ đệm (máy tự thu hồi được)
   ram_segment_free: Trống
   disk: Dung lượng
+  disk_free: Dung lượng còn trống {free_gb} GB
 gallery:
   title: Bắt đầu nhanh
   subtitle: Chọn một mẫu, chạy thử ngay, rồi thay bằng dữ liệu của bạn.
@@ -355,6 +364,7 @@ port:
   bench_report: Tốc độ & bộ nhớ
   endpoint: Model đang chạy thử
   value: Giá trị
+  checkpoint: Model hoàn chỉnh
 node_state:
   not_ready: Chưa đủ
   ready: Sẵn sàng
@@ -404,24 +414,59 @@ node:
   model.hf_pick:
     title: Chọn model gốc
     desc: Chọn model có sẵn để bắt đầu. Danh sách đã được kiểm tra giấy phép.
+    param:
+      repo:
+        label: Model gốc
+        help: Model nhỏ chạy nhanh hơn; model lớn trả lời tốt hơn nhưng cần nhiều bộ nhớ hơn.
+    port:
+      model: Model
   data.hf_load:
     title: Dataset Hugging Face
     desc: Lấy bộ dữ liệu có sẵn trên Hugging Face.
   data.local_folder:
     title: Thư mục ảnh + câu hỏi/đáp án
     desc: Dùng ảnh và câu hỏi/đáp án của bạn trong thư mục dự án.
+    param:
+      path:
+        label: Thư mục dữ liệu
+        help: Thư mục trong dự án chứa ảnh và file câu hỏi/đáp án.
+    port:
+      dataset: Dữ liệu
   data.format_vlm_chat:
     title: Chuyển dữ liệu sang dạng hội thoại
     desc: Sắp xếp ảnh và câu hỏi/đáp án theo đúng dạng model cần để học.
   data.split:
     title: Chia dữ liệu học / kiểm tra
     desc: Tách một phần dữ liệu để kiểm tra model sau khi học.
+    param:
+      val_fraction:
+        label: Phần để kiểm tra
+        help: Tỉ lệ dữ liệu giữ lại để kiểm tra model, không dùng để học. Thường 10%.
+    port:
+      dataset: Dữ liệu
+      train: Dữ liệu học
+      val: Dữ liệu kiểm tra
   data.preview:
     title: Xem trước dữ liệu
     desc: Xem vài mẫu và các lỗi thường gặp trước khi train.
   train.lora_vlm:
     title: Fine-tune nhẹ (LoRA)
     desc: Dạy model trả lời theo dữ liệu của bạn, tốn ít bộ nhớ.
+    param:
+      preset:
+        label: Mức
+        help: 'Nhanh: thử ý tưởng. Cân bằng: dùng hằng ngày. Chất lượng: lâu hơn, kết quả tốt hơn.'
+      epochs:
+        label: Số vòng học
+        help: Số lần model đọc hết dữ liệu. Nhiều vòng quá dễ học vẹt.
+      learning_rate:
+        label: Tốc độ học (learning rate)
+        help: Cao quá dễ làm hỏng model; nên giữ mặc định.
+    port:
+      base_model: Model gốc
+      train_data: Dữ liệu học
+      val_data: Dữ liệu kiểm tra (tuỳ chọn)
+      adapter: Phần học thêm (LoRA)
   train.sft_vlm:
     title: Fine-tune toàn bộ
     desc: Dạy lại toàn bộ model. Tốn nhiều bộ nhớ và thời gian hơn LoRA.
@@ -437,9 +482,23 @@ node:
   quantize.modelopt_ptq:
     title: Nén model
     desc: Làm model nhỏ và chạy nhanh hơn, chất lượng có thể giảm nhẹ.
+    param:
+      format:
+        label: Kiểu nén
+        help: FP8 giữ chất lượng tốt nhất; NVFP4 cân bằng; INT4-AWQ nhỏ nhất nhưng có thể giảm chất lượng nhiều hơn.
+    port:
+      model: Model
+      quantized: Model đã nén
   eval.benchmarks:
     title: Đo điểm benchmark
     desc: Chấm điểm model trên các bộ đề chuẩn theo năng lực.
+    param:
+      groups:
+        label: Năng lực cần đo
+        help: Mỗi năng lực gồm một vài bộ đề chuẩn; điểm hiện riêng từng bộ đề.
+    port:
+      model: Model
+      report: Điểm benchmark
   bench.perf:
     title: Đo tốc độ & bộ nhớ
     desc: Đo model trả lời nhanh cỡ nào và dùng bao nhiêu bộ nhớ.
@@ -449,6 +508,10 @@ node:
   export.merge_lora:
     title: Gộp phần học thêm vào model
     desc: Gộp LoRA vào model gốc thành một model hoàn chỉnh.
+    port:
+      base_model: Model gốc
+      adapter: Phần học thêm (LoRA)
+      model: Model hoàn chỉnh
   export.trtllm:
     title: Xuất để chạy nhanh (TensorRT-LLM)
     desc: Chuẩn bị model để phục vụ nhanh nhất trên GPU NVIDIA.
@@ -458,3 +521,26 @@ node:
   note:
     title: Ghi chú
     desc: Ghi chú cho người đọc workflow, không chạy gì.
+template:
+  lora_finetune:
+    title: Dạy model đọc tài liệu của bạn (LoRA)
+    desc: Fine-tune nhẹ một model nhìn-hiểu-ảnh bằng ảnh và câu hỏi/đáp án của bạn. Chạy thử ngay với dữ liệu mẫu hoá đơn.
+  quantize_bench:
+    title: Nén model & đo lại điểm
+    desc: Nén model cho nhỏ và nhanh hơn, rồi đo điểm cùng điều kiện với bản gốc để thấy chất lượng giảm bao nhiêu.
+inspector:
+  empty_hint: Chọn một bước trên canvas để xem và chỉnh thiết lập.
+license:
+  badge:
+    commercial_ok: Dùng thương mại được
+    conditional: Dùng được, có điều kiện
+    non_commercial: Chỉ cho nghiên cứu, không dùng thương mại
+  obligations_title: 'Khi dùng model này, bạn cần:'
+  obligation:
+    attribution_notice: 'Giữ nguyên câu ghi công này khi chia sẻ model hoặc model bạn tạo ra từ nó: "{notice}".'
+    no_guardrail_bypass: Không dùng để gỡ hoặc làm yếu cơ chế an toàn của model, kể cả khi fine-tune; vi phạm thì mất quyền sử dụng.
+    prohibited_use_policy_link: Nên đọc chính sách sử dụng có trách nhiệm của nhà phát hành.
+    share_alike: Model hoặc dữ liệu bạn tạo ra từ đây phải phát hành cùng giấy phép này.
+    non_commercial: Không được dùng cho mục đích thương mại, kể cả model bạn fine-tune từ nó.
+  policy_link: Xem chính sách
+  notice_from_license: (câu ghi công lấy nguyên văn từ giấy phép)

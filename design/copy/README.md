@@ -16,3 +16,7 @@ The former `*.draft.yaml` files here were merged into it on 2026-10-12 and delet
 - Error titles never contain placeholders. Title VI ≤ 10 tokens (`split()`), EN ≤ 8 words; what ≤ 2 sentences.
 - Estimates: style by `Estimate.source` (P010 §6) — measured plain, formula "~", declared italic + ⓘ, unknown text.
 - Permission `level`: info → text.secondary + neutral ✓ (never status.good); warning/critical → color.status.*.
+- `license.obligation.*`: shown **directly** in the model-pick dialog under the license badge (one line each, never hidden in details).
+  `attribution_notice` renders `{notice}` = verbatim text from the license file (untrusted-ish: plain text, never markdown), followed by `license.notice_from_license`.
+  `prohibited_use_policy_link` is advisory: neutral style (info), with `license.policy_link` to the publisher URL from licenses.yaml (not from the model card).
+  `non_commercial` pairs with the ⛔ badge. `no_guardrail_bypass` uses warning style — it's the one users of a fine-tuning app can actually breach.
