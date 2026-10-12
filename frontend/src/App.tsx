@@ -33,11 +33,17 @@ export function App() {
     return () => window.removeEventListener("vlm:navigate", go);
   }, []);
 
-  // Autosave the open workflow (debounced 1s) so a reload never loses work (design review M1 K1).
+  // Autosave the open workflow so a reload never loses work (design review M1 K1): short debounce, plus a
+  // synchronous flush on pagehide so an edit made just before reload/close is not lost (E2E caught this).
   useEffect(() => {
     if (!workflow) return;
-    const timer = setTimeout(() => saveDraft(workflow), 1000);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => saveDraft(workflow), 300);
+    const flush = () => saveDraft(workflow);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pagehide", flush);
+    };
   }, [workflow]);
 
   const load = useCallback(() => {
