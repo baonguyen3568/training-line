@@ -8,10 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = pytest.mark.xfail(
-    strict=True, raises=ImportError, reason="spec: bao-backend implements vlm_pipeline.graph.cache (P009) in P2"
-)
-
 IMG = "sha256:" + "0" * 64
 
 
