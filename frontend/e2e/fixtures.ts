@@ -30,6 +30,21 @@ export const test = base.extend<{ blockedRequests: string[] }>({
         blocked.push(url);
         return route.abort("blockedbyclient");
       });
+      // context.route does not see WebSockets: refuse any socket to another origin too.
+      await context.routeWebSocket(
+        (url) => url.origin.replace(/^ws/, "http") !== allowed,
+        (ws) => {
+          blocked.push(ws.url());
+          return ws.close();
+        },
+      );
+      // App tier: bootstrap the session exactly like a user opening the printed URL (D13: ?token= -> cookie).
+      const token = process.env.E2E_TOKEN;
+      if (token) {
+        const page = await context.newPage();
+        await page.goto(`/?token=${token}`);
+        await page.close();
+      }
       await use(blocked);
       // The app must never call anything but its own origin (bao-security condition 1).
       expect(blocked, `requests outside ${allowed}`).toEqual([]);

@@ -11,7 +11,9 @@ function node(page: Page, typeId: string): Locator {
 }
 
 async function nodeId(page: Page, typeId: string): Promise<string> {
-  const id = await node(page, typeId).getAttribute("data-id");
+  // data-testid sits inside the React Flow wrapper, which carries data-id
+  const wrapper = page.locator(".react-flow__node").filter({ has: node(page, typeId) });
+  const id = await wrapper.getAttribute("data-id");
   if (!id) throw new Error(`node ${typeId} has no data-id`);
   return id;
 }
@@ -62,11 +64,17 @@ test("first screen is the gallery and offers a blank workflow", async ({ page })
 });
 
 test("M1 journey: build, run, save, reopen", async ({ page }, testInfo) => {
+  const appTier = process.env.E2E_TIER === "app";
+  const sockets: string[] = [];
+  page.on("websocket", (ws) => sockets.push(ws.url()));
   await buildGraph(page);
+  // Both tiers show the demo banner (mock API, or a backend on FakeWorker): never mistaken for real training.
+  await expect(page.getByText(tr("app.demo_mode"))).toBeVisible();
 
   // Run: every node ends completed (or cached); the check bar shows no blocking issue.
   await expect(page.getByTestId("check-bar").locator('[data-code][class*="error"]')).toHaveCount(0);
-  const run = page.getByRole("button", { name: tr("app.run") });
+  const checkBar = page.getByTestId("check-bar");
+  const run = checkBar.getByRole("button", { name: tr("app.run") });
   await expect(run).toBeEnabled();
   await run.click();
   for (const t of NODES) {
@@ -74,7 +82,10 @@ test("M1 journey: build, run, save, reopen", async ({ page }, testInfo) => {
       timeout: 30_000,
     });
   }
-  await expect(page.getByRole("button", { name: tr("app.run") })).toBeEnabled();
+  await expect(checkBar.getByRole("button", { name: tr("app.run") })).toBeEnabled();
+  // Proof of tier: the app tier streams run events over the backend WebSocket; the mock opens none.
+  const runSockets = sockets.filter((u) => /\/api\/runs\/[^/]+\/events/.test(u));
+  expect(runSockets.length > 0).toBe(appTier);
 
   // Save: a plain download of the workflow file.
   const [download] = await Promise.all([
