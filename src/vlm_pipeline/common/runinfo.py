@@ -10,6 +10,8 @@ import json
 import math
 import os
 import re
+import secrets
+import threading
 import time
 from collections.abc import Iterable, Iterator, Mapping
 from enum import StrEnum
@@ -79,7 +81,8 @@ class RunManifest(BaseModel):
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    # Unique per process AND thread: the app writes run.json from several threads (graph runs in parallel).
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.{secrets.token_hex(4)}.tmp")
     tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 

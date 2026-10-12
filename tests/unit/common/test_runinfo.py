@@ -76,3 +76,25 @@ def test_automodel_adapter_maps_keys_and_is_strict_json() -> None:
     expected = datetime(2026, 10, 12, 9, 33, 45, 462000, tzinfo=UTC).timestamp()
     assert abs(rec["ts"] - expected) < 1e-3
     assert "tps_per_gpu" not in rec
+
+
+def test_concurrent_manifest_writes_from_threads(tmp_path: Path) -> None:
+    import threading
+
+    errors: list[BaseException] = []
+
+    def writer(i: int) -> None:
+        try:
+            for _ in range(50):
+                write_manifest(tmp_path, RunManifest(run_id="r", name=f"n{i}", stage="train", task="lora"))
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=writer, args=(i,)) for i in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    assert read_manifest(tmp_path).run_id == "r"
+    assert [p.name for p in tmp_path.iterdir()] == ["run.json"]
