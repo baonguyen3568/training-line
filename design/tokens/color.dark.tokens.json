@@ -1,0 +1,199 @@
+{
+  "$description": "VLM dashboard color tokens (dark). DTCG 2025.10. Validated 2026-10-12 with dataviz validate_palette.js; see .team/proposals/006-annex-ux-design-system.md A5.3",
+  "color": {
+    "page": {
+      "$type": "color",
+      "$value": "#0d0d0d"
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#1a1a19"
+    },
+    "text": {
+      "primary": {
+        "$type": "color",
+        "$value": "#f0efec"
+      },
+      "secondary": {
+        "$type": "color",
+        "$value": "#c3c2b7"
+      },
+      "muted": {
+        "$type": "color",
+        "$value": "#898781"
+      }
+    },
+    "grid": {
+      "$type": "color",
+      "$value": "#2c2c2a"
+    },
+    "axis": {
+      "$type": "color",
+      "$value": "#383835"
+    },
+    "accent": {
+      "$description": "Brand/chrome only (nav, focus). Never a series or status color.",
+      "brand": {
+        "$type": "color",
+        "$value": "#76b900"
+      }
+    },
+    "status": {
+      "good": {
+        "$type": "color",
+        "$value": "#0ca30c"
+      },
+      "warning": {
+        "$type": "color",
+        "$value": "#fab219"
+      },
+      "serious": {
+        "$type": "color",
+        "$value": "#ec835a"
+      },
+      "critical": {
+        "$type": "color",
+        "$value": "#d03b3b"
+      }
+    },
+    "series": {
+      "1": {
+        "$type": "color",
+        "$value": "#3987e5"
+      },
+      "2": {
+        "$type": "color",
+        "$value": "#d95926"
+      },
+      "3": {
+        "$type": "color",
+        "$value": "#199e70"
+      },
+      "4": {
+        "$type": "color",
+        "$value": "#c98500"
+      },
+      "5": {
+        "$type": "color",
+        "$value": "#d55181"
+      },
+      "6": {
+        "$type": "color",
+        "$value": "#008300"
+      },
+      "7": {
+        "$type": "color",
+        "$value": "#9085e9"
+      },
+      "8": {
+        "$type": "color",
+        "$value": "#e66767"
+      }
+    },
+    "variant": {
+      "base": {
+        "bf16": {
+          "$type": "color",
+          "$value": "#3987e5"
+        },
+        "fp8": {
+          "$type": "color",
+          "$value": "#5b9ef2"
+        },
+        "nvfp4": {
+          "$type": "color",
+          "$value": "#7bb5fe"
+        },
+        "int4_awq": {
+          "$type": "color",
+          "$value": "#9acbff"
+        }
+      },
+      "ft": {
+        "bf16": {
+          "$type": "color",
+          "$value": "#d95926"
+        },
+        "fp8": {
+          "$type": "color",
+          "$value": "#e9774e"
+        },
+        "nvfp4": {
+          "$type": "color",
+          "$value": "#f89370"
+        },
+        "int4_awq": {
+          "$type": "color",
+          "$value": "#ffaf91"
+        }
+      },
+      "ft2": {
+        "bf16": {
+          "$type": "color",
+          "$value": "#199e70"
+        },
+        "fp8": {
+          "$type": "color",
+          "$value": "#4eb288"
+        },
+        "nvfp4": {
+          "$type": "color",
+          "$value": "#74c5a0"
+        },
+        "int4_awq": {
+          "$type": "color",
+          "$value": "#96d9b9"
+        }
+      }
+    },
+    "delta": {
+      "$description": "Significant \u0394 vs baseline (delta_ci95 excludes 0) \u2014 text/arrow color, always with \u25b2/\u25bc glyph. CI contains 0 \u2192 use text.muted.",
+      "better": {
+        "$type": "color",
+        "$value": "#0ca30c"
+      },
+      "worse": {
+        "$type": "color",
+        "$value": "#e66767"
+      },
+      "neutral-bg": {
+        "$type": "color",
+        "$value": "#383835"
+      }
+    }
+  },
+  "chart": {
+    "line-width": {
+      "$type": "dimension",
+      "$value": {
+        "value": 2,
+        "unit": "px"
+      }
+    },
+    "marker-size": {
+      "$type": "dimension",
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      }
+    },
+    "marker": {
+      "bf16": {
+        "$type": "string",
+        "$value": "circle"
+      },
+      "fp8": {
+        "$type": "string",
+        "$value": "triangle"
+      },
+      "nvfp4": {
+        "$type": "string",
+        "$value": "diamond"
+      },
+      "int4_awq": {
+        "$type": "string",
+        "$value": "square"
+      }
+    }
+  }
+}

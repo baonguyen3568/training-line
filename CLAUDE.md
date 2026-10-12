@@ -1,8 +1,21 @@
 # Trainning-model — VLM Training Platform (NVIDIA stack)
 
-## Mục tiêu
-Một source hoàn chỉnh để **fine-tune / train Vision-Language Model (VLM) mới nhất** bằng stack NVIDIA mới nhất,
-pipeline end-to-end:
+## Tầm nhìn sản phẩm (user chốt 2026-10-12, ưu tiên cao nhất)
+Một **application cài sẵn từ đầu tới cuối** để **người dùng không biết code** chỉ cần thao tác trên UI là có thể:
+lấy & xử lý data → setup → train / fine-tune → chạy thử model → nén (quantize) → benchmark → export.
+- **Giao diện node-graph kéo thả** (kiểu ComfyUI / Unreal Blueprint, nhưng cho training model): mỗi bước là một node,
+  nối dây để tạo workflow, lưu/chia sẻ workflow dưới dạng file.
+- **Có sẵn template** cho các pipeline nổi tiếng và mới nhất (vd "Fine-tune VLM bằng LoRA", "Quantize FP8 + benchmark"),
+  người dùng mở ra là chạy được, sau đó tự sửa thoải mái.
+- **Tận dụng open source có sẵn** (không phát minh lại): lấy ý tưởng và code từ ComfyUI, LLaMA-Factory/LlamaBoard, React Flow…
+- **Hướng về NVIDIA**: engine bên dưới là NeMo AutoModel / Megatron-Bridge / NeMo-RL / NeMo Curator / ModelOpt /
+  TensorRT-LLM / NeMo Evaluator, tối ưu cho GPU NVIDIA (bắt đầu từ DGX Spark).
+- Người dùng no-tech ⇒ UI phải **chặn lỗi trước khi chạy**: kiểm tra kiểu kết nối giữa node, ước lượng RAM/thời gian/disk,
+  mặc định an toàn, thông báo lỗi dễ hiểu (không phải stack trace).
+
+## Mục tiêu kỹ thuật
+Engine phía sau là pipeline **fine-tune / train Vision-Language Model (VLM) mới nhất** bằng stack NVIDIA mới nhất,
+end-to-end:
 
 ```
 data (thu thập → curate → format) → train (SFT / LoRA / RL) → validate

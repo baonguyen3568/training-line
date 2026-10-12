@@ -1,0 +1,141 @@
+# Proposal 005 — Storage & Retention Policy
+
+- Tác giả: bao-cleanup · Trạng thái: **ACCEPTED → ADR-005** (điều kiện: verify save_consolidated; re-check quota khi chốt model list) (backend, security, research, tester, frontend, cleancode) → PM chốt ADR
+- Ngày: 2026-10-12 · Knowledge nền: `.team/knowledge/cleanup.md`
+
+## 1. Bối cảnh & ràng buộc (đo thực tế 2026-10-12)
+- Disk `/` còn ~2.0T/3.7T, **dùng chung** (docker của người khác 634G images + 59G build cache; HF cache global 190G không phải của ta).
+- RAM unified 121G, MemAvailable ~43G, swap đã dùng 8/15G. OOM trên GB10 có thể treo cả host.
+- Dự án hiện chiếm ~0 (chưa có image `vlm-*`, chưa có checkpoint).
+- Mục tiêu: (a) không bao giờ ảnh hưởng tài nguyên người khác, (b) footprint dự án có trần rõ ràng, (c) dọn dẹp tự động nhưng an toàn (dry-run mặc định), (d) không mất artifact quan trọng.
+
+## 2. Quyết định đề xuất
+
+### D1. Mọi cache nằm trong project root (`.cache/`, gitignored)
+```bash
+# .env.example (nạp bởi CLI/compose)
+HF_HOME=/home/ntcai/Trainning-model/.cache/hf          # hub/, datasets/, xet/
+TORCHINDUCTOR_CACHE_DIR=/home/ntcai/Trainning-model/.cache/torchinductor
+TRITON_CACHE_DIR=/home/ntcai/Trainning-model/.cache/triton
+UV_CACHE_DIR=  # giữ mặc định ~/.cache/uv (dùng chung user, chỉ là wheel, không dọn)
+```
+- Container mount `.cache/hf` → `/root/.cache/huggingface` (hoặc set `HF_HOME` trong container).
+- Global `~/.cache/huggingface`: **read-only reference**. Nếu cần model đã có ở đó (vd Qwen3.8-27B-NVFP4 cho baseline eval), load bằng `cache_dir=` + `local_files_only=True`; không ghi, không xoá.
+- Lý do: đo chính xác footprint, dọn bằng `hf cache rm/prune --cache-dir` mà không có rủi ro đụng repo/blob người khác (shared xet blobs). Đánh đổi: có thể tải trùng vài model → chấp nhận.
+- Eval/serve chạy với `HF_HUB_OFFLINE=1` + revision pin để reproducible.
+
+### D2. Layout run directory (đã gộp với bao-backend + bao-frontend)
+```
+outputs/runs/<run_id>/                  # run_id = YYYYMMDD-HHMM-<recipe>-<model_short>-<hash4>
+  run.json          # config resolve + git sha + versions + status (running|completed|failed|discarded) + parent_run_id
+  metrics.jsonl  system.jsonl  events.jsonl   # contract của frontend — giữ mãi
+  KEEP              # (tuỳ chọn) marker: retention không đụng
+  logs/             # stdout, tensorboard (giữ mãi, nén sau 30 ngày)
+  checkpoints/      # epoch_<E>_step_<S>/, LATEST, LOWEST_VAL
+  export/           # consolidated HF safetensors / LoRA adapter / ModelOpt quantized (FP8, NVFP4)
+  engines/          # TRT-LLM engines (regenerable)
+  eval/             # predictions + metrics json
+outputs/debug/BUG-NNN/  # fixcode: giữ tới khi bug VERIFIED + 14 ngày
+outputs/smoke/      # smoke test của tester — xoá ngay sau test (tester tự dọn; retention quét >3 ngày)
+outputs/system/    # disk_report.json, cleanup.jsonl
+data/raw/           # regenerable
+data/processed/     # đã curate/format (giữ; versioned theo tên thư mục)
+benchmarks/         # kết quả benchmark tổng hợp (commit git, giữ vĩnh viễn)
+```
+- Container chạy `--user $(id -u):$(id -g)` để file không root-owned (nếu image không cho phép → backend chown trong project sau job). Script retention gặp file không xoá được → báo lỗi, KHÔNG sudo.
+
+### D3. Retention checkpoint
+**Trong lúc train** (cấu hình recipe mặc định):
+| Framework | Cấu hình |
+|-----------|----------|
+| NeMo AutoModel | `checkpoint.max_recent_checkpoints: 2`, `checkpoint.save_consolidated: final`* , `checkpoint.model_save_format: safetensors` |
+| NeMo-RL | `checkpointing.keep_top_k: 2` + `metric_name`, `higher_is_better` |
+| Megatron-Bridge / Lightning | `save_top_k: 2`, `save_last: true`, `monitor: val_loss` |
+
+\* Docs AutoModel hiện tại (docs.nvidia.com/nemo/automodel/development/checkpointing) ghi `final | false | every`, trong đó `true` = legacy alias của `every` (export mỗi lần save → tốn gấp đôi). Recipe upstream (qwen3_5_4b.yaml) dùng `true` → **bao-backend xác minh trong container 26.08**; nếu bản 26.08 chỉ có bool thì dùng `true` nhưng tính dung lượng như `every`.
+
+**Thứ tự ưu tiên khi một checkpoint trùng nhiều vai trò**: `KEEP` > `LATEST` > `LOWEST_VAL`/best > khác. Ví dụ LATEST == LOWEST_VAL → áp luật LATEST (giữ optim 7 ngày). Script resolve symlink trước rồi gán vai trò cao nhất.
+LoRA: adapter có cả trong `checkpoints/epoch_*/model/` và `export/` → tính dung lượng theo inode (không đếm trùng), không coi bản trong checkpoint là "thừa" chỉ vì đã có ở export.
+
+**Sau khi run kết thúc** (`scripts/cleanup/retention.py`, dry-run mặc định). Chỉ áp dụng khi `run.json.status == completed` (hoặc `discarded`); run `running`/`failed`/`interrupted` chỉ được báo cáo, không strip/xoá — cần để resume:
+| Loại | Giữ | Xoá |
+|------|-----|-----|
+| Target của `LATEST` | đủ (để resume) trong 7 ngày, sau đó strip `optim/`,`dataloader/`,`rng/` | — |
+| Target của `LOWEST_VAL` / best | weights + config | `optim/` ngay khi run xong |
+| Checkpoint khác | — | sau 7 ngày (nếu không `KEEP`) |
+| `export/` (consolidated, adapter, quantized) | **giữ** đến khi run bị đánh dấu discard | — |
+| LoRA adapter | luôn giữ (vài trăm MB) | — |
+| `eval/` raw predictions | run gắn với báo cáo/ADR (hoặc `KEEP`) | còn lại sau 14 ngày (metrics json luôn giữ) |
+| `engines/` | 14 ngày kể từ lần dùng cuối | rebuild được |
+| run thất bại/smoke (`*-smoke-*`, không có eval) | — | sau 3 ngày |
+
+### D4. HF cache dự án
+- Hàng tuần (hoặc khi project footprint > quota): `hf cache prune --cache-dir .cache/hf/hub --dry-run` → apply.
+- Model không truy cập > 30 ngày và không được pin trong config đang dùng → đề xuất xoá (báo team, không tự xoá nếu > 20GB).
+- Dataset eval trong regression gate (MMMU val, MMBench dev, DocVQA val, ChartQA test, OCRBench, AI2D, MathVista testmini — chốt ở P002) **pin commit sha, không prune**. Danh sách pin: `configs/cleanup/pinned.yaml`.
+- **Không xoá revision base model mà một LoRA adapter còn giữ phụ thuộc** (retention đọc `run.json (`base_model`, `base_model_revision`)` để biết pin).
+- `.cache/hf/xet` xoá được bất kỳ lúc nào.
+
+### D5. Docker
+- Mọi Dockerfile: `LABEL project=vlm-training`; image tag `vlm-<component>:<version>`; container `--name vlm-<job>`; job một lần `--rm`; compose project name `vlm`.
+- Build bằng builder riêng: `docker buildx create --name vlm-builder --driver docker-container` → prune chỉ builder này.
+- Dọn (dry-run → apply): container exited `vlm-*` > 72h; dangling image label dự án > 7 ngày; image tag cũ không còn trong ADR (kiểm tra `docker ps -a --filter ancestor=` không có container ngoài dự án).
+- Base NGC image (20-30GB): chỉ giữ tag đang pin trong ADR-001 + 1 tag trước (rollback).
+
+### D6. Quota & cảnh báo
+| Chỉ số | Warn → PM | Critical |
+|--------|-----------|----------|
+| Project footprint (`.cache`+`outputs`+`data`+images vlm) | > 500 GB | > 800 GB → dừng download mới, chạy retention |
+| Disk free `/` | < 500 GB | < 200 GB |
+| MemAvailable | < 20 GB | < 10 GB → khuyến nghị dừng job của dự án |
+- `scripts/cleanup/disk_report.py` → in bảng + ghi `outputs/system/disk_report.json` (cho dashboard). Chạy trước mỗi job nặng (gắn vào bước tạo GPU_LOCK) và theo yêu cầu.
+- Download > 20GB vẫn phải báo PM trước (CLAUDE.md).
+- `outputs/system/disk_report.json` có `schema_version`, `ts`, `disk{total,used,free}`, `mem{total,available,buff_cache,swap_used}`, `project{cache_hf,outputs,data,docker_vlm}`, `level` (ok|warn|critical). Phân loại "thuộc dự án": path dưới project root, docker object tên `vlm-*` hoặc label `project=vlm-training`; RAM "của dự án" = RSS các process có cgroup/container `vlm-*` hoặc PID trong `.team/GPU_LOCK` (ước lượng, ghi rõ trên UI).
+
+### D8. Pre-flight check trước khi lấy GPU_LOCK (PM yêu cầu)
+**Một code path duy nhất** (thống nhất backend + fixcode/P007): logic ở `src/vlm_pipeline/common/memguard.py` — `preflight(est_peak_gb) -> Verdict` (+ `watchdog` của P007). `scripts/cleanup/preflight.py --est-peak-gb <N>` và job runner của backend chỉ gọi vào; in JSON verdict ra stdout (ghi vào events.jsonl). Exit code: `0` ok, `2` thiếu RAM/swap, `3` thiếu disk, `4` lock bận. Gọi trong bước acquire GPU_LOCK (skill `backend-gpu-job`). **Từ chối chạy (không tạo lock)** nếu:
+| Điều kiện | Ngưỡng |
+|-----------|--------|
+| `MemAvailable` | < `est_peak_gb` + margin, margin = max(10 GB, 20% × est_peak_gb) (PM chốt chung P005/P007) |
+| `MemAvailable` tuyệt đối | < 20 GB (sàn cứng cho mọi job nặng) |
+| `SwapFree` | < 2 GB (host đã áp lực bộ nhớ) |
+| Disk free `/` | < kích thước checkpoint dự kiến × (max_recent_checkpoints+1) + 50 GB |
+| `.team/GPU_LOCK` | đã tồn tại và PID còn sống (exit 4). PID chết = stale lock → chỉ báo PM, **không bao giờ tự xoá lock** |
+- `est_peak_gb` lấy từ memory budget của research (skill `research-model-selection`) và ghi vào `run.json`; job không khai báo → mặc định coi như cần 40 GB.
+- Ví dụ hiện tại (MemAvailable 43G): LoRA 4B (~16 GB peak) → cần ≥ 26 GB → OK; full-FT 8B (~70 GB) → từ chối.
+- Không có `drop_caches`/sudo (quyết định tạm của PM). Từ chối thì in số liệu MemAvailable/swap và hướng dẫn báo PM.
+- `--force` chỉ dùng khi PM đồng ý; ghi lý do vào log.
+- Runtime (watchdog P007): abort khi MemAvailable < 8 GB (fixcode có quyền phản biện con số nếu có dữ liệu).
+- Job dừng bởi watchdog (exit 75, P007) → `run.json.status = interrupted` → retention coi như running/failed (không strip optim/, để resume).
+
+### D7. An toàn khi xoá (ràng buộc cho mọi script dọn)
+1. Dry-run mặc định; `--apply` mới xoá; in danh sách + tổng GB.
+2. `realpath` phải nằm dưới project root; từ chối symlink trỏ ra ngoài.
+3. Bỏ qua: `KEEP`, target `LATEST`/`LOWEST_VAL`, file đang mở (`fuser`), run đang giữ `.team/GPU_LOCK`, checkpoint có file `.tmp`/đang async save.
+4. Tổng > 20GB hoặc có `export/` → cần xác nhận PM + bao-security (flag `--approved-by`).
+5. Mọi lần `--apply` append log `.team/log/YYYY-MM-DD.md` + `outputs/system/cleanup.jsonl`.
+6. **Whitelist không bao giờ xoá** (yêu cầu bao-frontend): `run.json`, `metrics.jsonl`, `system.jsonl`, `events.jsonl`, `logs/`, toàn bộ `benchmarks/`.
+7. Mỗi lần prune checkpoint/export → append vào `outputs/runs/<run_id>/events.jsonl`: `{"event":"checkpoint_pruned","path":...,"action":"strip_optim|delete","bytes":...,"ts":...,"by":...,"approved_by":...}` để dashboard hiển thị "đã xoá" thay vì link hỏng.
+8. **Không bao giờ xoá (yêu cầu bao-security)**: `configs/security/**`, `docker/IMAGES.lock`, manifest sha256 của dataset shard/model snapshot, SBOM/scan report (`benchmarks/security/`, `outputs/runs/<run_id>/provenance/`). Run "release": giữ `provenance/` kể cả khi weights trung gian đã xoá.
+9. Script không đọc/in `.env*`, `*.pem`, `~/.cache/huggingface/token`; loại chúng khỏi mọi danh sách in ra.
+10. Image base NGC (không có label/prefix): chỉ coi là của dự án nếu digest có trong `docker/IMAGES.lock`. Xoá cần 2 bước: (a) digest có trong IMAGES.lock và không còn được ADR pin, (b) `docker ps -a --filter ancestor=<id>` rỗng (kể cả container ngoài dự án) → PM xác nhận. Image không có trong lock, không `vlm-`, không có label → không đụng (vd nemo-speech của người khác).
+11. Cấm tuyệt đối trong code: `docker system prune`, `docker image prune -a` không label, prune default builder, `sudo`, đường dẫn ngoài root.
+
+## 3. Deliverables (Phase 2, sau ADR)
+- `scripts/cleanup/disk_report.py`, `scripts/cleanup/retention.py` (pure Python, stdlib + pydantic config `configs/cleanup/retention.yaml`), unit test với thư mục giả (tmp_path) — nhờ bao-tester review.
+- `.env.example` cache vars; snippet LABEL cho Dockerfile (bao-backend áp dụng).
+- `retention.py` dry-run xuất JSON (schema_version 1): `runs[].items[]` với `roles`, `action` (keep|strip_optim|delete), `reclaim_gb`, `rule`, `reason`, `blocked_by`; top-level `total_reclaim_gb`, `needs_approval`. Dùng cho view retention của bao-design (P006 v1.1).
+- Kiểm tra định kỳ git index (yêu cầu security): file >5MB hoặc `.env*` bị stage/commit → báo security + PM (`git ls-files -s` + `git diff --cached --name-only`).
+- Pre-commit `check-added-large-files --maxkb=1000` (chốt trong Proposal 004 §4).
+
+## 4. Câu hỏi mở
+1. ~~(backend) tần suất save~~ → đã trả lời: `ckpt_every_steps` 100–500, consolidated final là input cho ModelOpt; strip optim chỉ khi status=completed.
+2. ~~(security) artifact audit~~ → đã trả lời (D7 mục 8–10).
+3. (research) Danh sách model dự kiến + size → kiểm tra quota 500GB có hợp lý không.
+4. (PM/user) Quota 500/800GB có chấp nhận? `drop_caches` trước job lớn cần sudo — user có muốn cho phép không, hay chỉ cảnh báo?
+5. ~~(tester) dataset pin~~ → đã trả lời (xem D4); Video-MME ngoài regression, tải khi cần (báo PM nếu >20GB).
+
+## 5. Phương án đã cân nhắc và loại
+- **Dùng HF cache global**: tiết kiệm tải trùng nhưng không dọn được an toàn, footprint không đo được → loại.
+- **Giữ tất cả checkpoint** (mặc định AutoModel): model 8B full-FT ~ 50GB/checkpoint với optim → vài chục bản = TB → loại.
+- **Cron tự xoá không cần người**: rủi ro cao trên máy chung giai đoạn đầu → chỉ tự động phần an toàn (xet cache, `.incomplete`, smoke runs); phần còn lại dry-run + báo cáo.

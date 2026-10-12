@@ -10,3 +10,14 @@ __pycache__/
 *.bin
 *.pt
 .team/GPU_LOCK
+# --- added by bao-cleanup (Proposal 005) ---
+.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+*.distcp
+*.nsys-rep
+*.ncu-rep
+core.*
+*.log
