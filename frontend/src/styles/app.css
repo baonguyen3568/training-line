@@ -865,3 +865,18 @@ button.link {
   border-radius: var(--radius-sm);
   font-size: var(--font-size-caption);
 }
+
+.engine-warnings {
+  margin: var(--space-12) 0;
+}
+.engine-warnings h2 {
+  font-size: 1rem;
+  margin: 0 0 var(--space-8);
+}
+.engine-warnings ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-8);
+}

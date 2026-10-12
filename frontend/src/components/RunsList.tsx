@@ -4,6 +4,7 @@ import type { RunInfo } from "../api/types";
 import { t } from "../i18n";
 import { formatDateTime } from "../lib/format";
 import { useUi } from "../store/ui";
+import { EngineWarningsCell } from "./EngineWarnings";
 
 export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
   const [runs, setRuns] = useState<RunInfo[] | null>(null);
@@ -27,6 +28,7 @@ export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
               <th>{t("run_monitor.col_name")}</th>
               <th>{t("run_monitor.col_status")}</th>
               <th>{t("run_monitor.col_started")}</th>
+              <th>{t("engine_warning.col")}</th>
             </tr>
           </thead>
           <tbody>
@@ -39,6 +41,9 @@ export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
                 </td>
                 <td>{t(`run_monitor.status.${r.status ?? "running"}`)}</td>
                 <td>{r.started_at ? formatDateTime(r.started_at * 1000) : "—"}</td>
+                <td>
+                  <EngineWarningsCell warnings={r.engine_warnings} status={r.status ?? "running"} />
+                </td>
               </tr>
             ))}
           </tbody>

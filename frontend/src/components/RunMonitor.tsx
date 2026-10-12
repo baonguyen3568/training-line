@@ -12,6 +12,7 @@ import {
   nonFiniteSteps,
   SUPPORTED_SCHEMA,
 } from "../lib/metrics";
+import { EngineWarningsPanel } from "./EngineWarnings";
 import { type ChartSeries, LineChart } from "./LineChart";
 
 const POLL_MS = 3000;
@@ -163,6 +164,7 @@ export function RunMonitor({ runId }: { runId: string }) {
         <code className="muted small">{run.run_id}</code>
       </header>
       {unsupported && <p className="banner">{t("run_monitor.schema_unsupported")}</p>}
+      <EngineWarningsPanel warnings={run.engine_warnings} status={status} />
 
       <section className="tiles" aria-label={t("run_monitor.summary")}>
         <div className="tile">
