@@ -222,3 +222,20 @@ Thiếu 1 điều kiện → run **INVALID**, không ghi số vào catalog, khô
   → Bỏ key `freeze_embeddings` khỏi YAML (bản vá sẽ báo lỗi với key lạ).
 - Kỳ vọng tham số train: v1.1 = **284.6M (30.4%)**, assert ±1%. 2.0: fixcode đếm lại (tied, vocab 72256).
 - Ghi nhận thêm: Adam bf16 có cảnh báo ổn định từ AutoModel. Giữ như recipe, nhưng theo dõi loss ở P-3. Nếu dao động thì thử fp32 master weights cho decoder (thêm ~1–2GB).
+
+## 10. P-1b PASS trên 26.08-3 (04:30)
+- Checklist §9.2: (a) trainable 284,633,088 = **30.40%** ✓; (b) memguard abort 10GB ✓; (c) host peak **+17.8–18.0GB** (backend/tester), cgroup 22.9GB (cận trên vì gồm page cache); ~20 s/step với GBS 8.
+- Catalog: `ram_gb_train` 35 → **20** (measured), commit c7e323d. 20 so với 18.0 = +11%, đạt luật estimator (≥ số đo, ≤ +30%). Preflight cộng thêm 10GB headroom (cần ~30GB trống). Đây là biên an toàn riêng, không tính vào luật +30%.
+- **Chưa xong**:
+  - (d) cảnh báo `could not derive turn markers` VẪN xuất hiện trên 26.08-3, nên test mask label của fixcode phải PASS trên batch thật trước khi chấm F1;
+  - (e) gate số học sau khi sửa adapter.
+- P-2 eval qua đường HF remote (BUG-001: native generate lỗi), từ worktree sạch.
+
+### 10.1 Preset thời lượng cho template no-code (PM gợi ý)
+CORD train 800 ảnh, GBS 8 → 100 step/epoch × ~20 s ≈ **33 phút/epoch** (+ ~1 phút khởi động, + validation).
+| Preset (Simple) | Cấu hình | Thời gian ước | Dùng khi |
+|---|---|---|---|
+| **Thử nhanh** | 50 step | ~17–20 phút | xem pipeline chạy được, chưa kỳ vọng chất lượng |
+| **Nhanh** (mặc định template) | 1 epoch (100 step) | ~35 phút | kết quả đầu tiên dùng được ❓ (P-2 sẽ cho biết F1 sau 1 epoch) |
+| Tiêu chuẩn | 3 epoch (300 step) | ~1h40 | chất lượng tốt nhất của template |
+Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ "Nhanh" làm mặc định; nếu không thì mặc định "Tiêu chuẩn" và hiện rõ thời gian. Cần đo F1 theo checkpoint ở step 100/200/300 trong cùng run P-3 (ckpt_every 100), không chạy 3 run riêng.
