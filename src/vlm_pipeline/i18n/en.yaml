@@ -323,6 +323,7 @@ app:
   retry: Try again
   nav_workflows: Workflows
   nav_runs: Run history
+  redo: Redo
 header:
   gpu_free: GPU · Free
   gpu_busy: 'GPU · Busy: {who} running {job} since {since}'
@@ -818,6 +819,7 @@ run:
   finished: Finished in {duration}
   finished_with_errors: Finished with {error_count} failed steps
   view_results: View results
+  connection_lost: Lost connection to the app, reconnecting… The run keeps going on the machine.
 workflow:
   save: Save workflow
   open: Open workflow

@@ -323,6 +323,7 @@ app:
   retry: Thử lại
   nav_workflows: Workflow
   nav_runs: Lịch sử chạy
+  redo: Làm lại
 header:
   gpu_free: GPU · Rảnh
   gpu_busy: 'GPU · Đang bận: {who} chạy {job} từ {since}'
@@ -818,6 +819,7 @@ run:
   finished: Chạy xong sau {duration}
   finished_with_errors: Chạy xong, có {error_count} bước lỗi
   view_results: Xem kết quả
+  connection_lost: Mất kết nối với app, đang thử nối lại… Lần chạy vẫn tiếp tục trên máy.
 workflow:
   save: Lưu workflow
   open: Mở workflow
