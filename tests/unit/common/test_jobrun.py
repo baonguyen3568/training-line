@@ -54,3 +54,19 @@ def test_secrets_never_reach_containers(key: str) -> None:
 )
 def test_classify_exit(info: ExitInfo, expected: tuple[RunStatus, str | None]) -> None:
     assert classify_exit(info) == expected
+
+
+def test_git_state_on_this_repo() -> None:
+    from vlm_pipeline.common.jobrun import git_state
+    from vlm_pipeline.common.paths import project_root
+
+    commit, dirty = git_state(project_root())
+    assert commit is not None
+    assert len(commit) == 40
+    assert isinstance(dirty, bool)
+
+
+def test_git_state_outside_repo(tmp_path: Path) -> None:
+    from vlm_pipeline.common.jobrun import git_state
+
+    assert git_state(tmp_path) == (None, None)

@@ -126,6 +126,33 @@ def _docker_state(name: str) -> ExitInfo:
     return ExitInfo(exit_code=int(state.get("ExitCode", -1)), oom_killed=bool(state.get("OOMKilled", False)))
 
 
+def git_state(root: Path) -> tuple[str | None, bool | None]:
+    """(HEAD commit, dirty) of the project; (None, None) if git is unavailable."""
+    try:
+        head = subprocess.run(  # noqa: S603
+            ["git", "-C", str(root), "rev-parse", "HEAD"],  # noqa: S607
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()  # fmt: skip
+        status = subprocess.run(  # noqa: S603
+            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],  # noqa: S607
+            capture_output=True, text=True, check=True,
+        ).stdout  # fmt: skip
+    except (OSError, subprocess.CalledProcessError):
+        return None, None
+    return head, bool(status.strip())
+
+
+def image_digest(image: str) -> str | None:
+    """Local image content id (``sha256:...``): identifies exactly what ran, also for local builds."""
+    try:
+        return subprocess.run(  # noqa: S603
+            ["docker", "image", "inspect", "-f", "{{.Id}}", image],  # noqa: S607
+            capture_output=True, text=True, check=True,
+        ).stdout.strip() or None  # fmt: skip
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
 def _docker_rm(name: str) -> None:
     subprocess.run(["docker", "rm", name], capture_output=True, check=False)  # noqa: S603,S607
 
@@ -151,7 +178,17 @@ def run_job(
     handle = gpu_lock.acquire(path, who=who, job=manifest.name, run_id=manifest.run_id, host_pid=os.getpid())
     container = f"vlm-{job.name}"
     try:
-        manifest = manifest.model_copy(update={"status": RunStatus.RUNNING, "pid": os.getpid()})
+        commit, dirty = git_state(project_root)
+        manifest = manifest.model_copy(
+            update={
+                "status": RunStatus.RUNNING,
+                "pid": os.getpid(),
+                "git_commit": manifest.git_commit or commit,
+                "git_dirty": dirty if manifest.git_dirty is None else manifest.git_dirty,
+                "container_image": manifest.container_image or job.image,
+                "container_digest": manifest.container_digest or image_digest(job.image),
+            }
+        )
         write_manifest(run_dir, manifest)
         _run_logged(docker_args(job, project_root, lock_token=handle.info.token), run_dir / "logs" / "stdout.log")
         info = _docker_state(container)
