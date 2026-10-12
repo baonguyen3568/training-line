@@ -103,6 +103,10 @@ class FakeWorker:
         self.checkpoints = set(checkpoints)
         self.calls: list[str] = []
 
+    def identity(self, spec: NodeSpec) -> str:
+        """Part of the executor cache key. Fixed, so subclasses in tests share cache entries (and can resume)."""
+        return "fake/1"
+
     def run(self, job: NodeJob) -> NodeResult:
         self.calls.append(job.node_id)
         if job.node_id in self.fail:

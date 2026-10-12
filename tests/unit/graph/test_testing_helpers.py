@@ -63,3 +63,12 @@ def test_outputs_exist_on_disk(tmp_path: Path) -> None:
     out = FakeWorker().run(_job(tmp_path / "run", "test.train")).outputs["adapter"]
     assert Path(out.path).is_file()
     assert Path(out.path).read_text() == out.hash
+
+
+def test_identity_is_fixed_across_subclasses() -> None:
+    class Sub(FakeWorker):
+        pass
+
+    spec = make_test_registry().get("test.train")
+    assert spec is not None
+    assert FakeWorker().identity(spec) == Sub().identity(spec) == "fake/1"
