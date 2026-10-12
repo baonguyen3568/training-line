@@ -149,6 +149,9 @@ error:
   SYS-004:
     title: 'App error: GPU step without the lock'
     what: This is an app error, not something you did. The step was stopped before using the GPU, so the machine and other jobs weren't affected.
+  ENV-001:
+    title: Runtime environment is missing a library
+    what: The app's runtime environment is missing a library this model needs ({packages}). This isn't something you did; the app's environment needs an update.
 action:
   migrate_node: Review changes and update
   open_node: Open this step

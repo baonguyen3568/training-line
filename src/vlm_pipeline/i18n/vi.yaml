@@ -149,6 +149,9 @@ error:
   SYS-004:
     title: 'Lỗi của app: chạy GPU khi chưa giữ khoá'
     what: Đây là lỗi của app, không phải do bạn. Bước này đã được dừng trước khi dùng GPU nên máy và các tác vụ khác không bị ảnh hưởng.
+  ENV-001:
+    title: Môi trường chạy thiếu thư viện
+    what: Môi trường chạy của app thiếu thư viện model này cần ({packages}). Đây không phải lỗi của bạn; app cần được cập nhật môi trường.
 action:
   migrate_node: Xem thay đổi và cập nhật
   open_node: Mở bước này
