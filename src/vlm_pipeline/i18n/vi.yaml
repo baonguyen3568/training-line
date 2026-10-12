@@ -149,6 +149,9 @@ error:
   SEC-003:
     title: Giấy phép không cho phép dùng thế này
     what: Giấy phép của {name} không cho phép {use}.
+  SEC-004:
+    title: Môi trường chạy đã bị thay đổi ngoài app
+    what: Môi trường "{image}" trên máy không còn khớp bản app đã kiểm tra, nên app chưa chạy bước nào để tránh rủi ro. Đây không phải lỗi của bạn; hãy gửi báo cáo để team cài lại bản đúng.
   SYS-000:
     title: Đã xảy ra lỗi chưa được nhận diện
     what: App chưa biết lỗi này. Tiến độ đã được lưu nếu có; bạn có thể gửi báo cáo để team sửa.

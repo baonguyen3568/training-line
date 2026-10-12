@@ -426,6 +426,19 @@ SEC-003:
   actions:
     - {id: pick_other_asset, kind: navigate, target: "node:asset", confirm: false}
 
+SEC-004:
+  slug: IMAGE_DIGEST_MISMATCH
+  severity: error
+  prevent_in_preflight: true
+  # The local tag no longer points at the image id pinned in docker/IMAGES.lock (security D1/D16
+  # image_digest_mismatch): someone rebuilt/retagged it outside the app. Fail closed, nothing is run.
+  # expected/actual are digests for the report, not shown in the message.
+  params: [image, expected, actual]
+  match:
+    - {kind: executor, value: "common/images.py ImageMismatchError (run_job, preflight): tag -> image id != IMAGES.lock"}
+  actions:
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
 CACHE-001:
   slug: CACHE_ARTIFACT_INVALID
   severity: warn
