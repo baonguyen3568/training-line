@@ -19,10 +19,30 @@ const portTypes: PortType[] = [
   { id: "Model", parent: null, color_token: "color.port.model", label_key: "port.model" },
   { id: "Adapter", parent: null, color_token: "color.port.model", label_key: "port.adapter" },
   { id: "Checkpoint", parent: "Model", color_token: "color.port.model", label_key: "port.model" },
-  { id: "QuantizedModel", parent: "Model", color_token: "color.port.model", label_key: "port.quantized_model" },
-  { id: "ExportArtifact", parent: null, color_token: "color.port.model", label_key: "port.export_artifact" },
-  { id: "EvalReport", parent: null, color_token: "color.port.report", label_key: "port.eval_report" },
-  { id: "BenchReport", parent: null, color_token: "color.port.report", label_key: "port.bench_report" },
+  {
+    id: "QuantizedModel",
+    parent: "Model",
+    color_token: "color.port.model",
+    label_key: "port.quantized_model",
+  },
+  {
+    id: "ExportArtifact",
+    parent: null,
+    color_token: "color.port.model",
+    label_key: "port.export_artifact",
+  },
+  {
+    id: "EvalReport",
+    parent: null,
+    color_token: "color.port.report",
+    label_key: "port.eval_report",
+  },
+  {
+    id: "BenchReport",
+    parent: null,
+    color_token: "color.port.report",
+    label_key: "port.bench_report",
+  },
   { id: "Endpoint", parent: null, color_token: "color.port.endpoint", label_key: "port.endpoint" },
 ];
 
@@ -54,7 +74,11 @@ export const mockNodeTypes: NodeSpec[] = [
     params_schema: {
       type: "object",
       properties: {
-        repo: { type: "string", enum: ["Qwen/Qwen3.5-0.8B", "Qwen/Qwen3.5-2B"], default: "Qwen/Qwen3.5-0.8B" },
+        repo: {
+          type: "string",
+          enum: ["Qwen/Qwen3.5-0.8B", "Qwen/Qwen3.5-2B"],
+          default: "Qwen/Qwen3.5-0.8B",
+        },
       },
       required: ["repo"],
     },
@@ -79,7 +103,13 @@ export const mockNodeTypes: NodeSpec[] = [
     params_schema: {
       type: "object",
       properties: {
-        val_fraction: { type: "number", minimum: 0.05, maximum: 0.5, default: 0.1, "x-ui": { widget: "slider" } },
+        val_fraction: {
+          type: "number",
+          minimum: 0.05,
+          maximum: 0.5,
+          default: 0.1,
+          "x-ui": { widget: "slider" },
+        },
       },
     },
   }),
@@ -138,7 +168,11 @@ export const mockNodeTypes: NodeSpec[] = [
     params_schema: {
       type: "object",
       properties: {
-        groups: { type: "array", enum: ["documents", "charts", "reasoning", "math"], default: ["documents"] },
+        groups: {
+          type: "array",
+          enum: ["documents", "charts", "reasoning", "math"],
+          default: ["documents"],
+        },
       },
     },
   }),
@@ -148,7 +182,13 @@ export const mockNodeTypes: NodeSpec[] = [
     category: "data",
     inputs: { dataset: { type: "Dataset" } },
     outputs: { dataset: { type: "Dataset" } },
-    origin: { kind: "third_party", publisher: "acme", pack: "vision-tools", version: "0.3.1", reviewed: false },
+    origin: {
+      kind: "third_party",
+      publisher: "acme",
+      pack: "vision-tools",
+      version: "0.3.1",
+      reviewed: false,
+    },
     permissions: [
       {
         id: "gpu",
@@ -170,16 +210,37 @@ const templates: Template[] = [
     difficulty: "basic",
     tags: ["finetune"],
     sample_data: true,
-    estimate: { ram_gb: { lo: 18, hi: 26 }, disk_gb: { lo: 4, hi: 8 }, minutes: { lo: 20, hi: 45 }, gpu_exclusive: true, source: "formula" },
+    estimate: {
+      ram_gb: { lo: 18, hi: 26 },
+      disk_gb: { lo: 4, hi: 8 },
+      minutes: { lo: 20, hi: 45 },
+      gpu_exclusive: true,
+      source: "formula",
+    },
     workflow: {
       format: "vlm-workflow",
       schema_version: 1,
       name: "lora_finetune",
       nodes: [
-        { id: "n1", type: "model.hf_pick", version: "1.0.0", params: { repo: "Qwen/Qwen3.5-0.8B" } },
-        { id: "n2", type: "data.local_folder", version: "1.0.0", params: { path: "data/sample-invoices" } },
+        {
+          id: "n1",
+          type: "model.hf_pick",
+          version: "1.0.0",
+          params: { repo: "Qwen/Qwen3.5-0.8B" },
+        },
+        {
+          id: "n2",
+          type: "data.local_folder",
+          version: "1.0.0",
+          params: { path: "data/sample-invoices" },
+        },
         { id: "n3", type: "data.split", version: "1.0.0", params: { val_fraction: 0.1 } },
-        { id: "n4", type: "train.lora_vlm", version: "1.0.0", params: { preset: "balanced", epochs: 2 } },
+        {
+          id: "n4",
+          type: "train.lora_vlm",
+          version: "1.0.0",
+          params: { preset: "balanced", epochs: 2 },
+        },
         { id: "n5", type: "export.merge_lora", version: "1.0.0", params: {} },
         { id: "n6", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["documents"] } },
       ],
@@ -201,7 +262,13 @@ const templates: Template[] = [
     difficulty: "basic",
     tags: ["quantize", "eval"],
     sample_data: false,
-    estimate: { ram_gb: { lo: 12, hi: 20 }, disk_gb: { lo: 2, hi: 4 }, minutes: { lo: 15, hi: 40 }, gpu_exclusive: true, source: "formula" },
+    estimate: {
+      ram_gb: { lo: 12, hi: 20 },
+      disk_gb: { lo: 2, hi: 4 },
+      minutes: { lo: 15, hi: 40 },
+      gpu_exclusive: true,
+      source: "formula",
+    },
     workflow: {
       format: "vlm-workflow",
       schema_version: 1,
@@ -209,7 +276,12 @@ const templates: Template[] = [
       nodes: [
         { id: "n1", type: "model.hf_pick", version: "1.0.0", params: { repo: "Qwen/Qwen3.5-2B" } },
         { id: "n2", type: "quantize.modelopt_ptq", version: "1.0.0", params: { format: "fp8" } },
-        { id: "n3", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["documents", "charts"] } },
+        {
+          id: "n3",
+          type: "eval.benchmarks",
+          version: "1.0.0",
+          params: { groups: ["documents", "charts"] },
+        },
       ],
       edges: [
         { from: ["n1", "model"], to: ["n2", "model"] },
@@ -219,7 +291,11 @@ const templates: Template[] = [
   },
 ];
 
-function issue(code: string, partial: Partial<ValidationIssue>, params: Record<string, string | number>): ValidationIssue {
+function issue(
+  code: string,
+  partial: Partial<ValidationIssue>,
+  params: Record<string, string | number>,
+): ValidationIssue {
   return {
     code,
     severity: "error",
@@ -232,7 +308,11 @@ function issue(code: string, partial: Partial<ValidationIssue>, params: Record<s
 }
 
 /** Minimal mirror of validate steps 1–2 (structure, types) so the UI can be exercised without a backend. */
-export function mockValidate(workflow: Workflow, types: NodeSpec[], ports: PortType[]): ValidationResult {
+export function mockValidate(
+  workflow: Workflow,
+  types: NodeSpec[],
+  ports: PortType[],
+): ValidationResult {
   const byType = new Map(types.map((s) => [s.type_id, s]));
   const nodeTitle = (typeId: string) => tp(["node", typeId, "title"]);
   const errors: ValidationIssue[] = [];
@@ -252,7 +332,9 @@ export function mockValidate(workflow: Workflow, types: NodeSpec[], ports: PortT
     for (const [port, ps] of Object.entries(nodeSpec.inputs)) {
       const connected = workflow.edges.some((e) => e.to[0] === node.id && e.to[1] === port);
       if (!ps.optional && !connected) {
-        errors.push(issue("CFG-003", { node_id: node.id, port }, { node: nodeTitle(node.type), port }));
+        errors.push(
+          issue("CFG-003", { node_id: node.id, port }, { node: nodeTitle(node.type), port }),
+        );
       }
     }
   }
@@ -285,7 +367,8 @@ export function mockValidate(workflow: Workflow, types: NodeSpec[], ports: PortT
   };
 }
 
-const delay = <T,>(value: T) => new Promise<T>((r) => setTimeout(() => r(structuredClone(value)), 50));
+const delay = <T>(value: T) =>
+  new Promise<T>((r) => setTimeout(() => r(structuredClone(value)), 50));
 
 export const mockApi: Api = {
   nodeTypes: () => delay<NodeTypesResponse>({ node_types: mockNodeTypes, port_types: portTypes }),

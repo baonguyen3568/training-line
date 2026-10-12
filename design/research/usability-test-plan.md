@@ -56,5 +56,5 @@ Cuối buổi: 3 câu hỏi.
 
 ## Phụ thuộc
 - Slice S-5 chạy được đến validate overlay. T4 và T5 cần lỗi giả lập và dialog cài; nếu chưa có thì dùng prototype giấy hoặc HTML tĩnh cho 2 nhiệm vụ đó.
-- bao-tester: fixture đã có ở `tests/fixtures/usability/` (t1, t3, t4, t5). Cần thêm: cấu hình tắt policy_block cho T5, và log sự kiện local (frontend).
+- bao-tester: fixture ở `tests/fixtures/usability/` (t1, t3, t4, t5 + `t5_app_config.json` policy tắt, `t5b_app_config.json` policy bật). Override chỉ được chấp nhận khi `worker: fake` (worker thật → ValueError). Còn thiếu: log sự kiện local (frontend).
 - PM/user: người tham gia và đồng ý ghi màn hình.

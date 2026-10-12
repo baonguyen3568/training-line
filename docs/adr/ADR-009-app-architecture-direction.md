@@ -30,4 +30,4 @@
 - Port type tập đóng; plugin chỉ khai subtype của type core. `plugin_api` có semver.
 - Cài đặt: luôn qua dialog (P010 §15). Quyền cao / GPU + nguồn chưa xác minh → phải gõ tên node. Workflow chia sẻ KHÔNG mang URL/commit để tự cài; không có cài hàng loạt.
 - Output của plugin được kiểm bằng allowlist parse định dạng. Plugin hỏng → `unavailable`, app vẫn khởi động.
-- **Chính sách riêng cho host dev dùng chung (user chốt 2026-10-12)**: trước khi vá toolkit (≥1.19.1) CẤM plugin bên thứ 3 có gpu=true trên máy này. Sau khi vá: chỉ cài plugin team đã review code ở SHA cố định. Máy end-user: cài theo dialog + cảnh báo.
+- **Chính sách riêng cho host dev dùng chung (user chốt 2026-10-12)**: trước khi vá toolkit (≥1.19.1) CẤM plugin bên thứ 3 có gpu=true trên máy này. **Siết thêm (user chốt U5)**: trên máy này chặn MỌI plugin chưa được team review (kể cả không dùng GPU), ngay từ bây giờ; chỉ cài plugin đã review ở SHA cố định. Máy end-user: cài theo dialog + cảnh báo.

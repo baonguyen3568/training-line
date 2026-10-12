@@ -90,7 +90,11 @@ function ParamField({
   if (schema.type === "boolean") {
     return (
       <label className="field check">
-        <input type="checkbox" checked={Boolean(current)} onChange={(e) => onChange(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={Boolean(current)}
+          onChange={(e) => onChange(e.target.checked)}
+        />
         {label}
       </label>
     );
@@ -114,7 +118,12 @@ function ParamField({
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      <input id={id} type="text" value={String(current ?? "")} onChange={(e) => onChange(e.target.value)} />
+      <input
+        id={id}
+        type="text"
+        value={String(current ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   );
 }
@@ -182,7 +191,12 @@ export function Inspector() {
         />
       ))}
       {advanced.length > 0 && (
-        <button type="button" className="link" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((s) => !s)}>
+        <button
+          type="button"
+          className="link"
+          aria-expanded={showAdvanced}
+          onClick={() => setShowAdvanced((s) => !s)}
+        >
           ▸ {t("canvas.show_advanced", { param_count: advanced.length })}
         </button>
       )}

@@ -35,10 +35,10 @@ Mốc tham chiếu: Qwen3-8B LoRA đo được ≈ 21GiB.
 
 | Tier | Model (repo@SHA do security vet) | Params | License | Remote code | Disk | RAM LoRA BF16 (ước) | Engine train | Quant được (chính thức) | Trong app v1 |
 |---|---|---|---|---|---|---|---|---|---|
-| CI | Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17 | 0.8B | Apache-2.0 | Không | ~2GB | ~6GB | AutoModel (YAML tự viết từ qwen3_5_4b) | FP8 | Ẩn (chỉ CI) |
-| **Dev/Template** | **Qwen/Qwen3.5-2B@15852e8c16360a2fea060d615a32b45270f8a8fc** | 2B | Apache-2.0 | Không | ~5GB | ~10GB (full SFT ~25GB) | AutoModel | FP8 | ✅ mặc định template |
-| Main | Qwen/Qwen3.5-4B@851bf6e8 | ~5B | Apache-2.0 | Không | 9.3GB | ~16GB | AutoModel (`qwen3_5_4b.yaml`) | FP8 | ✅ |
-| **Main** | **Qwen/Qwen3.5-9B@c2022362** | ~10B | Apache-2.0 | Không | 19.3GB | ~28GB (**startup peak** = + page cache khi load ~19GB weights, có thể chạm trần 40GB → cần đo) | AutoModel (`qwen3_5_9b.yaml`) | FP8 | ✅ "khuyên dùng" |
+| CI | Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17 | 0.8B | Apache-2.0 | Không | ~2GB | **đo: 7–13GB** (S-3) | AutoModel (YAML tự viết từ qwen3_5_4b) | FP8 | Ẩn (chỉ CI) |
+| **Dev/Template** | **Qwen/Qwen3.5-2B@15852e8c16360a2fea060d615a32b45270f8a8fc** | 2B | Apache-2.0 | Không | ~5GB | ước **10–16GB** (chờ S-3b) | AutoModel | FP8 | ✅ mặc định template |
+| Main | Qwen/Qwen3.5-4B@851bf6e8 | ~5B | Apache-2.0 | Không | 9.3GB | ước **16–24GB** | AutoModel (`qwen3_5_4b.yaml`) | FP8 | ✅ |
+| **Main** | **Qwen/Qwen3.5-9B@c2022362** | ~10B | Apache-2.0 | Không | 19.3GB | ước **28–38GB** (sát trần 40GB; **chưa được coi là "khuyên dùng" cho tới khi đo**) | AutoModel (`qwen3_5_9b.yaml`) | FP8 | ✅ (nhãn "khuyên dùng" chờ S-3c) |
 | Stretch | Qwen/Qwen3.6-27B@6a9e13bd | 27B | Apache-2.0 | Không | 55.6GB | ~65GB BF16 ❌ / QLoRA ~35GB ❓ | AutoModel (cùng kiến trúc 3.5 ❓) | FP8 (+`nvidia/…-NVFP4` có sẵn, **chờ vet**) | ⚠️ "cần máy rảnh", ẩn mặc định |
 | Stretch | Qwen/Qwen3.8-27B@1d4bf0f2 | 27B | Apache-2.0 | Không | 55.6GB | như trên | AutoModel v0.6.0 (`qwen3_8_27b_lora.yaml`), 26.08 chờ spike | FP8, NVFP4 (nvidia/, **chờ vet**) | ⚠️ sau b' |
 | Stretch | Qwen/Qwen3.6-35B-A3B@995ad96e | 35B/3B MoE | Apache-2.0 | Không | 71.9GB | ~80GB ❌ | AutoModel qwen3_5_moe | FP8 | ❌ v1 |
@@ -63,6 +63,26 @@ Schema entry (đề xuất cho `configs/catalog/models.yaml`):
   tier: main
 ```
 UI dùng `ram_gb` + `MemAvailable` để chặn trước khi chạy; `license.commercial`/`remote_code` để hiện cảnh báo; `quant_formats` để ẩn lựa chọn quant không hỗ trợ.
+
+### 3.2 Hiệu chỉnh RAM bằng số đo thật (cập nhật 2026-10-12 20:10)
+Nguồn: S-3, LoRA Qwen3.5-0.8B, dim 8, vision frozen, local_batch 1, GBS 4, act-ckpt, sdpa, MedPix (~100–1200 label tokens/step), image `vlm-automodel:26.08-1`.
+Số liệu do bao-backend và bao-tester đo. File: `outputs/runs/20261012-1630-lora-qwen3.5-0.8b-s3a/`, `outputs/perf/s3-20261012/`, `benchmarks/perf/s3-lora-qwen3.5-0.8b-20261012.json`.
+| Đại lượng | Giá trị |
+|---|---|
+| CUDA max_allocated | 8.14GiB ở step 0 (warmup + Triton JIT ~2m50s), steady 3.1–4.9GiB |
+| RSS container | ≤5.0GB |
+| Host MemAvailable giảm | steady **+6.5GB**, peak **+12.6GB**. Peak rơi vào step 10–15, **không trùng** đợt lưu checkpoint (adapter chỉ 61MB). Có thể lẫn nhiễu từ service khác (MemAvailable dao động 30–36GB cùng lúc) → coi là cận trên bảo thủ |
+| Tốc độ | ~2.5 s/step, tps median ~550, 20 step ≈ 3m45s (gồm 2m50s step 0) |
+| Disk | adapter + optimizer 61MB/ckpt |
+Mô hình ước lượng tạm thời (1 điểm đo, chưa tách được phần cố định và phần scale theo model):
+- `steady ≈ 4.7GB cố định (CUDA ctx + lib + dataloader) + 2GB × P(tỷ tham số, gồm vision)`, cộng activation tăng theo hidden size
+- `peak ≈ steady × 1.6–1.9` (hệ số lấy từ 0.8B, gồm warmup/JIT step 0)
+Theo đúng ngưỡng của tester (ước lượng ≥ thực đo, ≤ +30%), các dải ở bảng §3 cho 2B/4B/9B **chưa đạt chuẩn "measured"**: `source=estimated`.
+UI phải dùng **cận trên** của dải cho preflight.
+Cần đo tiếp:
+- **S-3b**: Qwen3.5-2B (template mặc định), cùng config + CORD-v2. Mục đích: có điểm thứ 2 để fit hệ số scale, và chạy thật template.
+- S-3c: Qwen3.5-9B. Chỉ chạy khi S-3b cho thấy ước lượng ≤35GB.
+- Tách nhiễu bằng cách đo thêm trong container: `torch.cuda.max_memory_allocated` + RSS process. Không chỉ dựa vào MemAvailable của cả host.
 
 ### 3.1 Image tối thiểu theo model (train / serve), dưới driver 580.142
 | Model | Train (tối thiểu) | Serve | Quantize đã kiểm chứng (nguồn) |

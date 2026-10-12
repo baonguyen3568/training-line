@@ -328,7 +328,12 @@ Mount do orchestrator cố định: `/in` (ro, artifact được nối vào), `/
   Ghi chú: quy tắc (1) **chặt hơn** chính sách user đã duyệt ở giai đoạn *trước khi vá* (lúc đó chỉ chặn plugin có GPU), vì nó chặn cả plugin không dùng GPU nhưng chưa được review. Lý do: plugin không GPU vẫn chạy code tuỳ ý trên kernel dùng chung. Đã nêu rõ cho PM xác nhận (U5).
 - `personal`: không có policy_block mặc định. Mọi kiểm soát D16 vẫn áp dụng như bình thường.
 - `/api/policy` trả `{profile, toolkit_patched, toolkit_version, sandbox_verified, storage:{approval_policy, threshold_gb}}`. UI hiện banner "Máy dùng chung — chính sách quản trị đang bật" khi `shared_dev`.
-- Trên host này: admin (user) tạo file `~/.config/vlm-app/policy.toml` với `profile = "shared_dev"`. File này **không** nằm trong repo nên không lan sang máy end-user.
+- Trên host này (bao-backend chỉ ra: agent không được ghi ra ngoài repo theo CLAUDE.md):
+  (1) mọi launcher/script dev của dự án `export VLM_PROFILE=shared_dev`, vì env chỉ được làm chặt hơn nên không mở được lỗ;
+  (2) PM nhờ user tạo `~/.config/vlm-app/policy.toml` (`profile = "shared_dev"`) một lần (U6);
+  (3) khi profile hiệu lực là `personal` mà host đang chạy container không thuộc dự án (không phải `vlm-*`), server log WARNING kèm banner "Máy có vẻ dùng chung — cân nhắc profile shared_dev". Chỉ cảnh báo, không tự đổi profile.
+  Loader `app/policy.py`: pydantic frozen extra=forbid, đọc 1 lần lúc khởi động. File có nhưng hỏng thì fail-closed về `shared_dev` và ghi log.
+  File không nằm trong repo nên không lan sang máy end-user.
 
 ## 5. Việc cần người khác / user
 | # | Việc | Ai |
@@ -336,6 +341,7 @@ Mount do orchestrator cố định: `/in` (ro, artifact được nối vào), `/
 | U1 | Vá NVIDIA Container Toolkit lên ≥1.19.1 (sudo + restart docker ảnh hưởng mọi service) | user (qua PM) |
 | U2 | ~~Chọn nhánh A/B~~ → user chốt **F** (miễn phí, phân phối, không bán). Còn chờ: user đồng ý (ii) xây trên MIT + phát hành Apache-2.0, hay chấp nhận fork GPL-3.0 | user (qua PM) |
 | U3 | HF token: token đã đưa bị 401 và đã lộ trong transcript chat → **revoke**, tạo token fine-grained read-only mới, user tự dán vào `.env` (không qua chat) | user |
+| U6 | Tạo `~/.config/vlm-app/policy.toml` với `profile = "shared_dev"` (agent không được ghi ngoài repo) | user (qua PM) |
 | U5 | D17: trên host dev, xác nhận chặn cả plugin **không GPU** nhưng chưa review (chặt hơn bản đã duyệt ở giai đoạn trước vá) | user (qua PM) |
 | U4 | ~~v1 không custom node bên thứ 3~~ → user CHO PHÉP (ADR-009) ⇒ D16. Chờ user duyệt **chính sách host dev**: cấm node bên thứ 3 có GPU tới khi vá toolkit; sau vá chỉ node đã được team review | user (qua PM) |
 | T1 | Implement D2 trong compose/skill backend-gpu-job | bao-backend (đã áp) |

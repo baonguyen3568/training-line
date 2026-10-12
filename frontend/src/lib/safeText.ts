@@ -5,7 +5,8 @@
 // C0/C1 controls (except \t \n), zero-width + LRM/RLM, bidi embeddings/overrides, bidi isolates, BOM.
 const INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F​-‏‪-‮⁦-⁩﻿]/g;
 
-const hex = (ch: string) => `\\u${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
+const hex = (ch: string) =>
+  `\\u${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
 
 /** Replace invisible/bidi characters with a visible escape so the text cannot reorder itself. */
 export function stripInvisible(text: string): string {

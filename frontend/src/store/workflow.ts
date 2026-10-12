@@ -74,7 +74,9 @@ export const useWorkflow = create<WorkflowState>((set, get) => ({
     const wf = get().workflow;
     if (!wf) return;
     // Position lives in `ui` and is excluded from the backend cache key (P009 §3).
-    set({ workflow: { ...wf, nodes: wf.nodes.map((n) => (n.id === id ? { ...n, ui: { x, y } } : n)) } });
+    set({
+      workflow: { ...wf, nodes: wf.nodes.map((n) => (n.id === id ? { ...n, ui: { x, y } } : n)) },
+    });
   },
 
   setParam(id, name, value) {
@@ -83,7 +85,9 @@ export const useWorkflow = create<WorkflowState>((set, get) => ({
     set({
       workflow: {
         ...wf,
-        nodes: wf.nodes.map((n) => (n.id === id ? { ...n, params: { ...n.params, [name]: value } } : n)),
+        nodes: wf.nodes.map((n) =>
+          n.id === id ? { ...n, params: { ...n.params, [name]: value } } : n,
+        ),
       },
     });
   },

@@ -1,7 +1,15 @@
 // API types for P009 §2–§6. Hand-written until the backend exports `schemas/` (OpenAPI + NodeSpec JSON Schema);
 // then they are replaced by openapi-typescript output in src/generated/ and this file re-exports from there.
 
-export type Category = "source" | "data" | "train" | "test" | "quantize" | "eval" | "export" | "util";
+export type Category =
+  | "source"
+  | "data"
+  | "train"
+  | "test"
+  | "quantize"
+  | "eval"
+  | "export"
+  | "util";
 export type TrustLevel = "first_party" | "reviewed" | "unverified";
 export type PermissionLevel = "info" | "warning" | "critical";
 export type Severity = "error" | "warn" | "info";

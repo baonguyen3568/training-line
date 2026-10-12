@@ -40,8 +40,8 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | S-4 | common/memguard.py + preflight (disk/lock) | bao-fixcode + bao-cleanup | REVIEW (memguard+errors: fixcode ✓, diskguard+storage_report+scripts/cleanup: cleanup ✓; 47 test pass; chờ cleancode+security review) |
 | S-5 | frontend/ scaffold theo checklist 12 bước (Vite+React+@xyflow/react, tokens, i18n VI/EN) — vertical slice gallery→validate overlay | bao-frontend + bao-design | DOING |
 | S-6 | P001 cập nhật default image 26.08 → ADR-001 | bao-research | DONE (backend+security APPROVED) → PM chốt ADR-001 |
-| S-7 | Security review mọi PR S-1..S-5; xác nhận CORD-v2; review image dẫn xuất | bao-security | DOING (CORD-v2 ✓, Dockerfile vlm-automodel ✓ hadolint sạch) |
-| S-8 | Gom test xfail hiện có vào tests/ theo layout ADR-004 | bao-tester | TODO (chờ S-1) |
+| S-7 | Security review mọi PR S-1..S-5; xác nhận CORD-v2; review image dẫn xuất | bao-security | DOING (CORD-v2 ✓, Dockerfile vlm-automodel ✓ hadolint sạch, S-1 ✓ sau 1 fix, S-4 ✓, P001 ✓+4 chỉnh, git history gitleaks sạch; chờ code S-2/S-3/S-5) |
+| S-8 | Gom test xfail hiện có vào tests/ theo layout ADR-004 | bao-tester | REVIEW (conftest + split spec; chờ cleancode) |
 
 ## Phase 2 (cũ) — Build pipeline
 | ID | Task | Owner | Status |

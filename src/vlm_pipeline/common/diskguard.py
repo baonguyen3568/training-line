@@ -5,13 +5,15 @@ Stdlib only and read-only: nothing here writes or deletes files. All I/O is inje
 
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-GB = 1024**3
+from vlm_pipeline.common.gpu_lock import GpuLockError, _pid_alive, is_alive, read_lock
+from vlm_pipeline.common.paths import GIB
+
+GB = GIB  # kept for callers; prefer common.paths.GIB
 
 
 @dataclass(frozen=True)
@@ -56,54 +58,24 @@ class LockStatus:
     corrupt: bool = False
 
 
-def _pid_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:  # exists, owned by another user
-        return True
-    return True
-
-
-def _parse_lock(raw: str) -> dict[str, object]:
-    """JSON lock (backend-gpu-job skill / gpu_lock) or legacy one-line text ``who | job | started_at | PID``."""
-    try:
-        data = json.loads(raw)
-    except ValueError:
-        parts = [p.strip() for p in raw.strip().split("|")]
-        if len(parts) < 4:
-            raise
-        return {"who": parts[0], "job": parts[1], "started_at": parts[2], "host_pid": parts[3]}
-    if not isinstance(data, dict):
-        raise ValueError("lock is not a JSON object")
-    return data
-
-
 def check_lock(lock_path: Path, *, pid_alive: Callable[[int], bool] = _pid_alive) -> LockStatus | None:
-    """Read-only view of ``.team/GPU_LOCK``. Temporary until ``gpu_lock.read_lock``/``is_alive`` (S-2) exist.
+    """Read-only view of the GPU lock for preflight, via ``gpu_lock.read_lock``/``is_alive`` (single parser).
 
     ``None`` means no lock. A dead holder gives ``alive=False``: callers still treat it as busy and must report it
-    to the PM; this function never removes a lock. An unreadable lock is ``corrupt=True`` and treated as alive.
+    to the PM; nothing here removes a lock. A malformed/unreadable lock (``GpuLockError``, e.g. not written by
+    ``gpu_lock.acquire``) is ``corrupt=True`` and treated as alive.
     """
     try:
-        raw = lock_path.read_text(encoding="utf-8")
-    except FileNotFoundError:
+        info = read_lock(lock_path)
+    except GpuLockError:
+        return LockStatus(who="?", job="?", run_id=None, host_pid=None, started_at=None, alive=True, corrupt=True)
+    if info is None:
         return None
-    except OSError:
-        return LockStatus(who="?", job="?", run_id=None, host_pid=None, started_at=None, alive=True, corrupt=True)
-    try:
-        data = _parse_lock(raw)
-        pid_raw = data.get("host_pid", data.get("pid"))
-        host_pid = int(str(pid_raw)) if pid_raw is not None else None
-    except (ValueError, TypeError):
-        return LockStatus(who="?", job="?", run_id=None, host_pid=None, started_at=None, alive=True, corrupt=True)
-    alive = pid_alive(host_pid) if host_pid is not None and host_pid > 0 else True
     return LockStatus(
-        who=str(data.get("who", "?")),
-        job=str(data.get("job", "?")),
-        run_id=str(data["run_id"]) if data.get("run_id") is not None else None,
-        host_pid=host_pid,
-        started_at=str(data["started_at"]) if data.get("started_at") is not None else None,
-        alive=alive,
+        who=info.who,
+        job=info.job,
+        run_id=info.run_id,
+        host_pid=info.host_pid,
+        started_at=info.started_at,
+        alive=is_alive(info, pid_alive=pid_alive),
     )

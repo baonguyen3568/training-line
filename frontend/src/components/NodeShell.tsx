@@ -110,8 +110,13 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
       </div>
       <div className="node-footer">
         {spec.permissions.map((p) => (
-          <span key={p.id} className={`perm level-${p.level}`} title={t(p.perm_copy_key, { max_runtime: "" })}>
-            {p.id === "gpu" ? "▣" : p.id === "network" ? "🌐" : "⏱"} {t(`custom_node.badge_perm.${p.id}`)}
+          <span
+            key={p.id}
+            className={`perm level-${p.level}`}
+            title={t(p.perm_copy_key, { max_runtime: "" })}
+          >
+            {p.id === "gpu" ? "▣" : p.id === "network" ? "🌐" : "⏱"}{" "}
+            {t(`custom_node.badge_perm.${p.id}`)}
           </span>
         ))}
         {errors.length > 0 && (
@@ -119,7 +124,9 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
             ✕ {t("node_state.failed")} ({errors.length})
           </span>
         )}
-        {errors.length === 0 && warns.length > 0 && <span className="state warn">⚠ {warns.length}</span>}
+        {errors.length === 0 && warns.length > 0 && (
+          <span className="state warn">⚠ {warns.length}</span>
+        )}
         {issues.length === 0 && <span className="state ready">○ {t("node_state.ready")}</span>}
       </div>
     </div>

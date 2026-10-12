@@ -22,7 +22,8 @@ export function Gallery({ onOpen }: { onOpen: (id: string) => void }) {
     return (items ?? []).filter((it) => {
       if (filter !== "all" && !it.tags.includes(filter)) return false;
       if (!q) return true;
-      const text = `${tp(it.title_key.split("."))} ${tp(it.description_key.split("."))}`.toLowerCase();
+      const text =
+        `${tp(it.title_key.split("."))} ${tp(it.description_key.split("."))}`.toLowerCase();
       return text.includes(q);
     });
   }, [items, filter, query]);

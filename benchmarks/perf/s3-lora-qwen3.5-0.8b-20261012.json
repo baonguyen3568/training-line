@@ -18,10 +18,17 @@
   "min_mem_available_gb": 29.4,
   "container_rss_peak_gb": 5.0,
   "docker_stats_mem_peak_gib": 4.7,
-  "automodel_step_mem_gib_range": [3.2, 4.2],
+  "automodel_step_mem_gib_range": [
+    3.2,
+    4.2
+  ],
   "load_model": "2.10 GB loaded in 8.9 s",
   "wall_time_s": 308,
-  "throughput_tps_range": [390, 664],
-  "attribution_caveat": "Host delta minus container RSS (~8 GB at peak) is NOT attributable from these signals: on UMA, CUDA allocations do not show in process RSS, and the host is shared (other services can move MemAvailable). Peak may include a transient from another service. Treat 12.6 GB as the conservative upper bound until a run with per-process GPU memory (torch.cuda.memory_reserved / nvidia-smi compute-apps) disambiguates.",
-  "recommendation_for_estimator": "ram_gb range [7, 13] for LoRA Qwen3.5-0.8B smoke at this config; never below 12.6 GB peak until disambiguated (estimator must not underestimate)."
+  "throughput_tps_range": [
+    390,
+    664
+  ],
+  "attribution_caveat": "Peak coincides with step 0 (bao-backend). ~4 GB of the host-vs-RSS gap matches CUDA max_allocated at step 0 (UMA allocations are not in RSS); the rest is likely JIT compiler child processes (not in the main PID VmRSS, but in the container cgroup) plus CUDA context / caching-allocator reserved. Not yet verified: next run samples cgroup memory.current/peak and memory_reserved, and repeats with a warm Triton cache.",
+  "recommendation_for_estimator": "ram_gb [7, 13]; keep >= 12.6 GB as STARTUP peak (cold JIT cache). Steady ~6.5 GB. Re-measure with warm Triton cache before lowering.",
+  "memory_peak_phase": "startup: first forward/backward + Triton JIT compile (LoRA kernels + GatedDeltaNet), 09:30:54-09:33:45 UTC; AutoModel step-0 mem 8.14 GiB (~2x steady)"
 }

@@ -21,7 +21,9 @@ export const LANE_WIDTH = 300;
 export const ROW_HEIGHT = 170;
 
 /** Lane-based layout: x from the lane, y from the order within the lane (no dagre for the common case). */
-export function laneLayout(items: { id: string; category: Category }[]): Map<string, { x: number; y: number }> {
+export function laneLayout(
+  items: { id: string; category: Category }[],
+): Map<string, { x: number; y: number }> {
   const rows = new Map<Lane, number>();
   const out = new Map<string, { x: number; y: number }>();
   for (const item of items) {

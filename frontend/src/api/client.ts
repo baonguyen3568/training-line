@@ -1,7 +1,14 @@
 // Same-origin API client. Auth is the HttpOnly session cookie set by the server (P003 D13); this wrapper only
 // adds the CSRF header on mutating requests. CSRF token: double-submit cookie `vlm_csrf` (readable, not HttpOnly)
 // — exact mechanism to be confirmed with bao-backend/bao-security.
-import type { NodeTypesResponse, SystemStatus, Template, TemplateMeta, ValidationResult, Workflow } from "./types";
+import type {
+  NodeTypesResponse,
+  SystemStatus,
+  Template,
+  TemplateMeta,
+  ValidationResult,
+  Workflow,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(

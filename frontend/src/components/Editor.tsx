@@ -26,7 +26,11 @@ function Lanes() {
   return (
     <ViewportPortal>
       {LANES.map((lane, i) => (
-        <div key={lane} className="lane" style={{ transform: `translate(${i * LANE_WIDTH}px, 0)`, width: LANE_WIDTH }}>
+        <div
+          key={lane}
+          className="lane"
+          style={{ transform: `translate(${i * LANE_WIDTH}px, 0)`, width: LANE_WIDTH }}
+        >
           <span className="lane-label">{t(`canvas.lane.${lane}`)}</span>
         </div>
       ))}
@@ -116,7 +120,13 @@ function EditorInner() {
           const pt = ports.find((p) => p.id === type);
           return pt ? tp(pt.label_key.split(".")) : type;
         };
-        setToast(t("canvas.wire_rejected", { target: c.targetHandle, expected: label(res.expected), actual: label(res.actual) }));
+        setToast(
+          t("canvas.wire_rejected", {
+            target: c.targetHandle,
+            expected: label(res.expected),
+            actual: label(res.actual),
+          }),
+        );
       }
     },
     [connect, ports],

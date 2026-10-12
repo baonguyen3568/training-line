@@ -55,7 +55,12 @@ export function CheckBar() {
           </span>
         )}
         {(errors.length > 0 || warnings.length > 0) && (
-          <button type="button" className="link" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <button
+            type="button"
+            className="link"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+          >
             {t("preflight.show_details")}
           </button>
         )}

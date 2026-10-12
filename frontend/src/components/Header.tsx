@@ -29,7 +29,11 @@ export function Header({ onHome }: { onHome: () => void }) {
     : lock.stale
       ? t("header.gpu_stale")
       : lock.held
-        ? t("header.gpu_busy", { who: lock.who ?? "?", job: lock.job ?? "?", since: lock.since ?? "?" })
+        ? t("header.gpu_busy", {
+            who: lock.who ?? "?",
+            job: lock.job ?? "?",
+            since: lock.since ?? "?",
+          })
         : t("header.gpu_free");
   const gpuState = !lock ? "unknown" : lock.stale ? "critical" : lock.held ? "busy" : "free";
 
