@@ -872,3 +872,24 @@ train_preset:
   fast: Nhanh
   balanced: Cân bằng
   quality: Chất lượng
+model_catalog:
+  nemotron-parse-v1.1:
+    tagline: Đọc tài liệu/hoá đơn
+  cosmos-reason2-2b:
+    tagline: Hiểu ảnh/video
+  cosmos-reason2-8b:
+    tagline: Hiểu ảnh/video (nâng cao)
+  qwen3-vl-2b-instruct:
+    tagline: Mốc so sánh
+  qwen3.5-0.8b:
+    tagline: Kiểm thử nhanh
+  qwen3.5-2b:
+    tagline: Đa năng, nhỏ
+  qwen3.5-4b:
+    tagline: Đa năng
+  qwen3.5-9b:
+    tagline: Đa năng, lớn — cần máy rảnh
+  gemma-4-e2b-it:
+    tagline: Đa năng, nhỏ
+  gemma-4-e4b-it:
+    tagline: Đa năng

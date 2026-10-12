@@ -872,3 +872,24 @@ train_preset:
   fast: Fast
   balanced: Balanced
   quality: Quality
+model_catalog:
+  nemotron-parse-v1.1:
+    tagline: Reads documents/receipts
+  cosmos-reason2-2b:
+    tagline: Understands images/video
+  cosmos-reason2-8b:
+    tagline: Understands images/video (advanced)
+  qwen3-vl-2b-instruct:
+    tagline: Comparison baseline
+  qwen3.5-0.8b:
+    tagline: Quick testing
+  qwen3.5-2b:
+    tagline: General purpose, small
+  qwen3.5-4b:
+    tagline: General purpose
+  qwen3.5-9b:
+    tagline: General purpose, large — needs a free machine
+  gemma-4-e2b-it:
+    tagline: General purpose, small
+  gemma-4-e4b-it:
+    tagline: General purpose
