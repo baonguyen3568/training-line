@@ -20,7 +20,6 @@ GOOD_HOST = f"127.0.0.1:{PORT}"
 
 def _client():  # type: ignore[no-untyped-def]
     from fastapi.testclient import TestClient
-
     from vlm_pipeline.app import create_app
 
     return TestClient(create_app(token=TOKEN, port=PORT), base_url=f"http://{GOOD_HOST}")
@@ -80,8 +79,9 @@ def test_no_cors_headers() -> None:
 def test_websocket_without_cookie_is_rejected() -> None:
     from starlette.websockets import WebSocketDisconnect
 
-    with pytest.raises(WebSocketDisconnect), _client().websocket_connect(
-        "/api/runs/x/events", headers={"Host": GOOD_HOST, "Origin": f"http://{GOOD_HOST}"}
+    with (
+        pytest.raises(WebSocketDisconnect),
+        _client().websocket_connect("/api/runs/x/events", headers={"Host": GOOD_HOST, "Origin": f"http://{GOOD_HOST}"}),
     ):
         pass
 
@@ -89,8 +89,9 @@ def test_websocket_without_cookie_is_rejected() -> None:
 def test_websocket_with_foreign_origin_is_rejected() -> None:
     from starlette.websockets import WebSocketDisconnect
 
-    with pytest.raises(WebSocketDisconnect), _client().websocket_connect(
-        "/api/runs/x/events", headers={**_auth(), "Origin": "http://evil.example"}
+    with (
+        pytest.raises(WebSocketDisconnect),
+        _client().websocket_connect("/api/runs/x/events", headers={**_auth(), "Origin": "http://evil.example"}),
     ):
         pass
 
@@ -100,3 +101,24 @@ def test_token_query_param_not_in_access_log(caplog: pytest.LogCaptureFixture) -
     _client().get(f"/?token={TOKEN}", headers={"Host": GOOD_HOST})
     assert caplog.records, "access log must exist (otherwise this test proves nothing)"
     assert TOKEN not in caplog.text
+
+
+def test_spoofed_package_hint_not_echoed_by_api() -> None:
+    """P003 D16: the hint must not appear anywhere in the API response, technical_detail included."""
+    import json
+
+    hint = "vlm/lora-trainer"
+    wf = {
+        "format": "vlm-workflow",
+        "schema_version": 1,
+        "name": "t",
+        "nodes": [{"id": "x", "type": "acme/fake.train", "version": "1.0.0", "params": {}, "package": hint}],
+        "edges": [],
+    }
+    r = _client().post("/api/graphs/validate", json=wf, headers={**_auth(), "Origin": f"http://{GOOD_HOST}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert hint not in json.dumps(body)
+    cfg004 = [i for i in body["issues"] if i["code"] == "CFG-004"]
+    assert cfg004
+    assert cfg004[0]["params"]["suggested_package"] is None

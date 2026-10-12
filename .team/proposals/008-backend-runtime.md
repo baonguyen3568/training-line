@@ -19,7 +19,7 @@ Giao tiếp: file `run_dir/resolved_config.json` (in) + `run_dir/{metrics,events
 2. Acquire `.team/GPU_LOCK` atomic: ghi JSON {who,job,run_id,host_pid,started_at,token} ra file tạm rồi `os.link(tmp, lock)` (fail nếu đã tồn tại → không có khoảng file rỗng); `LockInfo` = frozen dataclass. Lock của người khác: không bao giờ xoá; PID chết → báo PM.
    API stdlib-only (`common/gpu_lock.py`, thống nhất với cleancode/tester/fixcode): `acquire() -> LockHandle`, `release(handle)` (chỉ khi token khớp),
    `read()`, `is_stale()` (chỉ báo), `verify_token(lock_path, token)` raise `GpuLockError`. Token vào container qua env `VLM_GPU_LOCK_TOKEN`, lock mount ro.
-3. `docker run --rm --name vlm-<run_id>` theo baseline security (user 1000, cap-drop ALL, no-new-privileges, 127.0.0.1 ports, env-file, image @sha256, `PYTHONPATH=/workspace/src`).
+3. `docker run --name vlm-<run_id>` (KHÔNG `--rm`: runner `docker inspect` lấy exit_code + `.State.OOMKilled` → run.json, rồi `docker rm`; phân loại exit theo P009 §5) theo baseline security (user 1000, cap-drop ALL, no-new-privileges, 127.0.0.1 ports, env-file, image @sha256, `PYTHONPATH=/workspace/src`).
 4. Tail stdout/stderr → `logs/`, adapter parse → `metrics.jsonl` theo contract frontend; watchdog memguard; SIGTERM → container stop có grace để save ckpt.
 5. Exit mapping: 0 → `completed`, 75 (memguard) → `interrupted`, khác → `failed`. Luôn release lock trong `finally`.
 
@@ -87,3 +87,13 @@ Nhận định backend (sơ bộ): nếu 26.02 thiếu recipe VLM cho base model
 - Bổ sung 1: rẻ nhất để gỡ ❓ "26.08 có chạy trên nhánh 580 không": **probe vài giây** trên image 26.08 đã có sẵn (banner forward-compat + `torch.cuda.is_available()` + matmul/SDPA bf16, < 2GB RAM, có GPU_LOCK, không train). Nếu chạy được ngay trên 580.142 → bỏ được (a) lẫn (b'). Cần PM mở cho phép probe (RESET đang cấm chạy GPU).
 - Bổ sung 2: (a) cần pull `nemo-automodel:26.02` (~20–25GB) → cần PM duyệt (vượt ngưỡng 20GB). Làm probe trước rồi mới pull.
 - Bổ sung 3: chọn Qwen3.5 còn vướng ModelOpt (Qwen3.5 chỉ FP8 validated, không NVFP4/AWQ) — độc lập với chuyện image, đưa vào bảng chọn model của P001.
+
+### A.4 Kết quả probe (bao-backend, 2026-10-12 16:15, PM duyệt; GPU_LOCK + kiểm RAM, không train)
+Image `nemo-automodel@sha256:b0bd0e50…` trên driver **580.142** (không cập nhật gì):
+- Banner: `CUDA Forward Compatibility mode ENABLED. Using CUDA 13.3 driver version 610.43.02 with kernel driver version 580.142` → **chạy được**.
+- `torch 2.13.0a0 (nv26.06)`, CUDA 13.3, `cuda_available=True`, GB10 capability 12.1, arch_list sm_80…sm_120 + compute_120 (sm_121 chạy cubin sm_120).
+- bf16 matmul 4096² sau warmup: **~40 TFLOPS**, kết quả finite; SDPA bf16 causal OK; peak alloc 0.2 GB. (Lần đo không warmup chỉ 6 TFLOPS — luôn warmup khi benchmark.)
+- transformers 5.12.1, TE 2.14.1. Banner ghi "NVIDIA Release 26.06" dù tag 26.08 (khớp báo cáo Classmethod).
+- ⚠️ **Chạy non-root (uid 1000, baseline security) KHÔNG import được `nemo_automodel`**: `/opt/Automodel/nemo_automodel` là `drwxrwx--- root:root`. `automodel` CLI ở `/opt/venv/bin`.
+  Đề xuất: image dẫn xuất `vlm-automodel:26.08-<n>` = `FROM nemo-automodel@sha256:b0bd… ` + `RUN chmod -R o+rX /opt/Automodel` (+ LABEL project=vlm-training), giữ non-root. Phương án khác: chạy root + cap-drop ALL + no-new-privileges rồi chown output — kém hơn. Chờ security.
+- Hệ quả: **không cần (a) pull 26.02 lẫn (b') cập nhật DGX OS cho mức "chạy được"**. Chưa chứng minh train end-to-end (recipe VLM, LoRA, checkpoint) — cần spike khi PM mở lại. (b') vẫn nên làm theo lịch vá CVE toolkit vì driver 580.142 cũ hơn bản chính chủ 580.159.03.

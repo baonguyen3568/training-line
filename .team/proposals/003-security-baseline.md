@@ -135,7 +135,7 @@ Scope suy ra từ stage (configs/train → train, configs/eval → eval, configs
 schema_version: 2
 assets:
   - repo_id: Qwen/Qwen3.5-0.8B        # stable key
-    kind: model                       # model | dataset | benchmark | image | code
+    kind: model                       # model | dataset | benchmark | image | code | plugin
     revision: 2fc06364715b967f1860aea9cf38778875588b17
     license: Apache-2.0
     license_url: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/LICENSE
@@ -210,13 +210,112 @@ Bằng chứng từ hệ sinh thái tương tự (ComfyUI):
 - Catalog model/dataset được hỗ trợ (P001) = `licenses.yaml` ship kèm app, hiển thị badge. Asset ngoài catalog (user dán repo id bất kỳ) thì hiện license đọc từ HF metadata với nhãn "chưa xác minh", kèm cảnh báo.
 - Ước lượng disk/RAM trước khi tải (đồng bộ với memguard/preflight P007). Asset lớn hơn 20GB cần xác nhận.
 
+### D16. Custom node sandbox v1 (user chốt cho phép node bên thứ 3 từ v1, theo ADR-009). Đồng tác giả: bao-security + bao-backend (DRAFT)
+D16 thay thế tầng 1–2 của D10. Tầng 3 (cách ly lúc chạy) vẫn giữ, áp cho **mọi** node.
+
+**Threat model.** Mục tiêu là giảm thiệt hại trong trường hợp xấu nhất, vì tác giả node có thể độc hại hoặc bị chiếm (tiền lệ LLMVISION, ultralytics).
+| # | Kẻ tấn công muốn | Đường đi | Chặn bằng |
+|---|---|---|---|
+| T1 | Lấy token HF/NGC, cookie, SSH key | Đọc env, mount, `$HOME` | Container node **không bao giờ** nhận secret hay env của host. Không mount gì ngoài `/in` (ro) và `/out`. Muốn tải từ HF thì dùng node download first-party |
+| T2 | Exfiltrate dataset/model của user | Mạng | **v1: luôn `--network none`** cho node bên thứ 3. Từ v1.1, nếu mở thì qua egress proxy allowlist (container `vlm-egress`, network docker `internal`) |
+| T3 | Đào coin / chiếm GPU (đúng payload của botnet ComfyUI 2026) | GPU, CPU | GPU chỉ cấp khi manifest khai báo **và** user duyệt. Có giới hạn thời gian chạy, `--cpus`, `--memory`, `--pids-limit`. Lấy GPU_LOCK như job khác. Hiển thị usage |
+| T4 | **Thoát container ra host** (host đang chạy banking-rag, kafka…) | Lỗi kernel, lỗi NVIDIA Container Toolkit (CVE-2025-23266, CVE-2026-24260), driver ioctl khi có `--gpus` | Toolkit ≥1.19.1 là **hard gate**. Non-root, `cap_drop ALL`, `no-new-privileges`, rootfs read-only, seccomp mặc định. **Rủi ro còn lại: kernel + driver GPU dùng chung, không có sandbox mạnh hơn** (gVisor nvproxy chưa có bằng chứng hỗ trợ arm64/driver 580) |
+| T5 | Leo thang qua orchestrator | Manifest đòi mount/flag; output độc hại (pickle) được node first-party load | Manifest **không** được chọn mount hay docker flag; orchestrator tự sinh từ bảng quyền cố định. Output của node bên thứ 3 chỉ được nhận khi **parse được đúng định dạng thuộc allowlist** (json/jsonl, safetensors header hợp lệ, parquet `PAR1`, ảnh/video decode được), có giới hạn size. Không dùng denylist magic pickle, vì pickle protocol 0/1 là dạng text. **Cấm pickle/.pt/.bin** đi qua cạnh nối |
+| T6 | Bám trụ, cài cắm lâu dài | Ghi vào code node, cache dùng chung | Container mới cho mỗi lần chạy. Code node mount ro. Không cache chung giữa các node pack. Không auto-update |
+| T7 | Mã độc lúc **cài đặt** | `setup.py`/build hooks, pip deps | Build image riêng cho từng node pack trong sandbox build: chỉ có mạng tới PyPI/pypi.nvidia.com, không mount gì, deps từ lockfile có hash. Sau khi build thì image bất biến, digest được ghi lại |
+| T9 | Chiếm phiên app trên trình duyệt (đề xuất của bao-frontend) | Node nạp JS/CSS vào SPA: chạy cùng origin nên gọi được mọi API với cookie phiên (HttpOnly không cứu được), đọc được CSRF token, phá toàn bộ D13 | Node bên thứ 3 **chỉ đóng góp dữ liệu khai báo** (NodeSpec, JSON Schema, x-ui, i18n). **Không nạp JS/CSS.** Text render dạng plain text. Widget chỉ lấy từ bộ widget có sẵn. UI riêng cho node (v1.1+) phải chạy trong iframe sandbox **khác origin**, giao tiếp qua postMessage có schema |
+| T8 | Lừa UI / người dùng | Tên giả node first-party, mô tả gây hiểu lầm | Namespace bắt buộc `publisher/pack`; prefix `vlm/` dành riêng. Badge "Bên thứ 3 – chưa xác minh". Quyền hiển thị do orchestrator tự sinh, không lấy từ text tác giả viết |
+
+**Mô hình quyền: manifest chốt (P009 §2.4, backend + design + frontend thống nhất). Danh sách đóng, orchestrator tự sinh docker args:**
+```yaml
+permissions:
+  gpu: false                    # bool
+  network: none                 # none | {hosts: ["huggingface.co", ...]}  — exact hostnames, no "*", no IP, no "any"
+  max_runtime: 1h
+  max_memory: 16GiB             # checked by preflight/memguard (P007)
+# NO "mounts"/"extra_paths"/"env"/"secrets"/"devices"/"docker_args" keys — schema extra=forbid → manifest_invalid
+origin: {publisher, package, version, source_repo, commit_sha (40-hex), source_sha256, image_digest, license}
+```
+Mount do orchestrator cố định: `/in` (ro, artifact được nối vào), `/out` (rw, run dir của node). **Không có quyền đọc đường dẫn tuỳ ý.**
+
+**Mức cảnh báo, v1. Chốt theo đề xuất của backend: node bên thứ 3 CHỈ có `network: none`.** Lý do: một allowlist host vẫn là kênh exfiltrate. Ví dụ huggingface.co: plugin upload dữ liệu của user lên repo của kẻ tấn công bằng token của chính kẻ đó. Proxy còn là một service sống lâu phải vá. Field `network.hosts` giữ trong schema để mở lại ở v1.1 (cần proposal riêng). v1 khai báo khác `none` → `permission_unsupported`.
+| Tổ hợp | Mức | Xác nhận |
+|---|---|---|
+| chỉ io | xanh | bấm Cài |
+| `gpu: true`, nguồn **chưa xác minh** | ⛔ đỏ | **gõ tên node** (theo phản biện của bao-design: cài là việc làm 1 lần nên không gây "alarm fatigue"; GPU mở thêm đường thoát T4 và là payload đào coin T3) |
+| `gpu: true`, nguồn **đã review** / first-party | ⚠ vàng | tick checkbox + bấm Cài |
+| `max_runtime`/`max_memory` vượt mặc định CPU-only (1h / 8GB) | ⚠ vàng | bấm Cài |
+| *(v1.1+)* network tới host phổ biến / host khác / GPU + network | vàng / ⛔ đỏ + gõ tên / ⛔ đỏ + gõ tên | |
+
+**Image của plugin: build từ source, v1 không nhận image dựng sẵn.** `Dockerfile` của plugin phải `FROM` một base trong allowlist (image `vlm-*` của mình đã pin digest). Build chạy trong sandbox: không mount, chỉ có mạng tới PyPI, không secret. Sau đó trivy scan, kết quả hiển thị dạng thông tin. Image dựng sẵn của publisher là binary không review được, xem lại ở v1.1+.
+
+**Lý do chặn cài (blocking):**
+| Mã | Khi nào |
+|---|---|
+| `manifest_invalid` | schema sai, có key lạ (mounts/env/secrets…), `network` chứa `*`/IP/"any" |
+| `hash_unpinned` | không có commit SHA 40-hex / source sha256, hoặc tải về không khớp |
+| `forbidden_code` | quét tĩnh phát hiện: `exec`/`eval`/`compile` trên dữ liệu không phải hằng; pip/uv/apt install lúc runtime; payload encode (base64/zlib/marshal) lớn đem đi thực thi; tải và chạy binary; `ctypes`/`LD_PRELOAD`; `os.setuid`/ghi vào `/proc`, `/sys` |
+| `license_blocked` | không có LICENSE, hoặc license cấm sử dụng |
+| `base_image_not_allowed` | `FROM` ngoài allowlist |
+| `build_failed` | build lỗi, hoặc build cần mạng ngoài PyPI |
+| `permission_unsupported` | xin quyền chưa hỗ trợ ở v1 (`network` khác `none`) |
+| `policy_block` | chính sách quản trị của host (vd host dev chặn plugin bên thứ 3 có GPU) |
+| `image_digest_mismatch` (lúc chạy) | digest image hiện tại khác lúc cài, nghĩa là bị sửa |
+
+**Không chặn, chỉ cảnh báo:** `subprocess`, network lúc import, `pickle`/`torch.load`, `trust_remote_code`, file nhị phân lạ. Kèm câu "Quét tự động không đảm bảo an toàn".
+
+**UI khi cài (lời thường, tiếng Việt):**
+1. Nguồn: URL repo + commit SHA, publisher, ngày commit cuối, có phải registry nội bộ hay không. Badge "Chưa xác minh".
+2. **Quyền xin**, mỗi quyền 1 dòng bằng lời thường, vd "Dùng GPU: node có thể chạy tính toán nặng trên máy bạn" hay "Kết nối Internet tới: api.example.com: dữ liệu của bạn có thể được gửi đi".
+3. License của node (đọc từ file LICENSE; GPL/NC hiện badge). Node không đi kèm app.
+4. Kết quả quét tĩnh, hiển thị dạng cảnh báo, không phải "an toàn": có `eval/exec`, `subprocess`, network lúc import, code obfuscate/base64 lớn, `pickle/torch.load`, `trust_remote_code`, pip install lúc runtime. Mọi kết quả đều ghi kèm "quét không đảm bảo an toàn".
+5. Danh sách pip deps mới + kích thước image.
+6. Xác nhận: mức ⚠ vàng thì tick 1 checkbox cho mỗi quyền rồi bấm Cài. Mức ⛔ đỏ (v1: GPU + nguồn chưa xác minh; v1.1+: network) thì phải **gõ tên node**. Không có lựa chọn "luôn cho phép". Câu trấn an về cách ly chỉ hiện khi policy `sandbox_verified=true`.
+7. Cập nhật: không auto-update. Màn update hiện **diff quyền** và diff code (số file/dòng đổi). Quyền tăng thì phải duyệt lại từ đầu. Có nút gỡ, gỡ là xoá luôn image.
+
+**"Cài node còn thiếu" từ workflow chia sẻ (bao-fixcode phát hiện, CFG-004).** Đây là đường tấn công điển hình: workflow mồi + nút "Install missing nodes", vốn là đường ComfyUI-Manager bị lạm dụng.
+- File workflow chỉ được mang `node_type` và gợi ý `publisher/package@version`. Gợi ý này **chỉ dùng làm khoá tra** registry/allowlist. `suggested_package` hiển thị là **kết quả server tra ra** (không ra thì `null`). Tên gói trong workflow không bao giờ được hiện nguyên văn hay đưa vào lệnh cài (chống typosquat/spoof). UI chỉ hiện `suggested_package` khi `trust_level` ∈ {first_party, reviewed}. Lỗ này do bao-frontend phát hiện, bao-fixcode chốt. **App bỏ qua mọi URL, commit hay nguồn cài nằm trong workflow**: nguồn cài chỉ resolve từ registry/allowlist của app, hoặc từ URL người dùng **tự gõ**.
+- Không có cài hàng loạt ("cài tất cả node thiếu"). Mỗi node một màn cài, có đủ bước xác nhận D16.
+- Node gợi ý không có trong nguồn tin cậy: trang thông tin ghi "Không có trong nguồn tin cậy — workflow này do người khác chia sẻ", không có nút cài 1 chạm. Người dùng muốn cài thì tự dán URL repo, và node rơi vào mức "chưa xác minh" (nếu có GPU thì phải gõ tên).
+- Workflow có node chưa cài vẫn mở được (placeholder) nhưng không chạy được (CFG-004). Không bao giờ tự cài.
+- **Định danh vs tên hiển thị** (bao-fixcode đề xuất, security chốt cách làm đơn giản hơn):
+  - `node_type`, `publisher`, `package` là **ASCII-only** theo regex `^[a-z0-9][a-z0-9_.-]{0,63}$` (node_type = `publisher/package/node`). Định danh có ký tự ngoài regex → `manifest_invalid` / CFG-007. Cách này loại bỏ cả lớp homoglyph Cyrillic, bidi, zero-width ở tầng định danh.
+  - `name_lookalike_of` trên định danh ASCII: so sau khi map confusables ASCII (`rn→m`, `vv→w`, `1/l/I`, `0/o`, `-`/`_`/`.` coi như nhau) cộng khoảng cách edit ≤ 2 với node first_party/reviewed.
+  - Tên hiển thị/i18n được phép Unicode (tiếng Việt): normalize NFKC. Có ký tự bidi (U+202A–202E, U+2066–2069), điều khiển hoặc zero-width (U+200B–200F, U+FEFF) thì từ chối. Lookalike của tên hiển thị dùng skeleton Unicode TR39. UI escape ký tự lạ.
+- UI không điền sẵn link cài lấy từ workflow, kể cả dạng gợi ý (bao-design). Tên node lấy từ workflow là text không tin cậy: hiển thị plain, cắt ngắn, kèm nhãn "tên do file workflow ghi". Server cảnh báo khi tên giống node first-party/reviewed (T8). Ô link chỉ nhận commit SHA 40-hex.
+- `trust_level` ∈ `first_party | reviewed | unverified` **chỉ do server tính** từ registry/allowlist và hash thực tế. Mọi trường kiểu trust/verified nằm trong workflow hay manifest đều bị bỏ qua (workflow mồi có thể tự khai "verified"). Đề xuất của bao-fixcode.
+
+**Nguồn tin cậy & pin (phối hợp P004 §8.5 của cleancode):**
+- 3 mức tin cậy hiển thị trên UI: `first-party` (code nằm trong repo, phát hành kèm chữ ký release D15) / `đã review` (có trong `configs/security/plugin_allowlist.yaml`: repo, commit SHA, sha256 tarball nguồn, digest image build, reviewer, ngày) / `chưa xác minh`.
+- Pin khi cài: **commit SHA 40-hex** (không nhận branch/tag) + sha256 tarball nguồn + digest image đã build. Lần chạy nào digest không khớp với lúc cài thì từ chối.
+- v1 không làm hạ tầng ký cho bên thứ 3 (chưa có PKI hay registry). Hash pin + review là đủ cho v1. Ký bằng Sigstore xem lại khi có registry.
+- **Chỉ chạy trong container. Cấm phương án "venv riêng / subprocess trên host"**: venv không cách ly filesystem, network, secret hay `$HOME`, nên mọi bảo vệ T1–T6 sẽ mất.
+- Secret: **v1 không truyền secret vào plugin, kể cả khi user muốn cấp**. User no-tech sẽ bấm "Cho phép" theo phản xạ. Plugin cần dữ liệu từ HF thì nhận artifact từ node download first-party nối vào. Nếu sau này thật sự cần, thiết kế token phạm vi hẹp cho từng plugin (fine-grained, read, 1 repo), làm proposal riêng.
+- RAM: `max_memory` được preflight/memguard (P007) kiểm như job khác, vì trên UMA GPU allocation không bị `--memory` chặn.
+- License: entry `kind: plugin` trong licenses.yaml cho plugin first-party / đã review. Plugin chưa xác minh thì license đọc từ repo và hiển thị nhãn "chưa xác minh". App không phân phối kèm plugin bên thứ 3.
+
+**Hiện thực phía executor (bao-backend, trả lời a/b/c):**
+- **(a) Network.** Docker SDK (`docker` Python lib / CLI) làm được: `docker network create --internal vlm-sandbox` + container `vlm-egress` (proxy CONNECT allowlist hostname, vd tinyproxy/squid pin digest) nối cả `vlm-sandbox` lẫn bridge; node có quyền network nhận `--network vlm-sandbox -e HTTPS_PROXY=http://vlm-egress:3128`. Không cần quyền daemon đặc biệt.
+  **Đề xuất của backend: v1 chỉ hỗ trợ `network = []` (none) cho node bên thứ 3**, quyền network để v1.1. Lý do: mọi nhu cầu tải model/data đã có node download first-party; proxy là thêm 1 service sống lâu phải vá/giám sát, và allowlist hostname vẫn exfiltrate được qua host được phép. Giữ field trong manifest (schema) để không phá tương thích khi bật.
+- **(b) Giới hạn tài nguyên.** Không dùng một mặc định cứng 1h/16GB cho mọi node:
+  - Node **CPU-only**: `--memory` mặc định 8GB, `--cpus 4`, `--pids-limit 512`, timeout 1h; manifest được xin cao hơn (cảnh báo Trung bình), trần 32GB / 12h.
+  - Node **gpu=true**: `--memory` chỉ chặn RSS CPU, **không chặn CUDA trên UMA** → giới hạn thật là `max_memory` khai báo + preflight + memguard watchdog (P007, dừng exit 75 → MEM-002). `--memory` đặt = `max_memory` (vì load weights đi qua RAM CPU trước: 16GB không đủ cho model 9B bf16 ≈ 18GB). Timeout theo `max_runtime` khai báo (trần 24h), executor gửi SIGTERM → grace 120s để lưu checkpoint → SIGKILL (exit 137 do mình huỷ → `interrupted`, không phải lỗi — quy tắc fixcode).
+  - Mọi node: `--read-only` + tmpfs `/tmp` (giới hạn size), `--shm-size` 2GB (GPU 8GB), `--ulimit nofile`.
+- **(c) UID riêng.** Làm được không cần root: chạy node bên thứ 3 với `--user 61001:<gid của user app>` (uid cao để tránh trùng user thật trên host; 1001 có thể trùng). Orchestrator (uid app) tạo `/out` trước với mode `2770` (setgid group app) → file node ghi ra thuộc `61001:<gid app>`, orchestrator đọc được qua group và **xoá được** (xoá cần quyền ghi thư mục cha, do orchestrator sở hữu). Sau khi node xong, orchestrator validate output (whitelist định dạng, size) rồi **copy/hardlink sang vùng artifact** do uid app sở hữu; `/out` gốc bị xoá. `/in` mount ro nên uid khác không cần quyền ghi.
+- Container: tên `vlm-node-<run_id>`, label `project=vlm-training`, `vlm.trust=third_party`, KHÔNG `--rm` (để đọc OOMKilled/exit), `docker rm` sau khi ghi run.json. Executor chỉ sinh docker args từ bảng quyền cố định; mọi field lạ trong manifest → từ chối cài (extra=forbid).
+
+**Chính sách riêng cho máy dev dùng chung này (DGX Spark) — khuyến nghị gửi PM/user:**
+- **Cho tới khi user xác nhận đã vá toolkit (≥1.19.1): CẤM chạy node bên thứ 3 có `gpu=true`** trên máy này. Lý do: CVE-2026-24260 cho phép từ container ra host, nghĩa là thoát ra host chung với banking-rag và các service khác.
+- Sau khi vá: node bên thứ 3 trên máy này chỉ cài từ danh sách team đã review (security đọc code ở SHA đó). Không cài node tuỳ ý từ git URL. Lý do: kernel và driver GPU dùng chung, không có sandbox mạnh hơn container cho GPU trên arm64. Một lỗi kernel/driver 0-day ảnh hưởng **dữ liệu của người khác** (banking-rag), không chỉ dự án mình. Rủi ro này không cân xứng với lợi ích trên máy dev.
+- Đây là chính sách **vận hành cho host này**, không giới hạn tính năng sản phẩm. Trên máy của end-user, app vẫn cho cài node bên thứ 3 theo ADR-009, kèm cảnh báo ở trên, và quyết định là của end-user cho máy của họ.
+
 ## 5. Việc cần người khác / user
 | # | Việc | Ai |
 |---|------|----|
 | U1 | Vá NVIDIA Container Toolkit lên ≥1.19.1 (sudo + restart docker ảnh hưởng mọi service) | user (qua PM) |
 | U2 | ~~Chọn nhánh A/B~~ → user chốt **F** (miễn phí, phân phối, không bán). Còn chờ: user đồng ý (ii) xây trên MIT + phát hành Apache-2.0, hay chấp nhận fork GPL-3.0 | user (qua PM) |
 | U3 | HF token: token đã đưa bị 401 và đã lộ trong transcript chat → **revoke**, tạo token fine-grained read-only mới, user tự dán vào `.env` (không qua chat) | user |
-| U4 | Chấp thuận: v1 không có custom node bên thứ 3 / node code tự do (D10) | user (qua PM) |
+| U4 | ~~v1 không custom node bên thứ 3~~ → user CHO PHÉP (ADR-009) ⇒ D16. Chờ user duyệt **chính sách host dev**: cấm node bên thứ 3 có GPU tới khi vá toolkit; sau vá chỉ node đã được team review | user (qua PM) |
 | T1 | Implement D2 trong compose/skill backend-gpu-job | bao-backend (đã áp) |
 | T2 | Pre-commit + ruff S + banned-api (P004) | bao-cleancode (đã gộp) |
 | T3 | `safe_load` wrapper + guard `trust_remote_code` | bao-backend / bao-fixcode |

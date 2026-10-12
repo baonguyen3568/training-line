@@ -2,7 +2,8 @@
 
 Target: ``vlm_pipeline.eval.scoring.parse_multi_choice`` and ``eval_multi_choice``.
 Reference: MMMU official ``mmmu/utils/eval_utils.py::parse_multi_choice_response`` / ``eval_multi_choice``
-(https://github.com/MMMU-Benchmark/MMMU @268471d0d488, read 2026-10-12): strip leading/trailing punctuation, look for ``(X)``, then
+(https://github.com/MMMU-Benchmark/MMMU @268471d0d488, read 2026-10-12):
+strip leading/trailing punctuation, look for ``(X)``, then
 `` X `` (case-sensitive), then option text when the response has > 5 words; with several candidates
 the one occurring LAST wins.
 Deliberate deviation: the official parser falls back to ``random.choice`` seeded once at import, so the

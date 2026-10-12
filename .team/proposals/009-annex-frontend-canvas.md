@@ -1,5 +1,5 @@
 # Proposal 009 — Phụ lục F: Canvas/editor, node library, template gallery, live run view (bao-frontend)
-Trạng thái: DRAFT · 2026-10-12 · Đi kèm `009-node-graph-architecture.md` (bao-backend: node spec, graph JSON, executor, API).
+Trạng thái: **Hướng đi ACCEPTED — ADR-009** (React Flow 12, tự xây) · chi tiết còn DRAFT · 2026-10-12 · Đi kèm `009-node-graph-architecture.md` (bao-backend: node spec, graph JSON, executor, API).
 Phụ thuộc: R-1 (bao-research: fork vs tự xây), R-3 (bao-design: UX no-tech). Chưa chốt — phụ lục này là input để chốt.
 
 ## F1. Lựa chọn thư viện canvas — bằng chứng (kiểm tra 2026-10-12)
@@ -49,6 +49,9 @@ React SPA (Vite, TS) — served by FastAPI at /
 └── panels (từ P006): run monitor, scorecard, Pareto, error analysis, demo (/demo Gradio)
 ```
 - **Backend là nguồn sự thật** (đồng ý với bao-backend): UI chỉ biết `NodeSpec` generic. Thêm node mới = thêm spec ở backend, UI không đổi.
+- Tooling (đồng ý với bao-cleancode): TS strict, Biome 2.5 (lint+format), Vitest 5, types sinh từ `schemas/` bằng openapi-typescript vào `frontend/src/generated/` (Biome ignore, không sửa tay; commit + drift check
+  trong `check.sh` bước `frontend`: `npm ci --ignore-scripts && biome ci && tsc --noEmit && vitest run`); pin exact; cooldown npm
+  `min-release-age` (npm 11.12.1 có config này, đơn vị cần xác minh) — chốt với bao-security. UI hint của params: `x-ui` trong JSON Schema (không ui_schema riêng).
 - Form engine: tự viết renderer nhỏ cho tập con JSON Schema (string/number/int/bool/enum/array of enum/file-ref) + `ui:` hints,
   thay vì RJSF — bundle nhẹ, kiểm soát UX no-tech, ít deps (security). Tập con được liệt kê trong P009 §Node spec.
 
@@ -133,6 +136,64 @@ PoC 2–3 ngày trên ComfyUI để user cảm nhận trước khi đầu tư ed
 ## F6c. Áp patch từ gợi ý lỗi
 Theo P010 (design): patch đổi tham số → áp thẳng + hiện diff + Hoàn tác 1 click; patch tốn kém/không đảo được/đổi cấu trúc graph →
 xem trước + xác nhận. Action có field `confirm: bool` (bao-fixcode) quyết định; action phá huỷ luôn `kind: navigate` → dry-run.
+
+## F6d. Node bên thứ 3 (ADR-009: cho phép từ v1) — phía UI · khớp P003 D16 (T8, T9)
+**Nguyên tắc cứng (P003 D16 T9):** node bên thứ 3 chỉ đóng góp dữ liệu khai báo (NodeSpec, JSON Schema, `x-ui`, i18n).
+**Không nạp JS và không nạp CSS** (CSS injection exfiltrate được qua selector + `url()`). Text của node (title/desc/i18n) render **plain
+text, bỏ mọi markup kể cả markdown/link**; URL hiện dạng thô, mở bằng `rel="noopener noreferrer"` + `target=_blank`. Widget chỉ từ bộ có sẵn.
+UI riêng cho node (v1.1+): iframe **khác origin** (cổng khác, hoặc `sandbox="allow-scripts"` KHÔNG `allow-same-origin`), postMessage kiểm
+origin + schema, iframe không nhận cookie/token của app.
+- **Danh tính (T8):** namespace `publisher/pack` hiển thị đầy đủ; prefix `vlm/` dành riêng cho first-party. Theo P010 §15 (design):
+  node chính chủ **không** có badge (vắng badge là tín hiệu); chỉ node có `origin.kind == third_party` mang tab góc
+  `🧩 Bên thứ 3 – chưa xác minh · <publisher>` + viền kép mảnh (hoặc `· đã được team review` nếu `reviewed`). UI quyết định badge
+  **chỉ theo `origin.kind`**, không theo tên.
+- **Quyền** (chân node, icon + tooltip chữ): v1 node bên thứ 3 **chỉ network none** (security + backend) → không có badge Internet ở v1;
+  manifest xin network → bị chặn với mã `permission_unsupported` (hiện "Node cần quyền mà ứng dụng chưa hỗ trợ"). v1 còn: `▣ GPU` (mức theo trust: chưa xác minh → ⛔ đỏ + gõ tên; đã review/first-party → ⚠ vàng + checkbox — D16 bản mới),
+  `⏱ >1h` / `🧠 >16GB`. Badge Internet + mức đỏ + gõ tên cho network → v1.1.
+  Không có badge "thư mục ngoài" — D16 không có quyền mount/đọc file tuỳ ý ở v1 (node cần thì không chạy được). Text quyền do **orchestrator sinh**
+  từ bảng quyền cố định, không lấy từ text tác giả.
+- **Chính sách host dev (D16, chờ user):** trước khi vá toolkit: chặn node bên thứ 3 có GPU; sau khi vá: chặn node "chưa được team review".
+  Node hiện "⛔ Bị chặn trên máy này theo chính sách quản trị" + **đúng lý do API trả** (`policy_block.reason_key`); pre-flight chặn Chạy.
+  UI không tự suy luận lý do, không hard-code chính sách.
+- **Thiếu node:** placeholder xám "Thiếu node <publisher/pack>/<type_id>@<version>" + "Xem để cài" — không tự cài (D11). Mã lỗi (catalog bao-fixcode): `CFG-004 {node_type, reason: not_installed|not_allowed, suggested_package?, trust_level: first_party|reviewed|unverified}` → "Xem để cài" / "Không được phép trên máy này";
+  `CFG-009 {node_id, node_type, workflow_version, installed_version, migratable}` → action `migrate_node` (patch, confirm=true, hiện diff tham số,
+  chỉ khi migratable) + `open_node`.
+- **Nguồn cài khi mở workflow chia sẻ (D16 mới):** UI/API **không** dùng URL/commit trong file workflow làm nguồn cài — chỉ registry/allowlist
+  của app hoặc URL người dùng tự dán. Không có nút "cài tất cả node thiếu"; mỗi node 1 màn xác nhận; node ngoài nguồn tin cậy không có
+  nút cài 1 chạm. UX (P010 §15.2): trust_level first_party/reviewed → dialog cài 15.3; unverified (không có trong nguồn tin cậy) → màn "Không có trong nguồn tin cậy —
+  workflow này do người khác chia sẻ": không nút cài, chỉ ô dán link commit **trống** (không điền sẵn/placeholder từ file) + "Xoá bước này".
+  Tên node lấy từ file = untrusted: plain text, cắt ~60 ký tự, trong ngoặc kép + nhãn "(tên do file workflow ghi)". Backend trả
+  `name_lookalike_of` (type_id first-party bị nghi giả mạo, hoặc null) → UI hiện ⚠ "Tên giống node chính chủ — có thể là giả mạo" (UI không tự so khớp).
+  **Unicode (Trojan Source/homoglyph):** mọi chuỗi untrusted → loại/hiện escape ký tự điều khiển + bidi (U+202A–202E, U+2066–2069,
+  U+200B–200F, C0/C1). **Định danh** (`node_type`, `publisher/pack`) có ký tự ngoài ASCII → hiện kèm dạng `\u....` + ⚠ "tên chứa ký tự
+  đặc biệt". Text hiển thị (title/desc tiếng Việt) không cảnh báo non-ASCII, chỉ loại bidi/control. Server normalize NFKC + confusables cho `name_lookalike_of`.
+  D16: `node_type`/`publisher`/`package` phải khớp `^[a-z0-9][a-z0-9_.-]{0,63}$`; vi phạm → `CFG-007 {field, reason: invalid_identifier}`
+  (không echo giá trị) → UI hiện "Định danh trong file workflow không hợp lệ (trường <field>)". Nhánh `\u....` ⚠ ở UI = phòng thủ lớp 2.
+  "Kiểm tra link" chỉ nhận commit SHA đủ 40 hex (kiểm cả client và server). `suggested_package` chỉ hiện khi trust_level first_party/reviewed. Workflow chứa `install_url`/`source` → schema `extra=forbid` từ chối (hoặc bị bỏ qua), UI không bao giờ đọc các trường đó.
+- **Màn cài đặt** (theo D16 "UI khi cài"): nguồn (repo + SHA, publisher, ngày commit), quyền bằng lời thường, license (GPL/NC badge),
+  kết quả quét tĩnh dạng cảnh báo + câu "quét không đảm bảo an toàn", pip deps + kích thước image. Xác nhận quyền: mức = trust level × quyền, **API trả**; **mỗi quyền vàng 1 checkbox riêng** (vd GPU: "Tôi hiểu node này sẽ dùng GPU: có thể chạy tính toán nặng, tốn điện
+  và RAM trên máy bạn"); chưa tick hết → nút Cài disabled; không có "luôn cho phép". Gõ tên chỉ cho mức đỏ (network, v1.1). **UI không hard-code mức**: mỗi quyền trong `permissions` có
+  `{level: info|warning|critical (ngữ nghĩa: warning→color.status.warning, critical→color.status.critical, info→text.secondary + ✓ trung tính — KHÔNG dùng status.good), requires_typed_confirm, perm_copy_key, confirm_copy_key}` do backend trả (theo D16) → đổi policy không phải sửa UI.
+  `sandbox_verified` do API quyết (true chỉ khi build pass test D16 VÀ orchestrator tự kiểm docker args/non-root/không mount secret lúc khởi động; không bật bằng config);
+  câu trấn an kiểu "không được cấp quyền …" + "cách ly giảm rủi ro nhưng không loại bỏ hoàn toàn" chỉ hiện khi test D16 pass (flag từ API);
+  không có "luôn cho phép". Cập nhật: màn **diff quyền + diff code**, quyền tăng → duyệt lại từ đầu. Gỡ = xoá image.
+- **Pre-flight:** `Estimate.source ∈ measured|formula|declared|unknown`. `declared` = tác giả plugin tự khai → hiện "tác giả node tự khai, chưa đo";
+  Hiển thị (P010): declared = chữ nghiêng + ⓘ "do tác giả node khai, chưa kiểm chứng"; formula = "~"; unknown = "chưa có số đo".
+  Số tự khai **không được nới** kiểm tra an toàn (giới hạn chạy vẫn là max_runtime/max_memory của orchestrator). `unknown` → "chưa ước lượng được" (không chặn); xin GPU khi GPU bận → xếp hàng như job khác.
+- **Cần backend:** NodeSpec `origin {kind: builtin|third_party, publisher, pack, version, commit_sha, license, installed_at, reviewed}`,
+  `permissions` (đã chuẩn hoá bởi orchestrator), `policy_block {code, reason_key}` nếu bị chính sách host chặn.
+
+## F6e. Test bắt buộc cho UI node bên thứ 3 (bao-tester yêu cầu)
+- Component test (Vitest + Testing Library): NodeSpec có `title`/`description`/enum label = `<img src=x onerror=alert(1)>` → hiện nguyên văn,
+  DOM không có `<img>`, không có handler chạy (spy `window.alert` không được gọi). Áp cho node header, thư viện, inspector, dialog cài.
+- Link trong text tác giả (`[click](javascript:…)`, `https://…`) → hiện chuỗi thô, không tạo `<a>` từ markdown.
+- T8: bảng quyền và badge chỉ dựng từ `permissions`/`origin` đã chuẩn hoá; fixture có description "Node này KHÔNG dùng GPU" nhưng
+  permissions.gpu=true → UI vẫn hiện GPU; title chứa "vlm/" với origin.kind=third_party → vẫn có badge Bên thứ 3.
+- Mức xác nhận theo `requires_typed_confirm` (2 fixture: GPU chưa xác minh → gõ tên; GPU đã review → checkbox).
+- Màn node thiếu: tên dài 500 ký tự + payload HTML → cắt ~60, plain text, có nhãn "(tên do file workflow ghi)"; `name_lookalike_of` ≠ null → có ⚠;
+  link commit SHA 7 ký tự hoặc branch → bị từ chối. node_type chứa U+202E hoặc Cyrillic "а" → hiện escape + ⚠; title tiếng Việt có dấu → không ⚠.
+- Workflow import có `install_url`/`source` → bị từ chối/bỏ qua; nút "Xem để cài" không chứa URL lấy từ file; không tồn tại "cài tất cả".
+- Lint guard: Biome cấm `dangerouslySetInnerHTML` toàn repo frontend.
 
 ## F7b. Phân phối
 User sẽ cho người khác dùng miễn phí (PM 2026-10-12) → có phân phối → rủi ro GPL của custom node ComfyUI là thật; phương án 3 chỉ nên dùng cho PoC ngoài repo.

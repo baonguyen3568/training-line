@@ -168,10 +168,10 @@ Khác ComfyUI: output node của ta là dataset, checkpoint, model quantized (GB
 - **Nút xoá an toàn** (khác dashboard team, nơi chỉ copy lệnh dry-run):
   1. Bấm xoá → backend chạy dry-run → dialog liệt kê chính xác thứ sẽ bị xoá + dung lượng + hậu quả ("workflow 'LoRA demo' sẽ phải tải lại model 8 GB").
   2. Gõ tên để xác nhận **chỉ khi** mục không tính lại được (model đã train) hoặc phải tải lại > 20 GB; mục tính lại được (kết quả tạm) chỉ cần nút xác nhận dù lớn. Tối đa 1 ô gõ/dialog, server trả `confirm_text` = mục rủi ro nhất (chốt với design, P010 §9). Model đã train **không khoá mặc định** — người dùng sở hữu dữ liệu của mình.
-  2b. **Duyệt theo deployment** (góp ý bao-frontend): cấu hình server `storage.approval_policy`:
+  2b. **Duyệt theo deployment** (góp ý bao-frontend; **PM chốt 2026-10-12**: mặc định `none` cho bản cài end-user, `threshold` 20 GB cho máy dev dùng chung): cấu hình server `storage.approval_policy`:
       `none` (mặc định cho bản cài cá nhân — người dùng là chủ dữ liệu, chỉ cần dialog) | `threshold` (`approval_threshold_gb`, mặc định 20; dùng cho **máy dev dùng chung của dự án**, khớp D7.4 + skill cleanup-safe-delete).
-      Plan JSON trả `approval_policy` + `threshold_gb` (null nếu `none`). Khi `threshold` và plan vượt ngưỡng: `needs_approval=true`, `POST /api/storage/apply` trả `APPROVAL_REQUIRED` trừ khi có `approved_by` hợp lệ (PM/security).
-      Body lỗi: `error_code`, `error_params{gb,threshold_gb}`, `deleted: []`, `approval_request{item_ids, requested_by, requested_at, admin_command}`; admin duyệt bằng CLI `retention.py --items ... --apply --approved-by <tên>` (tính lại plan nên không phụ thuộc plan_id hết hạn). Không bao giờ duyệt từ UI người dùng. Mẫu: `005-annex-storage-plan.threshold.sample.json`. UI hiện banner theo dữ liệu, không hard-code. Policy chỉ đổi được bởi người cài đặt (file config server), không đổi từ UI người dùng.
+      Plan JSON trả `approval_policy` + `threshold_gb` (null nếu `none`). Khi `threshold` và plan vượt ngưỡng: `needs_approval=true`, `POST /api/storage/apply` trả 403 với mã catalog **DISK-002 `STORAGE_APPROVAL_REQUIRED`** (severity info; params `{gb, threshold_gb, item_count, item_ids, admin_command}`; action `show_admin_command`; copy `error.DISK-002.*`) trừ khi có `approved_by` hợp lệ (PM/security).
+      Body lỗi: `error_code: "DISK-002"`, `error_params{gb, threshold_gb, item_count, item_ids, admin_command}`, `deleted: []`, `approval_request{item_ids, requested_by, requested_at, admin_command}`; admin duyệt bằng CLI `retention.py --items ... --apply --approved-by <tên>` (tính lại plan nên không phụ thuộc plan_id hết hạn). Không bao giờ duyệt từ UI người dùng. Mẫu: `005-annex-storage-plan.threshold.sample.json`. UI hiện banner theo dữ liệu, không hard-code. Policy chỉ đổi được bởi người cài đặt (file config server), không đổi từ UI người dùng.
   3. Mục được bảo vệ (D7 whitelist, LATEST của run đang chạy/interrupted, base model mà adapter đang phụ thuộc, artifact security) → nút bị khoá kèm lý do dễ hiểu.
   4. Thực thi = cùng code path `retention.py --apply` (không có đường xoá thứ hai), ghi event `checkpoint_pruned`/`cache_evicted` với `by=<user>`.
 - Gợi ý chủ động: khi preflight (D8) báo thiếu disk → panel đề xuất "Giải phóng X GB từ kết quả tạm" (chỉ cache tính lại được).
@@ -191,3 +191,21 @@ Khác ComfyUI: output node của ta là dataset, checkpoint, model quantized (GB
 6. ~~(P009) cache executor~~ → đã chốt với backend (R1, P009 §5).
 7. (design) Panel "Dung lượng" thuộc màn nào trong app no-code; ngôn ngữ nhãn cho người dùng không biết code.
 8. ~~(PM) trần cache 200 GB~~ → đồng ý, kèm 2 điều kiện (R1). ADR-005 cập nhật khi P009 chốt.
+
+## 7. Kiểm tra lại quota theo P001 (điều kiện 2 của ADR-005) — 2026-10-12
+Nguồn: P001 §3 (bao-research), `docker/IMAGES.lock`. Ước lượng footprint giai đoạn 2 (chưa có 27B/35B/Omni):
+| Hạng mục | Ước lượng | Ghi chú |
+|----------|-----------|---------|
+| HF models: Qwen3.5 0.8B/2B/4B/9B | ~36 GB | không cái nào > 20 GB |
+| Image `nemo-automodel:26.08` (đã pull) | 29.4 GB | chờ probe driver 580.142 |
+| Image `vlm-automodel` FROM `nemo-automodel:26.02` | ~25–30 GB giải nén | 13 GB là bản nén |
+| Image `vllm/vllm-openai:v0.31.0` | ~22 GB | không dùng chung v0.27.1 (của project khác) |
+| Dataset eval regression (không có Video-MME) | ~10–30 GB | P002 |
+| Checkpoint LoRA | < 5 GB | vài trăm MB/run |
+| Merged 9B + quantized FP8/NVFP4 + engines | ~60 GB | merged 19 GB/bản, giữ ≤ 2 bản |
+| **Tổng không tính cache node** | **~200–230 GB** | |
+| Cache node (trần) | ≤ 200 GB | evict đầu tiên |
+| **Tổng xấu nhất** | **~430 GB** | < warn 500 GB ✅ |
+- Kết luận: quota 500/800 GB (user đã xác nhận) **đủ** cho giai đoạn 2. Thêm 1 model 27–35B (55–72 GB) vẫn < 500; thêm ≥ 2 → chạm warn, cần retention/evict cache trước khi tải.
+- **Image AutoModel (chốt PM + research)**: chỉ giữ 1 image AutoModel (+1 rollback). Probe 26.08 trên driver 580.142 PASS ⇒ dùng 26.08, **không** pull 26.02. FAIL ⇒ pull 26.02, 26.08 vẫn **giữ** (phương án b' cập nhật DGX OS sẽ làm nó chạy được). 26.08 chỉ vào danh sách ứng viên xoá **sau khi user chọn (a) dài hạn**; khi đó xử lý theo D7 mục 10 (IMAGES.lock → kiểm ancestor → PM xác nhận). Disk còn dư nên giữ không tốn đáng kể.
+- Không full-FT 9B: checkpoint có optim ~90 GB/bản (fp32 Adam), và cũng vượt budget RAM.

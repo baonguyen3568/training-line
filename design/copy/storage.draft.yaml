@@ -55,8 +55,7 @@ dialog:
   # Only shown when plan.needs_approval=true (storage.approval_policy=threshold, shared dev machine). Personal installs: policy=none, never shown.
   approval_needed: {vi: "Tổng dung lượng xoá lớn hơn {threshold_gb} GB nên cần quản trị viên duyệt trước.", en: "This deletes more than {threshold_gb} GB, so an admin must approve it first."}
 
-error_apply:
-  APPROVAL_REQUIRED: {vi: "Cần quản trị viên duyệt trước khi xoá {gb} GB. Danh sách đã được giữ nguyên, chưa xoá gì.", en: "An admin must approve before {gb} GB can be deleted. Nothing has been deleted yet."}
+# APPROVAL_REQUIRED copy moved to error.DISK-002 (design/copy/errors.draft.yaml)
 
 event_done:  # "Đã xoá lúc X" for hf_model_removed | dataset_removed | cache_evicted | checkpoint_pruned
   vi: "Đã xoá lúc {time} bởi {who}"

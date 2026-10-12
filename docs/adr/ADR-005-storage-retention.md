@@ -20,7 +20,7 @@ Chấp nhận toàn bộ D1–D8 của Proposal 005 v3. Tóm tắt:
 
 ## Điều kiện / mục còn mở
 1. bao-backend xác minh ngữ nghĩa `checkpoint.save_consolidated` trong container được pin ở ADR-001. Kết quả cập nhật vào bảng D3.
-2. Quota 500GB được kiểm tra lại khi ADR-001 chốt danh sách model + kích thước (bao-research).
+2. ~~Quota 500GB kiểm tra lại theo danh sách model~~ → XONG (P005 §7): ~430GB tối đa kể cả cache node 200GB, nằm dưới mức warn 500GB. Mỗi model 27-35B thêm 55-72GB.
 
 ## Hệ quả
 - Phase 2: bao-cleanup viết `scripts/cleanup/{disk_report,retention,preflight}.py`, bao-tester viết test, bao-cleancode + bao-security review.

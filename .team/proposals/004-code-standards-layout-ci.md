@@ -189,9 +189,10 @@ frontend/ (TS, project riêng)  ──HTTP/WS + JSON Schema──►  app/  (API
                                                               │
                                                            common/
 ```
-import-linter contract: `app | cli` > `graph` > `nodes` > `data | train | quantize | eval | serve` (độc lập) > `common`.
+import-linter contract (chốt với bao-backend, P009 §9c): `app | cli` > `graph` > `nodes` > `{engines: data | train | quantize | eval | serve} | artifacts` > `common`.
+`engines` và `artifacts` (index SQLite + API retention) là anh em độc lập: engine nhận path, không biết index. Các engine độc lập với nhau.
 Quy tắc quan trọng:
-1. **`graph` không biết node cụ thể nào** — chỉ biết protocol `NodeSpec` (ports, params schema, estimate, run). Registry là 1 list tường minh trong `nodes/__init__.py` (không plugin/entry-point cho tới khi có custom node của bên thứ 3 — YAGNI).
+1. **`graph` không biết node cụ thể nào** — chỉ biết `NodeSpec` (frozen, data: ports, version, category; serialize ra API) + Protocol `NodeImpl {params_model, estimate, check, build_job}`. Registry là 1 list tường minh trong `nodes/__init__.py` (không plugin/entry-point cho tới khi có custom node của bên thứ 3 — YAGNI).
 2. **Một nguồn sự thật cho tham số**: params của node = pydantic config của engine (hoặc subset của nó). JSON Schema sinh tự động → frontend render form. Cấm định nghĩa tham số 2 lần (node + config).
 3. **Port type** là enum/type nhỏ, đóng (vd `Dataset[VLMChat]`, `Checkpoint[HF]`, `Checkpoint[Quantized]`, `Endpoint`, `Report`), kiểm ở `graph.validate()` *trước khi chạy* — yêu cầu "chặn lỗi trước khi chạy" cho no-tech user nằm ở đây, phải test được thuần (không GPU).
 4. **Workflow file** (JSON, có `schema_version`) là artifact hạng nhất: template = workflow file; `cli` chạy được headless → cùng 1 đường code cho UI, test và tái lập.
@@ -200,7 +201,11 @@ Quy tắc quan trọng:
 
 ### 8.2 Contract backend ↔ frontend
 - Backend export `schemas/` (OpenAPI + node-spec JSON Schema) bằng 1 lệnh; frontend sinh TS types từ đó. Test "schema drift" trong `check.sh`: export lại rồi `git diff --exit-code`.
-- Tooling frontend (TS strict, lint/format, test) do bao-frontend chọn; tôi chỉ yêu cầu: chạy được qua `check.sh` (bước `frontend`), version pin + cooldown như Python.
+- Tooling frontend (bao-frontend chọn, đã thống nhất): TypeScript strict (`noUncheckedIndexedAccess`), Biome 2.5 (lint+format, binary linux-arm64), Vitest 5; e2e Playwright do bao-tester. Pin exact.
+  Bước `frontend` của `check.sh`: `npm ci --ignore-scripts && biome ci && tsc --noEmit && vitest run`.
+  TS types sinh từ `schemas/` bằng openapi-typescript 7.13 → file generated được commit; drift kiểm cả 2 phía.
+  Cooldown npm: `min-release-age` trong `frontend/.npmrc` (chờ xác minh đơn vị + security chốt); fallback `before=<ngày>`.
+- UI hints của param: một namespace duy nhất `x-ui: {widget, order, preset, advanced}` trong `Field(json_schema_extra=...)`; không có `ui_schema` riêng.
 
 ### 8.3 Chính sách vendor / fork code bên thứ 3
 **License đã kiểm (GitHub API, 2026-10-12):** ComfyUI **GPL-3.0**, ComfyUI_frontend **GPL-3.0**; LlamaFactory Apache-2.0; xyflow (React Flow) MIT; litegraph.js (cả bản Comfy-Org) MIT; Langflow MIT; Flowise Apache-2.0 trừ `packages/server/src/enterprise` (commercial) — bao-security xác minh từ LICENSE gốc. Phân tích GPL-3 chi tiết: P003 D6b (fork hoặc plugin chạy trong process ComfyUI → app phải GPL-3 khi phân phối; dùng nội bộ không phát sinh nghĩa vụ; security khuyến nghị nền MIT).
@@ -221,3 +226,21 @@ Quy tắc cho mọi code bên thứ 3:
 - Layer contract (8.1), thêm `forbidden` contract cho third_party.
 - `check.sh` thêm bước `frontend` + schema-drift.
 - Test: thêm "node contract test" — mọi node đã đăng ký: schema export được, default params hợp lệ, `estimate()` chạy không cần GPU; `graph` test với fake nodes.
+
+### 8.5 Plugin (custom node bên thứ 3) cài lúc runtime — user cho phép từ v1 (PM, 2026-10-12)
+Khác với vendor/dependency (§8.3): code plugin **không nằm trong repo, không qua review của ta**, do người dùng cài. Mục tiêu kiến trúc: plugin hỏng/độc không làm hỏng app, và không làm yếu "chặn lỗi trước khi chạy".
+Bài học từ ComfyUI: custom node import thẳng vào process server → xung đột dependency, crash lúc khởi động, chạy code tuỳ ý khi import.
+
+1. **Khai báo là data, thực thi ở ngoài process.** Plugin = thư mục/gói có `vlm-node.toml` (manifest): `name`, `version`, `api_version`, `license`, danh sách node (type_id, ports, params JSON Schema + `x-ui`, `image@sha256`). Manifest chỉ là data: **không JS/CSS/HTML** — plugin không nạp gì vào frontend (P003 D16 T9); UI node của plugin render hoàn toàn từ JSON Schema + `x-ui` + i18n key của plugin.
+   Server **đọc manifest, không import code plugin**. `NodeSpec` của plugin dựng từ manifest (tận dụng tách NodeSpec/NodeImpl).
+2. **Chạy plugin = job container, KHÔNG có lựa chọn khác** (bao-security, P003 D16): image pin digest, sandbox D16 (non-root, cap_drop ALL, rootfs ro, `/in` ro + `/out`, network none hoặc proxy allowlist, RAM theo memguard). Venv/subprocess trên host bị loại vì không cô lập filesystem/network/`$HOME`/secret; venv chỉ chấp nhận cho node first-party khi có lý do hiệu năng. Không bao giờ cài dep plugin vào venv của app.
+3. **estimate/check của plugin**: tuỳ chọn, chạy trong container sandbox như trên, timeout ngắn; manifest khai `max_memory`/`max_runtime` → `Estimate.source = "declared"` (UI cảnh báo "do tác giả khai, chưa đo"); không có gì → `"unknown"` (UI hiện "chưa ước lượng được", P010), validate chỉ còn tầng kiểu + JSON Schema — vẫn chạy được.
+4. **Port type đóng**: plugin chỉ dùng PortType của core (có thể khai subtype có `parent` là type core — data, không code). Không cho plugin định nghĩa type gốc mới ở v1 → type check giữa node core ↔ plugin vẫn chặt.
+5. **API ổn định, có version**: plugin chỉ được dựa vào `vlm_pipeline.plugin_api` (worker-side helpers: đọc input artifact, ghi output + events/metrics theo schema P006, raise lỗi bằng code catalog) — semver, manifest khai `api_version`; server từ chối plugin khác major. Module này là facade mỏng trên `common` + contract artifact, không lộ `graph`/`app`.
+6. **Namespace**: `type_id = <plugin_name>.<node>`; prefix của core (`data.`, `train.`, `model.`, `quantize.`, `eval.`, `bench.`, `serve.`, `export.`, `util.`, `test.`) bị cấm cho plugin.
+7. **Cô lập lỗi**: manifest lỗi / api_version lệch / image thiếu → plugin đó `unavailable` với error code (catalog, vd `PLG-00x`), app vẫn khởi động; workflow dùng node của plugin đó → validate báo lỗi thân thiện, không crash.
+8. **Vị trí & vòng đời**: `plugins/` (gitignored, dữ liệu người dùng — bao-cleanup quản retention), mỗi plugin pin version + hash; workflow file ghi `requires.plugins: {name: version}` để chia sẻ tái lập được.
+9. **Công cụ cho tác giả plugin**: `vlm plugin check <path>` chạy cùng bộ contract test như node core (manifest hợp lệ, schema export được, default params hợp lệ, type_id đúng namespace, có license). Đây cũng là bước bắt buộc trước khi app cho cài.
+10. **Ranh giới trách nhiệm**: kiến trúc/contract ở đây (cleancode + backend); tin cậy/nguồn/ký/quét/sandbox quyền + license → **bao-security** (P003 D16): 3 mức tin cậy first-party / reviewed (`plugin_allowlist.yaml`: commit SHA + sha256 tarball + image digest) / unverified; v1 chưa ký bên thứ 3. **Secret: v1 không cấp cho plugin dưới mọi hình thức** (kể cả user cho phép tường minh) — plugin cần dữ liệu HF thì nối từ node download first-party. Kiểm tra license plugin dùng cùng `licenses.yaml`, `kind: plugin`.
+
+Không chọn: import plugin in-process qua entry-point (nhanh nhưng mất cô lập dep + chạy code lúc import); venv/subprocess trên host (không cô lập — security); cho plugin tự định nghĩa port type tuỳ ý (mất type check).

@@ -3,7 +3,8 @@
 Definition: Masry et al., "ChartQA", ACL Findings 2022, end of Sec. 5.1 (https://arxiv.org/abs/2203.10244):
 numeric answers within 5% relative error are correct, others need an exact match.
 Reference code (identical in both): google-research/pix2struct ``metrics.py::relaxed_correctness`` (@110d6666e881) and
-VLMEvalKit ``vqa_eval.py::relaxed_correctness`` (@21e52b8df8ce), both read 2026-10-12: ``"x%"`` -> x/100; numeric branch only when target is
+VLMEvalKit ``vqa_eval.py::relaxed_correctness`` (@21e52b8df8ce), both read 2026-10-12:
+``"x%"`` -> x/100; numeric branch only when target is
 non-zero (target 0 falls back to string compare); string compare is case-insensitive. The harness strips
 the prediction before calling it (VLMEvalKit ``process_line``), so we strip too.
 """

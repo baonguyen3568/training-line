@@ -126,3 +126,6 @@ Khuyến nghị sơ bộ (sẽ chốt trong Proposal 002 với bao-research):
 
 ## 9. RESET 2026-10-12: app no-code node-graph
 Xem P002 mục "Ảnh hưởng của RESET". Tóm tắt: các gate phải do app thực thi; test thêm graph executor (topo/cycle/type/cache/resume/migration, property-based bằng hypothesis), mỗi template có validate + smoke CPU + smoke GPU nightly, estimator không được đánh giá thấp RAM, error catalog + fault-injection (không lộ traceback), UI E2E Playwright.
+- TODO Phase 2 (E2E Playwright, dialog cài plugin, P009 annex F6e): mock `/api/plugins/install/plan` trả payload XSS ở title/description/enum.
+  Assert: text hiện nguyên văn; `img[src="x"]` count 0; `document.querySelectorAll('[onerror],[onload]').length === 0`;
+  `page.on('dialog')` → fail; link `javascript:` hiện dạng chữ thô. Kiểm Chromium linux-arm64 trước, KHÔNG chạy browser khi đang có GPU_LOCK.

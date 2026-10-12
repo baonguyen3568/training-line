@@ -9,7 +9,7 @@ Chi tiết bằng chứng ở `.team/knowledge/research.md`. ✅ = đã đo/xác
 - Catalog là **dữ liệu** (`configs/catalog/models.yaml`), không hard-code. Thêm model = thêm 1 entry + được security vet.
 
 ## 1. Ràng buộc nền (đã chốt với user qua PM)
-- Driver **580.142** được giữ nguyên, nên **mọi engine image phải là CUDA ≤ 13.1** (13.0 chạy native, 13.1 chạy forward-compat, cả hai ✅ đo).
+- Driver **580.142** được giữ nguyên. **Cập nhật 19:10 (P008 A.4, bao-backend probe):** `nemo-automodel:26.08` (CUDA 13.3) **CHẠY được** trên 580.142 qua forward-compat (bf16 matmul ~40 TFLOPS, SDPA OK). Vì vậy quy tắc đổi từ "CUDA ≤13.1" thành **"mỗi image phải probe PASS trên 580.142"**. Không suy rộng: forum báo vllm 26.04 fail trên 580.173. (b') vẫn nên làm theo lịch vá toolkit.
   Phương án nâng cấp (b'): cập nhật DGX OS chính chủ lên driver 580.159.03 để mở khoá image 26.08 (❓ cần probe). User quyết khi cần.
 - RAM thực cho job ~**40GB** (máy dùng chung). Ước lượng RAM trong catalog tính theo con số này.
 - Không tải gì cho tới khi PM mở lại (HF token đang 401).
@@ -17,11 +17,11 @@ Chi tiết bằng chứng ở `.team/knowledge/research.md`. ✅ = đã đo/xác
 ## 2. Engine theo loại node
 | Node | Engine mặc định | Image (arm64, CUDA) | Fallback / ghi chú |
 |---|---|---|---|
-| Train SFT/LoRA | **NeMo AutoModel v0.4.0** (`FinetuneRecipeForVLM`) | `vlm-automodel` FROM `nvcr.io/nvidia/nemo-automodel:26.02` (13.0, digest arm64 `sha256:6ee69689…`) + `nemo_automodel==0.4.0 --no-deps` + `transformers==5.5.0`, torch giữ nguyên 2.10.0a0 | Engine thứ 2 (**sau v1**, cần security duyệt + tự build image arm64): **LLaMA-Factory 0.9.5** (Apache-2.0, có playbook Spark) build FROM `pytorch:25.11-py3` (13.0 ✅ chạy, Triton ✅). Megatron-Bridge: chưa dùng (cần nemo:26.08 CUDA 13.3) |
-| Train QLoRA | AutoModel `qlora.py` (bitsandbytes) | như trên | ❓ kernel bnb trên sm_121. Chỉ cần cho model ≥27B; gắn cờ "thử nghiệm" |
-| RL (GRPO/DPO) | Giai đoạn 2. DPO qua LLaMA-Factory; GRPO qua TRL | pytorch:25.11 | NeMo-RL v0.7.0 là CUDA 13.2 ❌ với driver hiện tại |
-| Chạy thử / serve | **vLLM v0.31.0** (đã vá RCE GHSA-h3rc-6mm3-gc2m) | `vllm/vllm-openai:v0.31.0` arm64 `sha256:3f7dd5b7…`, `cuda>=13.0` (security APPROVED, ngoại lệ D1 ngoài NGC; bind 127.0.0.1) | TRT-LLM 1.2.1 (13.1) cho perf. `--gpu-memory-utilization` ≤0.4 trên máy chung |
-| Quantize | **ModelOpt 0.47** `examples/hf_ptq/hf_ptq.py --vlm` | cài vào `vlm-automodel` hoặc pytorch:25.11 ❓ test | Qwen3.5/3-VL: **chỉ FP8 chính thức**; NVFP4/INT4 chính thức cho Qwen2.5-VL, Nemotron VL. Vision tower giữ BF16 |
+| Train SFT/LoRA | **NeMo AutoModel v0.6.0** (`FinetuneRecipeForVLM`) | **`vlm-automodel:26.08-1`** = FROM `nemo-automodel:26.08@b0bd0e50…` (CUDA 13.3 forward-compat, torch 2.13 nv26.06, transformers 5.12.1, flash_attn 2.7.4, bnb 0.49.2) + `chmod -R o+rX /opt/Automodel` (security đã duyệt có điều kiện: FROM pin digest, không secret, có label, hadolint pass, digest vào IMAGES.lock, security review Dockerfile). **Điều kiện: spike train 20 step PASS** | Fallback: 26.02 (CUDA 13.0) + `nemo_automodel==0.4.0 --no-deps` + transformers 5.5.0. Engine thứ 2 (**sau v1**): LLaMA-Factory 0.9.5 FROM pytorch:25.11. Megatron-Bridge (nemo:26.08) ❓ probe |
+| Train QLoRA | AutoModel `qlora.py` (bitsandbytes 0.49.2 có sẵn trong 26.08) | như trên | ❓ kernel bnb trên sm_121. Chỉ cần cho model ≥27B; gắn cờ "thử nghiệm" |
+| RL (GRPO/DPO) | Giai đoạn 2. NeMo-RL v0.7.0 (CUDA 13.2) ❓ cần probe; fallback: DPO qua LLaMA-Factory, GRPO qua TRL | nemo-rl:v0.7.0 ❓ / pytorch:25.11 | — |
+| Chạy thử / serve | **vLLM v0.31.0** (đã vá RCE GHSA-h3rc-6mm3-gc2m) | `vllm/vllm-openai:v0.31.0` arm64 `sha256:3f7dd5b7…`, `cuda>=13.0` (security APPROVED, ngoại lệ D1 ngoài NGC; bind 127.0.0.1) | TRT-LLM 1.2.1 (13.1) cho perf. `--gpu-memory-utilization` mặc định **≤0.3** (~36GB; 0.4 ≈ 48GB vượt ngân sách), chỉ tăng khi preflight cho phép |
+| Quantize | **ModelOpt 0.47** `examples/hf_ptq/hf_ptq.py --vlm` | **0.47 KHÔNG có sẵn trong image nào**: 26.08 kèm ModelOpt 0.44 (trước khi VLM gộp vào hf_ptq ở 0.46). Phải cài pip 0.47 (`--no-deps` lên vlm-automodel, hoặc image `vlm-modelopt` riêng) ❓ test | Qwen3.5/3-VL: **chỉ FP8 chính thức**; NVFP4/INT4 chính thức cho Qwen2.5-VL, Nemotron VL. Vision tower giữ BF16 |
 | Benchmark accuracy | **lmms-eval 0.7.3** gọi endpoint vLLM (+ in-process HF cho gate reproduce) | host venv hoặc pytorch:25.11 | VLMEvalKit pin commit. NeMo Evaluator VLM container **không có arm64** ❌ |
 | Benchmark perf | vLLM bench / script riêng (P002, bao-tester) | như serve | — |
 | Data | HF `datasets` + JSONL chat messages | host/pytorch:25.11 | NeMo Curator 26.07 (arm64 image+video) cho dedup/filter. Để giai đoạn 2 |
@@ -38,12 +38,12 @@ Mốc tham chiếu: Qwen3-8B LoRA đo được ≈ 21GiB.
 | CI | Qwen/Qwen3.5-0.8B | 0.8B | Apache-2.0 | Không | ~2GB | ~6GB | AutoModel (YAML tự viết từ qwen3_5_4b) | FP8 | Ẩn (chỉ CI) |
 | **Dev/Template** | **Qwen/Qwen3.5-2B** | 2B | Apache-2.0 | Không | ~5GB | ~10GB (full SFT ~25GB) | AutoModel | FP8 | ✅ mặc định template |
 | Main | Qwen/Qwen3.5-4B@851bf6e8 | ~5B | Apache-2.0 | Không | 9.3GB | ~16GB | AutoModel (`qwen3_5_4b.yaml`) | FP8 | ✅ |
-| **Main** | **Qwen/Qwen3.5-9B@c2022362** | ~10B | Apache-2.0 | Không | 19.3GB | ~28GB | AutoModel (`qwen3_5_9b.yaml`) | FP8 | ✅ "khuyên dùng" |
+| **Main** | **Qwen/Qwen3.5-9B@c2022362** | ~10B | Apache-2.0 | Không | 19.3GB | ~28GB (**startup peak** = + page cache khi load ~19GB weights, có thể chạm trần 40GB → cần đo) | AutoModel (`qwen3_5_9b.yaml`) | FP8 | ✅ "khuyên dùng" |
 | Stretch | Qwen/Qwen3.6-27B@6a9e13bd | 27B | Apache-2.0 | Không | 55.6GB | ~65GB BF16 ❌ / QLoRA ~35GB ❓ | AutoModel (cùng kiến trúc 3.5 ❓) | FP8 (+`nvidia/…-NVFP4` có sẵn) | ⚠️ "cần máy rảnh", ẩn mặc định |
-| Stretch | Qwen/Qwen3.8-27B@1d4bf0f2 | 27B | Apache-2.0 | Không | 55.6GB | như trên | AutoModel ≥v0.5 ❓ (cần b') | FP8, NVFP4 (nvidia/) | ⚠️ sau b' |
+| Stretch | Qwen/Qwen3.8-27B@1d4bf0f2 | 27B | Apache-2.0 | Không | 55.6GB | như trên | AutoModel v0.6.0 (`qwen3_8_27b_lora.yaml`), 26.08 chờ spike | FP8, NVFP4 (nvidia/) | ⚠️ sau b' |
 | Stretch | Qwen/Qwen3.6-35B-A3B@995ad96e | 35B/3B MoE | Apache-2.0 | Không | 71.9GB | ~80GB ❌ | AutoModel qwen3_5_moe | FP8 | ❌ v1 |
 | Alt | google/gemma-4-{E2B,E4B}-it | 2–8B | Apache-2.0 (security: commercial=yes; hiện Prohibited Use Policy như khuyến nghị) | Không | ~5–16GB | ~10–20GB | AutoModel (`gemma4_*_peft.yaml`) | FP8 ❓ | ✅ (sau khi pin SHA) |
-| R&D | nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16@e5e99324 | ~31B/3B | NVIDIA Open Model Agreement | **Có, bắc cầu 2 repo (C-RADIOv4-H)** | 66GB | ~75GB ❌ | AutoModel ≥v0.5 (cần b') | FP8/NVFP4 (nvidia/) | ❌ chỉ R&D (security: approved-with-conditions) |
+| R&D | nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16@e5e99324 | ~31B/3B | NVIDIA Open Model Agreement | **Có, bắc cầu 2 repo (C-RADIOv4-H)** | 66GB | ~75GB ❌ | AutoModel v0.6.0 (26.08, chờ spike) | FP8/NVFP4 (nvidia/) | ❌ chỉ R&D (security: approved-with-conditions) |
 Loại khỏi catalog: Mistral Small 4 (119B), InternVL3.5 (lạc hậu), Qwen3-VL (đã bị Qwen3.5 thay thế, nhưng vẫn là fallback vì 26.02 gốc hỗ trợ native), Nemotron Nano 12B v2 VL (đang bị deprecate, chỉ có recipe multi-GPU).
 
 Schema entry (đề xuất cho `configs/catalog/models.yaml`):
@@ -64,6 +64,15 @@ Schema entry (đề xuất cho `configs/catalog/models.yaml`):
 ```
 UI dùng `ram_gb` + `MemAvailable` để chặn trước khi chạy; `license.commercial`/`remote_code` để hiện cảnh báo; `quant_formats` để ẩn lựa chọn quant không hỗ trợ.
 
+### 3.1 Image tối thiểu theo model (train / serve), dưới driver 580.142
+| Model | Train (tối thiểu) | Serve | Quantize đã kiểm chứng (nguồn) |
+|---|---|---|---|
+| Qwen3.5-0.8B/2B/4B/9B | `vlm-automodel:26.08-1` (fallback 26.02 + v0.4.0) | vllm-openai:v0.31.0 | FP8 (ModelOpt hf_ptq support matrix "Qwen3.5: FP8"); NVFP4/INT4 = chưa kiểm chứng |
+| Gemma 4 E2B/E4B | như trên (`gemma4_{2b,4b}_peft.yaml`) | vllm-openai:v0.31.0 ❓ | chưa kiểm chứng (ModelOpt chỉ liệt kê Gemma 3 FP8) |
+| Qwen3.6-27B | như trên ❓ (cùng kiến trúc) + QLoRA ❓ | vllm-openai:v0.31.0 | FP8 chính chủ `Qwen/…-FP8`, NVFP4 chính chủ `nvidia/…-NVFP4` (checkpoint có sẵn, không phải tự quant) |
+| Qwen3.8-27B, Nemotron Omni | `vlm-automodel:26.08-1` (v0.6.0), chờ spike | vllm-openai:v0.31.0 | checkpoint FP8/NVFP4 chính chủ |
+Template mặc định (ADR-003: chỉ asset dùng thương mại được): **Qwen3.5-2B** (Apache-2.0). Dataset mẫu của template: CORD-v2 (CC-BY-4.0), xem §4.
+
 ## 4. Recipe mặc định cho template (LoRA SFT, Spark)
 Dựa trên recipe chính chủ (`qwen3_5_9b.yaml`, `qwen3_8_27b_lora.yaml`), chỉnh cho máy chung 1 GPU:
 - `peft: dim 16, alpha 32, exclude *vision*/*visual*/*lm_head*`, `freeze_vision_tower: true`.
@@ -71,20 +80,20 @@ Dựa trên recipe chính chủ (`qwen3_5_9b.yaml`, `qwen3_8_27b_lora.yaml`), ch
 - `activation_checkpointing: true`, `loss_fn: FusedLinearCrossEntropy`, `attn: sdpa` (không dùng flash-attn trên sm_121).
 - `max_pixels` mặc định 512·28·28 (user chỉnh được trong Advanced), video ≤16 frame.
 - Seed cố định, `ckpt_every_steps` theo thời gian (~30 phút), `model_save_format: safetensors`, `save_consolidated: true` để export thẳng sang vLLM/ModelOpt.
-- Dataset mẫu cho template: **phải được security duyệt license**. Ứng viên: `mmoukouba/MedPix-VQA` (dùng trong recipe NVIDIA, cần kiểm license), CORD-v2 (OCR hoá đơn, CC-BY-4.0 ❓). Không dùng LLaVA-Instruct/ShareGPT4V (ToS OpenAI).
+- Dataset mẫu cho template: **`naver-clova-ix/cord-v2`@7f0115a4…** (HF tag `license:cc-by-4.0`, dùng thương mại được nhưng phải ghi attribution; không gated; ~1K ảnh hoá đơn → JSON có cấu trúc). AutoModel đã có recipe dùng CORD-v2 (`gemma3_vl_4b_cord_v2*.yaml`, `nemotron_omni_cord_v2*.yaml`), nên có sẵn hàm dataset/collate. Task trích xuất hoá đơn dễ hiểu với người không biết code và không trùng benchmark eval. **Đã bỏ MedPix-VQA** (license gốc chưa rõ, security xếp CONDITIONAL). **Security APPROVED** (license CC BY 4.0, xác minh trong README clovaai/cord; SHA đầy đủ `7f0115a4b758a71d6473b8d085751692da2fef98`). App phải hiện attribution: "CORD: A Consolidated Receipt Dataset for Post-OCR Parsing" (Park et al., NAVER Clova), github.com/clovaai/cord, CC BY 4.0 kèm link, ghi chú nếu dữ liệu đã bị sửa đổi. Không dùng LLaVA-Instruct/ShareGPT4V (ToS OpenAI).
 
 ## 5. Rủi ro
 | Rủi ro | Mức | Giảm thiểu |
 |---|---|---|
-| Combo 26.02 + AutoModel v0.4.0 không phải tổ hợp NVIDIA test | Trung bình | Smoke test đầu tiên khi mở GPU; fallback LLaMA-Factory trên pytorch:25.11 |
+| 26.08 chạy qua forward-compat (không phải cấu hình NVIDIA công bố cho Spark); fallback 26.02 + v0.4.0 không phải tổ hợp NVIDIA test | Trung bình | Spike train 20 step trước khi pin; giữ fallback; (b') cập nhật DGX OS chính chủ |
 | Qwen3.5 chưa có NVFP4 chính thức trong ModelOpt | Trung bình | v1 chỉ hiện FP8; NVFP4 gắn "thử nghiệm" + so với checkpoint `nvidia/*-NVFP4` |
 | Ước lượng RAM sai trên UMA → treo host | Cao | memguard (P007/P008) + hiệu chỉnh `ram_gb` bằng đo thật; headroom 10GB |
 | Model ≥27B không chạy được trong 40GB | Chắc chắn | Ẩn mặc định, hiện lý do dễ hiểu |
 | Qwen3.5 mặc định thinking mode → eval/chat dài và chậm | Trung bình | Template chat/eval đặt non-thinking mặc định, ghi rõ khi so với số công bố (P002) |
 
 ## 6. Việc cần làm khi PM mở GPU (thứ tự)
-1. Probe vài giây `nemo-automodel:26.08` trên 580.142 (bao-backend). Nếu chạy được thì cân nhắc dùng thẳng 26.08/v0.6.0.
-2. Build `vlm-automodel` (26.02 + v0.4.0), smoke LoRA Qwen3.5-0.8B/2B 20 step: đo peak RAM, it/s.
+1. ~~Probe `nemo-automodel:26.08` trên 580.142~~ → **PASS** (bao-backend, P008 A.4).
+2. Build `vlm-automodel:26.08-1`, smoke LoRA Qwen3.5-0.8B/2B 20 step: đo peak RAM (cả lúc khởi động), it/s. Fail → fallback 26.02 + v0.4.0.
 3. Smoke vLLM v0.31.0 serve Qwen3.5-2B và ModelOpt FP8 trên 2B.
 4. Hiệu chỉnh `ram_gb` trong catalog từ số đo.
 

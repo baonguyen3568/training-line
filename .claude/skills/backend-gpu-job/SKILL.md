@@ -39,7 +39,7 @@ Tell bao-tester (they sample /proc/meminfo during spikes) and log a line in `.te
 ```bash
 RUN_ID=$(date +%Y%m%d-%H%M)-<recipe>-<model>-$(head -c2 /dev/urandom | xxd -p)
 RUN_DIR=outputs/runs/$RUN_ID; mkdir -p $RUN_DIR/{logs,checkpoints,export} .cache/hf
-docker run --rm --name vlm-$RUN_ID --label project=vlm-training \
+docker run --name vlm-$RUN_ID --label project=vlm-training \
   --gpus all --shm-size=16g --ulimit memlock=-1 --ulimit stack=67108864 \
   --security-opt no-new-privileges --cap-drop ALL --memory=48g \
   --user $(id -u):$(id -g) -e HOME=/tmp \

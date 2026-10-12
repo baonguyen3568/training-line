@@ -15,7 +15,8 @@ ASSUMED INTERFACE (draft — agree with bao-backend, rename both sides together)
   ``test.train`` (in ``data: Dataset``, ``base_model: Model``; out ``adapter: Adapter``;
   params ``max_steps: int 1..100000 = 100``, ``lr: float > 0 = 1e-4``),
   ``test.eval`` (in ``model: Model``; out ``report: EvalReport``).
-Codes follow ``src/vlm_pipeline/common/error_catalog.yaml`` (owner bao-fixcode). CFG-001..007, SEC-001/002 approved by bao-fixcode;
+Codes follow ``src/vlm_pipeline/common/error_catalog.yaml`` (owner bao-fixcode).
+CFG-001..007, SEC-001/002 approved by bao-fixcode;
 CFG-008 (duplicate node id) proposed.
 """
 
@@ -206,3 +207,44 @@ def test_duplicate_node_ids_rejected() -> None:
     wf = copy.deepcopy(VALID)
     wf["nodes"].append(_n("d", "test.dataset"))
     assert "CFG-008" in _codes(_run(wf))  # proposed code: duplicate node id
+
+
+@pytest.mark.parametrize("field", ["install_url", "source", "pip", "git"])
+def test_workflow_cannot_carry_install_sources(field: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """P003 D16 / P009 §2.4: a workflow file never installs anything and never triggers a network request."""
+    import socket
+
+    def _no_network(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("validator must not open network connections")
+
+    monkeypatch.setattr(socket.socket, "connect", _no_network)
+    wf = copy.deepcopy(VALID)
+    wf["nodes"].append({**_n("x", "acme/ocr-tools.read"), field: "https://evil.example/pack.tar.gz"})
+    codes = _codes(_run(wf))
+    assert "CFG-007" in codes  # extra=forbid on node objects
+    assert "CFG-004" in codes  # node type not installed, reported, never auto-installed
+
+
+def test_package_hint_from_workflow_is_never_trusted() -> None:
+    """P003 D16: a package name written in a workflow is only a registry lookup key. A spoofed first-party name
+    unknown to the registry yields ``suggested_package=None`` and the string is never echoed back.
+    ASSUMED: the hint is carried as node field ``package`` (allowed key, unlike install_url)."""
+    hint = "vlm/lora-trainer"
+    wf = copy.deepcopy(VALID)
+    wf["nodes"].append({**_n("x", "acme/fake.train"), "package": hint})
+    issues = [i for i in _run(wf) if i.code == "CFG-004"]
+    assert issues
+    issue = issues[0]
+    assert issue.params["reason"] == "not_installed"
+    assert issue.params["trust_level"] == "unverified"
+    assert issue.params["suggested_package"] is None
+    assert hint not in repr(issue)
+
+
+@pytest.mark.parametrize(
+    "type_id", ["acme/ocr-t\u043e\u043els.read", "Acme/ocr.read", "acme/ocr\u200b.read", "acme/\u202eocr.read"]
+)
+def test_node_type_charset_enforced(type_id: str) -> None:
+    wf = copy.deepcopy(VALID)
+    wf["nodes"].append(_n("x", type_id))
+    assert "CFG-007" in _codes(_run(wf))

@@ -16,3 +16,7 @@
 - 2026-10-12 USER: UI mặc định tiếng Việt + Simple. Quota 500/800GB chính thức.
 - 2026-10-12 ADR-009 hướng kiến trúc: React Flow + FastAPI/SQLite/docker executor + AutoModel/LLaMA-Factory.
 - 2026-10-12 Storage approval_policy: 'threshold' 20GB trên máy dev dùng chung này; 'none' mặc định cho bản cài cá nhân của end-user.
+- 2026-10-12 USER: MỞ PHASE 2 = scaffold code + GPU smoke nhỏ. Tải >20GB vẫn phải hỏi PM.
+- 2026-10-12 Probe: nemo-automodel:26.08 CHẠY trên driver 580.142 (CUDA forward compat) → default 26.08, không cần 26.02. Cập nhật DGX OS 580.159.03 (user đồng ý) làm chung đợt vá toolkit, không gấp.
+- 2026-10-12 ADR-002 Eval protocol ACCEPTED. ADR-009 A1 plugin sandbox. ADR-004 A3 layering mới.
+- 2026-10-12 Dataset template mặc định: CORD-v2 (CC-BY-4.0, chờ security xác nhận nguồn gốc). MedPix loại khỏi template.

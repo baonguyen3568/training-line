@@ -22,3 +22,12 @@
 ## Còn mở
 - Hệ kiểu pin (R-1 và P009 còn lệch nhẹ): backend + research thống nhất.
 - Mã lỗi thống nhất (design + fixcode).
+
+## Amendment A1 (2026-10-12) — Custom node sandbox v1 (P003 D16, P004 §8.5, P009 §2.4)
+Đồng thuận: security, backend, frontend, design, tester, fixcode, cleancode.
+- Manifest `vlm-node.toml` thuần data. Server **không import** code plugin. Không nạp JS/CSS bên thứ 3 vào app.
+- Plugin chạy trong container sandbox: v1 **network none**, không mount tuỳ ý, không secret. `trust_level` = first_party | reviewed | unverified, do server tính.
+- Port type tập đóng; plugin chỉ khai subtype của type core. `plugin_api` có semver.
+- Cài đặt: luôn qua dialog (P010 §15). Quyền cao / GPU + nguồn chưa xác minh → phải gõ tên node. Workflow chia sẻ KHÔNG mang URL/commit để tự cài; không có cài hàng loạt.
+- Output của plugin được kiểm bằng allowlist parse định dạng. Plugin hỏng → `unavailable`, app vẫn khởi động.
+- **Chính sách riêng cho host dev dùng chung**: chờ user chốt (xem DECISIONS.md).

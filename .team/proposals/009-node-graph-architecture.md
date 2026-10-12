@@ -59,7 +59,7 @@ class NodeSpec(BaseModel, frozen=True):      # chỉ data; đây là thứ /api/
 class NodeImpl(Protocol):
     params_model: type[BaseModel]          # = config pydantic của engine (hoặc subset), không định nghĩa lại
     def estimate(self, params, inputs_meta) -> Estimate: ...
-    # Estimate = {ram_gb:[lo,hi], disk_gb:[lo,hi], minutes:[lo,hi], gpu_exclusive, source: measured|formula|unknown, basis}
+    # Estimate = {ram_gb:[lo,hi], disk_gb:[lo,hi], minutes:[lo,hi], gpu_exclusive, source: measured|formula|declared|unknown, basis}  # declared = tác giả plugin khai, chưa đo
     def check(self, params, inputs_meta) -> list[Issue]: ...    # lỗi nghiệp vụ: chỉ code + params
     def build_job(self, params, inputs, run_dir) -> JobSpec: ... # → job runner P008
 ```
@@ -73,6 +73,23 @@ class NodeImpl(Protocol):
 - Category `source` = làn "Nguồn" (dữ liệu + model gốc): `model.hf_pick`, `data.hf_load`, `data.local_folder`.
 - **Registry PortType** (`GET /api/node-types` trả kèm): `{id, parent, color_token, label_key}` — UI tô màu/kiểm tra nối dây theo `parent` (subtype).
 - Node nặng chỉ là **adapter mỏng** dịch params → recipe chính chủ (AutoModel YAML, `hf_ptq.py` args, `vllm serve` args) — đúng P004/P008.
+
+### 2.4 Node bên thứ 3 (plugin) — v1 theo ADR-009, sandbox theo P003 D16, layout P004 §8.5
+- **Đóng gói**: node pack = manifest khai báo (tên file chốt 1 cái với security/cleancode: đề xuất `vlm-node.toml` của D16) + source → build thành **1 image riêng** trong sandbox build, pin commit SHA 40-hex + sha256 tarball + digest image.
+- **Loader**: dựng `NodeSpec` từ manifest (data), **không import code plugin vào server**; manifest extra=forbid, không JS/CSS, UI chỉ từ JSON Schema + `x-ui` + i18n key. Registry = list core tường minh + plugin manifest hợp lệ đã cài.
+- **Chạy**: CHỈ container (không venv/subprocess host), qua đúng Worker/job runner P008 với profile sandbox D16: uid 61001, rootfs ro, `/in` ro + `/out`, network none (v1), không secret/env host, docker args do orchestrator tự sinh từ bảng quyền. Output validate (magic bytes chặn pickle, loại file whitelist safetensors/json/jsonl/parquet/ảnh/video, size) **trước** khi chuyển vào vùng artifact; duyệt `/out` bằng lstat/`O_NOFOLLOW`, không follow symlink. `--pids-limit 4096`, `--read-only` + tmpfs `/tmp` giới hạn size. Manifest khai network ≠ none → từ chối cài (mã catalog fixcode cấp cho `permission_unsupported`). v1 chỉ build image plugin từ source FROM base `vlm-*` trong allowlist, không nhận image dựng sẵn.
+- `plugin_api` (phía worker, semver): đọc `/in` + resolved config, ghi `/out` + events/metrics theo contract, raise lỗi bằng code catalog.
+- **NodeSpec thêm** (frontend F6d + design P010 §15):
+  `origin {kind: first_party|third_party, publisher, pack, version, commit_sha, license, installed_at, reviewed: bool}`,
+  `permissions` (đã chuẩn hoá bởi orchestrator: {gpu, network: [], max_runtime, max_memory_gb} — UI không hiện text tác giả viết),
+  `policy_block {code, reason_key} | None` (vd node bên thứ 3 gpu=true bị chặn trên host chưa vá toolkit).
+- Số `declared` của plugin là **untrusted**: chỉ hiển thị (nhãn "tác giả node tự khai, chưa đo"), không bao giờ dùng để nới preflight; preflight dùng max(declared, ước lượng của ta); giới hạn chạy do orchestrator + memguard quyết định.
+- **Workflow có node chưa cài**: validate trả `CFG-004` params `{node_type, reason: not_installed|not_allowed}`; lệch version → `CFG-009` NODE_VERSION_MISMATCH `{node_id, node_type, workflow_version, installed_version, migratable}` (actions `migrate_node` khi migratable, `open_node`). Server giữ nguyên node + dây (UI placeholder), **không bao giờ tự cài**.
+- **API plugin** (thêm vào §6):
+  `POST /api/plugins/install/plan {source: git_url, commit_sha}` → dry-run: manifest, quyền chuẩn hoá, kết quả quét tĩnh, license, deps, kích thước image, sha256 — chưa cài gì, trả `plan_id`;
+  `POST /api/plugins/install/apply {plan_id, ack}` (quyền Cao cần `ack.typed_name`); `GET /api/plugins`;
+  `GET /api/plugins/{id}/usages` → workflow đang dùng; `DELETE /api/plugins/{id}` (xoá cả image);
+  `POST /api/plugins/{id}/update/plan {commit_sha}` → diff quyền (added/removed) + diff code (file/dòng); quyền tăng → apply phải ack lại từ đầu.
 
 ### 2.3 Bộ node v1 (đề xuất, bám pipeline)
 Data: `data.hf_load`, `data.local_folder`, `data.format_vlm_chat`, `data.split`, `data.preview` ·
@@ -100,11 +117,11 @@ Export: `export.hf_dir`, `export.merge_lora`, `export.trtllm` · Utility: `compa
   - Load model: `use_safetensors=True`; `trust_remote_code` chỉ theo allowlist (repo_id, revision) **kể cả repo bắc cầu qua auto_map** (vd Nemotron-Omni → C-RADIOv4-H).
 
 ## 4. Validation trước khi chạy (`POST /api/graphs/validate`)
-Response: `{errors:[{node_id, port, param, code, severity: error|warn, params, title_key, title, what, why, action_ids}], estimate:{per_node:{...}, ram_gb_peak, disk_gb, duration_min, gpu_exclusive}}`. Mã: cấu trúc/kiểu/tham số = CFG-001..007, path/secret = SEC-001/002, license = SEC-003, RAM = MEM-001, disk = DISK-001. Thứ tự kiểm:
+Response: `{errors:[{node_id, port, param, code, severity: error|warn, params, title_key, title, what, why, action_ids}], estimate:{per_node:{...}, ram_gb_peak, disk_gb, duration_min, gpu_exclusive}}`. Mã: cấu trúc/kiểu/tham số = CFG-001..008 (CFG-008 NODE_ID_DUPLICATE), path/secret = SEC-001/002, license = SEC-003, RAM = MEM-001, disk = DISK-001. Thứ tự kiểm:
 1. Cấu trúc: chu trình, cổng bắt buộc chưa nối, node type/version không tồn tại.
 2. Kiểu: dây nối kiểu không tương thích.
 3. Tham số: JSON Schema + `NodeSpec.validate` (vd LoRA rank, max_steps, image size).
-4. Ngữ nghĩa xuyên node: Adapter.base khớp Model; format quantize được runtime hỗ trợ; dataset có split eval.
+4. Ngữ nghĩa xuyên node: Adapter chỉ gắn Model có cùng `base_repo@revision` (LoRA 2B không nối vào 9B — research); Quantize nhận Model (Adapter phải merge trước); format quantize được runtime hỗ trợ; dataset có split eval.
 5. Tài nguyên: `estimate()` từng node vs `preflight` (P007): **RAM đỉnh từng node nặng** so với MemAvailable − margin; tổng disk; thời gian ước lượng. Trả mức "đỏ/vàng/xanh" cho UI.
 6. Chính sách: license model/dataset (configs/security/licenses.yaml), download > 20GB cần xác nhận.
 Ước lượng RAM ban đầu = bảng số đo thật (spike, P1-9) + công thức (params × bytes/param × hệ số LoRA/full, + activations theo seq/ảnh); hiệu chỉnh dần từ run thật (peak_mem_gb trong run.json).
@@ -130,11 +147,13 @@ Response: `{errors:[{node_id, port, param, code, severity: error|warn, params, t
 - **Hiển thị cache/resume (P010)**: event `node_status` khi cache hit kèm `cached_from{run_id, completed_at}` → UI "↺ dùng lại kết quả hh:mm";
   node `interrupted`/`failed` có `resumable: bool` + `checkpoint{step, saved_at}` → nút "Tiếp tục từ checkpoint".
 - **Resume**: run graph có `graph_run_id`; mỗi node có trạng thái `pending|queued|running|completed|failed|interrupted|cached|skipped`. Chạy lại graph = các node completed được cache; node train `interrupted` (memguard exit 75) resume từ checkpoint LATEST.
-- **Phân loại exit của worker** (fixcode, theo thứ tự): (1) exit 75 → MEM-002 `interrupted`; (2) exit 137/SIGKILL **và** (`.State.OOMKilled=true` hoặc `oom_kill` tăng trong cgroup `memory.events`) → MEM-003;
+- **Phân loại exit của worker** (fixcode, theo thứ tự): (0) executor đã chủ động huỷ (user Huỷ/timeout → SIGTERM → SIGKILL sau grace) → exit 137/143 **không phải lỗi**: `cancelled`/`interrupted` (resumable nếu có checkpoint), không gán mã; (1) exit 75 → MEM-002 `interrupted`; (2) exit 137/SIGKILL **và** (chỉ khi có bằng chứng, không đoán) (`.State.OOMKilled=true` hoặc `oom_kill` tăng trong cgroup `memory.events`) → MEM-003;
   (3) có event `error` trong events.jsonl → mã của event; (4) còn lại (139 SIGSEGV, 134 SIGABRT…) → SYS-003 `WORKER_CRASHED` {exit_code, signal} + 30 dòng log cuối trong technical_detail; exception không phân loại được → SYS-000.
   Vì cần đọc `OOMKilled`, container **không chạy `--rm`**: runner `docker inspect` lấy state + exit_code (ghi vào run.json) rồi mới `docker rm`.
   Cache hit nhưng artifact mất/manifest lệch → CACHE-001 (warn, chạy lại, không chặn).
 - **Huỷ**: cancel node → SIGTERM container (grace để save ckpt) → `interrupted`.
+- Mọi event lỗi runtime mang `resumable: bool` + `checkpoint_step?` lấy từ checkpoint **thật** trên disk (UI chỉ hiện "Tiếp tục từ chỗ đã lưu" khi đúng).
+- **Shape lỗi (chốt cleancode + fixcode)**: catalog KHÔNG chứa text; domain exception, `Issue` của validate và event `error` chỉ mang `code + params` (+ node_id, port, technical_detail đã redact). Text từ `i18n/{vi,en}.yaml`, render ở rìa (server response/UI).
 - **Lỗi dễ hiểu**: worker ghi `events.jsonl` loại `error` có `code` theo catalog fixcode (MEM-003 UMA OOM, NET-001 tải lỗi `reason: gated|auth|network`, DISK-001…; fallback SYS-000); server map code → key i18n `error.<code>.*` + action; stack trace chỉ ở "chi tiết".
 - Persist: SQLite (`outputs/app.db`): graph_runs, node_runs, artifacts(cache_key, type, path, hash, parent ids). Thư mục run vẫn là `outputs/runs/<run_id>/` (P005/P006) — mỗi node nặng 1 run dir, `parent_run_id` → lineage.
 
@@ -152,6 +171,7 @@ Response: `{errors:[{node_id, port, param, code, severity: error|warn, params, t
 | GET | `/api/system` | RAM/disk/GPU lock (cho header) |
 | GET | `/api/storage/plan` | dry-run dọn dẹp (gọi `retention.plan()` của cleanup, P005 §6 R3) → JSON items + `plan_id` (hết hạn 10 phút) |
 | POST | `/api/storage/apply` | `{plan_id, item_ids[], confirm}` → server tính lại plan, chỉ xoá item còn hợp lệ VÀ nằm trong plan đã xem (chống TOCTOU); dùng cùng cơ chế `evicting→evicted` của §5 nên không đua với executor. **Không có endpoint xoá theo path tuỳ ý.** |
+|  | (nhánh duyệt, P005 §6 R2 2b) | Config server `storage.approval_policy = none | threshold` (`approval_threshold_gb`, mặc định 20; máy dùng chung = threshold). Vượt ngưỡng → **403** `{code: "DISK-002", params {gb, threshold_gb, item_count, item_ids, admin_command}, deleted: [], approval_request{item_ids, requested_by, requested_at, admin_command}}`; admin duyệt bằng `retention.py --items … --apply --approved-by <tên>` (tính lại plan). Plan JSON có `approval_policy`, `threshold_gb`. |
 
 ## 7–8. Canvas, node library, inspector, template gallery, live run view — xem phụ lục của bao-frontend
 → [.team/proposals/009-annex-frontend-canvas.md](009-annex-frontend-canvas.md) (khuyến nghị React Flow `@xyflow/react` 12.12, MIT; form engine theo tập con JSON Schema ở §2.2).

@@ -1,19 +1,25 @@
 """Spec tests for the graph executor with a fake worker (P009 §5). CPU only, no containers.
 
 ASSUMED INTERFACE (draft — agree with bao-backend):
-- ``vlm_pipeline.graph.testing.FakeWorker(fail: dict[node_id, BaseException] | None = None)``;
+- ``vlm_pipeline.graph.testing.FakeWorker(fail: dict[node_id, BaseException] | None = None,
+  checkpoints: set[node_id] = set())`` (nodes in ``checkpoints`` have saved a checkpoint before failing);
   records ``calls: list[str]`` (node ids in execution order); produces deterministic artifact hashes.
 - ``vlm_pipeline.graph.executor.Executor(registry, worker, state_dir: Path)``;
   ``run(workflow: dict) -> GraphRun`` with ``status: dict[node_id, str]`` (pending|queued|running|completed|
-  failed|interrupted|cached|skipped) and ``errors: dict[node_id, UserError]`` (``code``, ``params``, ``details`` — traceback only in
+  failed|interrupted|cached|skipped) and ``errors: dict[node_id, UserError]`` (``code``, ``params``, ``details``;
+  traceback only in
   ``details``; user text resolved from i18n keys at the API layer, like ``Issue``).
 - ``vlm_pipeline.graph.testing.ContainerExit(exit_code, oom_killed=False, events=())``: raised by FakeWorker to
-  simulate a container job ending (P008). Classification order (bao-fixcode): exit 75 → MEM-002 (interrupted);
+  simulate a container job ending (P008); ``cancelled_by_executor=True`` marks a user cancel (SIGTERM → SIGKILL).
+  Classification order (bao-fixcode): cancelled by executor → ``interrupted`` with NO error (checked first);
+  exit 75 → MEM-002 (interrupted);
   exit 137 + OOMKilled → MEM-003; worker error event with a catalog code → that code; non-zero exit without
   event → SYS-003; unknown exception → SYS-000.
+- Runtime errors carry ``resumable: bool``; ``vlm_pipeline.common.errors.available_actions(error) -> list[str]``
+  returns the catalog action ids offered for that error, never ``resume_checkpoint`` when ``resumable`` is False.
 - ``vlm_pipeline.graph.errors``: ``InterruptedByMemguard`` (exit 75) and catalog exceptions
   (``OutOfMemoryUMA`` → ``MEM-003``, memguard pause → ``MEM-002``); anything unknown → ``SYS-000``.
-  Codes = ``src/vlm_pipeline/common/error_catalog.yaml``; display rules = P010 §6–§7.
+  Codes = ``src/vlm_pipeline/common/error_catalog.yaml``; display rules = P010 §6-§7.
 """
 
 from __future__ import annotations
@@ -39,10 +45,18 @@ def _wf() -> dict[str, Any]:
         "format": "vlm-workflow",
         "schema_version": 1,
         "name": "t",
-        "nodes": [n("d", "test.dataset"), n("m", "test.model"), n("t", "test.train", max_steps=10),
-                  n("m2", "test.model"), n("q", "test.quant")],
-        "edges": [{"from": ["d", "data"], "to": ["t", "data"]}, {"from": ["m", "model"], "to": ["t", "base_model"]},
-                  {"from": ["m2", "model"], "to": ["q", "model"]}],
+        "nodes": [
+            n("d", "test.dataset"),
+            n("m", "test.model"),
+            n("t", "test.train", max_steps=10),
+            n("m2", "test.model"),
+            n("q", "test.quant"),
+        ],
+        "edges": [
+            {"from": ["d", "data"], "to": ["t", "data"]},
+            {"from": ["m", "model"], "to": ["t", "base_model"]},
+            {"from": ["m2", "model"], "to": ["q", "model"]},
+        ],
     }
 
 
@@ -111,7 +125,7 @@ def test_failure_isolated_to_its_branch(tmp_path: Path) -> None:
 def test_resume_after_interrupt_does_not_rerun_completed(tmp_path: Path) -> None:
     from vlm_pipeline.graph.errors import InterruptedByMemguard
 
-    ex, worker = _executor(tmp_path, fail={"t": InterruptedByMemguard()})
+    ex, _ = _executor(tmp_path, fail={"t": InterruptedByMemguard()})
     run = ex.run(_wf())
     assert run.status["t"] == "interrupted"  # UI shows "⏸ Tạm dừng" + persistent banner, not a toast (P010)
     assert run.errors["t"].code == "MEM-002"
@@ -159,7 +173,11 @@ def test_moving_nodes_on_canvas_keeps_cache(tmp_path: Path) -> None:
     [
         ({"exit_code": 75}, "MEM-002", "interrupted"),
         ({"exit_code": 137, "oom_killed": True}, "MEM-003", "failed"),
-        ({"exit_code": 1, "events": ({"type": "error", "code": "DATA-001", "params": {"idx": 3}},)}, "DATA-001", "failed"),
+        (
+            {"exit_code": 1, "events": ({"type": "error", "code": "DATA-001", "params": {"idx": 3}},)},
+            "DATA-001",
+            "failed",
+        ),
         ({"exit_code": 1}, "SYS-003", "failed"),
         ({"exit_code": 137, "oom_killed": False}, "SYS-003", "failed"),  # SIGKILL but not OOM: do not guess OOM
     ],
@@ -174,3 +192,44 @@ def test_container_exit_classification(
     assert run.status["t"] == expected_status
     assert run.errors["t"].code == expected_code
     assert run.status["q"] == "completed"  # independent branch unaffected
+
+
+@pytest.mark.parametrize(
+    ("failure", "has_checkpoint", "resumable"),
+    [
+        ("memguard", True, True),
+        ("unknown", False, False),
+        ("unknown", True, True),  # SYS-000 after a checkpoint was saved is still resumable
+        ("exit1", True, True),  # SYS-003 with checkpoint
+        ("exit1", False, False),
+    ],
+)
+def test_resume_action_depends_on_checkpoint_not_code(
+    tmp_path: Path, failure: str, has_checkpoint: bool, resumable: bool
+) -> None:
+    """``resumable`` = a real checkpoint exists (bao-fixcode); FakeWorker(checkpoints=...) simulates saved ckpts."""
+    from vlm_pipeline.common.errors import available_actions
+    from vlm_pipeline.graph.errors import InterruptedByMemguard
+    from vlm_pipeline.graph.testing import ContainerExit
+
+    exc: BaseException = {
+        "memguard": InterruptedByMemguard(),
+        "unknown": ValueError("boom"),
+        "exit1": ContainerExit(1),
+    }[failure]
+    ex, _ = _executor(tmp_path, fail={"t": exc}, checkpoints={"t"} if has_checkpoint else set())
+    err = ex.run(_wf()).errors["t"]
+    assert err.resumable is resumable
+    assert ("resume_checkpoint" in available_actions(err)) is resumable
+
+
+@pytest.mark.parametrize("exit_code", [137, 143])
+def test_user_cancel_is_not_an_error(tmp_path: Path, exit_code: int) -> None:
+    """Cancel → SIGTERM (143) or SIGKILL after grace (137): checked before OOMKilled, no error code shown."""
+    from vlm_pipeline.graph.testing import ContainerExit
+
+    exc = ContainerExit(exit_code, oom_killed=False, events=(), cancelled_by_executor=True)
+    ex, _ = _executor(tmp_path, fail={"t": exc})
+    run = ex.run(_wf())
+    assert run.status["t"] == "interrupted"
+    assert "t" not in run.errors

@@ -2,7 +2,7 @@
 Cập nhật: 2026-10-12. Nguồn ở cuối file. Ký hiệu: ✅ đã đo/xác minh trên máy này · 📄 xác minh từ nguồn chính chủ · ❓ chưa xác minh.
 
 ## 0. TL;DR cho cả team
-1. **Ràng buộc số 1 là driver, không phải GPU**: host chạy driver **580.142 (CUDA 13.0)**. Image NGC mới nhất (26.06+) build cho CUDA 13.2–13.4 (driver 595–615). ✅ CUDA 13.0 chạy native, ✅ CUDA 13.1 chạy qua "Forward Compatibility mode", ❓ CUDA ≥13.2 có báo cáo **không chạy** trên 580 (forum #379168). Mọi tag phải smoke-test trước khi pin.
+1. **Ràng buộc số 1 là driver, không phải GPU** (cập nhật: automodel 26.08/CUDA 13.3 đã probe PASS trên 580.142 → quy tắc là "probe từng image", không phải "≤13.1"): host chạy driver **580.142 (CUDA 13.0)**. Image NGC mới nhất (26.06+) build cho CUDA 13.2–13.4 (driver 595–615). ✅ CUDA 13.0 chạy native, ✅ CUDA 13.1 chạy qua "Forward Compatibility mode", ❓ CUDA ≥13.2 có báo cáo **không chạy** trên 580 (forum #379168). Mọi tag phải smoke-test trước khi pin.
 2. **Ràng buộc số 2 là RAM thực ~40GB** (UMA 121GB, ~77GB đang bị service khác dùng, swap đã dùng). Không phải 128GB.
 3. Train mặc định: **NeMo AutoModel** (HF-native, recipe VLM có sẵn cho Qwen3.5/3.6/3.8, Gemma 4, Nemotron Omni). Megatron-Bridge chỉ là fallback.
 4. Base model ứng viên: dev **Qwen3.5-2B** (CI: 0.8B), main **Qwen3.5-9B** (LoRA BF16 vừa 40GB), stretch **Qwen3.8-27B / Qwen3.6-27B** (QLoRA hoặc khi máy rảnh), NVIDIA-native **Nemotron 3 Nano Omni 30B-A3B** (~70GB BF16 → chỉ khi máy rảnh).
@@ -27,7 +27,7 @@ Cập nhật: 2026-10-12. Nguồn ở cuối file. Ký hiệu: ✅ đã đo/xác
 | nemo-automodel:25.11.00 | 13.0.1 | 580.82 | 2.9 | ✅ dự kiến native |
 | **nemo-automodel:26.02** | 13.0.2 | 580.95 | 2.10 | ✅ dự kiến native |
 | nemo-automodel:26.06 | 13.2.1 | 595.58 | 2.12 | ❓ rủi ro cao |
-| nemo-automodel:26.08 (= v0.6.0) | 13.3.0 | 610.43 | 2.13 | ❓ rủi ro cao |
+| nemo-automodel:26.08 (= v0.6.0) | 13.3.0 | 610.43 | 2.13 | ✅ **probe PASS** forward-compat (bao-backend 2026-10-12: matmul ~40 TFLOPS, SDPA); kèm ModelOpt 0.44, bnb 0.49.2, flash_attn 2.7.4, transformers 5.12.1 |
 | nemo:26.08 | 13.3.0 | 610.43 | 2.13 | ❓ rủi ro cao |
 | nemo-rl:v0.7.0 | 13.2.0 | 595.45 | — | ❓ rủi ro cao |
 | pytorch:25.11-py3 | 13.0.2 | 580.95 | 2.10 | ✅ đã chạy (matmul+SDPA; Triton 3.5.0 @jit + torch.compile PASS — bao-fixcode) |

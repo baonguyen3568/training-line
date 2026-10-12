@@ -1,5 +1,5 @@
 {
-  "_comment": "ILLUSTRATIVE SAMPLE #2 (P005 §6 R2 mục 2b): shared project dev machine, storage.approval_policy=threshold. Same items as sample #1; total > threshold → needs_approval=true. Values are fake. See also 'apply_response_example' = body of POST /api/storage/apply when not approved.",
+  "_comment": "ILLUSTRATIVE SAMPLE #2 (P005 §6 R2 mục 2b): shared project dev machine, storage.approval_policy=threshold. Same items as sample #1; total > threshold → needs_approval=true. Values are fake. See also 'apply_response_example' = body of POST /api/storage/apply when not approved (error catalog DISK-002, copy keys error.DISK-002.title|what|why).",
   "schema_version": 2,
   "plan_id": "pln_20261012T1630_9c1e",
   "ts": "2026-10-12T16:30:00+07:00",
@@ -196,10 +196,17 @@
   "threshold_gb": 20,
   "apply_response_example": {
     "http_status": 403,
-    "error_code": "APPROVAL_REQUIRED",
+    "error_code": "DISK-002",
     "error_params": {
       "gb": 51.2,
-      "threshold_gb": 20
+      "threshold_gb": 20,
+      "item_count": 3,
+      "item_ids": [
+        "itm_hf_qwen3vl32b_nvfp4",
+        "itm_run_sft0412_ckpt",
+        "itm_ds_sample_old"
+      ],
+      "admin_command": "uv run scripts/cleanup/retention.py --items itm_hf_qwen3vl32b_nvfp4,itm_run_sft0412_ckpt,itm_ds_sample_old --apply --approved-by <admin-name>"
     },
     "deleted": [],
     "plan_id": "pln_20261012T1630_9c1e",
@@ -213,6 +220,13 @@
       "requested_at": "2026-10-12T16:31:00+07:00",
       "admin_command": "uv run scripts/cleanup/retention.py --items itm_hf_qwen3vl32b_nvfp4,itm_run_sft0412_ckpt,itm_ds_sample_old --apply --approved-by <admin-name>",
       "note": "Admin command re-computes the plan (TOCTOU-safe); plan_id expiry does not matter. Approval is never granted from the app UI."
+    },
+    "error_name": "STORAGE_APPROVAL_REQUIRED",
+    "severity": "info",
+    "action": {
+      "id": "show_admin_command",
+      "kind": "navigate",
+      "target": "admin_command"
     }
   }
 }

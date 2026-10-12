@@ -28,8 +28,8 @@ Check CUDA/driver baseline of an arm64 NGC image WITHOUT pulling (reads config b
 scripts/research/ngc_image_env.sh nvidia/nemo-automodel 26.08   # -> CUDA_VERSION, CUDA_DRIVER_VERSION, torch
 ```
 Host driver is **580.142 (CUDA 13.0)**. Measured 2026-10-12: CUDA 13.0 images run native; CUDA 13.1 images run via
-"CUDA Forward Compatibility mode ENABLED"; CUDA >= 13.2 images (driver baseline 595+) reported NOT to work on 580
-(forum #379168) — must be smoke-tested before pinning. Driver upgrade = system change → PM/user only.
+"CUDA Forward Compatibility mode ENABLED"; nemo-automodel:26.08 (CUDA 13.3) also PASSED via forward-compat;
+but forum #379168 reports vllm 26.04 (13.2) failing on 580.173 — so EVERY image must be probed before pinning. Driver upgrade = system change → PM/user only.
 
 Inside a container (only when needed, name it `vlm-probe-*`, `--rm`):
 ```bash

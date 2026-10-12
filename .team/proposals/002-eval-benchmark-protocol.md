@@ -1,12 +1,77 @@
 # Proposal 002 — Eval / Benchmark protocol
 Đồng chủ trì: bao-research (Phần A: bộ benchmark & protocol đối chiếu) + bao-tester (Phần B: harness, tái lập, gate, smoke, perf).
-Trạng thái: DRAFT (2026-10-12). Quy tắc sửa: mỗi bên chỉ sửa phần của mình; góp ý phần kia → ghi vào mục "Góp ý" cuối file.
+Trạng thái: REVIEW (2026-10-12) — Phần A + B xong, chờ PM chốt ADR. Quy tắc sửa: mỗi bên chỉ sửa phần của mình; góp ý phần kia → ghi vào mục "Góp ý" cuối file.
 Phụ thuộc: Proposal 001 (base model + container). Tham khảo: `.team/knowledge/tester.md`.
 
 ---
 ## Phần A — Bộ benchmark & protocol đối chiếu số công bố (owner: bao-research)
-_TODO bao-research: danh sách benchmark + split + revision, metric chính thức, prompt template, max_new_tokens,
-thinking on/off, max_pixels, judge model (local, pin), subset size cho smoke/regression, số công bố tham chiếu + nguồn._
+Viết 2026-10-12. Task name lmms-eval cần xác minh lại trên bản 0.7.3 khi cài (❓). Số công bố lấy từ model card (P001).
+
+### A1. Bộ benchmark chuẩn (registry dữ liệu, không hard-code trong UI)
+| Benchmark | Split (task lmms-eval ❓) | n | Metric chính thức → thang 0-100 | Chấm | Gate reproduce? | Nhóm năng lực (P010) | higher_is_better |
+|---|---|---|---|---|---|---|---|
+| MMMU | val (`mmmu_val`) | 900 | accuracy MC | rule (trích chữ cái); judge tùy chọn | ✅ | Kiến thức & suy luận đa ngành | true |
+| MMBench-EN **v1.1** | dev (`mmbench_en_dev` v1.1 ❓) | ~4.3k | accuracy (circular eval nếu harness hỗ trợ) | EM; judge tùy chọn | ✅ (EM) | Nhận thức tổng quát | true |
+| DocVQA | val (`docvqa_val`) | 5,349 | ANLS ×100 | rule | ✅ | Đọc tài liệu | true |
+| ChartQA | test (`chartqa`) | 2,500 | relaxed accuracy (±5%) | rule | ✅ | Hiểu biểu đồ & sơ đồ | true |
+| OCRBench (v1) | test (`ocrbench`) | 1,000 | score/1000 → /10 | rule | ✅ | Đọc tài liệu | true |
+| AI2D | test (`ai2d`) | 3,088 | accuracy | rule | ✅ | Hiểu biểu đồ & sơ đồ | true |
+| MathVista | testmini (`mathvista_testmini`) | 1,000 | accuracy | **judge/extractor** | ❌ (chỉ nội bộ) | Toán có hình | true |
+| Video-MME | w/o subs (`videomme`) | 2,700 QA | accuracy MC | rule | ❌ (đắt; release only) | Video | true |
+| Perf | — | — | TTFT/TPOT/e2e ms, peak_mem GB, disk GB | đo | — | — | false |
+| Perf | — | — | tokens/s, req/s | đo | — | — | true |
+Tầng chạy (khớp B5): **smoke** = 50 mẫu/benchmark cố định (seed, danh sách id commit vào repo) × {MMBench, ChartQA, OCRBench, DocVQA}; **regression** = 500 mẫu cố định × 6 benchmark rule-scored; **full** = toàn bộ split + MathVista + Video-MME.
+
+### A2. Protocol cố định (mọi run ghi đủ vào record)
+| Tham số | Mặc định | Lý do |
+|---|---|---|
+| Chat template | template của processor HF tại đúng revision model | lệch template là nguồn sai số lớn nhất |
+| Thinking | **off** cho regression/quant/so sánh nội bộ; **on** chỉ cho gate reproduce khi card báo số thinking | Qwen3.5 card mặc định thinking (~32K tokens) → off để đủ thời gian trên máy chung |
+| max_new_tokens | off: 1024 (MC/short-answer: 128) · on: 16384 | thinking cắt cụt → sai đáp án |
+| Decoding | greedy (temperature 0), seed 1234. **Ngoại lệ G1**: dùng sampling params của card, 3 seed (A3) | tái lập |
+| Ảnh | `min_pixels` 256·28·28, `max_pixels` 1280·28·28 cho eval (khác train) — pin cả phía vLLM (`--mm-processor-kwargs`) | OCR/DocVQA rất nhạy độ phân giải |
+| Video | 2 fps, tối đa 64 frame (card Qwen3.5: 2 fps) | — |
+| Prompt | prompt mặc định của task lmms-eval; prompt model-specific (nếu card công bố) ghi thành `prompt_variant` | — |
+| Judge (MathVista, MMMU/MMBench judge mode) | LLM local, pin repo@SHA, chạy qua vLLM; ghi `judge_model` | không gọi API ngoài; số judge-based **không so** với card |
+
+### A3. Số công bố tham chiếu cho gate reproduce (nguồn: model card HF, đọc lại 2026-10-12)
+Card Qwen3.5 nhỏ có **cả cột thinking và non-thinking**. G1 mặc định dùng cột non-thinking (theo đề xuất của tester).
+| Model | MMMU | MMBench-EN-dev **v1.1** | OCRBench | AI2D-test | MathVista-mini | MMStar | RealWorldQA |
+|---|---|---|---|---|---|---|---|
+| Qwen3.5-2B non-thinking | 64.2 | 81.3 | 85.4 | 81.5 | 73.9 | 68.0 | 71.2 |
+| Qwen3.5-2B thinking | 64.2 | 83.3 | 84.5 | 83.3 | 76.7 | 71.7 | 74.5 |
+| Qwen3.5-0.8B non-thinking | 47.4 | 68.0 | 79.1 | 68.7 | 58.6 | 55.9 | 61.6 |
+| Qwen3.5-0.8B thinking | 49.0 | 69.9 | 74.5 | 69.9 | 62.2 | 58.3 | 63.4 |
+| Qwen3.5-4B / 9B (thinking) | 77.6 / 78.4 | 89.4 / 90.1 | 85.0 / 89.2 | 89.6 / 90.2 | 85.1 / 85.7 | — | — |
+Thiết lập trên card:
+- **Sampling, không phải greedy.** Non-thinking: temperature 0.7, top_p 0.8, top_k 20, presence_penalty 1.5. Thinking: temperature 0.6 (top_p 0.95). Video: temperature 1.0, fps 2.
+- Card không ghi max tokens, độ phân giải ảnh hay prompt riêng cho từng benchmark. Khuyến nghị chung là 32,768 output tokens.
+- MMBench là **v1.1** (≠ v1.0). Phải chọn đúng task.
+- DocVQA và ChartQA **không có** trên card.
+
+Quyết định G1 (đã thống nhất với tester, chi tiết điều kiện ở B3):
+1. **G1 chạy full split**, không chạy subset (subset 500 có CI ±3.5pt nên ngưỡng ±1.5 vô nghĩa).
+2. **G1-nonthinking**: Qwen3.5-2B, cột non-thinking. Benchmark: MMMU, MMBench v1.1, OCRBench, AI2D. Dùng **đúng sampling params của card + 3 seed**, báo mean (sampling 1 seed có nhiễu). max_new_tokens 4096.
+3. **G1-thinking** (tùy chọn, đắt): chỉ MMMU (900) + OCRBench (1000), max_new_tokens 16384.
+4. Regression/quant nội bộ vẫn dùng greedy (A2). Sampling chỉ dùng cho G1 vì phải khớp card. **G1-internal (HF vs vLLM) luôn greedy**, vì HF generate không có presence_penalty nên hai đường không chạy cùng tham số sampling được.
+5. **G1-harness** (bắt lỗi harness độc lập với việc card thiếu protocol): chạy 1 model nhỏ có số trên **OpenVLM Leaderboard** (số do chính VLMEvalKit sinh với config công khai), ngưỡng ±1.5pt, chạy bằng VLMEvalKit cùng commit.
+   - Ứng viên: **Qwen/Qwen3-VL-2B-Instruct** (Apache-2.0, ~4.3GB, transformers native, AutoModel 26.02 hỗ trợ sẵn).
+   - ❓ Cần xác nhận model này có trên leaderboard; nếu không thì dùng Qwen2.5-VL-7B-Instruct (Apache-2.0, ~16GB).
+   - Tránh Qwen2.5-VL-3B (license qwen-research, non-commercial).
+   - Tải cần PM duyệt.
+6. DocVQA/ChartQA: baseline tự đo (greedy, thinking off), không có G1.
+
+### A4. Quy tắc diễn giải (cho UI và báo cáo)
+- **License dữ liệu eval** (security, 2026-10-12): ChartQA là GPL-3.0 (repo vis-nlp/ChartQA). Hệ quả: `eval_only=true` cho mọi split; app không đóng gói data mà end-user tự tải từ nguồn; không publish file prediction có chứa câu hỏi/ảnh, chỉ publish điểm tổng hợp; không train trên ChartQA. Áp dụng cùng nguyên tắc eval_only cho mọi benchmark trong A1.
+- So sánh chỉ hợp lệ khi trùng: harness+commit, task, split, subset ids, thinking, max_new_tokens, pixels, judge. UI cảnh báo khi khác `prompt_hash`/`config_hash` (khớp contract của frontend).
+- Fine-tune: báo **Δ trên domain eval** cạnh **Δ trên general benchmark** (forgetting). General tụt quá CI ở ≥2 benchmark ⇒ cảnh báo "model quên kiến thức chung".
+- Quant: theo B3 (FP8 TB ≤1pt; NVFP4 ≤2–3pt, OCR ≤3pt, không benchmark nào >5pt). Qwen3.5 NVFP4 là thử nghiệm (P001) ⇒ gắn nhãn.
+- Không hiện điểm gộp; nhóm năng lực hiện badge ↑/≈/↓ theo CI95 paired (đã thống nhất với design).
+- Contamination: dataset train phải qua kiểm trùng ảnh (perceptual hash) + câu hỏi (n-gram) với toàn bộ split eval ở A1 (G5).
+
+### A5. Ảnh hưởng của RESET (research)
+- Bộ benchmark trở thành **registry** (`configs/eval/benchmarks.yaml`) mà node Benchmark đọc: user chọn nhóm năng lực hoặc từng benchmark, còn tầng (Nhanh/Tiêu chuẩn/Đầy đủ) map vào A1.
+- Model ngoài catalog ⇒ không có số công bố ⇒ G1 chỉ chạy G1-internal, nhãn "chưa kiểm chứng".
 
 Đã thống nhất sơ bộ (16:2x, research ⇄ tester):
 - Gate reproduce chỉ dùng benchmark **rule-scored**: DocVQA (ANLS), ChartQA (relaxed acc), OCRBench, AI2D, MMMU (MC), MMBench (EM).
@@ -37,6 +102,9 @@ model (bf16 | fp8 | nvfp4)  ──serve──►  OpenAI-compatible endpoint (vL
 harness+commit, task+split+dataset revision, container digest, git sha, model path+revision, precision (LM + vision tower),
 chat_template_hash, system/prompt template, decoding (greedy, max_new_tokens), seed, min/max_pixels, answer_extractor
 (rule | judge+model), n_samples, score, CI95, path tới samples.jsonl (raw output từng mẫu).
+Raw predictions (`samples.jsonl`) chỉ lưu local trong `outputs/<run_id>/eval/`. Với benchmark `eval_only` có license hạn chế
+(vd ChartQA GPL-3, theo A4 và P003), artifact chia sẻ/export **mặc định không kèm prediction, câu hỏi hay ảnh**, chỉ kèm điểm tổng hợp.
+Test: export một EvalReport của benchmark eval_only thì không có `samples.jsonl` và không có field `question`/`image`.
 
 ### B3. Các gate
 | Gate | Khi nào | Điều kiện PASS |
@@ -48,6 +116,30 @@ chat_template_hash, system/prompt template, decoding (greedy, max_new_tokens), s
 | **G4 Perf** | cùng G3 + khi đổi serve config | Báo TTFT/TPOT/E2E p50/p90/p99, tok/s, memory; quant phải nhanh hơn hoặc ít memory hơn BF16 một cách có ý nghĩa (≥3 lần đo, median) — không thì không đáng deploy |
 | **G5 Leakage** | mỗi dataset train mới | Overlap train↔eval (sha256 + pHash ảnh, text chuẩn hoá) = 0, hoặc đã loại bỏ và ghi lại |
 Số G1/G3 là đề xuất ban đầu — chốt trong ADR.
+
+**Trạng thái G1** (sau khi research viết A3): `PASS` | `FAIL` | `INCONCLUSIVE` | `NOT_AVAILABLE` (model ngoài catalog, không có số công bố).
+- `INCONCLUSIVE` chỉ được dùng khi **đủ cả 4 điều kiện**, nếu không thì là FAIL. Mục đích là không để FAIL thật bị gắn nhãn "thiếu protocol":
+  1. card không công bố protocol (prompt/pixels/max tokens) cho benchmark đó, ghi rõ field nào thiếu;
+  2. |Δ| ≤ 5pt. Lệch lớn hơn gần như chắc chắn là lỗi harness/serve/template, không phải chi tiết protocol;
+  3. G1-internal PASS: HF in-process vs endpoint vLLM lệch ≤ 1pt trên cùng benchmark;
+  4. `unparseable_rate` ≤ 2% và đã spot-check bằng mắt ≥ 30 output raw.
+- G1 so với số công bố phải chạy **full split**, không chạy subset. Số công bố tính trên toàn split, nên subset 500 mẫu thêm sai số lấy mẫu
+  khoảng ±3pt, làm ngưỡng ±1.5pt mất ý nghĩa. Để giảm chi phí: ưu tiên cột **non-thinking** của card nếu có (rẻ hơn rất nhiều), và chỉ chạy thinking-on cho
+  benchmark nhỏ (MMMU 900, OCRBench 1000).
+- **G1-harness** (khuyến nghị): khi model chính chỉ đạt INCONCLUSIVE ở mọi benchmark, harness chưa từng được đối chiếu với nguồn ngoài nào.
+  Khi đó chạy harness trên 1 model nhỏ mà số công bố do **chính harness đó** sinh ra với config công khai (OpenVLM leaderboard/VLMEvalKit),
+  ngưỡng ±1.5pt. Việc này cần tải thêm model, nên cần PM duyệt.
+- **G1 với sampling** (card Qwen3.5 dùng T=0.7, top_p 0.8, top_k 20, presence_penalty 1.5 cho non-thinking; research A3):
+  - Chạy G1 qua **vLLM** với đúng các tham số đó × **3 seed**, mỗi request có seed riêng (cố định theo sample id + seed),
+    rồi so **mean** với số công bố. PASS nếu |mean − published| ≤ 1.5pt.
+  - Độ ổn định: spread (max − min) giữa 3 seed ≤ 2pt. Nếu vượt, chạy thêm 2 seed (tổng 5). Vẫn vượt thì G1 không được PASS: ghi
+    `INCONCLUSIVE (variance)` và mở bug kiểm tra harness/serve. Báo cả mean, spread và từng seed.
+  - Kiểm tái lập: chạy lại cùng seed trên 1 benchmark phải cho output giống hệt (vLLM seed per-request). Nếu không giống thì ghi
+    nguồn non-determinism (batching) vào record.
+  - **G1-internal (HF vs vLLM ≤1pt) luôn chạy greedy**, không dùng sampling. Lý do: HF `generate` không có `presence_penalty`
+    (`repetition_penalty` là cơ chế khác), nên 2 đường không thể dùng cùng tham số sampling, và so 2 phân phối ngẫu nhiên thì vô nghĩa.
+  - Regression/quant nội bộ: greedy như cũ.
+  - Benchmark phải đúng **phiên bản** card dùng (MMBench-EN-dev **v1.1**); task name lmms-eval xác minh khi cài.
 Tiền điều kiện cho mọi gate trên một checkpoint đã biến đổi (convert HF⇄Megatron, LoRA merge, quantize export):
 **R6 của Proposal 007** (test tính đúng của biến đổi). Ngưỡng tester đề xuất cho R6: convert cùng dtype phải bit-exact;
 logits so bằng cosine/KL, không dùng atol tuyệt đối; greedy ~16 prompt có ảnh, chấp nhận lệch tại near-tie; quantize

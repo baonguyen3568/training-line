@@ -1,0 +1,83 @@
+# DRAFT copy: third-party node install & canvas (P010 §15, aligned with P003 D16). Owner bao-design → src/vlm_pipeline/i18n after approval.
+# Every promise here must stay true under D16 (no secrets/env, only /in ro + /out, network only via egress proxy). Never say "safe".
+# Placeholder convention: *_gb sizes, *_count counts.
+custom_node:
+  library_group:   {vi: "Đã cài thêm", en: "Installed add-ons"}
+  badge:
+    unverified:    {vi: "Bên thứ 3 – chưa xác minh · {publisher}", en: "Third-party – unverified · {publisher}"}
+    reviewed:      {vi: "Bên thứ 3 · đã được team review · {publisher}", en: "Third-party · team-reviewed · {publisher}"}
+    policy_block:  {vi: "Bị chặn trên máy này theo chính sách quản trị", en: "Blocked on this machine by admin policy"}
+  install_title:   {vi: "Cài node bên thứ 3: \"{name}\"", en: "Install third-party node: \"{name}\""}
+  not_reviewed:    {vi: "Chưa xác minh — do người ngoài team viết, team chưa kiểm tra mã nguồn này.", en: "Unverified — written outside the team; the team has not reviewed this code."}
+  not_bundled:     {vi: "Node này không đi kèm app; bạn tự cài và chịu trách nhiệm khi dùng.", en: "This node isn't part of the app; you install it and use it at your own risk."}
+  source:          {vi: "Nguồn", en: "Source"}
+  commit_pinned:   {vi: "commit {commit_short} (đã khoá)", en: "commit {commit_short} (pinned)"}
+  publisher:       {vi: "Tác giả", en: "Publisher"}
+  license:         {vi: "Giấy phép", en: "License"}
+  permissions_intro: {vi: "Node này sẽ được phép:", en: "This node will be allowed to:"}
+  level_high:      {vi: "CAO", en: "HIGH"}
+  perm:
+    read_inputs:   {vi: "Đọc dữ liệu bạn nối vào và ghi kết quả ra", en: "Read the data you connect and write results"}
+    gpu:           {vi: "Dùng GPU: có thể chạy tính toán nặng trên máy bạn, tới {max_runtime}", en: "Use the GPU: may run heavy computation on your machine, up to {max_runtime}"}
+    # v1: network is not supported for third-party nodes (blocked_reason.permission_unsupported). Kept for v1.1.
+    network:       {vi: "Kết nối Internet tới {hosts}: dữ liệu của bạn có thể được gửi tới đó", en: "Connect to {hosts}: your data could be sent there"}
+    over_limits:   {vi: "Chạy lâu hơn hoặc dùng nhiều bộ nhớ hơn mức thường: tới {max_runtime}, {max_memory_gb} GB", en: "Runs longer or uses more memory than usual: up to {max_runtime}, {max_memory_gb} GB"}
+    # Show ONLY when the D16 sandbox test (docker args: no extra mounts/env) passes for this install. Wording per bao-security.
+    isolation:     {vi: "Node chạy trong vùng cách ly: không được cấp quyền đọc file khác, token hay mật khẩu của bạn. Cách ly giảm rủi ro nhưng không loại bỏ hoàn toàn — chỉ cài node từ nguồn bạn tin.", en: "The node runs in an isolated area: it is not granted access to your other files, tokens or passwords. Isolation reduces risk but doesn't remove it — only install nodes from sources you trust."}
+  badge_perm:
+    gpu:           {vi: "GPU", en: "GPU"}
+    network:       {vi: "Internet", en: "Internet"}
+  scan_title:      {vi: "Quét tự động (không đảm bảo an toàn)", en: "Automatic scan (does not guarantee safety)"}
+  scan_disclaimer: {vi: "Quét tự động không đảm bảo an toàn.", en: "An automatic scan does not guarantee safety."}
+  scan_none_found: {vi: "Không thấy {check}", en: "No {check} found"}
+  scan_found:
+    subprocess:    {vi: "Có gọi chương trình khác (subprocess)", en: "Runs other programs (subprocess)"}
+    eval_exec:     {vi: "Có chạy mã động (eval/exec)", en: "Runs dynamic code (eval/exec)"}
+    import_network: {vi: "Kết nối mạng ngay khi được nạp", en: "Connects to the network when loaded"}
+    obfuscated:    {vi: "Có đoạn mã bị che giấu/mã hoá", en: "Contains hidden or encoded code"}
+    pickle_load:   {vi: "Nạp file theo cách có thể chạy mã ẩn (pickle/torch.load)", en: "Loads files in a way that can run hidden code (pickle/torch.load)"}
+    trust_remote_code: {vi: "Cho phép model tự chạy mã tải về (trust_remote_code)", en: "Lets models run downloaded code (trust_remote_code)"}
+    runtime_pip:   {vi: "Tự cài thêm phần mềm khi đang chạy", en: "Installs software while running"}
+  deps_summary:    {vi: "Cài thêm {dep_count} thư viện Python · dung lượng {image_gb} GB", en: "Adds {dep_count} Python libraries · {image_gb} GB"}
+  acknowledge:     {vi: "Tôi hiểu node này do người ngoài viết và tự chịu trách nhiệm khi dùng", en: "I understand this node is written by others and I use it at my own risk"}
+  typed_confirm_gpu_unverified: {vi: "Node chưa xác minh xin dùng GPU. Gõ  {name}  để xác nhận:", en: "An unverified node asks to use the GPU. Type  {name}  to confirm:"}
+  typed_confirm_network: {vi: "Node xin kết nối Internet. Gõ  {name}  để xác nhận:", en: "This node asks for Internet access. Type  {name}  to confirm:"}  # v1.1
+  install:         {vi: "Cài node", en: "Install node"}
+  close:           {vi: "Đóng", en: "Close"}
+  blocked_title:   {vi: "Không thể cài node này", en: "This node can't be installed"}
+  blocked_reason:
+    not_sha_pinned:   {vi: "Link phải trỏ tới một commit cụ thể (40 ký tự), không phải nhánh hay tag, để biết chắc mình đang cài gì.", en: "The link must point to an exact commit (40 characters), not a branch or tag, so we know exactly what gets installed."}
+    manifest_invalid: {vi: "Node không khai báo rõ nó cần quyền gì, hoặc xin quyền không được phép.", en: "The node doesn't clearly declare its permissions, or asks for one that isn't allowed."}
+    network_wildcard: {vi: "Node xin kết nối tới mọi nơi trên Internet — không được phép.", en: "The node asks to connect anywhere on the Internet — not allowed."}
+    policy_block:     {vi: "Máy này đang chặn node bên thứ 3 có quyền này theo chính sách quản trị.", en: "This machine blocks third-party nodes with this permission by admin policy."}
+    license_blocked:  {vi: "Giấy phép không cho phép dùng theo cách này.", en: "Its license doesn't allow this use."}
+    permission_unsupported: {vi: "Node xin kết nối Internet — phiên bản app này chưa cho node bên thứ 3 dùng Internet.", en: "The node asks for Internet access — this app version doesn't allow that for third-party nodes yet."}
+    base_image_not_allowed: {vi: "Node dựa trên một môi trường chạy không nằm trong danh sách được phép.", en: "The node is built on a runtime environment that isn't on the allowed list."}
+    build_failed:     {vi: "Không dựng được node này. Có thể node bị lỗi hoặc thiếu thư viện.", en: "This node couldn't be built. It may be broken or missing libraries."}
+    image_digest_mismatch: {vi: "Node đã bị thay đổi sau khi cài nên app không chạy nó. Hãy gỡ và cài lại từ nguồn bạn tin.", en: "The node changed after it was installed, so the app won't run it. Uninstall and reinstall it from a source you trust."}
+  update_title:    {vi: "Cập nhật \"{name}\"", en: "Update \"{name}\""}
+  update_perms_added: {vi: "Bản mới xin thêm quyền: {perms}", en: "The new version asks for more: {perms}"}
+  update_code_diff: {vi: "Thay đổi {file_count} file, {line_count} dòng", en: "{file_count} files, {line_count} lines changed"}
+  missing_placeholder: {vi: "Thiếu node {name} {version}", en: "Missing node {name} {version}"}
+  see_to_install:  {vi: "Xem để cài", en: "Review to install"}
+  uninstall:       {vi: "Gỡ node", en: "Uninstall node"}
+  uninstall_used_by: {vi: "Đang được dùng trong: {workflows}", en: "Used in: {workflows}"}
+  uninstall_image: {vi: "Gỡ sẽ xoá luôn bản cài ({image_gb} GB).", en: "Uninstalling also deletes the installed copy ({image_gb} GB)."}
+  error_in_third_party: {vi: "Lỗi trong node bên thứ 3 {name}", en: "Error inside third-party node {name}"}
+  report_to_author: {vi: "Báo cho tác giả", en: "Report to author"}
+  preflight_info:  {vi: "Workflow này có {node_count} node bên thứ 3, {network_node_count} node kết nối Internet.", en: "This workflow has {node_count} third-party nodes, {network_node_count} use the Internet."}
+  paste_branch_error: {vi: "Đây là link nhánh/tag. Mở repo, chọn một commit cụ thể rồi dán link commit đó.", en: "That's a branch/tag link. Open the repo, pick a specific commit and paste its link."}
+  # Missing node from a shared workflow (D16 add-on): install source NEVER comes from the workflow file.
+  # Only from the app's registry/allowlist, or a URL the user pastes. No "install all".
+  shared_wf:
+    in_trusted_source: {vi: "Node này có trong nguồn tin cậy của app. Xem thông tin trước khi cài.", en: "This node is in the app's trusted sources. Review it before installing."}
+    not_in_trusted_source_title: {vi: "Không có trong nguồn tin cậy — workflow này do người khác chia sẻ", en: "Not in trusted sources — this workflow was shared by someone else"}
+    not_in_trusted_source_body: {vi: "App không cài theo thông tin trong file workflow. Nếu bạn tin node \"{name}\", hãy tự tìm repo gốc của tác giả và dán link commit vào đây. Node sẽ ở mức chưa xác minh.", en: "The app won't install from details inside the workflow file. If you trust \"{name}\", find the author's original repo yourself and paste a commit link here. It will be treated as unverified."}
+    paste_url_label: {vi: "Link commit của repo", en: "Repo commit link"}
+    paste_url_hint:  {vi: "Ví dụ: github.com/<tác giả>/<repo>/commit/<40 ký tự>", en: "e.g. github.com/<author>/<repo>/commit/<40 characters>"}
+    check_url: {vi: "Kiểm tra link", en: "Check link"}
+    alt_remove: {vi: "Hoặc xoá bước này khỏi workflow", en: "Or remove this step from the workflow"}
+    # Names coming from a workflow file are attacker-controlled: render plain text, truncate ~60 chars, in quotes, always with this label.
+    name_from_file:  {vi: "(tên do file workflow ghi)", en: "(name as written in the workflow file)"}
+    lookalike_warning: {vi: "Tên giống node chính chủ — có thể là giả mạo.", en: "Name looks like an official node — it may be fake."}
+    url_needs_commit: {vi: "Link phải trỏ tới một commit đầy đủ 40 ký tự, không phải nhánh hay tag.", en: "The link must point to a full 40-character commit, not a branch or tag."}

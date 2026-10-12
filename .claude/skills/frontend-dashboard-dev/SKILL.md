@@ -1,6 +1,6 @@
 ---
 name: frontend-dashboard-dev
-description: Use when starting, developing, running or debugging the project dashboard (frontend/) on the shared DGX Spark — port allocation, localhost binding, GPU-lock/memory awareness, arm64 deps, and the pre-merge checklist for UI changes.
+description: Use when scaffolding, starting, developing, running or debugging the frontend app (frontend/ — React Flow node-graph editor + monitor/benchmark panels, ADR-009) on the shared DGX Spark — port allocation, localhost binding, GPU-lock/memory awareness, arm64 deps, and the pre-merge checklist for UI changes.
 ---
 # Dashboard dev workflow (DGX Spark, shared host)
 
@@ -42,3 +42,20 @@ cat .team/GPU_LOCK 2>/dev/null || echo "no GPU lock"
 - [ ] Bound to 127.0.0.1 only (`ss -ltnp | grep 787`)
 - [ ] Matches bao-design tokens (colors/typography), dark + light
 - [ ] Reviewed by at least one other member (bao-design for UI, bao-backend for API/schema)
+
+## 7. Scaffold checklist (ONLY after PM opens Phase 2 — user approval required)
+Decisions: ADR-009 (React Flow 12, self-built), P009 annex F2-F7, P010 (UX), P004 §8.2 (tooling), P003 D11/D13 (security).
+1. `frontend/` with Vite + React + TS strict (`strict`, `noUncheckedIndexedAccess`); `.nvmrc` = installed Node (24.x).
+2. `.npmrc`: `ignore-scripts=true`, `save-exact=true`, cooldown (`min-release-age` — verify unit; agree with bao-security).
+3. Deps (exact pins, each with `configs/security/licenses.yaml` entry kind: code): @xyflow/react, react, react-dom, zustand,
+   @dagrejs/dagre, uplot, echarts. Dev: typescript, vite, @biomejs/biome, vitest, openapi-typescript. NO elkjs, no CDN.
+4. `npm ci --ignore-scripts` works on arm64 (check `@biomejs/cli-linux-arm64`, esbuild/rollup linux-arm64 binaries present).
+5. `frontend/src/generated/` (openapi-typescript from `schemas/`), header `// GENERATED — do not edit`, Biome ignore; drift check in `check.sh`.
+6. `check.sh` step `frontend`: `npm ci --ignore-scripts && npx biome ci && npx tsc --noEmit && npx vitest run`.
+7. Tokens: tiny build script `frontend/scripts/build-tokens.mjs` (DTCG `design/tokens/*.tokens.json` → CSS variables light/dark; no Style Dictionary).
+8. i18n: load resolved strings from API (`?locale=vi` default); missing key → show key; UI chrome strings from `src/vlm_pipeline/i18n/{vi,en}.yaml` export.
+9. Security baseline in app shell: fetch wrapper adds `X-VLM-CSRF`; no `dangerouslySetInnerHTML` (Biome rule on); WS via same origin + cookie;
+   no third-party JS loading path exists (F6d).
+10. Fixtures for tests: `.team/knowledge/error-samples-v0.jsonl`, `.team/proposals/005-annex-storage-plan*.sample.json`, run dir sample.
+11. First vertical slice: template gallery → open template → canvas render from NodeSpec (mock API) → validate overlay → bottom check bar.
+12. Review: bao-cleancode (code), bao-security (deps + headers), bao-design (tokens/UX); never merge without one reviewer.

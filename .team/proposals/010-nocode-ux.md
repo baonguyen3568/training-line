@@ -147,6 +147,11 @@ Chạy liên tục khi sửa graph (debounce ~500 ms), hiển thị ở thanh đ
 - **Ước lượng phải có nguồn**: RAM/thời gian/disk do backend tính (công thức + bảng đo thực tế trên GB10 từ bao-tester/bao-fixcode
   memguard), UI chỉ hiển thị **dải** + "độ tin cậy" (đo thật / ước lượng). Không có ước lượng → hiển thị "chưa ước lượng được", không bịa số.
 - Mọi gợi ý sửa là **nút làm ngay** (đổi sang QLoRA, bỏ mẫu lỗi), có Undo.
+- **Kiểu hiển thị theo `Estimate.source`** (P009). Mỗi kiểu có tooltip giải thích nguồn số:
+  - `measured`: chữ thường.
+  - `formula`: thêm tiền tố "~".
+  - `declared` (node bên thứ 3, tác giả tự khai): chữ nghiêng, icon ⓘ, tooltip "do tác giả node khai, chưa kiểm chứng". Preflight vẫn dùng số này nhưng cộng biên an toàn rộng hơn.
+  - `unknown`: "chưa có số đo".
 
 ## 7. Thông báo lỗi dễ hiểu (khi đang chạy)
 Khuôn 4 phần (theo NN/g: ngôn ngữ người đọc được, chỉ rõ vấn đề, gợi ý xây dựng, không đổ lỗi):
@@ -255,6 +260,104 @@ Bắt đầu nhanh                                                      🔍  L�
 1. Test giấy/wireframe với 1–2 người không biết code (PM nhờ user giới thiệu) — 5 task: mở template, thay dữ liệu, sửa lỗi nối, đọc kết quả, xoá dung lượng.
 2. Hi-fi cho: canvas + node + cổng, thanh kiểm tra, dialog lỗi, gallery, drawer Dung lượng (light/dark).
 3. Copy deck VI/EN cho node + lỗi. 4. Review chéo với frontend khi build.
+
+## 15. Node bên thứ 3 (custom node) — ADR-009 + P003 D16
+Ràng buộc kỹ thuật lấy theo **P003 D16** (security + backend), UX không được nói khác D16:
+- Container riêng cho mỗi lần chạy, chỉ mount `/in` (ro) và `/out`, không bao giờ nhận secret hay env của host.
+- Network mặc định none, `network` chỉ đi qua egress proxy allowlist.
+- Manifest đóng, quyền chỉ có: `gpu`, `network=[hosts]`, `max_runtime`/`max_memory`. Không có quyền đọc file tuỳ ý hay mount.
+- Pin commit SHA 40-hex + sha256 + image digest. Không auto-update. Node không nạp JS/CSS, text từ node render dạng plain text.
+Nguyên tắc UX: **không bao giờ cài ngầm**. Mọi đường vào (thư viện, mở workflow có node lạ, cập nhật) đều đi qua 1 dialog cài.
+**Không bao giờ nói "an toàn"**: kết quả quét luôn kèm câu "quét tự động không đảm bảo an toàn".
+
+### 15.1 Mức tin cậy & quyền (do orchestrator sinh, không lấy từ text tác giả viết)
+| Mức tin cậy (D16) | Badge trên node | Ghi chú |
+|---|---|---|
+| first-party (`vlm/…`) | *không badge* | sự vắng mặt của badge là tín hiệu; badge chỉ dựa vào `origin.kind`, không dựa vào tên |
+| đã được team review (`reviewed=true`) | "🧩 Bên thứ 3 · đã được team review · {publisher}" | |
+| chưa xác minh | "🧩 Bên thứ 3 – chưa xác minh · {publisher}" | mặc định cho mọi node mới cài |
+| bị chặn theo chính sách máy (`policy_block`) | "⛔ Bị chặn trên máy này theo chính sách quản trị" | vd máy dev chặn node bên thứ 3 có GPU tới khi vá toolkit; preflight khoá nút Chạy |
+
+| Quyền | Mức | Lời thường (dialog) | Badge chân node |
+|---|---|---|---|
+| `read_inputs` | luôn có | "Đọc dữ liệu bạn nối vào và ghi kết quả ra" | – |
+| `gpu=true` | **Cao** | "Dùng GPU: node có thể chạy tính toán nặng trên máy bạn, chiếm máy tới {max_runtime}" | ▣ GPU |
+| `network=[hosts]` | — | **v1: không hỗ trợ cho node bên thứ 3** → chặn cài (`permission_unsupported`). Câu chữ để sẵn cho v1.1 | (v1.1) 🌐 Internet |
+| `max_runtime`/`max_memory` vượt 1h/16GB | Trung bình | "Chạy lâu hơn/dùng nhiều bộ nhớ hơn mức thường: tới {max_runtime}, {max_memory_gb} GB" | ⏱/RAM in đậm |
+| cách ly (D16 T1) | – | "Node chạy trong vùng cách ly: không được cấp quyền đọc file khác, token hay mật khẩu của bạn. Cách ly giảm rủi ro nhưng không loại bỏ hoàn toàn — chỉ cài node từ nguồn bạn tin." **Chỉ hiện khi test sandbox D16 pass** | – |
+Không có badge "📁 thư mục ngoài": D16 không có quyền này, node cần quyền đó thì không chạy được.
+
+### 15.2 Đường vào
+- Thư viện: nhóm **"🧩 Đã cài thêm"** + nút "Cài node…" (dán link repo). Chỉ nhận commit SHA, không nhận branch/tag. Dán branch thì báo lỗi dễ hiểu kèm cách lấy SHA.
+- "Xem để cài" (từ lỗi CFG-004) chỉ **điều hướng** tới trang thông tin node = chính dialog 15.3, nơi có đủ kiểm tra D16. Thẻ lỗi không có nút cài trực tiếp.
+- **Workflow do người khác chia sẻ** (bổ sung D16): nguồn cài **không bao giờ** lấy từ file workflow. Chỉ lấy từ registry/allowlist của app, hoặc từ URL người dùng tự dán. Không có "cài tất cả".
+  - Node có trong nguồn tin cậy → mở dialog 15.3 như thường.
+  - Node không có → màn "Không có trong nguồn tin cậy — workflow này do người khác chia sẻ": không có nút cài 1 chạm, chỉ có ô dán link commit (→ mức chưa xác minh → dialog 15.3) và lựa chọn "xoá bước này".
+  - Không điền sẵn ô link bằng URL trong file workflow, kể cả dạng gợi ý — tránh link giả mạo được "đóng dấu" bởi UI.
+  - **Tên node lấy từ file là dữ liệu kẻ tấn công kiểm soát**: plain text, cắt ~60 ký tự, trong ngoặc kép, luôn kèm nhãn "(tên do file workflow ghi)".
+    Nếu backend trả `name_lookalike_of` (≠ null) — tên trùng/gần giống node first-party hoặc reviewed (cùng tên khác publisher, prefix `vlm/`) → thêm ⚠ "Tên giống node chính chủ — có thể là giả mạo".
+  - "Kiểm tra link" chỉ nhận link có commit SHA đủ 40 ký tự; nhánh/tag → báo lỗi kèm cách lấy link commit.
+  - Mức tin cậy dùng chung enum `trust_level: first_party|reviewed|unverified` (D16, API, UI, CFG-004).
+- Mở workflow có node chưa cài → **node giữ chỗ**: khung xám nét liền, ⚠, "Thiếu node {name} {version}", dây giữ nguyên, nút [Xem để cài] mở dialog.
+  Preflight chặn bằng CFG-004. Không bao giờ tự cài.
+- Cập nhật: chấm thông báo ở mục node. Màn cập nhật hiện **diff quyền** (quyền mới làm nổi) + diff code (số file/dòng đổi). Quyền tăng thì duyệt lại từ đầu.
+
+### 15.3 Dialog cài (Simple)
+```
+┌ Cài node bên thứ 3: "OCR tiếng Việt" ─────────────────────────────────────────────────┐
+│ 🧩 Chưa xác minh — do người ngoài team viết, team chưa kiểm tra mã nguồn này.           │
+│ Nguồn      github.com/acme/vlm-ocr-node · commit 3f9a…c21 (đã khoá) · 2026-09-30         │
+│ Tác giả    acme          Giấy phép  ◐ GPL-3.0 — dùng được, chia sẻ lại phải mở mã [Chi tiết]│
+│ Node này không đi kèm app; bạn tự cài và chịu trách nhiệm khi dùng.                      │
+│                                                                                         │
+│ Node này sẽ được phép:                                                                  │
+│   ✓ Đọc dữ liệu bạn nối vào và ghi kết quả ra                                           │
+│   ⚠ CAO  Dùng GPU: có thể chạy tính toán nặng trên máy bạn, tới 2 giờ                    │
+│   🛡 Chạy trong vùng cách ly: không được cấp quyền đọc file khác, token, mật khẩu.        │
+│      Cách ly giảm rủi ro nhưng không loại bỏ hoàn toàn — chỉ cài từ nguồn bạn tin.        │
+│                                                                                         │
+│ Quét tự động (không đảm bảo an toàn):  ⚠ có gọi subprocess  ·  ✓ không thấy eval/exec    │
+│ Cài thêm 4 thư viện Python · dung lượng 1.8 GB                                  [Xem]   │
+│                                                                                         │
+│ ⛔ Node chưa xác minh xin dùng GPU. Gõ  acme/vlm-ocr-node  để xác nhận: [_____________]   │
+│                                              [Huỷ]   [Cài node] (khoá tới khi gõ đúng)   │
+│ ▸ Nâng cao: commit đầy đủ, sha256 tarball, digest image, manifest, kết quả quét chi tiết │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+- Mỗi quyền do backend trả `perm_copy_key`, `confirm_copy_key`, `level: info|warning|critical`. Mapping token: info → text.secondary + ✓ trung tính (không dùng status.good), warning/critical → color.status.*.
+- **Mức xác nhận (chốt với security trong D16, 2026-10-12)**. UI đọc `requires_typed_confirm`/mức từ backend, không tự suy:
+  | Trường hợp | Mức | Xác nhận |
+  |---|---|---|
+  | GPU + nguồn **chưa xác minh** | ⛔ đỏ | **gõ tên node** |
+  | GPU + nguồn **đã review / first-party** | ⚠ vàng | tick checkbox rồi bấm Cài (ma sát thấp cho template) |
+  | runtime/memory vượt mặc định | ⚠ vàng | checkbox |
+  | chỉ io | xanh | checkbox "Tôi hiểu node này do người ngoài viết" |
+  | network (v1.1) | ⛔ đỏ | gõ tên |
+  Không có lựa chọn "luôn cho phép".
+- Kết quả quét là **danh sách cảnh báo**, không phải chứng nhận. Có phát hiện thì ⚠ kèm 1 câu lời thường. Không phát hiện thì ghi "không thấy", không ghi "an toàn".
+- **Không có nút cài, chỉ "Đóng"** khi: pin không phải SHA 40-hex, manifest thiếu/sai, xin network (v1: `permission_unsupported`),
+  base image không được phép, build lỗi, `policy_block` trên máy này, hoặc license chặn. Lúc chạy, `image_digest_mismatch` → node bị khoá, kèm hướng dẫn gỡ và cài lại.
+  Lý do viết bằng lời + "Chi tiết kỹ thuật".
+- Gỡ: liệt kê workflow đang dùng node + "Gỡ sẽ xoá luôn bản cài (image {image_gb} GB)".
+
+### 15.4 Trên canvas
+```
+┌🧩───────────────────────────────────────────┐  ← tab góc 🧩 + viền ngoài kép mảnh (không nét đứt — dành cho "👉 thay dữ liệu")
+│ OCR tiếng Việt                               │
+│ Bên thứ 3 – chưa xác minh · acme             │
+│ ...tham số Simple (widget có sẵn, text plain)│
+│ ⏱ ~5 phút · RAM ~6 GB · ▣ GPU · 🌐 Internet    │  ← badge quyền = icon + chữ
+└──────────────────────────────────────────────┘
+```
+- Inspector có khối "Nguồn & quyền" (rút gọn từ dialog) + nút **Gỡ node**.
+- Preflight thêm 1 dòng thông tin (không chặn): "Workflow này có {node_count} node bên thứ 3, {network_node_count} node kết nối Internet."
+  `policy_block` thì chặn kèm lý do.
+- Lỗi trong node bên thứ 3 → thẻ lỗi ghi "Lỗi trong node bên thứ 3 {name}" + action "Báo cho tác giả" (mở link repo) cạnh "Gửi báo cáo lỗi".
+- Template chính chủ **không** dùng node bên thứ 3. Workflow export liệt kê node bên thứ 3 + commit để người nhận thấy trước khi mở.
+
+### 15.5 Phụ thuộc
+security: nội dung D16 (mọi câu cam kết trong dialog phải khớp D16). Backend: API cài 2 bước (dry-run trả manifest/quét/deps/size/license → apply cần ack),
+`origin.kind`, `reviewed`, `policy_block`, diff quyền khi update. Frontend: 009 annex F6d.
 
 ## Nguồn
 - ComfyUI links (màu theo kiểu, chỉ nối cùng màu, reroute): https://docs.comfy.org/development/core-concepts/links
