@@ -19,21 +19,19 @@ df -h / | tail -1
   Shared host usually leaves only ~40 GB → default to LoRA ≤ 8B / full SFT ≤ 2-4B.
 - Downloads > 20 GB → tell bao-pm first. New model/image → `security-model-vetting` skill.
 
-## 2. Acquire lock (atomic; fails if someone else holds it)
+## 2. Acquire lock — ALWAYS via `common/gpu_lock.py` (one format for everyone; preflight/dashboard parse it)
 ```bash
-python3 - <<'PY'
-import json, os, time, sys
-p = ".team/GPU_LOCK"
-try:
-    fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-except FileExistsError:
-    sys.exit("GPU_LOCK held: " + open(p).read())
-os.write(fd, json.dumps({"who": "bao-backend", "job": "JOB_DESC", "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                         "host_pid": os.getppid(), "container": "vlm-JOBNAME"}, indent=1).encode()); os.close(fd)
-PY
+uv run python scripts/cleanup/preflight.py --est-peak-gb N --ckpt-gb M || exit $?   # 0 ok, 2 mem, 3 disk, 4 lock busy
+LOCK_JSON=$(uv run python -m vlm_pipeline.common.gpu_lock acquire \
+  --who bao-backend --job "what you run" --run-id "$RUN_ID" --host-pid $$) || { echo "$LOCK_JSON"; exit 4; }
+LOCK_TOKEN=$(python3 -c 'import json,sys;print(json.load(sys.stdin)["token"])' <<<"$LOCK_JSON")
+trap 'uv run python -m vlm_pipeline.common.gpu_lock release --token "$LOCK_TOKEN"' EXIT
+uv run python -m vlm_pipeline.common.gpu_lock status     # exit 4 + JSON (no token) while held
 ```
-`host_pid` must be the HOST PID of the process that holds the lock for the whole job (the orchestrator / your shell), never a PID inside the container — the dashboard uses it for stale detection. Once `common/gpu_lock.py` exists (P008), use it instead of this snippet (tmp file + os.link, token).
-Tell bao-tester (they sample /proc/meminfo during spikes) and log a line in `.team/log/<date>.md`.
+- `--host-pid` = PID of the process that stays alive for the whole job (the launcher shell `$$`), never a container PID.
+- Never write the lock by hand (`echo ... > GPU_LOCK`): a hand-written lock is "malformed" for everyone else.
+- Pass the token to containers as `-e VLM_GPU_LOCK_TOKEN=$LOCK_TOKEN` (gpu pytest + worker check it); mount the repo so `.team/GPU_LOCK` is visible.
+- Tell bao-tester (they sample /proc/meminfo + cgroup) ≥60 s before starting; log a line in `.team/log/<date>.md`.
 
 ## 3. Run the container (conventions)
 ```bash
@@ -60,7 +58,5 @@ docker run --name vlm-$RUN_ID --label project=vlm-training \
 `watch -n5 "grep MemAvailable /proc/meminfo"`. If MemAvailable < 6 GB or swap climbs fast → stop OUR job (`docker stop vlm-$RUN_ID`), never others.
 
 ## 5. Release
-```bash
-rm -f .team/GPU_LOCK      # only if it is ours: check "who" first
-```
+The `trap` above releases with the token (only removes the lock if it is still ours).
 Record peak memory, s/step, tok/s, digest into run.json / the proposal; log to `.team/log/<date>.md`.

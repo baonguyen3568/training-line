@@ -23,7 +23,9 @@ if out["cuda_available"]:
         arch_list=torch.cuda.get_arch_list(),
         driver=subprocess.run(  # fixed argv, no shell
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],  # noqa: S607 - nvidia-smi from container PATH
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         ).stdout.strip(),
     )
     a = torch.randn(4096, 4096, device="cuda", dtype=torch.bfloat16)
