@@ -115,13 +115,16 @@ def check_lock_status(status: LockStatus | None) -> list[Finding]:
     """A held, stale or unreadable lock all block the run; this never removes a lock."""
     if status is None:
         return []
-    params = {"who": status.who, "job": status.job, "since": status.started_at}
     if status.corrupt:
+        state = "corrupt"
         reason = "GPU lock file is unreadable: treated as busy, tell the PM (never delete it)"
     elif not status.alive:
+        state = "stale"
         reason = f"stale GPU lock (holder PID {status.host_pid} not running): tell the PM, never delete it"
     else:
+        state = "busy"
         reason = f"GPU busy: {status.who} is running {status.job!r} since {status.started_at}"
+    params = {"who": status.who, "job": status.job, "since": status.started_at, "state": state}
     return [Finding("SYS-001", ExitCode.LOCK_BUSY, reason, params)]
 
 

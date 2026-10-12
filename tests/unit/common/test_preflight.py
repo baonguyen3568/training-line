@@ -119,6 +119,7 @@ def test_preflight_stale_or_corrupt_lock_is_still_busy(status: LockStatus, needl
     assert v.exit_code is ExitCode.LOCK_BUSY
     assert needle in v.reasons[0]
     assert "never delete" in v.reasons[0]
+    assert v.findings[0].params["state"] == {"stale": "stale", "unreadable": "corrupt"}[needle]
 
 
 def test_preflight_reads_lock_file_under_root_without_touching_it(tmp_path: Path) -> None:

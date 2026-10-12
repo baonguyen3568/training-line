@@ -97,12 +97,27 @@ SYS-001:
   slug: GPU_LOCK_BUSY
   severity: info
   prevent_in_preflight: true
-  params: [who, job, since]
+  # state from gpu_lock / preflight: busy (holder alive) | stale (holder PID gone: tell PM, never auto-delete)
+  # | corrupt (unreadable lock: who/job/since are unknown, the text must not use them)
+  params: [who, job, since, {name: state, type: enum, values: [busy, stale, corrupt]}]
+  variant_by: state
   match:
     - {kind: preflight, value: LOCK_BUSY}
   actions:
     - {id: queue, kind: navigate, target: run_queue, confirm: false}
     - {id: cancel_run, kind: navigate, target: cancel_run, confirm: false}
+
+SYS-004:
+  slug: GPU_LOCK_NOT_HELD
+  severity: error
+  prevent_in_preflight: false
+  # A worker/job started without holding the GPU lock token (gpu_lock.verify_token): a runner bug, not a user
+  # mistake. The job is stopped before touching the GPU.
+  params: []
+  match:
+    - {kind: executor, value: "gpu_lock.verify_token: GPU lock not held / held by another job"}
+  actions:
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
 
 SYS-002:
   slug: GPU_LOCK_TIMEOUT
