@@ -208,3 +208,49 @@ def test_guard_context_manager_starts_and_stops_thread(tmp_path: Path) -> None:
         assert g._thread is not None
         assert g._thread.is_alive()
     assert g._thread is None
+
+
+def _real_p1_curve() -> list[float]:
+    fixture = Path(__file__).resolve().parents[2] / "fixtures" / "memory" / "p1_parse_v1.1_26.08-2_mem_avail_gb.txt"
+    return [float(x) for x in (ln.strip() for ln in fixture.read_text().splitlines()) if x and not x.startswith("#")]
+
+
+def test_p1_curve_at_real_speed_is_killed_before_reaching_abort(tmp_path: Path) -> None:
+    """Replay the measured 1 Hz P-1 curve with a fake clock: the fast-fall rule must kill ABOVE abort_gb (8 GB),
+    i.e. before the 60 s graceful path would even start, and well above the 6.34 GB floor that was reached."""
+    clock, exits = _Clock(), []
+    g = MemGuard(meminfo_path=tmp_path / "m", cgroup_root=None, clock=clock, hard_exit=lambda: exits.append(1),
+                 interval_s=1.0)  # fmt: skip
+    killed_at = None
+    for second, gb in enumerate(_real_p1_curve()):
+        clock.t = float(second)
+        _meminfo(tmp_path / "m", avail_gb=gb)
+        g.poll_once()
+        if exits:
+            killed_at = gb
+            break
+    assert killed_at is not None
+    assert g.fast_fall_killed
+    assert killed_at > MemThresholds().abort_gb
+
+
+def test_slow_drift_below_warn_is_not_killed(tmp_path: Path) -> None:
+    clock, exits = _Clock(), []
+    g = MemGuard(meminfo_path=tmp_path / "m", cgroup_root=None, clock=clock, hard_exit=lambda: exits.append(1))
+    for i in range(60):  # 13.0 -> 10.0 GB over 60 s (0.05 GB/s): needs > 5 s to reach 8 GB
+        clock.t = float(i)
+        _meminfo(tmp_path / "m", avail_gb=13.0 - 0.05 * i)
+        g.poll_once()
+    assert exits == []
+    assert g.state == "warn"
+
+
+def test_fast_fall_ignored_while_plenty_of_memory_left(tmp_path: Path) -> None:
+    """Weight loading falls fast but plateaus far above the danger zone: no kill above warn_gb."""
+    clock, exits = _Clock(), []
+    g = MemGuard(meminfo_path=tmp_path / "m", cgroup_root=None, clock=clock, hard_exit=lambda: exits.append(1))
+    for i, gb in enumerate([44.0, 40.0, 36.0, 32.0, 28.0, 24.0, 20.0, 18.0, 18.0, 18.0]):
+        clock.t = float(i)
+        _meminfo(tmp_path / "m", avail_gb=gb)
+        g.poll_once()
+    assert exits == []

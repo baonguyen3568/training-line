@@ -342,6 +342,10 @@ CFG-005:
   params: [node, param, value, rule]
   match:
     - {kind: validate, value: "node params ValidationError"}
+    # Runtime guard from AutoModel patch 0002: trainable share outside the recipe's expectation (freeze did not
+    # apply as intended) -> params {param: freeze_config, rule: trainable_pct}; the job stops before step 1.
+    - {kind: regex, value: "VLM_TRAINABLE_PCT_MISMATCH"}
+    - {kind: regex, value: "freeze_config has unknown keys"}
   actions:
     - {id: reset_default, kind: patch, confirm: false}
 

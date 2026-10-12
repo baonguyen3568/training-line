@@ -16,6 +16,7 @@ import math
 import os
 import threading
 import time
+from collections import deque
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -46,6 +47,11 @@ class MemThresholds:
     abort_grace_s: float = 60.0
     saving_grace_s: float = 300.0
     emergency_gb: float = 4.0
+    # Fast-fall kill (P-1: MemAvailable fell ~2 GB/s at startup, so a 60 s graceful stop is meaningless there):
+    # below warn_gb, if the recent slope predicts reaching abort_gb within `fast_horizon_s`, kill without grace.
+    fast_horizon_s: float = 5.0
+    slope_window_s: float = 2.0
+    slope_min_samples: int = 3
 
     def required_available_gb(self, est_peak_gb: float) -> float:
         """MemAvailable needed to start a job with the given estimated peak."""
@@ -150,6 +156,8 @@ class MemGuard:
         self._on_abort = on_abort
         self.hard_exited = False
         self._stop_requested_at: float | None = None
+        self._history: deque[tuple[float, float]] = deque(maxlen=256)  # (clock, available_gb)
+        self.fast_fall_killed = False
         self._saving = threading.Event()
         self._halt = threading.Event()
         self._thread: threading.Thread | None = None
@@ -160,6 +168,11 @@ class MemGuard:
         cgroup_gb = read_cgroup_available_gb(self._cgroup_root) if self._cgroup_root is not None else None
         available = effective_available_gb(snapshot, cgroup_gb)
         self.min_available_gb = min(self.min_available_gb, available)
+        now = self._clock()
+        self._history.append((now, available))
+        if not self.hard_exited and self._falling_too_fast(now, available):
+            self._fast_fall_kill(available)
+            return snapshot
         if available < self.thresholds.abort_gb:
             if not self.should_stop.is_set():
                 logger.error(
@@ -188,6 +201,44 @@ class MemGuard:
             self.hard_exited = True
             self._hard_exit()
         return snapshot
+
+    def slope_gb_per_s(self, now: float) -> float | None:
+        """Least-squares slope of MemAvailable over the last ``slope_window_s`` (None without enough samples)."""
+        window = [(t, v) for t, v in self._history if now - t <= self.thresholds.slope_window_s]
+        if len(window) < self.thresholds.slope_min_samples:
+            return None
+        mean_t = sum(t for t, _ in window) / len(window)
+        mean_v = sum(v for _, v in window) / len(window)
+        var_t = sum((t - mean_t) ** 2 for t, _ in window)
+        if var_t == 0:
+            return None
+        return sum((t - mean_t) * (v - mean_v) for t, v in window) / var_t
+
+    def _falling_too_fast(self, now: float, available: float) -> bool:
+        th = self.thresholds
+        if available >= th.warn_gb:  # plenty left: loading phases may fall fast and then plateau
+            return False
+        slope = self.slope_gb_per_s(now)
+        if slope is None or slope >= 0:
+            return False
+        if available <= th.abort_gb:  # already below abort: fast if it would hit emergency within the horizon
+            return (available - th.emergency_gb) / -slope <= th.fast_horizon_s
+        return (available - th.abort_gb) / -slope <= th.fast_horizon_s
+
+    def _fast_fall_kill(self, available: float) -> None:
+        logger.critical(
+            "MemAvailable %.1f GB falling %.2f GB/s (predicted < abort within %.0f s): kill without grace",
+            available,
+            -(self.slope_gb_per_s(self._clock()) or 0.0),
+            self.thresholds.fast_horizon_s,
+        )
+        self.state = "abort"
+        if not self.should_stop.is_set():
+            self._stop_requested_at = self._clock()
+            self.should_stop.set()
+        self.fast_fall_killed = True
+        self.hard_exited = True
+        self._hard_exit()
 
     def _deadline_passed(self, available_gb: float) -> bool:
         if self._stop_requested_at is None:

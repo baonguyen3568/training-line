@@ -29,6 +29,19 @@ File: `nemo_automodel/components/models/nemotron_parse/model.py`
    `lm_head.weight` to `decoder.embed_tokens.weight` when the config asks for it (transformers v5 does not reliably
    tie from the dict-shaped keys alone; cf. AutoModel's `Qwen2ForCausalLM`). `post_init()` calls it. v1.x untied.
 
+Not patched here (by design): `NemotronParseLoss.class_token_start_idx` — resolved from the model's `config.json` in
+our own adapter, not by editing NVIDIA code.
+
+Regression tests: `tests/integration/automodel/test_nemotron_parse_patch.py` (10 tests, marker `integration`).
+Verified 2026-10-12: **10 FAIL** on vlm-automodel:26.08-1, **10 PASS** with the patched file.
+Still to do (tester, nightly, GPU lock): white-image probe at the RADIO patch-embed input and golden logits vs the
+reference implementation for v1.1 / v1.2 / 2.0; tied-weights save/load round trip with real weights.
+
+Upstream: draft issue `.team/upstream/automodel-nemotron-parse-normalize.md` (ON HOLD until rewritten with the
+root cause above; the user posts it). The patch may be offered as a PR later — the user decides.
+Remove this patch when the AutoModel version in our image contains an equivalent fix (re-run the regression tests
+against the unpatched image first).
+
 ## 0002-nemotron-parse-freeze-backbone-and-trainable-share-guard.patch (on top of 0001)
 Files: `nemo_automodel/components/utils/model_utils.py`, `nemo_automodel/components/models/nemotron_parse/model.py`
 
@@ -51,15 +64,5 @@ warning — both locked by tests.
 Regression tests: `tests/integration/automodel/test_nemotron_parse_freeze.py` — 4 FAIL on 26.08-2 (behavioural), all
 5 PASS with 0001+0002; 0001+0002 apply cleanly on the pristine NGC base.
 
-Not patched here (by design): `NemotronParseLoss.class_token_start_idx` — resolved from the model's `config.json` in
-our own adapter, not by editing NVIDIA code.
-
-Regression tests: `tests/integration/automodel/test_nemotron_parse_patch.py` (10 tests, marker `integration`).
-Verified 2026-10-12: **10 FAIL** on vlm-automodel:26.08-1, **10 PASS** with the patched file.
-Still to do (tester, nightly, GPU lock): white-image probe at the RADIO patch-embed input and golden logits vs the
-reference implementation for v1.1 / v1.2 / 2.0; tied-weights save/load round trip with real weights.
-
-Upstream: draft issue `.team/upstream/automodel-nemotron-parse-normalize.md` (ON HOLD until rewritten with the
-root cause above; the user posts it). The patch may be offered as a PR later — the user decides.
-Remove this patch when the AutoModel version in our image contains an equivalent fix (re-run the regression tests
-against the unpatched image first).
+Pending for the next regeneration of 0002 (review bao-cleancode, no behaviour change): `f".{p}" in f".{pname}"` for
+the boundary match; validate `VLM_EXPECTED_TRAINABLE_PCT` format/`lo <= hi` with a clear message.

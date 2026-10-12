@@ -59,23 +59,37 @@ def test_thresholds_are_locked_to_adr_005() -> None:
     assert (t.min_margin_gb, t.margin_frac, t.hard_floor_gb, t.min_swap_free_gb) == (10.0, 0.2, 20.0, 2.0)
 
 
-def test_low_memory_stops_the_job_gracefully(tmp_path: Path) -> None:
+def test_slow_crossing_stops_the_job_gracefully(tmp_path: Path) -> None:
+    """RAM drifting slowly below abort_gb: graceful `docker stop` (checkpoint), no kill."""
     meminfo, argv, stop_flag, kill_flag = _setup(tmp_path)
-    _drop_later(meminfo, 7.5, 0.3)  # crosses abort_gb shortly after start (the P-1 peak was before step 1)
-    started = time.monotonic()
+    _meminfo(meminfo, 8.1)
+    _drop_later(meminfo, 7.95, 0.4)  # 0.15 GB step: far from emergency at this slope
     rc, guard = run_guarded(
         argv, tmp_path / "log", on_abort=stop_flag.touch, hard_exit=kill_flag.touch, meminfo_path=meminfo,
         interval_s=0.05,
     )  # fmt: skip
     assert rc == 143
     assert guard.should_stop.is_set()
-    assert not kill_flag.exists()
-    assert time.monotonic() - started < 5
-    assert guard.min_available_gb == pytest.approx(7.5, abs=0.01)
+    assert not guard.hard_exited
     assert classify_exit(ExitInfo(rc, oom_killed=False, preempted_by_memguard=True)) == (
         RunStatus.INTERRUPTED,
         "MEM-002",
     )
+
+
+def test_sudden_drop_kills_without_grace(tmp_path: Path) -> None:
+    """40 -> 7.5 GB at once (startup spike): no 60 s grace, kill now."""
+    meminfo, argv, stop_flag, kill_flag = _setup(tmp_path)
+    (tmp_path / "ignore").touch()
+    _drop_later(meminfo, 7.5, 0.3)
+    started = time.monotonic()
+    rc, guard = run_guarded(
+        argv, tmp_path / "log", on_abort=stop_flag.touch, hard_exit=kill_flag.touch, meminfo_path=meminfo,
+        interval_s=0.05,
+    )  # fmt: skip
+    assert rc == 137
+    assert guard.hard_exited
+    assert time.monotonic() - started < 5
 
 
 def test_job_ignoring_the_stop_is_killed_after_grace(tmp_path: Path) -> None:
@@ -146,5 +160,5 @@ def test_replay_of_the_p1_incident_curve(tmp_path: Path) -> None:
         interval_s=0.02,
     )  # fmt: skip
     assert guard.should_stop.is_set()
-    assert rc == 143
-    assert DEFAULT_THRESHOLDS.emergency_gb < guard.min_available_gb < DEFAULT_THRESHOLDS.abort_gb
+    assert rc == 137  # fast fall: killed, not a 60 s graceful stop
+    assert guard.fast_fall_killed
