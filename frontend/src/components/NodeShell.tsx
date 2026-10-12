@@ -20,6 +20,11 @@ export interface ShellData extends Record<string, unknown> {
 }
 export type ShellNode = Node<ShellData, "vlm">;
 
+function portTypeLabel(ports: PortType[], type: string): string {
+  const pt = ports.find((p) => p.id === type);
+  return pt ? tp(pt.label_key.split(".")) : type;
+}
+
 /** Node-specific port copy (node.<type>.port.<name>) first, then the generic port-type label. */
 function portLabel(ports: PortType[], typeId: string, name: string, type: string): string {
   const specific = tpOptional(["node", typeId, "port", name]);
@@ -133,6 +138,9 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
   }
 
   const inputs = Object.entries(spec.inputs);
+  const missing = new Set(
+    issues.filter((i) => i.code === "CFG-003" && i.port).map((i) => i.port as string),
+  );
   const outputs = Object.entries(spec.outputs);
   return (
     <div
@@ -161,10 +169,16 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
                 type="target"
                 position={Position.Left}
                 id={name}
-                className={`port shape-${ps.type}`}
+                className={`port shape-${ps.type}${missing.has(name) ? " needs-wire" : ""}`}
                 style={{ background: portColor(ports, ps.type) }}
               />
               <span>{portLabel(ports, typeId, name, ps.type)}</span>
+              {missing.has(name) && (
+                // Users stumble exactly here (design M1 r1): name what to connect, from CFG-003.
+                <span className="port-hint">
+                  ← {t("canvas.hint.connect_port", { port_type: portTypeLabel(ports, ps.type) })}
+                </span>
+              )}
             </li>
           ))}
         </ul>

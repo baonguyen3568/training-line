@@ -762,3 +762,66 @@ button.link {
   color: var(--color-text-primary);
   border-bottom: 1px solid var(--color-grid);
 }
+
+/* M1 polish (design review M1 r1) */
+.react-flow__node.flash .vlm-node {
+  animation: vlm-flash 1.2s ease-out;
+}
+@keyframes vlm-flash {
+  0%,
+  60% {
+    box-shadow: 0 0 0 4px var(--color-accent-focus);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+.port.needs-wire {
+  animation: vlm-pulse 1.2s ease-in-out infinite;
+}
+@keyframes vlm-pulse {
+  50% {
+    box-shadow: 0 0 0 4px var(--color-status-warning);
+  }
+}
+.port-hint {
+  display: block;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node.flash .vlm-node,
+  .port.needs-wire {
+    animation: none;
+    outline: 2px solid var(--color-status-warning);
+  }
+}
+.error-cards {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-8) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.error-card {
+  border-left: 3px solid var(--color-status-critical);
+  background: var(--color-page);
+  padding: var(--space-8);
+  border-radius: var(--radius-sm);
+}
+.error-card.warn {
+  border-left-color: var(--color-status-warning);
+}
+.error-card p {
+  margin: var(--space-4) 0;
+}
+/* compact library items: one-line description */
+.library-item {
+  padding: var(--space-4) var(--space-8);
+}
+.library-desc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

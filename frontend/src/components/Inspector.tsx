@@ -194,7 +194,7 @@ function ParamRow(props: FieldProps) {
 }
 
 export function Inspector() {
-  const { workflow, specs, ports, selectedId } = useWorkflow();
+  const { workflow, specs, ports, selectedId, validation } = useWorkflow();
   const { setParam, connect, disconnect } = useWorkflow.getState();
   const mode = useUi((s) => s.mode);
   const [expanded, setExpanded] = useState(false);
@@ -204,6 +204,7 @@ export function Inspector() {
   }
   const spec = specs.get(node.type);
   if (!spec) return <aside className="inspector">{t("error.CFG-004.title")}</aside>;
+  const issues = validation?.errors.filter((e) => e.node_id === node.id) ?? [];
 
   const params = Object.entries(spec.params_schema.properties).sort(
     ([, a], [, b]) => (a["x-ui"]?.order ?? 99) - (b["x-ui"]?.order ?? 99),
@@ -230,6 +231,39 @@ export function Inspector() {
         <p className="badge customized">
           ⚙ {t("canvas.customized", { param_count: customized.length })}
         </p>
+      )}
+
+      {issues.length > 0 && (
+        <ul className="error-cards">
+          {issues.map((e) => (
+            <li
+              key={`${e.code}-${e.port}-${e.param}-${e.what}`}
+              className={`error-card ${e.severity}`}
+              data-code={e.code}
+            >
+              <strong>
+                {e.severity === "error" ? "✕" : "⚠"} {e.title}
+              </strong>
+              <p>{e.what}</p>
+              {e.why && (
+                <p className="muted small">
+                  {t("error_card.why")}: {e.why}
+                </p>
+              )}
+              {(e.port || e.param) && (
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() =>
+                    document.getElementById(e.port ? `recv-${e.port}` : `param-${e.param}`)?.focus()
+                  }
+                >
+                  {t("error_card.fix")} →
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
 
       {Object.entries(spec.inputs).map(([port, ps]) => {

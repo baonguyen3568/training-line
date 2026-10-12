@@ -72,7 +72,8 @@ function EditorInner() {
     undo,
     redo,
   } = useWorkflow.getState();
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setCenter, getViewport } = useReactFlow();
+  const [flashId, setFlashId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLElement>(null);
   const [toast, setToast] = useState<string | null>(null);
   const key = graphKey(workflow);
@@ -155,6 +156,7 @@ function EditorInner() {
       type: "vlm",
       position: n.ui ?? { x: 0, y: 0 },
       selected: n.id === selectedId,
+      className: n.id === flashId ? "flash" : undefined,
       draggable: !locked,
       deletable: !locked,
       data: {
@@ -167,7 +169,7 @@ function EditorInner() {
         runState: run?.nodes[n.id],
       },
     }));
-  }, [workflow, specs, ports, validation, selectedId, run, locked]);
+  }, [workflow, specs, ports, validation, selectedId, run, locked, flashId]);
 
   const edges: Edge[] = useMemo(() => {
     if (!workflow) return [];
@@ -296,7 +298,18 @@ function EditorInner() {
   );
 
   /** Double-click / Enter in the library: add at the end of the node's lane. */
-  const addFromLibrary = useCallback((typeId: string) => void placeInLane(typeId), [placeInLane]);
+  const addFromLibrary = useCallback(
+    (typeId: string) => {
+      const id = placeInLane(typeId);
+      const pos = id && useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.ui;
+      if (!id || !pos) return;
+      // A node added off-screen must not be "lost": bring it into view, keep it selected, flash it briefly.
+      setCenter(pos.x + 120, pos.y + 60, { zoom: getViewport().zoom, duration: 250 });
+      setFlashId(id);
+      setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1200);
+    },
+    [placeInLane, setCenter, getViewport],
+  );
 
   if (!workflow) return null;
   return (

@@ -177,3 +177,20 @@ describe("cycle and empty-canvas guards (design review M1 K2/K3)", () => {
     expect(screen.queryByText(/Mọi thứ đã sẵn sàng/)).toBeNull();
   });
 });
+
+describe("guidance on unconnected ports and errors in the inspector (design review M1 r1)", () => {
+  it("hints the missing required port on the node and lists the error in the inspector", async () => {
+    const wfStore = await setup();
+    const tr = wfStore.getState().addNode("train.sft_vlm", { x: 0, y: 0 }) as string;
+    await wfStore.getState().validate();
+    wfStore.getState().select(tr);
+    const { Editor } = await import("../src/components/Editor");
+    const view = render(<Editor />);
+    await waitFor(() => expect(view.container.querySelectorAll(".port.needs-wire").length).toBe(2)); // base_model + train_data
+    expect(view.container.querySelector(".port-hint")?.textContent).toMatch(/Nối/);
+    const cards = view.container.querySelectorAll(".inspector .error-card[data-code='CFG-003']");
+    expect(cards.length).toBe(2);
+    fireEvent.click(cards[0]?.querySelector("button") as HTMLElement);
+    expect(document.activeElement?.id).toMatch(/^recv-/);
+  });
+});
