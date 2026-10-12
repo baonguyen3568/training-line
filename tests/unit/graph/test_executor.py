@@ -255,3 +255,55 @@ def test_runtime_image_is_part_of_the_cache_key(tmp_path: Path) -> None:
     worker = NewImage()
     Executor(make_test_registry(), worker, tmp_path).run(_wf())
     assert sorted(worker.calls) == ["d", "m", "t"]  # new image -> recompute
+
+
+def test_every_node_run_dir_has_a_run_json_linked_to_the_graph_run(tmp_path: Path) -> None:
+    """Dashboard + retention read run.json per node run dir (bao-cleanup); the cache index points at that dir."""
+    from vlm_pipeline.artifacts.index import ArtifactIndex
+    from vlm_pipeline.common.runinfo import RunStatus, read_manifest
+
+    index = ArtifactIndex(tmp_path / "app.db")
+    keys: dict[str, str] = {}
+    run = Executor(make_test_registry(), FakeWorker(), tmp_path, index=index, on_event=lambda e: (
+        keys.__setitem__(e["node_id"], e["cache_key"]) if e.get("cache_key") else None
+    )).run(_wf(), graph_run_id="g-m")  # fmt: skip
+    for nid in ("d", "m", "t"):
+        entry = index.lookup(keys[nid])
+        assert entry is not None
+        run_dir = Path(run.outputs[nid][next(iter(run.outputs[nid]))].path).parent
+        assert entry.run_id == run_dir.name
+        manifest = read_manifest(run_dir)
+        assert manifest.run_id == run_dir.name
+        assert manifest.parent_run_id == "g-m"
+        assert manifest.status == RunStatus.COMPLETED
+    assert read_manifest(run_dir).stage == "train"
+
+
+def test_failed_node_run_json_carries_the_error_code(tmp_path: Path) -> None:
+    from vlm_pipeline.common.runinfo import RunStatus, read_manifest
+    from vlm_pipeline.graph.errors import OutOfMemoryUMA
+
+    Executor(make_test_registry(), FakeWorker(fail={"t": OutOfMemoryUMA()}), tmp_path).run(_wf())
+    [t_dir] = list((tmp_path / "runs").glob("t-*"))
+    manifest = read_manifest(t_dir)
+    assert manifest.status == RunStatus.FAILED
+    assert manifest.error_code == "MEM-003"
+
+
+def test_container_path_outputs_are_rejected(tmp_path: Path) -> None:
+    """A worker returning /workspace/... (container path) must not poison the cache index (bao-cleanup)."""
+    from vlm_pipeline.graph.worker import ArtifactRef
+
+    class ContainerPaths(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            res = super().run(job)
+            return NodeResult(
+                {p: ArtifactRef(r.type, "/workspace/outputs/graph/runs/x/" + p, r.hash) for p, r in res.outputs.items()}
+            )
+
+    index_db = tmp_path / "app.db"
+    run = Executor(make_test_registry(), ContainerPaths(), tmp_path).run(_wf())
+    assert run.status["d"] == "failed"
+    assert run.errors["d"].code == "SYS-000"
+    assert "non-host" in run.errors["d"].details or "host path" in run.errors["d"].details
+    assert index_db.exists()

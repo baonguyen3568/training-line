@@ -21,6 +21,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from vlm_pipeline.artifacts.index import ArtifactIndex, CacheEntry, OutputRef
+from vlm_pipeline.common.runinfo import RunManifest, RunStatus, Stage, read_manifest, write_manifest
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
 from vlm_pipeline.graph.validation import Issue, validate
@@ -33,6 +34,74 @@ Event = dict[str, Any]
 DONE = frozenset({"completed", "cached"})
 # Output port types that hold trained weights: their cache entries are never auto-evicted (bao-security / P005).
 TRAINED_PORT_TYPES = frozenset({"Checkpoint", "Adapter"})
+
+
+_STAGE_BY_CATEGORY: dict[str, Stage] = {
+    "source": "data",
+    "data": "data",
+    "train": "train",
+    "test": "eval",
+    "quantize": "quantize",
+    "eval": "eval",
+    "export": "export",
+    "util": "data",
+}
+
+
+class NonHostOutputError(RuntimeError):
+    """A worker returned an output path that is not an existing host path inside the node's run dir."""
+
+
+def check_output_paths(outputs: Mapping[str, ArtifactRef], run_dir: Path) -> None:
+    """Outputs must be existing, absolute HOST paths under ``run_dir``.
+
+    A container path like ``/workspace/...`` would make the cache index point at nothing and retention unable to
+    free it (bao-cleanup).
+    """
+    root = run_dir.resolve()
+    for port, ref in outputs.items():
+        path = Path(ref.path)
+        if not path.is_absolute() or not path.exists():
+            raise NonHostOutputError(f"output {port!r}: not an existing absolute host path")
+        resolved = path.resolve()
+        if resolved != root and root not in resolved.parents:
+            raise NonHostOutputError(f"output {port!r}: outside the node run dir")
+
+
+def _write_node_manifest(
+    run_dir: Path,
+    *,
+    node_id: str,
+    spec: NodeSpec,
+    gid: str,
+    status: RunStatus,
+    error_code: str | None,
+    started: float,
+) -> None:
+    """Write ``run.json`` of a node run dir (dashboard + retention).
+
+    A manifest written by the worker itself (container jobs via jobrun) keeps its own status/details; the executor
+    only links it to the graph run.
+    """
+    try:
+        manifest = read_manifest(run_dir)
+        manifest = manifest.model_copy(
+            update={"parent_run_id": manifest.parent_run_id or gid, "tags": sorted({*manifest.tags, f"graph:{gid}"})}
+        )
+    except (OSError, ValueError):
+        manifest = RunManifest(
+            run_id=run_dir.name,
+            name=f"{node_id} ({spec.type_id})",
+            stage=_STAGE_BY_CATEGORY.get(spec.category, "data"),
+            task=spec.type_id,
+            status=status,
+            parent_run_id=gid,
+            error_code=error_code,
+            started_at=started,
+            ended_at=time.time() if status.is_terminal else None,
+            tags=[f"graph:{gid}", f"node:{node_id}"],
+        )
+    write_manifest(run_dir, manifest)
 
 
 def produces_trained_model(spec: NodeSpec) -> bool:
@@ -210,29 +279,46 @@ class Executor:
         run_dir.mkdir(parents=True, exist_ok=True)
         job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, read_checkpoint_step(run_dir))
         self._set(run, nid, "running", cache_key=key, resume_from_step=job.resume_from_step)
+        started = time.time()
         try:
             result = self.worker.run(job)
             missing = set(node.spec.outputs) - set(result.outputs)
             if missing:
                 raise RuntimeError(f"worker returned no output for ports {sorted(missing)}")
+            check_output_paths(result.outputs, run_dir)
         except Exception as exc:  # noqa: BLE001 - every worker failure becomes a catalog error, never a crash
             outcome = classify(exc, cancelled=cancel.is_set(), checkpoint_step=read_checkpoint_step(run_dir))
             if outcome.error is not None:
                 run.errors[nid] = outcome.error
             logger.info("node %s %s: %s", nid, outcome.status, outcome.error.code if outcome.error else "cancelled")
+            status = RunStatus.FAILED if outcome.status == "failed" else RunStatus.INTERRUPTED
+            code = outcome.error.code if outcome.error else None
+            _write_node_manifest(
+                run_dir,
+                node_id=nid,
+                spec=node.spec,
+                gid=run.graph_run_id,
+                status=status,
+                error_code=code,
+                started=started,
+            )
             self._set(run, nid, outcome.status, **({"error": _error_dict(outcome.error)} if outcome.error else {}))
             return
         run.outputs[nid] = dict(result.outputs)
         if node.spec.cacheable:
             self.index.record(
                 key,
-                run_id=run.graph_run_id,
+                run_id=run_dir.name,  # the node run dir (outputs/graph/runs/<run_id>), not the graph run
                 node_type=node.spec.type_id,
                 outputs={p: OutputRef(r.type, r.path, r.hash) for p, r in result.outputs.items()},
                 parents=[keys[src] for src, _, _ in upstream],
                 trained_model=produces_trained_model(node.spec),
             )
             self.index.lease([key], run.graph_run_id)  # downstream nodes of this run still read it
+        _write_node_manifest(
+            run_dir, node_id=nid, spec=node.spec, gid=run.graph_run_id, status=RunStatus.COMPLETED, error_code=None,
+            started=started,
+        )  # fmt: skip
         self._set(run, nid, "completed", cache_key=key)
 
     def _try_cache(self, run: GraphRun, nid: str, key: str) -> bool:
@@ -286,4 +372,4 @@ def _error_dict(err: UserError) -> dict[str, Any]:
     }
 
 
-__all__ = ["DONE", "Executor", "GraphRun"]
+__all__ = ["DONE", "Executor", "GraphRun", "NonHostOutputError", "check_output_paths"]
