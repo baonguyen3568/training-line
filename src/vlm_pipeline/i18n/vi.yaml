@@ -37,6 +37,12 @@ storage:
     free_temp: Giải phóng {gb} GB từ kết quả tạm
   item:
     temp_result_of_run: Kết quả tạm của run {run_name}
+  protected_reason:
+    TRAINED_MODEL: Model bạn đã train — app không tự xoá. Bạn vẫn xoá được, cần gõ tên để xác nhận.
+    MANIFEST_UNREADABLE: Thông tin của lần chạy này bị hỏng nên app không tự xoá. Bạn vẫn xoá tay được, cần gõ tên để xác nhận.
+  section:
+    auto: App sẽ tự dọn khi cần
+    manual: Cần bạn chọn
 error:
   GPU-001:
     title: Phần mềm không tương thích với GPU của máy

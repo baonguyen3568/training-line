@@ -37,6 +37,12 @@ storage:
     free_temp: Free {gb} GB from temporary results
   item:
     temp_result_of_run: Temporary results of run {run_name}
+  protected_reason:
+    TRAINED_MODEL: A model you trained — the app won't delete it automatically. You can still delete it by typing its name to confirm.
+    MANIFEST_UNREADABLE: This run's information is damaged, so the app won't delete it automatically. You can still delete it manually by typing its name.
+  section:
+    auto: The app cleans these up when needed
+    manual: You decide
 error:
   GPU-001:
     title: Software doesn't match this GPU
