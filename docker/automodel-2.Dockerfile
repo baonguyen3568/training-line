@@ -17,9 +17,12 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # 1) Extra wheels needed by Nemotron-Parse remote processor code (albumentations, cv2). Hash-locked, no deps
 #    resolution at build time (versions of numpy/scipy/pydantic/pyyaml are constrained to what the image has).
 COPY docker/automodel/extras.lock.txt /tmp/vlm/extras.lock.txt
-RUN /opt/venv/bin/python -m pip install --isolated --no-cache-dir --index-url https://pypi.org/simple \
+#    The base image already has unrelated pip-check conflicts (torchx/urllib3, leptonai): fail only on NEW ones.
+RUN (/opt/venv/bin/python -m pip check > /tmp/vlm/check.before 2>&1 || true) \
+ && /opt/venv/bin/python -m pip install --isolated --no-cache-dir --index-url https://pypi.org/simple \
       --only-binary=:all: --require-hashes --no-deps -r /tmp/vlm/extras.lock.txt \
- && /opt/venv/bin/python -m pip check \
+ && (/opt/venv/bin/python -m pip check > /tmp/vlm/check.after 2>&1 || true) \
+ && diff /tmp/vlm/check.before /tmp/vlm/check.after \
  && /opt/venv/bin/python -c "import albumentations, cv2; print(albumentations.__version__, cv2.__version__, cv2.__file__)" \
  && [[ "$(/opt/venv/bin/python -m pip list 2>/dev/null | grep -ciE '^opencv-')" -eq 1 ]]
 
