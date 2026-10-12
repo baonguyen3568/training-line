@@ -43,7 +43,8 @@ scripts/tools/gitleaks.sh git --redact --no-banner -c .gitleaks.toml
 
 if [[ -f frontend/package.json ]]; then
   step "frontend (biome, tsc, vitest)"
-  (cd frontend && npm ci --ignore-scripts --silent && npx biome ci && npx tsc --noEmit && npx vitest run)
+  # `npm run check` = build generated tokens/i18n -> biome ci -> tsc --noEmit -> vitest run (owner: bao-frontend)
+  (cd frontend && npm ci --ignore-scripts --silent && npm run check)
 fi
 
 step "pip-audit (informational, does not fail the run)"
