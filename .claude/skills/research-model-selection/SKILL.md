@@ -57,3 +57,7 @@ Write comparison table + decision + risks into `.team/proposals/001-*.md`; send 
   top-level prefix, which modules got activation checkpointing (AutoModel logs `selected N/N trainable layers`), and
   attention kernel flags. Docstrings/recipe YAML are not evidence: AutoModel's freeze_config matches module NAMES
   (`vision_tower`/`vision`/`visual`/`image_encoder`) and silently ignores unknown keys (e.g. `freeze_embeddings`).
+- Train/serve prompt parity: the decoder/input prefix used at eval and in "Chạy thử" must equal the one the collate
+  built at train time. Derive it by running the collate on one sample and cutting at the first labelled token -
+  never infer it from the label mask (masked tokens are still in the input; e.g. Nemotron Parse keeps its task
+  tokens `</s><s><predict_bbox><predict_classes><output_markdown>` in input but masks them from labels).
