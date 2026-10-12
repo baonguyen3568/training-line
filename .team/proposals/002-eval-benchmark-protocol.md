@@ -11,16 +11,23 @@ Viết 2026-10-12. Task name lmms-eval cần xác minh lại trên bản 0.7.3 k
 | Benchmark | Split (task lmms-eval ❓) | n | Metric chính thức → thang 0-100 | Chấm | Gate reproduce? | Nhóm năng lực (P010) | higher_is_better |
 |---|---|---|---|---|---|---|---|
 | MMMU | val (`mmmu_val`) | 900 | accuracy MC | rule (trích chữ cái); judge tùy chọn | ✅ | Kiến thức & suy luận đa ngành | true |
-| MMBench-EN **v1.1** | dev (`mmbench_en_dev` v1.1 ❓) | ~4.3k | accuracy (circular eval nếu harness hỗ trợ) | EM; judge tùy chọn | ✅ (EM) | Nhận thức tổng quát | true |
+| MMBench-EN (v1.1 cho G1; v1.0 cho so sánh nội bộ, xem ghi chú) | dev (lmms `mmbench_en_dev` = **v1.0**; v1.1 = VLMEvalKit `MMBench_DEV_EN_V11`) | ~4.3k | accuracy (circular eval nếu harness hỗ trợ) | EM; judge tùy chọn | ✅ (EM) | Nhận thức tổng quát | true |
 | DocVQA | val (`docvqa_val`) | 5,349 | ANLS ×100 | rule | ✅ | Đọc tài liệu | true |
 | ChartQA | test (`chartqa`) | 2,500 | relaxed accuracy (±5%) | rule | ✅ | Hiểu biểu đồ & sơ đồ | true |
 | OCRBench (v1) | test (`ocrbench`) | 1,000 | score/1000 → /10 | rule | ✅ | Đọc tài liệu | true |
 | AI2D | test (`ai2d`) | 3,088 | accuracy | rule | ✅ | Hiểu biểu đồ & sơ đồ | true |
 | MathVista | testmini (`mathvista_testmini`) | 1,000 | accuracy | **judge/extractor** | ❌ (chỉ nội bộ) | Toán có hình | true |
 | Video-MME | w/o subs (`videomme`) | 2,700 QA | accuracy MC | rule | ❌ (đắt; release only) | Video | true |
+| **CORD-v2** (template mặc định) | test (`cord_v2_test`, held-out, không bao giờ train) | 100 | **field_f1** (chính) · json_exact · nted_accuracy · parse_fail_rate; thang 0-100; theo đúng Donut (token2json + JSONParseEvaluator, **chỉ strip 2 đầu**, không gộp khoảng trắng giữa) | rule | — (tham khảo Donut ~84 F1 ❓) | Đọc tài liệu | true; parse_fail_rate=false |
 | Perf | — | — | TTFT/TPOT/e2e ms, peak_mem GB, disk GB | đo | — | — | false |
 | Perf | — | — | tokens/s, req/s | đo | — | — | true |
 Tầng chạy (khớp B5): **smoke** = 50 mẫu/benchmark cố định (seed, danh sách id commit vào repo) × {MMBench, ChartQA, OCRBench, DocVQA}; **regression** = 500 mẫu cố định × 6 benchmark rule-scored; **full** = toàn bộ split + MathVista + Video-MME.
+
+Ghi chú A1 (cập nhật 23:20, bao-tester phát hiện):
+- **MMBench**: `lmms-lab/MMBench` là **v1.0**. N-4 và regression nội bộ (paired) dùng v1.0. **G1** (đối chiếu card Qwen3.5, ghi v1.1) bắt buộc dùng v1.1 (TSV `MMBench_DEV_EN_V11` của OpenCompass/VLMEvalKit). Nguồn này **cần security vet** trước khi tải. Chấm **circular** theo nhóm biến thể xoay vòng: 500 câu → 1.865 dòng.
+- **Subset regression** (500/benchmark, phân tầng, seed 20261012, khoá theo id + sha256 câu hỏi): `configs/eval/subsets/regression_500/*.json`, tạo bằng `scripts/qa/make_regression_subsets.py`. lmms-eval không lọc được theo id, nên đóng gói mỗi subset thành dataset parquet đã lọc + task YAML riêng (pin hash). Bao-backend làm cùng tester.
+- **MMBench v1.1** (security, 23:40): APPROVED về nguồn và license. Nguồn: VLMEvalKit@21e52b8d `image_mcq.py` L67, URL `https://opencompass.openxlab.space/utils/benchmarks/MMBench/MMBench_DEV_EN_V11.tsv`, md5 `30c05be8f2f347a50be25aa067248184`; eval_only. **Host timeout từ máy này** nên tạm chưa tải được. Không dùng re-upload của bên thứ 3. Hệ quả: **G1 (đối chiếu card Qwen3.5) tạm hoãn**. Sau RESET, Qwen3.5 chỉ còn là catalog phụ, nên G1 không chặn template NVIDIA; G1-harness với Qwen3-VL-2B (OpenVLM leaderboard) vẫn làm được nếu leaderboard dùng benchmark ta có. Muốn bỏ hoãn thì thử lại sau, hoặc user tải từ mạng khác rồi security verify md5 + sha256.
+- CORD scorer: `src/vlm_pipeline/eval/cord.py` (port Donut, nTED Zhang–Shasha khớp `zss` 400/400). Parse-fail tính là dự đoán rỗng.
 
 ### A2. Protocol cố định (mọi run ghi đủ vào record)
 | Tham số | Mặc định | Lý do |
@@ -105,6 +112,9 @@ chat_template_hash, system/prompt template, decoding (greedy, max_new_tokens), s
 Raw predictions (`samples.jsonl`) chỉ lưu local trong `outputs/<run_id>/eval/`. Với benchmark `eval_only` có license hạn chế
 (vd ChartQA GPL-3, theo A4 và P003), artifact chia sẻ/export **mặc định không kèm prediction, câu hỏi hay ảnh**, chỉ kèm điểm tổng hợp.
 Test: export một EvalReport của benchmark eval_only thì không có `samples.jsonl` và không có field `question`/`image`.
+**Run dùng cho gate (G1, G3, N-4, P-3, số công bố)** phải chạy từ **git worktree sạch** ở một commit cụ thể (không push)
+(`git worktree add .worktrees/<run_id> <sha>`, trong project theo ADR-002 A1), nên `runinfo.reproducibility_gaps(run.json) == []`. Run từ working tree chung
+có `git_dirty=true` chỉ được dùng để smoke/debug, kết quả mang nhãn "not reproducible" và không được dùng làm gate.
 
 ### B3. Các gate
 | Gate | Khi nào | Điều kiện PASS |
