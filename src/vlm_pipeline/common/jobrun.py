@@ -360,7 +360,7 @@ def run_job(
                 "peak_mem_gb": round(max(0.0, baseline_gb - guard.min_available_gb), 1),
                 "host_min_available_gb": round(guard.min_available_gb, 1),
                 "trainable_pct": _trainable_pct(run_dir / "logs" / "stdout.log"),
-                "memguard_fast_fall": guard.fast_fall_killed or None,
+                "memguard_fast_fall": bool(guard.fast_fall_killed),
                 "memguard_abort_gb": mem_thresholds.abort_gb,
             }
         )

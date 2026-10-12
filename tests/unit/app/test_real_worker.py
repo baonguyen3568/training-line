@@ -59,8 +59,13 @@ def test_hub_dataset_pinned(tmp_path: Path) -> None:
 
     rev = next(d.revision for d in load_dataset_catalog().datasets if d.repo == "naver-clova-ix/cord-v2")
     _snap(root, "datasets", "naver-clova-ix/cord-v2", rev)
-    out = RealWorker(root).run(_job("data.hf_load", {"repo": "naver-clova-ix/cord-v2"}, root / "r")).outputs
+    w = RealWorker(root)
+    out = w.run(_job("data.hf_load", {"repo": "naver-clova-ix/cord-v2"}, root / "r")).outputs
     assert out["dataset"].hash == f"naver-clova-ix/cord-v2@{rev}"
+    limited = w.run(_job("data.hf_load", {"repo": "naver-clova-ix/cord-v2", "max_samples": 100}, root / "r2"))
+    ref = limited.outputs["dataset"]
+    assert ref.hash.endswith("#limit=100")
+    assert w._dataset_input(ref) == (f"/workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/{rev}", 100)
 
 
 def _train_inputs(w: RealWorker) -> dict[str, ArtifactRef]:

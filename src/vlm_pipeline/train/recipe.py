@@ -44,6 +44,7 @@ def build_recipe(
     dataset_dir: str,
     run_dir: str,
     class_token_start_idx: int | None = None,
+    train_limit: int | None = None,
 ) -> dict[str, Any]:
     """Return a new recipe dict (the template is not modified)."""
     import copy
@@ -55,6 +56,8 @@ def build_recipe(
         if isinstance(r.get(key), dict):
             r[key]["path_or_dataset"] = dataset_dir
 
+    if train_limit:
+        _section(r, "dataset")["limit_dataset_samples"] = train_limit  # "quick run" sizes of the data node
     sched = _section(r, "step_scheduler")
     sched["global_batch_size"] = params.global_batch_size
     sched["local_batch_size"] = params.local_batch_size

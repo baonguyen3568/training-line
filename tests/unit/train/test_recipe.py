@@ -58,3 +58,9 @@ def test_missing_template(tmp_path: Path) -> None:
     assert entry is not None
     with pytest.raises(RecipeError, match="no training template"):
         template_path(tmp_path, entry)
+
+
+def test_train_limit_sets_dataset_limit_only() -> None:
+    r = build_recipe(_tpl("cosmos-reason2-2b"), LoraParams(), model_dir="m", dataset_dir="d", run_dir="r",
+                     train_limit=100)  # fmt: skip
+    assert r["dataset"]["limit_dataset_samples"] == 100

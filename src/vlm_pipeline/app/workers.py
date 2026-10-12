@@ -8,6 +8,7 @@ them to catalog codes). Nothing is downloaded: models/datasets must already be i
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from pathlib import Path
 from typing import ClassVar
@@ -112,8 +113,24 @@ class RealWorker:
             raise NotCachedError("dataset not in the catalog", params={"repo": repo, "reason": "not_pinned"})
         revision = entry.revision
         path = _hub_snapshot(self.root, repo, revision, "dataset")
-        ref = ArtifactRef(type="Dataset", path=self._container_path(path), hash=f"{repo}@{revision}")
+        limit = int(getattr(job.params, "max_samples", 0) or 0)
+        # The artifact is a small descriptor (snapshot + sample limit), so "quick run" sizes cost no copy.
+        job.run_dir.mkdir(parents=True, exist_ok=True)
+        descriptor = job.run_dir / "dataset.json"
+        descriptor.write_text(
+            json.dumps({"repo": repo, "revision": revision, "path": self._container_path(path), "limit": limit}),
+            encoding="utf-8",
+        )
+        digest = f"{repo}@{revision}" + (f"#limit={limit}" if limit else "")
+        ref = ArtifactRef(type="Dataset", path=self._container_path(descriptor), hash=digest)
         return NodeResult(outputs={"dataset": ref})
+
+    def _dataset_input(self, ref: ArtifactRef) -> tuple[str, int]:
+        """(container dataset dir, sample limit) from a dataset artifact (descriptor json or plain dir)."""
+        if ref.path.endswith(".json"):
+            desc = json.loads(self._host_path(ref.path).read_text(encoding="utf-8"))
+            return str(desc["path"]), int(desc.get("limit", 0))
+        return ref.path, 0
 
     def _train(self, job: NodeJob) -> NodeResult:
         params = job.params
@@ -128,11 +145,13 @@ class RealWorker:
             class_token = resolve_parse_class_token_start_idx(self._host_path(base.path))
         run_dir = job.run_dir.resolve()
         (run_dir / "logs").mkdir(parents=True, exist_ok=True)
+        dataset_dir, limit = self._dataset_input(data)
         recipe = build_recipe(
             load_template(template_path(self.root, entry)),
             params,
             model_dir=base.path,
-            dataset_dir=data.path,
+            dataset_dir=dataset_dir,
+            train_limit=limit or None,
             run_dir=self._container_path(run_dir),
             class_token_start_idx=class_token,
         )
