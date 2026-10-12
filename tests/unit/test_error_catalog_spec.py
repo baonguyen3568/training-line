@@ -160,10 +160,20 @@ def test_action_when_conditions_reference_declared_params() -> None:
 @pytest.mark.parametrize(
     ("code", "params", "action_id", "offered"),
     [
-        ("CFG-004", {"type_id": "acme/x.y", "version": "1.0.0", "reason": "not_installed"}, "review_to_install", True),
         (
             "CFG-004",
-            {"type_id": "acme/x.y", "version": "1.0.0", "reason": "version_mismatch"},
+            {
+                "node_type": "acme/x.y",
+                "reason": "not_installed",
+                "trust_level": "unverified",
+                "suggested_package": None,
+            },
+            "review_to_install",
+            True,
+        ),
+        (
+            "CFG-004",
+            {"node_type": "acme/x.y", "reason": "not_allowed", "trust_level": "unverified", "suggested_package": None},
             "review_to_install",
             False,
         ),

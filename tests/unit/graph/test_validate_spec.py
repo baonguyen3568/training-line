@@ -228,7 +228,9 @@ def test_workflow_cannot_carry_install_sources(field: str, monkeypatch: pytest.M
 def test_package_hint_from_workflow_is_never_trusted() -> None:
     """P003 D16: a package name written in a workflow is only a registry lookup key. A spoofed first-party name
     unknown to the registry yields ``suggested_package=None`` and the string is never echoed back.
-    ASSUMED: the hint is carried as node field ``package`` (allowed key, unlike install_url)."""
+    Node field ``package`` (optional, registry lookup key only) - confirmed by bao-backend (P009 §2.4.1).
+    CFG-004 params: {node_type, reason: not_installed|not_allowed, trust_level, name_lookalike_of,
+    suggested_package}."""
     hint = "vlm/lora-trainer"
     wf = copy.deepcopy(VALID)
     wf["nodes"].append({**_n("x", "acme/fake.train"), "package": hint})

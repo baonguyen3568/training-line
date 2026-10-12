@@ -208,4 +208,5 @@ Nguồn: P001 §3 (bao-research), `docker/IMAGES.lock`. Ước lượng footprin
 | **Tổng xấu nhất** | **~430 GB** | < warn 500 GB ✅ |
 - Kết luận: quota 500/800 GB (user đã xác nhận) **đủ** cho giai đoạn 2. Thêm 1 model 27–35B (55–72 GB) vẫn < 500; thêm ≥ 2 → chạm warn, cần retention/evict cache trước khi tải.
 - **Image AutoModel (chốt PM + research)**: chỉ giữ 1 image AutoModel (+1 rollback). Probe 26.08 trên driver 580.142 PASS ⇒ dùng 26.08, **không** pull 26.02. FAIL ⇒ pull 26.02, 26.08 vẫn **giữ** (phương án b' cập nhật DGX OS sẽ làm nó chạy được). 26.08 chỉ vào danh sách ứng viên xoá **sau khi user chọn (a) dài hạn**; khi đó xử lý theo D7 mục 10 (IMAGES.lock → kiểm ancestor → PM xác nhận). Disk còn dư nên giữ không tốn đáng kể.
+- **Cập nhật 2026-10-12 (Phase 2 mở)**: probe 26.08 PASS → `nemo-automodel:26.08` là **image mặc định**, không còn là ứng viên xoá; không pull 26.02 → footprint image giảm ~25–30 GB so với ước lượng ở bảng trên.
 - Không full-FT 9B: checkpoint có optim ~90 GB/bản (fp32 Adam), và cũng vượt budget RAM.

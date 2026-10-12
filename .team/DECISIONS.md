@@ -20,3 +20,4 @@
 - 2026-10-12 Probe: nemo-automodel:26.08 CHẠY trên driver 580.142 (CUDA forward compat) → default 26.08, không cần 26.02. Cập nhật DGX OS 580.159.03 (user đồng ý) làm chung đợt vá toolkit, không gấp.
 - 2026-10-12 ADR-002 Eval protocol ACCEPTED. ADR-009 A1 plugin sandbox. ADR-004 A3 layering mới.
 - 2026-10-12 Dataset template mặc định: CORD-v2 (CC-BY-4.0, chờ security xác nhận nguồn gốc). MedPix loại khỏi template.
+- 2026-10-12 USER: Host dev dùng chung — cấm plugin bên thứ 3 dùng GPU tới khi vá toolkit; sau vá chỉ plugin đã review ở SHA cố định.

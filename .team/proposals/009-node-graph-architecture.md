@@ -91,6 +91,15 @@ class NodeImpl(Protocol):
   `GET /api/plugins/{id}/usages` → workflow đang dùng; `DELETE /api/plugins/{id}` (xoá cả image);
   `POST /api/plugins/{id}/update/plan {commit_sha}` → diff quyền (added/removed) + diff code (file/dòng); quyền tăng → apply phải ack lại từ đầu.
 
+#### 2.4.1 Chốt bổ sung (security D16 + design P010 §15 + frontend F6d/F6e + fixcode)
+- `trust_level: first_party|reviewed|unverified` (enum chung). **Mọi** mức cảnh báo do server tính theo trust_level × quyền, UI chỉ hiển thị.
+- `permissions[]` mỗi phần tử: `{id: gpu|network|runtime|memory, level: info|warning|critical, requires_typed_confirm, perm_copy_key, confirm_copy_key}` (vd GPU + unverified = critical/true; GPU + reviewed/first_party = warning/false; network = critical/true, v1.1).
+- Install plan trả thêm `requires_typed_confirm` (tổng hợp) và `sandbox_verified: bool` — chỉ true khi build metadata ghi test D16 PASS **và** lúc khởi động orchestrator tự kiểm docker args (non-root, cap_drop, không mount secret); không bật được bằng config.
+- Endpoint cài chỉ nhận: (a) `registry_id` từ registry/allowlist của app, hoặc (b) `{repo_url, commit_sha: ^[0-9a-f]{40}$, user_supplied: true}` (branch/tag/SHA ngắn → từ chối). **Không** có cài theo workflow, **không** cài hàng loạt. Schema workflow extra=forbid, không có field nguồn cài (`install_url`/`source` → CFG-007).
+- Node trong workflow có thể mang `package` (tuỳ chọn) — **chỉ là khoá tra registry**, không bao giờ echo lại trong response (kể cả technical_detail).
+- `CFG-004` params: `{node_type, reason: not_installed|not_allowed, trust_level: first_party|reviewed|unverified (server tính từ registry/allowlist + hash, không lấy từ workflow; không tra được → unverified), name_lookalike_of: type_id|null, suggested_package: chỉ lấy từ registry/allowlist|null}`. `name_lookalike_of` khi tên trùng/gần giống node first_party/reviewed (cùng tên khác publisher, hoặc dùng prefix `vlm/` dành riêng).
+- Preflight với `source=declared`: cộng biên an toàn rộng hơn (design), vẫn max(declared, ước lượng ta).
+
 ### 2.3 Bộ node v1 (đề xuất, bám pipeline)
 Data: `data.hf_load`, `data.local_folder`, `data.format_vlm_chat`, `data.split`, `data.preview` ·
 Model: `model.hf_pick` (danh mục model đã vet bởi security) ·
