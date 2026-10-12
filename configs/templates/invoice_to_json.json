@@ -1,0 +1,120 @@
+{
+  "id": "invoice_to_json",
+  "difficulty": "basic",
+  "tags": [
+    "finetune"
+  ],
+  "sample_data": true,
+  "requires_hf_account": false,
+  "workflow": {
+    "format": "vlm-workflow",
+    "schema_version": 1,
+    "name": "invoice_to_json",
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "model.hf_pick",
+        "version": "1.0.0",
+        "params": {
+          "model": "nemotron-parse-v1.1"
+        }
+      },
+      {
+        "id": "n2",
+        "type": "data.hf_load",
+        "version": "1.0.0",
+        "params": {
+          "repo": "naver-clova-ix/cord-v2"
+        }
+      },
+      {
+        "id": "n3",
+        "type": "data.split",
+        "version": "1.0.0",
+        "params": {
+          "val_fraction": 0.1
+        }
+      },
+      {
+        "id": "n4",
+        "type": "train.sft_vlm",
+        "version": "1.0.0",
+        "params": {
+          "epochs": 3
+        }
+      },
+      {
+        "id": "n5",
+        "type": "eval.benchmarks",
+        "version": "1.0.0",
+        "params": {
+          "suite": "cord_test"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": [
+          "n2",
+          "dataset"
+        ],
+        "to": [
+          "n3",
+          "dataset"
+        ]
+      },
+      {
+        "from": [
+          "n1",
+          "model"
+        ],
+        "to": [
+          "n4",
+          "base_model"
+        ]
+      },
+      {
+        "from": [
+          "n3",
+          "train"
+        ],
+        "to": [
+          "n4",
+          "train_data"
+        ]
+      },
+      {
+        "from": [
+          "n3",
+          "val"
+        ],
+        "to": [
+          "n4",
+          "val_data"
+        ]
+      },
+      {
+        "from": [
+          "n4",
+          "model"
+        ],
+        "to": [
+          "n5",
+          "model"
+        ]
+      },
+      {
+        "from": [
+          "n3",
+          "val"
+        ],
+        "to": [
+          "n5",
+          "data"
+        ]
+      }
+    ]
+  },
+  "title_key": "template.invoice_to_json.title",
+  "description_key": "template.invoice_to_json.desc"
+}

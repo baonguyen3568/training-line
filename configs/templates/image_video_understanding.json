@@ -1,0 +1,147 @@
+{
+  "id": "image_video_understanding",
+  "difficulty": "basic",
+  "tags": [
+    "finetune"
+  ],
+  "sample_data": false,
+  "requires_hf_account": true,
+  "workflow": {
+    "format": "vlm-workflow",
+    "schema_version": 1,
+    "name": "image_video_understanding",
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "model.hf_pick",
+        "version": "1.0.0",
+        "params": {
+          "model": "cosmos-reason2-2b"
+        }
+      },
+      {
+        "id": "n2",
+        "type": "data.local_folder",
+        "version": "1.0.0",
+        "params": {
+          "path": "data/my-images"
+        }
+      },
+      {
+        "id": "n3",
+        "type": "data.split",
+        "version": "1.0.0",
+        "params": {
+          "val_fraction": 0.1
+        }
+      },
+      {
+        "id": "n4",
+        "type": "train.lora_vlm",
+        "version": "1.0.0",
+        "params": {
+          "epochs": 3,
+          "lr_preset": "medium"
+        }
+      },
+      {
+        "id": "n5",
+        "type": "train.merge_lora",
+        "version": "1.0.0",
+        "params": {}
+      },
+      {
+        "id": "n6",
+        "type": "eval.benchmarks",
+        "version": "1.0.0",
+        "params": {
+          "suite": "perception"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": [
+          "n2",
+          "dataset"
+        ],
+        "to": [
+          "n3",
+          "dataset"
+        ]
+      },
+      {
+        "from": [
+          "n1",
+          "model"
+        ],
+        "to": [
+          "n4",
+          "base_model"
+        ]
+      },
+      {
+        "from": [
+          "n3",
+          "train"
+        ],
+        "to": [
+          "n4",
+          "train_data"
+        ]
+      },
+      {
+        "from": [
+          "n3",
+          "val"
+        ],
+        "to": [
+          "n4",
+          "val_data"
+        ]
+      },
+      {
+        "from": [
+          "n1",
+          "model"
+        ],
+        "to": [
+          "n5",
+          "base_model"
+        ]
+      },
+      {
+        "from": [
+          "n4",
+          "adapter"
+        ],
+        "to": [
+          "n5",
+          "adapter"
+        ]
+      },
+      {
+        "from": [
+          "n5",
+          "model"
+        ],
+        "to": [
+          "n6",
+          "model"
+        ]
+      },
+      {
+        "from": [
+          "n3",
+          "val"
+        ],
+        "to": [
+          "n6",
+          "data"
+        ]
+      }
+    ]
+  },
+  "title_key": "template.image_video_understanding.title",
+  "description_key": "template.image_video_understanding.desc"
+}

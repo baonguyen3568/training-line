@@ -129,6 +129,24 @@ def _register_graph_routes(app: FastAPI, services: Services, bus: EventBus) -> N
         return {"graph_run_id": graph_run_id}
 
 
+def _register_template_routes(app: FastAPI, services: Services) -> None:
+    root = getattr(services, "root", None)
+    if root is None:
+        return
+    from vlm_pipeline.app.templates import load_templates, template_meta
+
+    @app.get("/api/templates")
+    def list_templates() -> list[dict[str, Any]]:
+        return [template_meta(t) for t in load_templates(root)]
+
+    @app.get("/api/templates/{template_id}")
+    def get_template(template_id: str) -> dict[str, Any]:
+        found = next((t for t in load_templates(root) if t["id"] == template_id), None)
+        if found is None:
+            raise HTTPException(status_code=404, detail={"code": "CFG-004", "params": {}})
+        return found
+
+
 def _register_run_routes(app: FastAPI, services: Services) -> None:
     @app.get("/api/runs")
     def list_runs() -> list[dict[str, Any]]:
@@ -249,6 +267,7 @@ def create_app(
     _register_storage(app, services)
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
+    _register_template_routes(app, services)
     _register_ws(app, bus, ws_auth)
     if static_dir is None and getattr(services, "root", None) is not None:
         static_dir = services.root / "frontend" / "dist"  # type: ignore[attr-defined]
