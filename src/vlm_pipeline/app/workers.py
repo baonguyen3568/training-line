@@ -16,6 +16,7 @@ from typing import ClassVar
 
 from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
+from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
 from vlm_pipeline.common.jobrun import (
     CONTAINER_ROOT,
     ContainerJob,
@@ -30,7 +31,6 @@ from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
 
 logger = logging.getLogger(__name__)
-DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-5"
 PREPARED_DIRS = {"nemotron-parse-v1.1": "nemotron-parse-v1.1_fd1e3c6b"}  # train.prepare outputs (hash-verified)
 
 

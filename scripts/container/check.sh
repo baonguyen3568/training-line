@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Integration gates inside the NGC-derived image (ADR-004; owner bao-backend). Called by `scripts/check.sh --container`.
-#   scripts/container/check.sh [--image IMG] [--gpu]
+#   scripts/container/check.sh [--image IMG] [--gpu]   (default IMG = common.images.DEFAULT_TRAIN_IMAGE)
 # Without --gpu: import smoke + `pytest -m "integration and not gpu"` (no GPU, no lock, network none, repo read-only).
 # With --gpu: also `pytest -m gpu` under the GPU lock (token passed as VLM_GPU_LOCK_TOKEN; tests verify it).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 ROOT=$PWD
-IMAGE=vlm-automodel:26.08-2
+IMAGE=$(uv run --quiet python -c "from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE; print(DEFAULT_TRAIN_IMAGE)")
 GPU=0
 while [[ $# -gt 0 ]]; do
   case "$1" in

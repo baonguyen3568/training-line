@@ -12,6 +12,8 @@ from typing import ClassVar
 
 from vlm_pipeline.common.errors import VlmPipelineError
 
+# The one place that names the default training image (app worker, smoke CLI, container gates).
+DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-5"
 APPROVED_MARK = "bao-security APPROVED"
 _APPROVED_RE = re.compile(re.escape(APPROVED_MARK) + r"(?:$|[\s(])")  # "APPROVED-PENDING" is not approved
 

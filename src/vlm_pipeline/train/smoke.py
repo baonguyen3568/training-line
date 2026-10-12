@@ -19,11 +19,10 @@ import sys
 import time
 from pathlib import Path
 
+from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
 from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job, tightened_thresholds
 from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest, write_manifest
-
-DEFAULT_IMAGE = "vlm-automodel:26.08-1"
 
 
 def _complete_checkpoints(run_dir: Path, base_dir: Path, root: Path) -> None:
@@ -77,7 +76,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--base-revision")
     p.add_argument("--dataset")
     p.add_argument("--task", default="lora", choices=["lora", "sft"])
-    p.add_argument("--image", default=DEFAULT_IMAGE)
+    p.add_argument("--image", default=DEFAULT_TRAIN_IMAGE)
     p.add_argument("--worktree", metavar="COMMIT", help="run code from a git worktree at COMMIT (ADR-002 A1)")
     p.add_argument("--gate", action="store_true", help="refuse to run unless reproducibility_gaps() == []")
     p.add_argument("--abort-gb", type=float, help="memguard abort level; may only be HIGHER than ADR-005 (8 GB)")
