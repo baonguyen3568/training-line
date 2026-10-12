@@ -103,6 +103,9 @@ def test_thresholds_can_only_be_tightened() -> None:
 
 def test_lock_token_and_normal_env_still_pass() -> None:
     token = "t"  # noqa: S105 - dummy
-    args = docker_args(_job(env={"VLM_EXPECTED_TRAINABLE_PCT": "29.4:31.4"}), Path("/repo"), lock_token=token)
+    env = {"VLM_EXPECTED_TRAINABLE_PCT": "29.4:31.4", "TOKENIZERS_PARALLELISM": "false", "MAX_JOBS": "4",
+           "HF_HUB_ENABLE_HF_TRANSFER": "0"}  # fmt: skip
+    args = docker_args(_job(env=env), Path("/repo"), lock_token=token)
+    assert "TOKENIZERS_PARALLELISM=false" in args
     assert "VLM_GPU_LOCK_TOKEN=t" in args
     assert "VLM_EXPECTED_TRAINABLE_PCT=29.4:31.4" in args

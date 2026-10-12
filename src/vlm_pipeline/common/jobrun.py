@@ -71,7 +71,8 @@ BASE_ENV: Mapping[str, str] = {
 }
 _FORBIDDEN_ENV_PREFIXES = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "NGC_", "WANDB_API_KEY")
 # Anything that looks like a credential (bao-security): OPENAI_API_KEY, AWS_SECRET_ACCESS_KEY, HUGGINGFACE_TOKEN...
-_SECRET_NAME = re.compile(r"(TOKEN|_KEY|SECRET|PASSWORD|PASSWD|CREDENTIAL)", re.IGNORECASE)
+# Matched per "_"-separated segment so TOKENIZERS_PARALLELISM & co. pass (fail-closed: KEY_FRAMES needs the allowlist).
+_SECRET_NAME = re.compile(r"(?:^|_)(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD|CREDENTIALS?)(?:_|$)", re.IGNORECASE)
 # Explicit exceptions only (none yet; a first-party download job receiving a scoped token would be listed here, D12).
 SECRET_ENV_ALLOWLIST: frozenset[str] = frozenset()
 
