@@ -1,1 +1,2 @@
 14ef0bf840598d948fa4da150c09f9a9e356007afcc041c6b2e82baf9cc639e4  0001-nemotron-parse-normalize-flag-and-tied-embeddings.patch
+136ac59f9eccfbe127b9e8e4c6bdeceee4f5fa5890a3e3c2b6078dc50161e06c  0002-nemotron-parse-freeze-backbone-and-trainable-share-guard.patch

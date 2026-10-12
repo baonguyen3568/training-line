@@ -29,6 +29,28 @@ File: `nemo_automodel/components/models/nemotron_parse/model.py`
    `lm_head.weight` to `decoder.embed_tokens.weight` when the config asks for it (transformers v5 does not reliably
    tie from the dict-shaped keys alone; cf. AutoModel's `Qwen2ForCausalLM`). `post_init()` calls it. v1.x untied.
 
+## 0002-nemotron-parse-freeze-backbone-and-trainable-share-guard.patch (on top of 0001)
+Files: `nemo_automodel/components/utils/model_utils.py`, `nemo_automodel/components/models/nemotron_parse/model.py`
+
+P-1 incident (2026-10-12, 001a §9): Parse v1.1 full SFT trained **100 %** of 936.3M params and drove host
+MemAvailable to 6.34 GB.
+1. **`freeze_vision_tower` matched nothing in Nemotron-Parse.** `apply_parameter_freezing` freezes by attribute
+   `vision_tower` / names containing vision|visual|image_encoder; the Parse backbone is `encoder.model_encoder`.
+   Fix: models may declare `_vlm_frozen_vision_prefixes`; Parse declares `("encoder.model_encoder.",)`, matched at
+   a module boundary (survives `model.` / FSDP prefixes); a declared prefix that matches nothing is an error.
+   Plan A (bao-research): RADIO backbone frozen, neck + decoder + embeddings + head train ->
+   v1.1 **30.40 %** (284.6M / 936.3M), 2.0 **27.84 %** (251.4M / 903.0M, tied head). Frozen backbone also drops
+   the activations of 32 RADIO blocks that activation checkpointing never covered.
+2. **Unknown `freeze_config` keys were ignored** (e.g. `freeze_embeddings`): now a `ValueError`.
+3. **Trainable share guard**: `print_trainable_parameters` raises `VLM_TRAINABLE_PCT_MISMATCH` when the share is
+   outside `VLM_EXPECTED_TRAINABLE_PCT="<lo>:<hi>"` (set by our runner from the recipe catalog; unset = no check).
+
+Not a bug (measured, so not patched): RADIO attention is already `fused_attn=True` (timm default with SDPA), and the
+Parse label mask is correct (prompt and padding masked, target + EOS learned) despite the "BPE pattern-match"
+warning — both locked by tests.
+Regression tests: `tests/integration/automodel/test_nemotron_parse_freeze.py` — 4 FAIL on 26.08-2 (behavioural), all
+5 PASS with 0001+0002; 0001+0002 apply cleanly on the pristine NGC base.
+
 Not patched here (by design): `NemotronParseLoss.class_token_start_idx` — resolved from the model's `config.json` in
 our own adapter, not by editing NVIDIA code.
 

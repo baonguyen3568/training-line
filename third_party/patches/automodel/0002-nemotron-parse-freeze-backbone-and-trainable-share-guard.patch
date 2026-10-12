@@ -1,0 +1,62 @@
+diff --git a/nemo_automodel/components/models/nemotron_parse/model.py b/nemo_automodel/components/models/nemotron_parse/model.py
+--- a/nemo_automodel/components/models/nemotron_parse/model.py
++++ b/nemo_automodel/components/models/nemotron_parse/model.py
+@@ -492,6 +492,9 @@
+ 
+     # PATCH(vlm): Parse 2.0 ships tie_word_embeddings=True and no lm_head.weight (head shared with
+     # decoder.embed_tokens, as in its reference hf_nemotron_parse_modeling.py); v1.x stays untied.
++    # PATCH(vlm): the RADIO backbone is `encoder.model_encoder`; apply_parameter_freezing's name patterns
++    # (vision/visual/image_encoder) never matched it, so `freeze_vision_tower` trained 100% of the model.
++    _vlm_frozen_vision_prefixes = ("encoder.model_encoder.",)
+     tie_word_embeddings_support: TieSupport = TieSupport.BOTH
+     _tied_weights_keys = {"lm_head.weight": "decoder.embed_tokens.weight"}
+ 
+diff --git a/nemo_automodel/components/utils/model_utils.py b/nemo_automodel/components/utils/model_utils.py
+--- a/nemo_automodel/components/utils/model_utils.py
++++ b/nemo_automodel/components/utils/model_utils.py
+@@ -304,6 +304,16 @@
+     except Exception:
+         logging.info(f"{name} summary: <unavailable>")
+ 
++    # PATCH(vlm): fail fast when the trainable share is not what the recipe intends (a freeze that silently matched
++    # nothing trained 100% of Nemotron-Parse). The runner sets VLM_EXPECTED_TRAINABLE_PCT="<lo>:<hi>".
++    expected = os.environ.get("VLM_EXPECTED_TRAINABLE_PCT")
++    if expected and total_params > 0:
++        low, high = (float(x) for x in expected.split(":"))
++        pct = 100.0 * trainable_params / total_params
++        if not low <= pct <= high:
++            raise RuntimeError(
++                f"VLM_TRAINABLE_PCT_MISMATCH: {name} trainable {pct:.2f}% outside expected [{low}, {high}]%"
++            )
+     return trainable_params, total_params
+ 
+ 
+@@ -374,6 +384,11 @@
+         - freeze_language_model: bool (default False)
+         - freeze_video_embedder: bool (default False)
+     """
++    # PATCH(vlm): unknown keys used to be ignored silently (e.g. `freeze_embeddings`); refuse them instead.
++    _known = {"freeze_vision_tower", "freeze_audio_tower", "freeze_language_model", "freeze_video_embedder"}
++    unknown = sorted(set(freeze_config) - _known)
++    if unknown:
++        raise ValueError(f"freeze_config has unknown keys {unknown}; supported: {sorted(_known)}")
+     freeze_vision_tower = freeze_config.get("freeze_vision_tower", True)
+     freeze_audio_tower = freeze_config.get("freeze_audio_tower", False)
+     freeze_language_model = freeze_config.get("freeze_language_model", False)
+@@ -382,6 +397,16 @@
+     # Freeze vision tower
+     if freeze_vision_tower:
+         _freeze_module_by_attribute_and_patterns(model, "vision_tower", ["vision", "visual", "image_encoder"])
++        # PATCH(vlm): models whose vision backbone matches none of the names above (Nemotron-Parse: `encoder`)
++        # declare its parameter prefixes; match at a module boundary so wrappers (`model.`, FSDP) still match.
++        prefixes = getattr(model, "_vlm_frozen_vision_prefixes", ())
++        frozen = 0
++        for pname, param in model.named_parameters():
++            if any(("." + pname).find("." + p) != -1 for p in prefixes):
++                param.requires_grad_(False)
++                frozen += 1
++        if prefixes and frozen == 0:
++            raise RuntimeError(f"freeze_vision_tower: no parameter matched {list(prefixes)}")
+ 
+     # Freeze audio tower
+     if freeze_audio_tower:
