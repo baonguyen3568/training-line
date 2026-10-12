@@ -34,7 +34,11 @@ def test_no_gpu_and_read_only_mount() -> None:
     assert "/repo:/workspace:ro" in args
 
 
-@pytest.mark.parametrize("key", ["HF_TOKEN", "NGC_API_KEY", "WANDB_API_KEY"])
+@pytest.mark.parametrize(
+    "key",
+    ["HF_TOKEN", "NGC_API_KEY", "WANDB_API_KEY", "OPENAI_API_KEY", "HUGGINGFACE_TOKEN", "NVIDIA_API_KEY",
+     "AWS_SECRET_ACCESS_KEY", "DB_PASSWORD", "GCP_CREDENTIALS"],
+)  # fmt: skip
 def test_secrets_never_reach_containers(key: str) -> None:
     with pytest.raises(ValueError, match="secret-like"):
         docker_args(_job(env={key: "x"}), Path("/repo"))
@@ -95,3 +99,10 @@ def test_thresholds_can_only_be_tightened() -> None:
         tightened_thresholds(6.0)
     assert ei.value.code == "CFG-005"
     assert ei.value.params["param"] == "abort_gb"
+
+
+def test_lock_token_and_normal_env_still_pass() -> None:
+    token = "t"  # noqa: S105 - dummy
+    args = docker_args(_job(env={"VLM_EXPECTED_TRAINABLE_PCT": "29.4:31.4"}), Path("/repo"), lock_token=token)
+    assert "VLM_GPU_LOCK_TOKEN=t" in args
+    assert "VLM_EXPECTED_TRAINABLE_PCT=29.4:31.4" in args

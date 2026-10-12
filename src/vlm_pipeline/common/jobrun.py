@@ -70,13 +70,19 @@ BASE_ENV: Mapping[str, str] = {
     "WANDB_MODE": "offline",
 }
 _FORBIDDEN_ENV_PREFIXES = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "NGC_", "WANDB_API_KEY")
+# Anything that looks like a credential (bao-security): OPENAI_API_KEY, AWS_SECRET_ACCESS_KEY, HUGGINGFACE_TOKEN...
+_SECRET_NAME = re.compile(r"(TOKEN|_KEY|SECRET|PASSWORD|PASSWD|CREDENTIAL)", re.IGNORECASE)
+# Explicit exceptions only (none yet; a first-party download job receiving a scoped token would be listed here, D12).
+SECRET_ENV_ALLOWLIST: frozenset[str] = frozenset()
 
 
 def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None = None) -> list[str]:
     """Pure: the full ``docker run`` argv for ``job`` (tested; no shell, no user-controlled flags)."""
     env = {**BASE_ENV, **job.env}
     for key in env:
-        if key.startswith(_FORBIDDEN_ENV_PREFIXES):
+        if key in SECRET_ENV_ALLOWLIST:
+            continue
+        if key.startswith(_FORBIDDEN_ENV_PREFIXES) or _SECRET_NAME.search(key):
             raise ValueError(f"secret-like env var {key} must not be passed to job containers")
     if lock_token is not None:
         env[gpu_lock.TOKEN_ENV] = lock_token
