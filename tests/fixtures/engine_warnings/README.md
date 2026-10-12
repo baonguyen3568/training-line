@@ -1,6 +1,6 @@
 # Engine warning samples
 
-One real log line per `jobrun.ENGINE_WARNINGS` code (`<code>.log`), copied verbatim from a job log.
+One real log line per `jobrun.ENGINE_WARNINGS` code (`<code>.txt`; not `.log`, which is gitignored), copied verbatim from a job log.
 Re-capture them when the training image changes; `test_engine_warning_fixtures_match` fails if a code has no sample.
 
 | code | image | source run |
