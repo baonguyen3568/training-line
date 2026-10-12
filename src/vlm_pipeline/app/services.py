@@ -180,4 +180,5 @@ class DefaultServices:
             "mem_available_gb": round(mem.mem_available_gb, 1),
             "disk_free_gb": round(disk.free_gb, 1),
             "gpu_lock": lock,
+            "worker": self.worker,  # "fake" -> the UI shows the demo-mode banner
         }

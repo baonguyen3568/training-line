@@ -12,6 +12,7 @@ import json
 import os
 import signal
 import subprocess
+import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -243,6 +244,7 @@ def run_job(
     ckpt_gb: float = 0.0,
     lock_path: Path | None = None,
     gate: bool = False,
+    cancel: threading.Event | None = None,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock."""
     from vlm_pipeline.common.preflight import preflight
@@ -281,14 +283,30 @@ def run_job(
         )
         write_manifest(run_dir, manifest)
         baseline_gb = read_meminfo().mem_available_gb
+        cancelled = threading.Event()
+        done = threading.Event()
+
+        def _watch_cancel() -> None:  # executor cancel -> graceful docker stop (job can save a checkpoint)
+            assert cancel is not None  # noqa: S101 - only started when cancel is given
+            while not done.is_set():
+                if cancel.wait(0.5):
+                    cancelled.set()
+                    _docker_stop_async(container)
+                    return
+
+        if cancel is not None:
+            threading.Thread(target=_watch_cancel, name=f"cancel-{container}", daemon=True).start()
         _, guard = run_guarded(
             docker_args(job, project_root, lock_token=handle.info.token),
             run_dir / "logs" / "stdout.log",
             on_abort=lambda: _docker_stop_async(container),
             hard_exit=lambda: _docker_kill(container),
         )
+        done.set()
         state = _docker_state(container)
-        info = dataclasses.replace(state, preempted_by_memguard=guard.should_stop.is_set())
+        info = dataclasses.replace(
+            state, preempted_by_memguard=guard.should_stop.is_set(), cancelled_by_executor=cancelled.is_set()
+        )
         status, code = classify_exit(info)
         manifest = manifest.model_copy(
             update={
