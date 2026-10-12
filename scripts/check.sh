@@ -32,6 +32,9 @@ step "mypy"
 uv run mypy
 uv run mypy --strict scripts/cleanup
 
+step "API schemas are up to date (schemas/)"
+uv run python scripts/export_schemas.py --check
+
 step "import layers (import-linter)"
 uv run lint-imports --no-cache
 
