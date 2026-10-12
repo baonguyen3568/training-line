@@ -505,7 +505,7 @@ node:
   export.hf_dir:
     title: Save model
     desc: Save the model in Hugging Face format to use elsewhere.
-  export.merge_lora:
+  train.merge_lora:
     title: Merge add-on into model
     desc: Combine the LoRA add-on with the base model into one complete model.
     port:

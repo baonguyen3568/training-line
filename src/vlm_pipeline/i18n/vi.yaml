@@ -505,7 +505,7 @@ node:
   export.hf_dir:
     title: Lưu model
     desc: Lưu model theo định dạng Hugging Face để dùng ở nơi khác.
-  export.merge_lora:
+  train.merge_lora:
     title: Gộp phần học thêm vào model
     desc: Gộp LoRA vào model gốc thành một model hoàn chỉnh.
     port:
