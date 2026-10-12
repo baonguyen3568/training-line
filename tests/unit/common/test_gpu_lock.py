@@ -106,13 +106,14 @@ def test_stale_detection_is_report_only(tmp_path: Path) -> None:
     assert lock.exists()
 
 
-def test_verify_token_and_holds_lock(tmp_path: Path) -> None:
+def test_verify_token(tmp_path: Path) -> None:
     lock = tmp_path / "GPU_LOCK"
-    assert not gpu_lock.holds_lock("x", lock)
+    with pytest.raises(gpu_lock.GpuLockNotHeldError):
+        gpu_lock.verify_token(lock, "x")
     h = _acquire(lock)
     gpu_lock.verify_token(lock, h.info.token)
-    assert gpu_lock.holds_lock(h.info.token, lock)
-    assert not gpu_lock.holds_lock("deadbeef", lock)
+    with pytest.raises(gpu_lock.GpuLockNotHeldError):
+        gpu_lock.verify_token(lock, "\u00e1bc-non-ascii")
     with pytest.raises(gpu_lock.GpuLockNotHeldError) as ei:
         gpu_lock.verify_token(lock, "deadbeef")
     assert ei.value.code == "SYS-004"
@@ -147,3 +148,14 @@ def test_cli_acquire_status_release(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert lock.exists()
     assert gpu_lock.main([*base, "release", "--token", token]) == 0
     assert not lock.exists()
+
+
+def test_newer_schema_version_is_rejected_as_corrupt(tmp_path: Path) -> None:
+    lock = tmp_path / "GPU_LOCK"
+    _acquire(lock)
+    data = json.loads(lock.read_text())
+    data["schema_version"] = gpu_lock.LOCK_SCHEMA_VERSION + 1
+    lock.write_text(json.dumps(data))
+    with pytest.raises(GpuLockError) as ei:
+        gpu_lock.read_lock(lock)
+    assert ei.value.params["state"] == "corrupt"

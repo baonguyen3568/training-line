@@ -92,6 +92,9 @@ def _parse(raw: str) -> LockInfo:
     host_pid = data["host_pid"]
     if isinstance(host_pid, bool) or not isinstance(host_pid, int) or host_pid <= 0:
         raise ValueError("host_pid must be a positive integer")
+    schema_version = int(data.get("schema_version", LOCK_SCHEMA_VERSION))
+    if schema_version > LOCK_SCHEMA_VERSION:
+        raise ValueError(f"lock schema_version {schema_version} is newer than supported {LOCK_SCHEMA_VERSION}")
     return LockInfo(
         who=str(data["who"]),
         job=str(data["job"]),
@@ -99,7 +102,7 @@ def _parse(raw: str) -> LockInfo:
         host_pid=host_pid,
         started_at=str(data["started_at"]),
         token=str(data["token"]),
-        schema_version=int(data.get("schema_version", LOCK_SCHEMA_VERSION)),
+        schema_version=schema_version,
     )
 
 
@@ -180,17 +183,8 @@ def verify_token(path: Path, token: str) -> None:
     current = read_lock(path)
     if current is None:
         raise GpuLockNotHeldError("GPU lock not held")
-    if not secrets.compare_digest(current.token, token):
+    if not secrets.compare_digest(current.token.encode(), token.encode()):  # bytes: str form raises on non-ASCII
         raise GpuLockNotHeldError(f"GPU lock held by another job (who={current.who}, run_id={current.run_id})")
-
-
-def holds_lock(token: str, path: Path | None = None) -> bool:
-    """Boolean form of ``verify_token`` (pytest ``gpu`` fixture, worker sanity check). Unreadable lock -> False."""
-    try:
-        verify_token(path if path is not None else default_lock_path(), token)
-    except GpuLockError:
-        return False
-    return True
 
 
 def release(handle: LockHandle) -> None:
@@ -208,7 +202,8 @@ def release(handle: LockHandle) -> None:
 def main(argv: list[str] | None = None) -> int:
     """``python -m vlm_pipeline.common.gpu_lock {status|acquire|release}`` for shell scripts and skills.
 
-    ``acquire`` prints the lock JSON (including the token) once; keep the token to release. ``--host-pid`` must be
+    ``acquire`` prints the lock JSON (including the token) once; keep the token to release. Never tee that output
+    into run logs (``outputs/runs/*/logs``): the token must not outlive the lock on disk. ``--host-pid`` must be
     the PID of the process that stays alive for the whole job (usually the calling shell: ``--host-pid $$``).
     """
     import argparse

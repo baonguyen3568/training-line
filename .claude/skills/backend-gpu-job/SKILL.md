@@ -22,7 +22,7 @@ df -h / | tail -1
 ## 2. Acquire lock — ALWAYS via `common/gpu_lock.py` (one format for everyone; preflight/dashboard parse it)
 ```bash
 uv run python scripts/cleanup/preflight.py --est-peak-gb N --ckpt-gb M || exit $?   # 0 ok, 2 mem, 3 disk, 4 lock busy
-LOCK_JSON=$(uv run python -m vlm_pipeline.common.gpu_lock acquire \
+LOCK_JSON=$(uv run python -m vlm_pipeline.common.gpu_lock acquire \   # stdout holds the token: never tee it into run logs
   --who bao-backend --job "what you run" --run-id "$RUN_ID" --host-pid $$) || { echo "$LOCK_JSON"; exit 4; }
 LOCK_TOKEN=$(python3 -c 'import json,sys;print(json.load(sys.stdin)["token"])' <<<"$LOCK_JSON")
 trap 'uv run python -m vlm_pipeline.common.gpu_lock release --token "$LOCK_TOKEN"' EXIT
