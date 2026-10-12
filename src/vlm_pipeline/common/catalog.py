@@ -16,6 +16,11 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_valida
 from vlm_pipeline.common.paths import project_root
 
 CATALOG_PATH = Path("configs") / "catalog" / "models.yaml"
+DATASETS_PATH = Path("configs") / "catalog" / "datasets.yaml"
+
+# Hub repo id "org/name". No segment may start with "." so "../x" or "org/.." can never reach a path or URL.
+REPO_ID_PATTERN = r"^[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*$"
+REVISION_PATTERN = r"^[0-9a-f]{40}$"
 
 Tier = Literal["default", "template", "catalog", "baseline", "rnd"]
 
@@ -30,8 +35,8 @@ class CatalogEntry(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9.\-]*$")
-    repo: str = Field(pattern=r"^[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+$")
-    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    repo: str = Field(pattern=REPO_ID_PATTERN)
+    revision: str = Field(pattern=REVISION_PATTERN)
     display_name: str = Field(min_length=1)  # proper name only; tagline in i18n model_catalog.<id>.tagline
     vendor: str
     tier: Tier
@@ -46,6 +51,9 @@ class CatalogEntry(BaseModel):
     train_node: Literal["train.sft_vlm", "train.lora_vlm", "none"]
     ram_gb_train: float = Field(gt=0)
     ram_source: Literal["measured", "estimated"]
+    # Expected trainable share for full SFT (guard VLM_EXPECTED_TRAINABLE_PCT, patch 0002). 0/0 = no expectation yet.
+    sft_trainable_pct_min: float = Field(ge=0, le=100)
+    sft_trainable_pct_max: float = Field(ge=0, le=100)
     attn: Literal["eager", "sdpa"]
     loss: Literal["masked_ce", "nemotron_parse"]
     freeze_vision_tower: bool
@@ -62,6 +70,20 @@ class CatalogEntry(BaseModel):
     task_prompt_fixed: bool
     gallery_gates: tuple[str, ...]
     min_image: str
+
+    @property
+    def sft_trainable_pct(self) -> tuple[float, float] | None:
+        """``(min, max)`` expected trainable share for full SFT, ``None`` when not known yet."""
+        if (self.sft_trainable_pct_min, self.sft_trainable_pct_max) == (0, 0):
+            return None
+        return self.sft_trainable_pct_min, self.sft_trainable_pct_max
+
+    @model_validator(mode="after")
+    def _trainable_pct_range(self) -> Self:
+        low, high = self.sft_trainable_pct_min, self.sft_trainable_pct_max
+        if (low, high) != (0, 0) and not 0 < low < high <= 100:
+            raise ValueError(f"{self.id}: sft_trainable_pct must be 0/0 (unknown) or 0 < min < max <= 100")
+        return self
 
     @model_validator(mode="after")
     def _image_policy_consistent(self) -> Self:
@@ -114,3 +136,66 @@ def load_catalog_file(path: Path) -> Catalog:
 def load_catalog() -> Catalog:
     """The project catalog (cached for the process)."""
     return load_catalog_file(project_root() / CATALOG_PATH)
+
+
+# ------------------------------------------------------------------------------------------------- datasets
+
+
+class DatasetEntry(BaseModel):
+    """One vetted dataset. Field meanings: header comment of configs/catalog/datasets.yaml."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9.\-]*$")
+    repo: str = Field(pattern=REPO_ID_PATTERN)
+    revision: str = Field(pattern=REVISION_PATTERN)
+    display_name: str = Field(min_length=1)
+    license: str
+    commercial: Literal["yes", "no", "conditional"]
+    attribution: str = Field(min_length=1)
+    security: Literal["approved", "approved_with_conditions", "conditional", "rejected"]
+    use: Literal["train", "eval_only"]
+    splits: tuple[str, ...] = Field(min_length=1)
+    heldout_splits: tuple[str, ...] = ()
+    num_train: int = Field(ge=0)
+    format: str
+    loader: str = Field(pattern=r"^[a-z_][a-z0-9_]*$")
+    gated: bool
+    disk_gb: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _heldout_are_splits(self) -> Self:
+        if unknown := set(self.heldout_splits) - set(self.splits):
+            raise ValueError(f"{self.id}: heldout_splits not in splits: {sorted(unknown)}")
+        return self
+
+    @property
+    def trainable_splits(self) -> tuple[str, ...]:
+        """Splits that may be used for training/calibration (never a held-out split, never an eval-only set)."""
+        if self.use == "eval_only":
+            return ()
+        return tuple(s for s in self.splits if s not in self.heldout_splits)
+
+
+class DatasetCatalog(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: Literal[1]
+    datasets: tuple[DatasetEntry, ...]
+
+    @model_validator(mode="after")
+    def _unique(self) -> Self:
+        ids = [d.id for d in self.datasets]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate dataset id in catalog")
+        return self
+
+    def get(self, dataset_id: str) -> DatasetEntry | None:
+        return next((d for d in self.datasets if d.id == dataset_id), None)
+
+
+@functools.cache
+def load_dataset_catalog() -> DatasetCatalog:
+    """The project dataset catalog (cached for the process)."""
+    path = project_root() / DATASETS_PATH
+    return DatasetCatalog.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))

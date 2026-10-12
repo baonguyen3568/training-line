@@ -11,6 +11,8 @@
 #   train_node          train.sft_vlm | train.lora_vlm | none          (what the "Tự động" template choice maps to)
 #   ram_gb_train        UPPER bound used by preflight for the default train_node (GB, whole job incl. CUDA on UMA)
 #   ram_source          measured | estimated   (estimated -> UI shows "ước lượng")
+#   sft_trainable_pct_min/max  expected % of trainable params for train.sft_vlm after our freeze policy
+#                       (asserted at build by the adapter); 0/0 = no expectation measured yet (adapter warns)
 #   image_policy        fixed | qwen_pixels | token_budget   (decides which image widget/param exists; parity key)
 #                         fixed        -> fixed_image_hw set, min/max_pixels = 0, image_max_tokens = 0
 #                         qwen_pixels  -> min_pixels/max_pixels set (smart_resize), fixed_image_hw = []
@@ -40,6 +42,8 @@ models:
     train_node: train.sft_vlm      # full fine-tune of the decoder, vision + embeddings frozen (upstream recipe)
     ram_gb_train: 35
     ram_source: measured           # P-1 26.08-2 startup peak +35GB WITH freeze/fused-attn bugs (001a §9); re-measure after fix
+    sft_trainable_pct_min: 29.4
+    sft_trainable_pct_max: 31.4
     attn: eager
     loss: nemotron_parse           # NemotronParseLoss, coord weight 10, threshold read from config (fixcode patch)
     freeze_vision_tower: true      # = RADIO backbone only (encoder.model_encoder); neck trains (001a §9.3)
@@ -74,6 +78,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 14
     ram_source: estimated
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -108,6 +114,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 32
     ram_source: estimated
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -142,6 +150,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 14
     ram_source: estimated
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -176,6 +186,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 13
     ram_source: measured           # S-3: steady +6.5GB, peak +12.6GB (host, upper bound)
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -210,6 +222,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 16
     ram_source: estimated          # S-3b will measure
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -244,6 +258,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 24
     ram_source: estimated
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -278,6 +294,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 38
     ram_source: estimated          # close to the 40GB budget -> usually hidden by preflight
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -312,6 +330,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 20
     ram_source: estimated
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -347,6 +367,8 @@ models:
     train_node: train.lora_vlm
     ram_gb_train: 28
     ram_source: estimated
+    sft_trainable_pct_min: 0
+    sft_trainable_pct_max: 0
     attn: sdpa
     loss: masked_ce
     freeze_vision_tower: true
@@ -381,6 +403,8 @@ models:
     train_node: train.sft_vlm
     ram_gb_train: 14
     ram_source: estimated
+    sft_trainable_pct_min: 26.8
+    sft_trainable_pct_max: 28.8
     attn: eager
     loss: nemotron_parse
     freeze_vision_tower: true      # = RADIO backbone only (encoder.model_encoder); neck trains (001a §9.3)

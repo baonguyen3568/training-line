@@ -1,0 +1,26 @@
+# Dataset catalog (data, not code). Owner: bao-research. Licence verdicts: bao-security.
+# Replaces the temporary HUB_DATASET_REVISIONS constant in src/vlm_pipeline/app/workers.py.
+# Same rules as models.yaml: revision = vetted 40-char SHA (never `main`), flat fields, one entry per dataset.
+#
+#   use           train | eval_only        (eval_only: never train on it, never export predictions with its
+#                                            questions/images, end user downloads it themselves; P002 A4)
+#   splits        splits available; test splits listed in heldout_splits are NEVER used for training/calibration
+#   attribution   text the app must show (and ship with exports derived from it)
+schema_version: 1
+datasets:
+  - id: cord-v2
+    repo: naver-clova-ix/cord-v2
+    revision: 7f0115a4b758a71d6473b8d085751692da2fef98
+    display_name: "CORD v2"
+    license: cc-by-4.0
+    commercial: "yes"
+    attribution: "CORD: A Consolidated Receipt Dataset for Post-OCR Parsing (Park et al., NAVER Clova), https://github.com/clovaai/cord, CC BY 4.0; note if modified"
+    security: approved
+    use: train
+    splits: [train, validation, test]
+    heldout_splits: [test]
+    num_train: 800
+    format: parquet
+    loader: make_cord_v2_dataset
+    gated: false
+    disk_gb: 0.24
