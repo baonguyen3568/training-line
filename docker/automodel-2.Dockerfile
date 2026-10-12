@@ -13,6 +13,12 @@ LABEL project="vlm-training" \
       org.opencontainers.image.base.name="nvcr.io/nvidia/nemo-automodel:26.08" \
       org.opencontainers.image.base.digest="sha256:70b4e9df8dd23ef451372b25952cffe24ad29c17f5b9de5fd1b244caf4e7b55a"
 
+# No phoning home from libraries (bao-security, pre-approved). Jobs needing W&B online override WANDB_MODE explicitly.
+ENV NO_ALBUMENTATIONS_UPDATE=1 \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    DO_NOT_TRACK=1 \
+    WANDB_MODE=offline
+
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 

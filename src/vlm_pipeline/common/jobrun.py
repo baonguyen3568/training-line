@@ -63,7 +63,11 @@ BASE_ENV: Mapping[str, str] = {
     "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
     "PYTHONPATH": f"{CONTAINER_ROOT}/src",
     "VLM_PROJECT_ROOT": CONTAINER_ROOT,
-    "NO_ALBUMENTATIONS_UPDATE": "1",  # albumentations phones home for a version check (network none -> noise)
+    # No phoning home (P003, bao-security): albumentations update check, HF telemetry, generic opt-outs, W&B offline.
+    "NO_ALBUMENTATIONS_UPDATE": "1",
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+    "DO_NOT_TRACK": "1",
+    "WANDB_MODE": "offline",
 }
 _FORBIDDEN_ENV_PREFIXES = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "NGC_", "WANDB_API_KEY")
 
