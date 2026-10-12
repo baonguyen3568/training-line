@@ -67,3 +67,10 @@ BLOCKING: - file:line — issue — scenario — fix
 NON-BLOCKING: - ...
 ```
 Disagreement not resolved in 1 round → `.team/CONFLICTS.md` + notify PM (`trainning-model-6a`).
+
+## Ordering rule (learned 2026-10-12)
+- Third-party code patches (`third_party/patches/**`) and any deviation from an approved lock/Dockerfile must reach
+  security **before** the image is built. If a build already happened, review retroactively, compare the built
+  artifact (pip freeze, patch sha256, image digest) against what was reviewed, and record the deviation in the log.
+- Always verify by artifact, not by report: recompute sha256 of the exact file built, diff pinned hash lists, read
+  the committed code (not the description).

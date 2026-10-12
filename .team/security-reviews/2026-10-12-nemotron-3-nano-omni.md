@@ -65,3 +65,18 @@ c2eb9166de48f5eb5f90f8a750e8ebe67da93698e794dc0bbdab5f013bab8e66  open_clip_adap
 5b83b4c7b90b797d854a6da2fd4093ce9210a52533d3f7ba6bf505793b6c68c3  vitdet.py
 092e9a0b8eca4fee162484ef3ef77b399f686e5e0ffc7be85fb2d69bc2f9ebd9  vit_patch_generator.py
 ```
+
+## Cập nhật 2026-10-12 (chiều): N1 có cách pin, ĐÃ KIỂM CHỨNG
+
+**Cơ chế (đọc mã nguồn transformers 5.12.1 trong `vlm-automodel:26.08-1`):** `get_class_from_dynamic_module` tách `"repo--module.Class"`. Khi repo khác repo gốc thì `code_revision` **không** kế thừa `revision`, nên mặc định là `main`. Đây là gốc của N1. Nếu phần trước `--` là **đường dẫn thư mục local**, transformers nạp module từ thư mục đó và không cần mạng.
+
+**Cách pin:**
+1. Tải các file `.py` + `config.json` của `nvidia/C-RADIOv4-H@0057b339…`, KHÔNG tải `*.pth.tar`. Verify sha256 theo bảng trên.
+2. Bước prepare (first-party) sinh **config đã vá** trong workspace của run: thay `vision_config.auto_map` từ `nvidia/C-RADIOv4-H--hf_model.X` thành `<abs path thư mục C-RADIO đã pin>--hf_model.X`. Không sửa snapshot gốc trong HF cache.
+3. Load với `HF_HUB_OFFLINE=1`, `--network none`. Verify hash ngay trước khi load (chống TOCTOU).
+
+**Kiểm chứng:** chạy trong container `vlm-automodel:26.08-1` với `--network none --read-only`, non-root, `HF_HUB_OFFLINE=1`. Hash verify OK. `RADIOConfig`/`RADIOModel` resolve từ thư mục pin (`transformers_modules.radio.<hash>.hf_model`), không có request mạng. Chưa load weights đầy đủ vì model 66GB vượt ngân sách RAM; test này chỉ kiểm đường resolve code. Script: scratchpad `pin-test/test_pin.py`; bao-backend nên đưa vào node prepare + test integration.
+
+**Trạng thái mới:** N1 HIGH → **MITIGATED (có điều kiện: dùng đúng cách pin trên)**. N2 (SSRF video_io) vẫn mở: wrapper first-party phải chặn `http(s)://` và `data:`, chỉ cho path local trong workspace. N3 LOW không đổi.
+**License chồng:** code C-RADIO thuộc NVIDIA Open Model License (bản 10/2025, card trỏ bản 06/2024) có điều khoản **tự chấm dứt nếu "bypass, disable, reduce the efficacy of… safety guardrail"**. Omni (NVIDIA Open Model Agreement 2026-03) không có điều khoản này. Fine-tune vision tower hầu như không đụng guardrail, nhưng app no-code nên hiển thị nghĩa vụ "không dùng để gỡ cơ chế an toàn" cho model NVIDIA dùng Open Model License.
+**Kết luận:** Omni lên **APPROVED cho R&D + catalog "nâng cao"** khi đủ 3 điều kiện: pin C-RADIO theo cách trên, wrapper N2, và vLLM ≥0.31.0. **Không làm template mặc định**, vì 66GB / ~75GB RAM vượt ngân sách 40GB của host (lý do tài nguyên, không phải security).

@@ -140,8 +140,8 @@ assets:
     license: Apache-2.0
     license_url: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/LICENSE
     upstream: [Qwen/Qwen3.5-0.8B-Base]
-    commercial: yes                   # yes | no | conditional
-    derivatives: yes
+    commercial: "yes"                 # "yes" | "no" | "conditional" — quoted strings, not YAML bools
+    derivatives: "yes"
     obligations: "keep LICENSE"
     scope: [spike]                    # spike | train | eval | serve  (model/image level)
     reviewer: bao-security
@@ -197,11 +197,17 @@ Bằng chứng từ hệ sinh thái tương tự (ComfyUI):
 - Lưu trữ: OS keyring (Secret Service) nếu có. Nếu không (DGX headless thường không có) thì lưu file trong app data dir **ngoài repo/workspace**, perm 0600, chủ là user chạy app. Nói rõ: mã hoá bằng key nằm trên cùng đĩa không tăng bảo mật thật, nên không quảng cáo là "encrypted".
 - Token chỉ được truyền (env, trong lúc chạy) cho đúng node cần nó (download). Không vào log, workflow, run manifest, W&B, hay error message hiển thị cho user (redact trước khi dịch lỗi sang ngôn ngữ dễ hiểu).
 - Có nút "Xoá token" và "Kiểm tra lại".
+- **Loại token (chốt cùng bao-design, P010 §16):** chế độ Simple hướng dẫn tạo token **Read** cổ điển, vì fine-grained dễ tick sai quyền và người dùng sẽ cấp rộng hơn để "sửa lỗi". Fine-grained để ở Advanced. Server đọc `whoami.auth.accessToken.role`: `write` → **từ chối** ở Simple, cảnh báo đỏ ở Advanced; `fineGrained` → kiểm có quyền đọc repo gated. UI ghi rõ rủi ro còn lại: "Token Read đọc được mọi repo của bạn, kể cả riêng tư". Gợi ý đặt tên `vlm-app-read` + thời hạn hết hạn.
 
 ### D13. App web local: CSRF / DNS rebinding / máy dùng chung
 - Bind `127.0.0.1` (không bind 0.0.0.0). **Host header allowlist** (`127.0.0.1:<port>`, `localhost:<port>`), sai thì trả 403. Biện pháp này chặn DNS rebinding.
 - **Origin check** trên mọi request đổi trạng thái và mọi WebSocket handshake. Không bật CORS. API nhận JSON kèm custom header (vd `X-VLM-CSRF` mang token phiên) nên form cross-site không gửi được.
 - **Cần auth kể cả trên localhost** (tôi sửa lại khuyến nghị trước đây cho P006): máy dùng chung có nhiều user/service, container nào chạy `--network host` cũng gọi được 127.0.0.1. Cách làm: token ngẫu nhiên sinh lúc khởi động (kiểu Jupyter), mở URL `?token=` một lần rồi đổi sang cookie `HttpOnly; SameSite=Strict`. Token lưu file 0600.
+- **CSRF + WebSocket (chốt sau khi hiện thực S-5, frontend + backend):**
+  - CSRF token = HMAC(server_secret, session_id), cấp qua `GET /api/session` (JSON body). Client giữ token trong bộ nhớ, gửi header `X-VLM-CSRF`. **Không** dùng cookie đọc được: cookie không tách theo port và SameSite coi mọi port của 127.0.0.1 là cùng site, nên app khác trên máy có thể tossing cookie.
+  - WebSocket: lúc handshake kiểm Origin khớp chính xác scheme+host+port và cookie `vlm_session`. Message đầu tiên bắt buộc là `{"type":"auth","csrf_token":…}` (so bằng compare_digest). Server không gửi gì trước khi auth xong. Sai hoặc quá 5 giây → close 4401. **Không** truyền token qua query string hay subprotocol (lọt vào log).
+- **Hiện thực:** `src/vlm_pipeline/app/security.py` (bao-security, M1-7). ASGI middleware + `install_security()` + `ws_authenticate()`. uvicorn bắt buộc chạy `access_log=False`.
+- **E2E Playwright trên host dev:** Chromium chạy `--no-sandbox`, vì host có `kernel.apparmor_restrict_unprivileged_userns=1`, không đổi được khi không có sudo. Điều kiện bù: chặn mọi request không phải 127.0.0.1, env đã lọc (không có token thật), profile tạm, fixture tĩnh. Khi E2E render nội dung từ internet thì chuyển sang container Playwright chính chủ.
 - Endpoint upload: whitelist loại file (ảnh/video/parquet/jsonl/safetensors), **không** deserialize pickle, giới hạn kích thước và số pixel, lưu tên file ngẫu nhiên.
 - CSP và header như P006 §8.
 
