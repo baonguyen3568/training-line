@@ -384,7 +384,7 @@ canvas:
   wire_replaced: Replaced the previous wire
 library:
   title: Step library
-  search: Search steps… (e.g. compress, LoRA, benchmark)
+  search: Search steps… (e.g. compress)
   no_match: No steps match. Try another word.
   snapped_to_lane: Placed "{node}" in the {lane} lane
   collapse: Collapse library
@@ -425,6 +425,7 @@ preflight:
   run_blocked: Fix the errors before running
   estimate_line: 'Estimated: {time} · {ram} · {disk}'
   queue_when_busy: Queue — runs automatically when the GPU is free
+  empty: Add a step to get started
 error_card:
   what: What happened
   why: Why
@@ -908,3 +909,7 @@ model_picker:
   needs_free_ram: 'Needs a freer machine: ~{need_gb} GB needed, {avail_gb} GB free'
   fits: Fits in free memory
   gated: Needs a Hugging Face account
+draft:
+  restore_prompt: Restore the unsaved workflow from {time}?
+  restore: Restore
+  discard: Discard

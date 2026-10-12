@@ -384,7 +384,7 @@ canvas:
   wire_replaced: Đã thay dây cũ
 library:
   title: Thư viện bước
-  search: 'Tìm bước… (vd: nén, LoRA, benchmark)'
+  search: 'Tìm bước… (vd: nén)'
   no_match: Không có bước nào khớp. Thử từ khác.
   snapped_to_lane: Đã đặt "{node}" vào làn {lane}
   collapse: Thu gọn thư viện
@@ -425,6 +425,7 @@ preflight:
   run_blocked: Sửa các lỗi trước khi chạy
   estimate_line: 'Dự kiến: {time} · {ram} · {disk}'
   queue_when_busy: Xếp hàng — tự chạy khi GPU rảnh
+  empty: Thêm bước để bắt đầu
 error_card:
   what: Chuyện gì xảy ra
   why: Vì sao
@@ -908,3 +909,7 @@ model_picker:
   needs_free_ram: 'Cần máy rảnh hơn: cần ~{need_gb} GB, đang trống {avail_gb} GB'
   fits: Vừa với bộ nhớ đang trống
   gated: Cần tài khoản Hugging Face
+draft:
+  restore_prompt: Khôi phục workflow chưa lưu từ {time}?
+  restore: Khôi phục
+  discard: Bỏ
