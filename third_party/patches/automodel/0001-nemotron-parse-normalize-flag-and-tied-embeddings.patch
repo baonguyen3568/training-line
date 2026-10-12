@@ -1,0 +1,80 @@
+diff --git a/nemo_automodel/components/models/nemotron_parse/model.py b/nemo_automodel/components/models/nemotron_parse/model.py
+--- a/nemo_automodel/components/models/nemotron_parse/model.py
++++ b/nemo_automodel/components/models/nemotron_parse/model.py
+@@ -12,6 +12,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++import logging  # PATCH(vlm)
+ import math
+ from dataclasses import dataclass
+ from typing import List, Optional, Tuple, Union
+@@ -45,6 +46,21 @@
+ )
+ from nemo_automodel.components.models.common.utils import compute_lm_head_logits
+ 
++logger = logging.getLogger(__name__)  # PATCH(vlm)
++
++
++def _resolve_processor_normalizes(get) -> bool:
++    # PATCH(vlm): the encoder flag is `image_processor_normalizes` up to Parse v1.1 and `processor_normalizes` from
++    # v1.2 on. Accept both (new name wins) and warn if they disagree; `get(name)` returns None when absent.
++    new, old = get("processor_normalizes"), get("image_processor_normalizes")
++    if new is not None and old is not None and bool(new) != bool(old):
++        logger.warning(
++            "encoder processor_normalizes=%s and image_processor_normalizes=%s disagree; using processor_normalizes",
++            new,
++            old,
++        )
++    return bool(new if new is not None else (old if old is not None else False))
++
+ # -----------------------------------------------------------------------------
+ # NemotronParse configuration
+ # -----------------------------------------------------------------------------
+@@ -191,6 +207,9 @@
+             for key, value in encoder.items():
+                 if hasattr(self.encoder, key):
+                     setattr(self.encoder, key, value)
++            # PATCH(vlm): RADIOConfig has no normalize attribute, so the hasattr() copy above dropped the flag for
++            # every Parse version and RadioWithNeck normalized already-normalized pixels a second time.
++            self.encoder.image_processor_normalizes = _resolve_processor_normalizes(encoder.get)
+         else:
+             self.encoder = PretrainedConfig()
+ 
+@@ -376,7 +395,7 @@
+     def __init__(self, config):
+         super().__init__()
+         self.config = config
+-        self.image_processor_normalizes = bool(getattr(config, "image_processor_normalizes", False))
++        self.image_processor_normalizes = _resolve_processor_normalizes(lambda k: getattr(config, k, None))  # PATCH(vlm)
+         self._radio_input_conditioner_externalized = False
+ 
+         # Create RADIO encoder from config (which is now actual RADIOConfig)
+@@ -471,7 +490,10 @@
+ class NemotronParseForConditionalGeneration(HFCheckpointingMixin, NemotronParsePreTrainedModel, GenerationMixin):
+     """NemotronParse model for conditional generation tasks."""
+ 
+-    tie_word_embeddings_support: TieSupport = TieSupport.UNTIED_ONLY
++    # PATCH(vlm): Parse 2.0 ships tie_word_embeddings=True and no lm_head.weight (head shared with
++    # decoder.embed_tokens, as in its reference hf_nemotron_parse_modeling.py); v1.x stays untied.
++    tie_word_embeddings_support: TieSupport = TieSupport.BOTH
++    _tied_weights_keys = {"lm_head.weight": "decoder.embed_tokens.weight"}
+ 
+     @dataclass(frozen=True)
+     class ModelCapabilities:
+@@ -531,6 +553,15 @@
+     def set_input_embeddings(self, value):
+         self.decoder.embed_tokens = value
+ 
++    def tie_weights(self, *args, **kwargs):
++        # PATCH(vlm): keep everything the base class does, then tie explicitly: transformers v5 does not reliably
++        # tie custom models from the dict-shaped _tied_weights_keys alone (cf. nemo_automodel Qwen2ForCausalLM).
++        # post_init() calls this, so tied checkpoints (Parse 2.0) are tied at construction.
++        result = super().tie_weights(*args, **kwargs)
++        if getattr(self.config, "tie_word_embeddings", False):
++            self.lm_head.weight = self.decoder.embed_tokens.weight
++        return result
++
+     def forward(
+         self,
+         pixel_values: Optional[torch.FloatTensor] = None,

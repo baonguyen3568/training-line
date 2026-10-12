@@ -77,6 +77,34 @@
 - QKV interleave / GQA head ordering sai → load OK nhưng output rác. Phát hiện bằng so logits, không bằng shape.
 - dtype: convert ở fp32 hay bf16? Ghi rõ; vision encoder thường nên giữ bf16/fp32.
 
+### 2.6b Lỗi "sai âm thầm" do đổi tên field config (không crash, accuracy tụt)
+**CẬP NHẬT 17:05 — root cause thật rộng hơn:** `NemotronParseConfig.__init__` dựng encoder config từ C-RADIOv2-H rồi chỉ
+copy key encoder `if hasattr(self.encoder, key)`; `RADIOConfig` không có field normalize → cờ RƠI Ở MỌI VERSION, kể cả
+v1.1 (đo trong 26.08-1: flag model thấy = False; tester xác nhận số học: input patch-embed = bf16(((1−m)/s−m)/s)).
+Fix: patch `third_party/patches/automodel/0001-…` (image vlm-automodel:26.08-2). Bài học: **đừng tin "bản cũ đúng"
+khi chưa đo** — kiểm hành vi model đã dựng, không chỉ tên field trong config.json. Probe gate: so với kỳ vọng làm tròn
+theo dtype encoder (bf16), không phải fp32 (lệch ~5e-3).
+**Ca ban đầu (bao-research, 2026-10-12):** Nemotron-Parse v1.2/2.0 + class native NeMo AutoModel (26.08 và main@829445d),
+`nemo_automodel/components/models/nemotron_parse/model.py` L379 đọc `getattr(config, "image_processor_normalizes", False)`,
+nhưng config encoder v1.2/2.0 đổi tên thành `processor_normalizes: true` → `getattr` trả default False → model
+**chuẩn hoá ảnh lần 2**. 2.0 còn `tie_word_embeddings: true` vs `TieSupport.UNTIED_ONLY` → từ chối load (lỗi rõ ràng).
+v1.1@fd1e3c6b dùng tên cũ → đúng; dự án chọn v1.1.
+**Root cause tổng quát:** code đọc config bằng `getattr(cfg, "<tên>", default)` — upstream đổi tên field không alias
+⇒ default âm thầm. Mọi `getattr(..., default)` trên config của model là điểm nghi vấn.
+**Phát hiện (test, rẻ → đắt):**
+1. *Config key coverage* (CPU, không cần weights): với mỗi model family, giữ bảng alias field nhạy cảm
+   (`image_processor_normalizes|processor_normalizes`, `tie_word_embeddings`, `rope_scaling|rope_parameters`,
+   `max_pixels|max_image_tokens`, `image_mean/std`…). Đọc **mọi alias** ở config gốc + sub-config (vision/text/encoder);
+   FAIL nếu các alias mâu thuẫn, WARN nếu có alias mà class native không đọc tên đó.
+2. *Double-normalization probe* (CPU, model tiny hoặc chỉ vision tower): ảnh trắng tổng hợp (255) → processor →
+   forward hook trên **input của layer đầu vision encoder** (patch-embed). Giá trị kỳ vọng tính chính xác được:
+   đã normalize 1 lần ⇒ `(1 - mean_c)/std_c` mỗi kênh (vd ImageNet ≈ 2.25/2.43/2.64); lần 2 ⇒ `((1-m)/s - m)/s`.
+   So với kỳ vọng (atol 1e-3) — không dùng mean≈0/std≈1 trên ảnh tự nhiên (không đủ chắc để gate).
+3. *Golden logits* (nightly, GPU lock): ảnh + prompt cố định, so logits/top-1 với golden từ đường HF tham chiếu
+   (`trust_remote_code` trong sandbox, revision pin). Bắt được cả các rename khác ngoài normalize (R6 của P007).
+**Fix khi gặp:** không sửa code NVIDIA tại chỗ — `_nvidia_compat.py` map alias (ghi `WORKAROUND(BUG-NNN)` + link
+upstream + version), mở issue upstream; hoặc pin revision model dùng tên cũ (như v1.1).
+
 ### 2.7 Quantize (ModelOpt) / export
 - VLM: **phải exclude vision tower + projector** khỏi quantize (kiểm tra pattern exclude thực sự match) [COM-NVIDIA skill]. Sau quantize: in danh sách module đã quantize.
 - NVFP4 trên GB10 có thể chậm hơn FP8 (§2.1). Calibration dùng ảnh+text thật của domain, không chỉ text.
@@ -90,7 +118,7 @@
 ## 3. Sổ lỗi dự án (append khi fix bug thật)
 | Ngày | Bug | Root cause | Fix / commit | Test |
 |---|---|---|---|---|
-| — | (chưa có) | | | |
+| 2026-10-12 | Nemotron-Parse (MỌI version, cả v1.1): ảnh normalize 2 lần với AutoModel native; 2.0 bị từ chối vì tied | `NemotronParseConfig` copy key encoder theo `hasattr(RADIOConfig)` → cờ rơi; v1.2+ đổi tên cờ; class `UNTIED_ONLY` | patch `third_party/patches/automodel/0001` → image 26.08-2 | `tests/integration/automodel/test_nemotron_parse_patch.py` (10 FAIL→PASS) + probe tester |
 
 ## 4. Env fingerprint (dán vào mọi bug report)
 ```bash
