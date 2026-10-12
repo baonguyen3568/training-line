@@ -39,14 +39,14 @@ Quy tắc tốc độ cho M1: code UI/core chỉ cần 1 reviewer (cleancode HO�
 Docker/deps/network/secrets/xoá file/plugin. Không viết proposal mới cho M1, chỉ làm theo P009/P010 đã có.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| M1-1 | `nodes/`: NodeSpec + registry cho ~8 node v1: Dataset (CORD-v2 / thư mục ảnh), Model (từ catalog), Fine-tune, Evaluate, Chạy thử (inference), Quantize FP8, Benchmark, Export | bao-cleancode + bao-research (params từ recipe) | DOING |
-| M1-2 | `graph/`: validate (type/cycle/thiếu input) + executor (topo, cache fingerprint, chạy node → job, event stream, cancel/resume cơ bản) | bao-fixcode (dùng spec xfail của tester) | TODO |
-| M1-3 | `app/`: FastAPI GET /api/nodes, POST /api/graphs/validate, POST /api/runs, GET runs/metrics, WS events, auth token (D13); FakeWorker | bao-backend | TODO |
+| M1-1 | `nodes/`: NodeSpec + registry cho ~8 node v1: Dataset (CORD-v2 / thư mục ảnh), Model (từ catalog), Fine-tune, Evaluate, Chạy thử (inference), Quantize FP8, Benchmark, Export | bao-cleancode + bao-research (params từ recipe) | REVIEW (12 node: f1eb045, 4b12dd7, 7f0e0ae; chờ i18n design + soát research) |
+| M1-2 | `graph/`: validate (type/cycle/thiếu input) + executor (topo, cache fingerprint, chạy node → job, event stream, cancel/resume cơ bản) | bao-fixcode (dùng spec xfail của tester) | DONE (e6da8a1 + 2dd806a): validate + cache + executor; 60 spec + 9 test; review cleancode |
+| M1-3 | `app/`: FastAPI GET /api/nodes, POST /api/graphs/validate, POST /api/runs, GET runs/metrics, WS events, auth token (D13); FakeWorker | bao-backend | REVIEW (ec726ac: API + D13 security live; cancel + container worker chờ executor M1-2) |
 | M1-4 | Frontend: thư viện node (sidebar, tìm kiếm, kéo thả vào canvas), workflow trống, nối dây kéo-thả, xoá/nhân bản node, lưu/mở file workflow (.json), trạng thái chạy từng node trên canvas, nối API thật | bao-frontend | DOING |
 | M1-5 | UX thư viện node + trạng thái node khi chạy (spec nhanh, review UI) | bao-design | DOING |
-| M1-6 | E2E Playwright: tạo trống → kéo 3 node → nối → chạy FakeWorker → thấy kết quả; chuyển spec xfail graph/executor sang pass | bao-tester | TODO |
-| M1-7 | Review security tối thiểu cho app/ (auth, CORS/Host, WS) | bao-security | DOING (đề nghị viết sẵn app/security.py cho backend) |
-| M1-8 | Node cache retention + dọn worktree; hỗ trợ backend FakeWorker fixtures | bao-cleanup | DOING (worktree cleanup DONE 42dc8fc; fixtures run dir giả: đang làm; node cache retention chờ executor M1-2 + artifacts index) |
+| M1-6 | E2E Playwright: tạo trống → kéo 3 node → nối → chạy FakeWorker → thấy kết quả; chuyển spec xfail graph/executor sang pass | bao-tester | DOING (chromium arm64 OK; chờ selector + UI M1-4; dep chờ security) |
+| M1-7 | Review security tối thiểu cho app/ (auth, CORS/Host, WS) | bao-security | DONE (app/security.py ec726ac + fix d87595b; D13 spec 29/29) |
+| M1-8 | Node cache retention + dọn worktree; hỗ trợ backend FakeWorker fixtures | bao-cleanup | REVIEW→DONE phần code: worktrees 42dc8fc, testing+runs_index aba6332, index+cache_retention d162093, lease acadb6f, release_all_except e40d180 (fixcode/security/backend approve). Còn: backend nối app (startup release, panel Dung lượng, DISK-003) |
 S-9 (patch 26.08-2 → P-1/P-2) chạy song song, không chặn M1.
 
 ## Phase 2 — MỞ 2026-10-12 (user): scaffold + GPU smoke nhỏ. Tải >20GB phải hỏi PM. Mọi job GPU qua GPU_LOCK + preflight.
