@@ -7,7 +7,8 @@ planned the same way (no time-of-check/time-of-use gap), then logs ``checkpoint_
 ``optim/``, ``dataloader/``, ``rng/`` sub-directories are.
 
 Rules (first match wins, per checkpoint; statuses are ``common.runinfo.RunStatus``):
-1. run has a ``KEEP`` file, or is the run holding the GPU lock, or the lock is unreadable -> keep (blocked)
+1. run has a ``KEEP`` file, or is the run holding the GPU lock, or the lock is unreadable -> keep (blocked);
+   a ``KEEP`` file inside one checkpoint directory pins only that checkpoint
 2. status is queued/running/interrupted/evicted -> keep (blocked); missing/unknown status -> keep (UNKNOWN_STATUS)
 3. failed/cancelled: nothing before ``failed_grace_days`` after the run's last activity; then ``.incomplete`` and
    non-LATEST checkpoints are deleted, and LATEST is deleted ``failed_latest_days`` after the last activity.
@@ -220,7 +221,7 @@ def _consequence(run_id: str, ckpt_name: str, roles: list[str], action: Action) 
     return "PERMANENT_LOSS", {"name": f"{run_id}/{ckpt_name}"}
 
 
-def _plan_checkpoint(  # noqa: PLR0911 - one return per ADR-005 D3 rule, kept as a flat decision table
+def _plan_checkpoint(  # noqa: PLR0911, PLR0912 - flat ADR-005 D3 decision table
     run_id: str,
     ckpt: Path,
     roles: list[str],
@@ -240,6 +241,8 @@ def _plan_checkpoint(  # noqa: PLR0911 - one return per ADR-005 D3 rule, kept as
 
     if blocked is not None:
         return item("keep", 0, "D7.blocked", f"protected: {blocked}", blocked)
+    if (ckpt / "KEEP").exists():  # one checkpoint pinned, e.g. the preset chosen from several eval checkpoints
+        return item("keep", 0, "D7.ckpt_keep", "checkpoint pinned (KEEP)", "PINNED_OR_KEEP")
     if failed_ended_at is not None:
         ended_days = (now - failed_ended_at) / DAY_S
         if ended_days < policy.failed_grace_days:

@@ -315,3 +315,20 @@ def test_every_consequence_code_has_text_and_params_cover_placeholders(locale: s
         assert key in texts, key
         placeholders = {name for _, name, _, _ in Formatter().parse(texts[key]) if name}
         assert placeholders <= params, (key, placeholders - params)
+
+
+def test_keep_inside_one_checkpoint_pins_only_that_checkpoint(tmp_path: Path) -> None:
+    run = _standard_run(tmp_path)  # step_10 would be deleted (old, not LATEST/best)
+    (run / "checkpoints" / "epoch_0_step_10" / "KEEP").touch()
+    got = _actions(tmp_path)
+    assert got["epoch_0_step_10"] == ("keep", "PINNED_OR_KEEP")
+    assert got["epoch_0_step_50"] == ("delete", None)  # the rest of the run is still cleaned
+
+
+@pytest.mark.parametrize("status", ["completed", "failed"])
+def test_checkpoint_keep_beats_incomplete_and_failed_rules(tmp_path: Path, status: str) -> None:
+    run = _run(tmp_path, "r1", status=status, ended_days_ago=30)
+    ckpt = _ckpt(run, "epoch_0_step_1", age_days=30, incomplete=True)
+    (ckpt / "KEEP").touch()
+    _age_tree(run / "checkpoints", 30)
+    assert _actions(tmp_path) == {"epoch_0_step_1": ("keep", "PINNED_OR_KEEP")}
