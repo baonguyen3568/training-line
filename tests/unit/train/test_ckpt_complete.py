@@ -12,6 +12,7 @@ from vlm_pipeline.train.ckpt_complete import (
     EXTRA_SHARD,
     INDEX_NAME,
     complete_from_base,
+    generation_config_drift,
     missing_from_export,
     read_header,
     weight_map,
@@ -167,3 +168,90 @@ def test_corrupt_base_offsets_are_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="data_offsets"):
         complete_from_base(base, out)
     assert not (out / EXTRA_SHARD).exists()
+
+
+NVIDIA_GENERATION = {
+    "bos_token_id": 0,
+    "decoder_start_token_id": 2,
+    "do_sample": False,
+    "eos_token_id": 2,
+    "forced_eos_token_id": 2,
+    "max_new_tokens": 9000,
+    "num_beams": 1,
+    "pad_token_id": 1,
+    "repetition_penalty": 1.1,
+    "transformers_version": "4.51.3",
+}
+AUTOMODEL_GENERATION = {  # what the consolidated save wrote on 26.08-4 (O-1b)
+    "bos_token_id": 0,
+    "decoder_start_token_id": 2,
+    "eos_token_id": 2,
+    "output_attentions": False,
+    "output_hidden_states": False,
+    "pad_token_id": 1,
+    "transformers_version": "5.12.1",
+    "use_cache": False,
+}
+
+
+def test_base_decoding_defaults_are_restored(tmp_path: Path) -> None:
+    """The export lost repetition_penalty/forced_eos/max_new_tokens: decoding from it looped (O-1b sample #5)."""
+    base, out = _base(tmp_path), _export(tmp_path)
+    (base / "generation_config.json").write_text(json.dumps(NVIDIA_GENERATION))
+    (out / "generation_config.json").write_text(json.dumps(AUTOMODEL_GENERATION))
+
+    restored = complete_from_base(base, out)
+
+    lost = ["do_sample", "forced_eos_token_id", "max_new_tokens", "num_beams", "repetition_penalty"]
+    assert [r for r in restored if r.startswith("generation_config.json:")] == [
+        f"generation_config.json:{k}" for k in lost
+    ]
+    got = json.loads((out / "generation_config.json").read_text())
+    for key, value in NVIDIA_GENERATION.items():
+        if key != "transformers_version":
+            assert got[key] == value, key
+    assert got["use_cache"] is False  # patch 0003: the Parse decoder has no KV cache
+    assert got["transformers_version"] == "5.12.1"
+    assert generation_config_drift(base, out) == []
+
+
+def test_base_value_wins_over_a_different_export_value(tmp_path: Path) -> None:
+    base, out = _base(tmp_path), _export(tmp_path)
+    (base / "generation_config.json").write_text(json.dumps(NVIDIA_GENERATION))
+    (out / "generation_config.json").write_text(json.dumps({**AUTOMODEL_GENERATION, "repetition_penalty": 1.0}))
+    complete_from_base(base, out)
+    assert json.loads((out / "generation_config.json").read_text())["repetition_penalty"] == 1.1
+
+
+def test_export_owned_keys_are_kept_even_if_the_base_sets_them(tmp_path: Path) -> None:
+    base, out = _base(tmp_path), _export(tmp_path)
+    (base / "generation_config.json").write_text(json.dumps({**NVIDIA_GENERATION, "use_cache": True}))
+    (out / "generation_config.json").write_text(json.dumps(AUTOMODEL_GENERATION))
+    complete_from_base(base, out)
+    assert json.loads((out / "generation_config.json").read_text())["use_cache"] is False
+
+
+def test_missing_export_generation_config_is_copied_and_rerun_is_a_no_op(tmp_path: Path) -> None:
+    base, out = _base(tmp_path), _export(tmp_path)
+    (base / "generation_config.json").write_text(json.dumps(NVIDIA_GENERATION))
+    complete_from_base(base, out)
+    assert json.loads((out / "generation_config.json").read_text())["max_new_tokens"] == 9000
+    before = (out / "generation_config.json").read_bytes()
+    assert complete_from_base(base, out) == []
+    assert (out / "generation_config.json").read_bytes() == before
+
+
+def test_base_without_generation_config_leaves_the_export_alone(tmp_path: Path) -> None:
+    base, out = _base(tmp_path), _export(tmp_path)
+    (out / "generation_config.json").write_text(json.dumps(AUTOMODEL_GENERATION))
+    complete_from_base(base, out)
+    assert json.loads((out / "generation_config.json").read_text()) == AUTOMODEL_GENERATION
+
+
+def test_cli_completes_an_export_made_outside_the_worker(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from vlm_pipeline.train.ckpt_complete import main
+
+    base, out = _base(tmp_path), _export(tmp_path)
+    assert main([str(base), str(out)]) == 0
+    assert json.loads(capsys.readouterr().out)["restored"] == [DEAD, NORM_MEAN, NORM_STD]
+    assert missing_from_export(base, out) == []

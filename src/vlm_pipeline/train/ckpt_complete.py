@@ -7,8 +7,12 @@ Nemotron-Parse loses three keys of NVIDIA's checkpoint that way:
   code then loads them as 0 and any path that runs the conditioner divides by zero;
 - ``decoder.embed_positions.weight``: present in NVIDIA's file but used by no modeling code. Copied anyway (harmless,
   and "export contains the base" then holds literally, so a strict loader or another runtime finds what it expects).
+It also rewrites ``generation_config.json`` from the model config, dropping NVIDIA's decoding defaults
+(``repetition_penalty 1.1``, ``forced_eos_token_id``, ``max_new_tokens``, ``num_beams``, ``do_sample``): whoever loads
+the export would decode differently from the base (endless repetition, O-1b sample #5).
 Keys missing from the export are copied byte-for-byte from the base into one extra shard and added to the index, then
-the export is checked to be a superset of the base. Tensors the export already has are never touched.
+the export is checked to be a superset of the base. Tensors the export already has are never touched. The base's
+generation config wins over the export's, except for keys we set on purpose (``EXPORT_OWNED_GENERATION_KEYS``).
 """
 
 from __future__ import annotations
@@ -25,13 +29,44 @@ EXTRA_SHARD = "model-vlm-restored-from-base.safetensors"
 # Keys that are an alias of another tensor when embeddings are tied: restoring the base copy would bring back a stale
 # head next to the trained embedding.
 TIED_ALIASES = frozenset({"lm_head.weight"})
+GENERATION_CONFIG = "generation_config.json"
+# use_cache=False is required by patch 0003 (the Parse decoder has no KV cache); the version stamp is informational.
+EXPORT_OWNED_GENERATION_KEYS = frozenset({"use_cache", "transformers_version"})
 _MAX_HEADER_BYTES = 100 * 1024 * 1024
 
 
 class CheckpointIncompleteError(RuntimeError):
     def __init__(self, missing: Iterable[str]) -> None:
         self.missing = sorted(missing)
-        super().__init__(f"exported checkpoint lacks {len(self.missing)} base tensor(s): {self.missing[:5]}")
+        super().__init__(f"exported checkpoint lacks {len(self.missing)} base item(s): {self.missing[:5]}")
+
+
+def generation_config_drift(base_dir: Path, export_dir: Path) -> list[str]:
+    """Base generation-config keys the export lacks or sets differently (``generation_config.json:<key>``)."""
+    base_path = base_dir / GENERATION_CONFIG
+    if not base_path.is_file():
+        return []
+    base = json.loads(base_path.read_text(encoding="utf-8"))
+    export_path = export_dir / GENERATION_CONFIG
+    export = json.loads(export_path.read_text(encoding="utf-8")) if export_path.is_file() else {}
+    return sorted(
+        f"{GENERATION_CONFIG}:{k}"
+        for k, v in base.items()
+        if k not in EXPORT_OWNED_GENERATION_KEYS and (k not in export or export[k] != v)
+    )
+
+
+def _restore_generation_config(base_dir: Path, export_dir: Path) -> list[str]:
+    drift = generation_config_drift(base_dir, export_dir)
+    if drift:
+        base = json.loads((base_dir / GENERATION_CONFIG).read_text(encoding="utf-8"))
+        export_path = export_dir / GENERATION_CONFIG
+        export = json.loads(export_path.read_text(encoding="utf-8")) if export_path.is_file() else {}
+        merged = {**export, **{k: v for k, v in base.items() if k not in EXPORT_OWNED_GENERATION_KEYS}}
+        tmp = export_path.with_name(export_path.name + ".tmp")
+        tmp.write_text(json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        tmp.replace(export_path)
+    return drift
 
 
 def read_header(path: Path) -> tuple[dict[str, dict[str, object]], int]:
@@ -114,9 +149,10 @@ def _read_tensor(shard: Path, name: str) -> tuple[dict[str, object], bytes]:
 
 
 def complete_from_base(base_dir: Path, export_dir: Path) -> list[str]:
-    """Copy base tensors missing from ``export_dir`` into it; return the restored names. Idempotent.
+    """Copy base tensors missing from ``export_dir`` and the base generation config into it. Idempotent.
 
-    Raises ``CheckpointIncompleteError`` if the export is still not a superset of the base afterwards.
+    Returns the restored tensor names and ``generation_config.json:<key>`` entries. Raises
+    ``CheckpointIncompleteError`` if the export still lacks part of the base afterwards.
     """
     missing = missing_from_export(base_dir, export_dir)
     if missing:
@@ -144,15 +180,33 @@ def complete_from_base(base_dir: Path, export_dir: Path) -> list[str]:
         tmp = index_path.with_name(index_path.name + ".tmp")
         tmp.write_text(json.dumps(index, indent=2) + "\n", encoding="utf-8")
         tmp.replace(index_path)
-    still = missing_from_export(base_dir, export_dir)
+    restored_generation = _restore_generation_config(base_dir, export_dir)
+    still = missing_from_export(base_dir, export_dir) + generation_config_drift(base_dir, export_dir)
     if still:
         raise CheckpointIncompleteError(still)
-    return missing
+    return missing + restored_generation
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``python -m vlm_pipeline.train.ckpt_complete BASE_DIR EXPORT_DIR`` for exports made outside RealWorker."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("base_dir", type=Path)
+    parser.add_argument("export_dir", type=Path)
+    args = parser.parse_args(argv)
+    print(json.dumps({"restored": complete_from_base(args.base_dir, args.export_dir)}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 
 
 __all__ = [
     "CheckpointIncompleteError",
     "complete_from_base",
+    "generation_config_drift",
     "missing_from_export",
     "read_header",
     "weight_map",

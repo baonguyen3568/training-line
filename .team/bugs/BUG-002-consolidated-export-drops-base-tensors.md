@@ -3,7 +3,7 @@ Severity: major for downstream runtimes (HF remote / vLLM / export load RADIO's 
 harmless on the native AutoModel path (recomputed in __init__)
 Found by: bao-tester (O-1b parity, run 20261012-1930-o1b-parity-ae1a, image 26.08-4)   Date: 2026-10-12
 Component: train export (AutoModel consolidated save)   Owner: bao-fixcode
-Status: FIXING (code ready, wiring into app/workers.py + parity re-run pending)
+Status: FIXED, pending bao-tester confirmation (7b671f2 + generation config; wired by bao-backend in RealWorker and smoke CLI)
 
 ## Symptom
 Strict load of `checkpoints/LATEST/model/consolidated` against NVIDIA's checkpoint: 665 vs 668 keys. Missing:
@@ -28,3 +28,18 @@ Real checkpoint (copy at outputs/fixcode/bug002/consolidated): 3 keys restored, 
 ## Verification pending
 - Wire after training in app/workers.py (bao-backend) so every downstream node gets the complete export.
 - bao-tester parity script on the completed copy: expect strict_load_ok true, remote norm_mean/std = CLIP values.
+
+## Also: generation_config.json (bao-tester, same class of bug)
+The consolidated save rewrites generation_config.json from the model config and drops NVIDIA's decoding defaults
+(do_sample, forced_eos_token_id 2, max_new_tokens 9000, num_beams 1, repetition_penalty 1.1) -> looping decode from the
+export (O-1b sample #5). `complete_from_base` now restores them: base wins except `use_cache` (patch 0003 needs False)
+and `transformers_version`. CLI for exports made elsewhere: `python -m vlm_pipeline.train.ckpt_complete BASE EXPORT`.
+
+## Verification (2026-10-12, 26.08-5, GPU via jobrun)
+- bao-tester's parity script on the completed copy (run 20261012-1939-bug002-parity-8068): remote norm_mean/std =
+  CLIP values (were 0), logprob diff 0.0, argmax 100 %, parity_ok true. strict_load_ok false ONLY for
+  `unexpected_keys: [decoder.embed_positions.weight]`.
+- Same script on NVIDIA's own base dir (run 20261012-1941-bug002-parity-base-91f3): identical load report. So the
+  export now loads exactly like the base; the right gate is "load report of export == load report of base", not {}.
+- transformers GenerationConfig.from_pretrained on the completed copy: repetition_penalty 1.1, forced_eos 2,
+  max_new_tokens 9000, num_beams 1, do_sample False, use_cache False.
