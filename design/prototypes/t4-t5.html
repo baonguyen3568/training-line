@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype T4–T5</title>
+<!-- Static prototype for usability tasks T4/T5/T5b (design/research/usability-test-plan.md).
+     Copy is taken verbatim from src/vlm_pipeline/i18n/vi.yaml; colors/sizes from the generated tokens.
+     Not product code — the real screens are built by bao-frontend. Switch screens with the tabs or ?s=t4|t5|t5b. -->
+<link rel="stylesheet" href="../../frontend/src/generated/tokens.css">
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--color-page); color: var(--color-text-primary); font: var(--font-size-body)/1.45 var(--font-family-ui); }
+  header { display: flex; gap: 12px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--color-grid); background: var(--color-surface); }
+  header b { font-size: 16px; margin-right: 16px; }
+  .chip { border: 1px solid var(--color-axis); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+  .chip.warn { border-color: var(--color-status-warning); }
+  .tabs { margin-left: auto; display: flex; gap: 4px; }
+  .tabs button { font: inherit; padding: 4px 10px; border: 1px solid var(--color-axis); background: var(--color-surface); color: inherit; border-radius: 4px; cursor: pointer; }
+  .tabs button[aria-pressed="true"] { background: var(--color-action-selected-bg); color: var(--color-action-selected-fg); font-weight: 600; }
+  main { display: grid; grid-template-columns: 1fr 380px; min-height: calc(100vh - 92px); }
+  .canvas { background: var(--color-canvas-background); padding: 24px; position: relative; }
+  .node { width: 240px; background: var(--color-canvas-node-bg); border: 1px solid var(--color-canvas-node-border); border-radius: 8px; font-size: 12px; position: absolute; }
+  .node h4 { margin: 0; padding: 8px 10px; font-size: 13px; border-bottom: 1px solid var(--color-grid); }
+  .node .sum { padding: 4px 10px; color: var(--color-text-secondary); }
+  .node .st { padding: 6px 10px; border-top: 1px solid var(--color-grid); }
+  .node.err { border: 2px solid var(--color-status-critical); }
+  .node.missing { background: var(--color-canvas-placeholder-bg); border: 1px solid var(--color-axis); }
+  .node.blocked { border: 2px solid var(--color-status-critical); }
+  .num { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--color-axis); border-radius: 50%; font-size: 11px; margin-right: 6px; }
+  .tp { position: absolute; top: -10px; left: 8px; background: var(--color-surface); border: 1px solid var(--color-text-secondary); border-radius: 4px; padding: 0 4px; font-size: 11px; }
+  aside { background: var(--color-surface); border-left: 1px solid var(--color-grid); padding: 16px; overflow: auto; }
+  aside h2 { font-size: 16px; margin: 0 0 8px; }
+  .card { border: 1px solid var(--color-grid); border-left: 4px solid var(--color-status-critical); border-radius: 8px; padding: 12px; margin: 8px 0; }
+  .card.warn { border-left-color: var(--color-status-warning); }
+  .card h3 { margin: 0 0 8px; font-size: 15px; }
+  .lbl { font-size: 12px; color: var(--color-text-secondary); text-transform: none; font-weight: 600; margin-top: 10px; }
+  .muted { color: var(--color-text-secondary); font-size: 13px; }
+  button.primary { background: var(--color-action-primary-bg); color: var(--color-action-primary-fg); border: 0; border-radius: 4px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:hover { background: var(--color-action-primary-bg-hover); }
+  button.secondary { background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-axis); border-radius: 4px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accent-focus); outline-offset: 2px; }
+  .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  details { margin-top: 10px; font-size: 13px; }
+  input[type=text] { width: 100%; padding: 8px; border: 1px solid var(--color-axis); border-radius: 4px; background: var(--color-page); color: inherit; font: 13px var(--font-family-mono); }
+  .untrusted { font-family: var(--font-family-mono); background: var(--color-page); padding: 0 4px; border-radius: 3px; }
+  footer { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--color-grid); background: var(--color-surface); }
+  footer .run { margin-left: auto; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <b>▣ VLM Studio</b>
+  <span class="chip">GPU · Đang bận: bao-backend chạy smoke từ 14:02</span>
+  <span class="chip warn">⚠ RAM 112/121 GB · còn trống 9 GB</span>
+  <nav class="tabs" aria-label="Màn hình prototype">
+    <button data-s="t4" aria-pressed="true">T4 thiếu RAM</button>
+    <button data-s="t5" aria-pressed="false">T5 node lạ</button>
+    <button data-s="t5b" aria-pressed="false">T5b bị chặn</button>
+  </nav>
+</header>
+
+<main>
+  <section class="canvas" aria-label="Canvas">
+    <div class="node" style="left:24px;top:40px"><h4><span class="num">1</span>Chọn model gốc</h4><div class="sum">NVIDIA-Nemotron-Parse-v1.1</div><div class="st">○ Sẵn sàng</div></div>
+    <div class="node" style="left:24px;top:170px"><h4><span class="num">2</span>Dataset Hugging Face</h4><div class="sum">cord-v2</div><div class="st">○ Sẵn sàng</div></div>
+    <div class="node" style="left:290px;top:110px"><h4><span class="num">3</span>Chia dữ liệu học / kiểm tra</h4><div class="st">○ Sẵn sàng</div></div>
+
+    <div id="n-t4" class="node err" style="left:556px;top:110px"><h4><span class="num">4</span>Fine-tune toàn bộ</h4><div class="st">✕ Lỗi · Không đủ bộ nhớ</div></div>
+
+    <div id="n-t5" class="node missing" style="left:556px;top:110px" hidden><h4><span class="num">4</span>⚠ Thiếu node</h4>
+      <div class="sum">"<span class="untrusted">fastvision/turbo-lora.train</span>"<br><span class="muted">(tên do file workflow ghi)</span></div>
+      <div class="st"><button class="secondary" data-go="t5">Xem để cài</button></div></div>
+
+    <div id="n-t5b" class="node blocked" style="left:556px;top:110px" hidden><span class="tp">🧩</span><h4><span class="num">4</span>Turbo LoRA Trainer</h4>
+      <div class="sum">Bên thứ 3 – chưa xác minh · fastvision</div>
+      <div class="st">⛔ Bị chặn trên máy này theo chính sách quản trị · ▣ GPU</div></div>
+  </section>
+
+  <aside>
+    <!-- T4: MEM-001 with already_optimized (Parse template, research 2026-10-12) -->
+    <div id="p-t4">
+      <h2>Fine-tune toàn bộ</h2>
+      <div class="card" role="alert">
+        <h3>✕ Không đủ bộ nhớ cho bước này</h3>
+        <div class="lbl">Chuyện gì xảy ra</div>
+        <p>Bước này cần khoảng 14 GB nhưng máy chỉ còn 9 GB trống, vì máy đang dùng chung với ứng dụng khác.</p>
+        <p class="muted">Mẫu này đã dùng cấu hình tiết kiệm bộ nhớ nhất. Hãy đợi các tác vụ khác xong, hoặc xếp hàng để tự chạy khi đủ bộ nhớ.</p>
+        <div class="lbl">Cách sửa</div>
+        <div class="actions">
+          <button class="primary">Xếp hàng — tự chạy khi đủ bộ nhớ</button>
+          <button class="secondary">Xem ứng dụng nào đang dùng bộ nhớ</button>
+        </div>
+        <details><summary>Chi tiết kỹ thuật</summary><p class="muted">Mã lỗi MEM-001 · node 4 · ước lượng: đo thực tế trên máy này</p><button class="secondary">Sao chép báo cáo lỗi</button></details>
+      </div>
+    </div>
+
+    <!-- T5: CFG-004 not_installed + trust_level=unverified (shared workflow) -->
+    <div id="p-t5" hidden>
+      <h2>Không có trong nguồn tin cậy — workflow này do người khác chia sẻ</h2>
+      <p>Bước "<span class="untrusted">fastvision/turbo-lora.train</span>" <span class="muted">(tên do file workflow ghi)</span> là node bên thứ 3 không có trong nguồn tin cậy — workflow này do người khác chia sẻ. App không cài theo thông tin trong file.</p>
+      <div class="card warn">
+        <p>App không cài theo thông tin trong file workflow. Nếu bạn tin node "<span class="untrusted">fastvision/turbo-lora.train</span>", hãy tự tìm repo gốc của tác giả và dán link commit vào đây. Node sẽ ở mức chưa xác minh.</p>
+        <label class="lbl" for="url">Link commit của repo</label>
+        <input id="url" type="text" placeholder="Ví dụ: github.com/<tác giả>/<repo>/commit/<40 ký tự>" autocomplete="off">
+        <p id="url-err" class="muted" hidden>Link phải trỏ tới một commit đầy đủ 40 ký tự, không phải nhánh hay tag.</p>
+        <div class="actions"><button class="secondary" id="check">Kiểm tra link</button></div>
+      </div>
+      <button class="secondary">Hoặc xoá bước này khỏi workflow</button>
+    </div>
+
+    <!-- T5b: policy_block -->
+    <div id="p-t5b" hidden>
+      <h2>Turbo LoRA Trainer</h2>
+      <p class="muted">Bên thứ 3 – chưa xác minh · fastvision</p>
+      <div class="card" role="alert">
+        <h3>⛔ Bị chặn trên máy này theo chính sách quản trị</h3>
+        <p>Máy này đang chặn node bên thứ 3 có quyền này theo chính sách quản trị.</p>
+        <p class="muted">Quyền bị chặn: ▣ Dùng GPU.</p>
+        <div class="actions"><button class="secondary">Xoá bước này</button><button class="secondary">Chọn bước thay thế</button></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <b>Kiểm tra trước khi chạy:</b>
+  <span id="f-msg">✕ 1 lỗi · Không đủ bộ nhớ cho bước này</span>
+  <span class="muted">Sửa các lỗi trước khi chạy</span>
+  <button class="primary run" disabled>▶ Chạy</button>
+</footer>
+
+<script>
+  const msgs = { t4: "✕ 1 lỗi · Không đủ bộ nhớ cho bước này", t5: "✕ 1 lỗi · Workflow dùng bước app không có", t5b: "✕ 1 lỗi · Bị chặn trên máy này theo chính sách quản trị" };
+  function show(s) {
+    for (const k of ["t4", "t5", "t5b"]) {
+      document.getElementById("p-" + k).hidden = k !== s;
+      document.getElementById("n-" + k).hidden = k !== s;
+    }
+    document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.s === s)));
+    document.getElementById("f-msg").textContent = msgs[s];
+    try { history.replaceState(null, "", "?s=" + s); } catch {}
+  }
+  document.querySelectorAll("[data-s],[data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.s || b.dataset.go)));
+  document.getElementById("check").addEventListener("click", () => {
+    const ok = /\/commit\/[0-9a-f]{40}$/.test(document.getElementById("url").value.trim());
+    document.getElementById("url-err").hidden = ok;
+  });
+  show(new URLSearchParams(location.search).get("s") || "t4");
+</script>
+</body>
+</html>

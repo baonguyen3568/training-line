@@ -54,6 +54,12 @@ Cuối buổi: 3 câu hỏi.
 ## Đầu ra
 `design/research/usability-round-1.md`: các vấn đề xếp theo mức nghiêm trọng, có video timestamp nội bộ, kèm đề xuất sửa. Gửi PM, frontend, và chủ của từng phần liên quan.
 
+## Prototype cho T4/T5/T5b
+`design/prototypes/t4-t5.html` là trang tĩnh, mở bằng trình duyệt, chọn màn bằng `?s=t4|t5|t5b`. Câu chữ lấy nguyên văn từ i18n, màu từ tokens. Ảnh chụp ở `design/prototypes/shots/`.
+- T4 theo template Parse: chỉ có nút "Xếp hàng" và "Xem ứng dụng nào đang dùng bộ nhớ", kèm dòng "đã dùng cấu hình tiết kiệm nhất". Số 14/9 GB là minh hoạ, chờ P-1 đo thật.
+- T5: có node giữ chỗ, tên lấy từ file được gắn nhãn, ô link để trống, kiểm tra link đòi commit đủ 40 ký tự. Không có nút cài 1 chạm.
+- T5b: màn bị chặn theo chính sách.
+
 ## Phụ thuộc
 - Slice S-5 chạy được đến validate overlay. T4 và T5 cần lỗi giả lập và dialog cài; nếu chưa có thì dùng prototype giấy hoặc HTML tĩnh cho 2 nhiệm vụ đó.
 - bao-tester: fixture ở `tests/fixtures/usability/` (t1, t3, t4, t5 + `t5_app_config.json` policy tắt, `t5b_app_config.json` policy bật). Override chỉ được chấp nhận khi `worker: fake` (worker thật → ValueError). Còn thiếu: log sự kiện local (frontend).
