@@ -64,3 +64,11 @@ def test_train_limit_sets_dataset_limit_only() -> None:
     r = build_recipe(_tpl("cosmos-reason2-2b"), LoraParams(), model_dir="m", dataset_dir="d", run_dir="r",
                      train_limit=100)  # fmt: skip
     assert r["dataset"]["limit_dataset_samples"] == 100
+
+
+def test_decode_overrides_never_reach_automodel() -> None:
+    template = {**_tpl("nemotron-parse-v1.1"), "decode_overrides": {"repetition_penalty": 1.0}}
+    r = build_recipe(template, FullFinetuneParams(), model_dir="/w/m", dataset_dir="/w/d", run_dir="/w/r",
+                     class_token_start_idx=50000)  # fmt: skip
+    assert "decode_overrides" not in r
+    assert template["decode_overrides"] == {"repetition_penalty": 1.0}  # input untouched

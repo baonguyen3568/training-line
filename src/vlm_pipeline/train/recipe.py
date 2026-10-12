@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from vlm_pipeline.common.catalog import CatalogEntry
+from vlm_pipeline.common.decoding import DECODE_OVERRIDES_KEY, decode_overrides_of
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 
 TEMPLATE_DIR = Path("configs") / "train" / "templates"
@@ -50,6 +51,7 @@ def build_recipe(
     import copy
 
     r: dict[str, Any] = copy.deepcopy(dict(template))
+    r.pop(DECODE_OVERRIDES_KEY, None)  # ours, not an AutoModel key: applied by the Eval / "Try it" nodes
     _section(r, "model")["pretrained_model_name_or_path"] = model_dir
     _section(r, "processor")["pretrained_model_name_or_path"] = model_dir
     for key in ("dataset", "validation_dataset"):
@@ -116,4 +118,8 @@ def load_template(path: Path) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise RecipeError(f"template {path.name} is not a mapping")
+    try:
+        decode_overrides_of(data)
+    except ValueError as exc:  # pydantic.ValidationError: unknown key or out-of-range value
+        raise RecipeError(f"template {path.name}: invalid {DECODE_OVERRIDES_KEY}: {exc}") from exc
     return data
