@@ -199,6 +199,8 @@ action:
   pick_workspace_folder: Chọn thư mục trong dự án
   move_to_secure_settings: Chuyển sang Cài đặt bảo mật
   pick_other_asset: Chọn model/dữ liệu khác
+  queue_until_memory: Xếp hàng — tự chạy khi đủ bộ nhớ
+  see_memory_usage: Xem ứng dụng nào đang dùng bộ nhớ
 custom_node:
   library_group: Đã cài thêm
   badge:
@@ -392,6 +394,7 @@ error_card:
   copy_report: Sao chép báo cáo lỗi
   open_full_log: Mở file log đầy đủ
   applied_change: 'Đã đổi {param}: {old} → {new}'
+  already_optimized: Mẫu này đã dùng cấu hình tiết kiệm bộ nhớ nhất. Hãy đợi các tác vụ khác xong, hoặc xếp hàng để tự chạy khi đủ bộ nhớ.
 benchmark_group:
   documents: Đọc tài liệu & chữ trong ảnh
   charts: Hiểu biểu đồ & sơ đồ

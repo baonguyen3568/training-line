@@ -148,6 +148,12 @@ Chạy liên tục khi sửa graph (debounce ~500 ms), hiển thị ở thanh đ
 - **Ước lượng phải có nguồn**: RAM/thời gian/disk do backend tính (công thức + bảng đo thực tế trên GB10 từ bao-tester/bao-fixcode
   memguard), UI chỉ hiển thị **dải** + "độ tin cậy" (đo thật / ước lượng). Không có ước lượng → hiển thị "chưa ước lượng được", không bịa số.
 - Mọi gợi ý sửa là **nút làm ngay** (đổi sang QLoRA, bỏ mẫu lỗi), có Undo.
+- **Chỉ hiện action thực sự áp dụng được cho node/recipe đang dùng** (chốt với bao-research 2026-10-12, ví dụ template Nemotron-Parse):
+  - Ảnh có độ phân giải cố định → không có "giảm ảnh".
+  - batch=1 đã là tối thiểu → không có "giảm batch".
+  - Checkpointing đã bật → không có nút bật nữa.
+  - Khi không còn nút giảm RAM nào: hiện dòng `error_card.already_optimized` + action `queue_until_memory` / `see_memory_usage`.
+  - Server lọc action theo `applicable_when` (tham số có trong NodeSpec và chưa ở giới hạn). UI không tự suy.
 - **Kiểu hiển thị theo `Estimate.source`** (P009). Mỗi kiểu có tooltip giải thích nguồn số:
   - `measured`: chữ thường.
   - `formula`: thêm tiền tố "~".

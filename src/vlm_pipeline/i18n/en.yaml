@@ -199,6 +199,8 @@ action:
   pick_workspace_folder: Choose a folder in the project
   move_to_secure_settings: Move to secure settings
   pick_other_asset: Choose another model/data
+  queue_until_memory: Queue — run automatically when there's enough memory
+  see_memory_usage: See what's using memory
 custom_node:
   library_group: Installed add-ons
   badge:
@@ -392,6 +394,7 @@ error_card:
   copy_report: Copy error report
   open_full_log: Open full log
   applied_change: 'Changed {param}: {old} → {new}'
+  already_optimized: This template already uses its most memory-saving setup. Wait for other jobs to finish, or queue it to run automatically when there's enough memory.
 benchmark_group:
   documents: Documents & text in images
   charts: Charts & diagrams
