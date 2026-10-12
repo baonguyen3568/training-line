@@ -17,7 +17,7 @@ describe("vertical slice", () => {
     await waitFor(() => expect(screen.getByText(/Mọi thứ đã sẵn sàng/)).toBeTruthy(), {
       timeout: 4000,
     });
-    expect(screen.getByRole("button", { name: /Chạy/ })).toHaveProperty("disabled", false);
+    expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", false);
   });
 
   it("blocks Run when a required input is disconnected via the 'Nhận từ' picker", async () => {
@@ -30,7 +30,7 @@ describe("vertical slice", () => {
     const pickers = screen.getAllByLabelText(/Nhận từ/);
     fireEvent.change(pickers[0] as HTMLElement, { target: { value: "" } });
     await waitFor(
-      () => expect(screen.getByRole("button", { name: /Chạy/ })).toHaveProperty("disabled", true),
+      () => expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", true),
       {
         timeout: 2000,
       },

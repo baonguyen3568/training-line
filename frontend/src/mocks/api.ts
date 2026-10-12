@@ -13,6 +13,7 @@ import type {
   ValidationResult,
   Workflow,
 } from "../api/types";
+import registrySnapshot from "../generated/node-types.json";
 import { tp } from "../i18n";
 import { parseJsonl } from "../lib/metrics";
 import { isCompatible } from "../lib/ports";
@@ -76,6 +77,7 @@ function spec(partial: Partial<NodeSpec> & Pick<NodeSpec, "type_id" | "category"
   };
 }
 
+/** Hand-written specs for unit/security tests (third-party, payloads). The mock API serves `registry`. */
 export const mockNodeTypes: NodeSpec[] = [
   spec({
     type_id: "model.hf_pick",
@@ -308,23 +310,30 @@ export const mockNodeTypes: NodeSpec[] = [
   }),
 ];
 
+const unknownEstimate = {
+  ram_gb: null,
+  disk_gb: null,
+  minutes: null,
+  gpu_exclusive: true,
+  source: "unknown" as const,
+};
+
+const edge = (from: string, out: string, to: string, inp: string) => ({
+  from: [from, out] as [string, string],
+  to: [to, inp] as [string, string],
+});
+
+// Templates use the REAL registry params (src/generated/node-types.json); estimates are unknown until measured.
 const templates: Template[] = [
   {
-    // Default template (ADR-001 amendment 1): Nemotron-Parse v1.1 full fine-tune on CORD-v2. Estimates are
-    // not measured yet → source "unknown" (UI shows "chưa có số đo" rather than invented numbers).
+    // Default template (ADR-001 amendment 1): Nemotron-Parse v1.1 full fine-tune on CORD-v2.
     id: "invoice_to_json",
     title_key: "template.invoice_to_json.title",
     description_key: "template.invoice_to_json.desc",
     difficulty: "basic",
     tags: ["finetune"],
     sample_data: true,
-    estimate: {
-      ram_gb: null,
-      disk_gb: null,
-      minutes: null,
-      gpu_exclusive: true,
-      source: "unknown",
-    },
+    estimate: unknownEstimate,
     workflow: {
       format: "vlm-workflow",
       schema_version: 1,
@@ -343,20 +352,21 @@ const templates: Template[] = [
           params: { repo: "naver-clova-ix/cord-v2" },
         },
         { id: "n3", type: "data.split", version: "1.0.0", params: { val_fraction: 0.1 } },
-        { id: "n4", type: "train.sft_vlm", version: "1.0.0", params: { epochs: 2 } },
-        { id: "n5", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["documents"] } },
+        { id: "n4", type: "train.sft_vlm", version: "1.0.0", params: { epochs: 3 } },
+        { id: "n5", type: "eval.benchmarks", version: "1.0.0", params: { suite: "cord_test" } },
       ],
       edges: [
-        { from: ["n2", "dataset"], to: ["n3", "dataset"] },
-        { from: ["n1", "model"], to: ["n4", "base_model"] },
-        { from: ["n3", "train"], to: ["n4", "train_data"] },
-        { from: ["n3", "val"], to: ["n4", "val_data"] },
-        { from: ["n4", "model"], to: ["n5", "model"] },
+        edge("n2", "dataset", "n3", "dataset"),
+        edge("n1", "model", "n4", "base_model"),
+        edge("n3", "train", "n4", "train_data"),
+        edge("n3", "val", "n4", "val_data"),
+        edge("n4", "model", "n5", "model"),
+        edge("n3", "val", "n5", "data"),
       ],
     },
   },
   {
-    // Template 2 (ADR-001 amendment 1): Cosmos-Reason2-2B is gated → HF account chip + wizard. Not measured yet.
+    // Template 2 (ADR-001 amendment 1): Cosmos-Reason2-2B is gated → HF account chip + wizard.
     id: "image_video_understanding",
     title_key: "template.image_video_understanding.title",
     description_key: "template.image_video_understanding.desc",
@@ -364,13 +374,7 @@ const templates: Template[] = [
     tags: ["finetune"],
     sample_data: false,
     requires_hf_account: true,
-    estimate: {
-      ram_gb: null,
-      disk_gb: null,
-      minutes: null,
-      gpu_exclusive: true,
-      source: "unknown",
-    },
+    estimate: unknownEstimate,
     workflow: {
       format: "vlm-workflow",
       schema_version: 1,
@@ -393,19 +397,20 @@ const templates: Template[] = [
           id: "n4",
           type: "train.lora_vlm",
           version: "1.0.0",
-          params: { preset: "balanced", epochs: 2 },
+          params: { epochs: 3, lr_preset: "medium" },
         },
         { id: "n5", type: "train.merge_lora", version: "1.0.0", params: {} },
-        { id: "n6", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["perception"] } },
+        { id: "n6", type: "eval.benchmarks", version: "1.0.0", params: { suite: "perception" } },
       ],
       edges: [
-        { from: ["n2", "dataset"], to: ["n3", "dataset"] },
-        { from: ["n1", "model"], to: ["n4", "base_model"] },
-        { from: ["n3", "train"], to: ["n4", "train_data"] },
-        { from: ["n3", "val"], to: ["n4", "val_data"] },
-        { from: ["n1", "model"], to: ["n5", "base_model"] },
-        { from: ["n4", "adapter"], to: ["n5", "adapter"] },
-        { from: ["n5", "model"], to: ["n6", "model"] },
+        edge("n2", "dataset", "n3", "dataset"),
+        edge("n1", "model", "n4", "base_model"),
+        edge("n3", "train", "n4", "train_data"),
+        edge("n3", "val", "n4", "val_data"),
+        edge("n1", "model", "n5", "base_model"),
+        edge("n4", "adapter", "n5", "adapter"),
+        edge("n5", "model", "n6", "model"),
+        edge("n3", "val", "n6", "data"),
       ],
     },
   },
@@ -416,31 +421,32 @@ const templates: Template[] = [
     difficulty: "basic",
     tags: ["quantize", "eval"],
     sample_data: false,
-    // Not measured yet on GB10 → unknown (never show made-up numbers).
-    estimate: {
-      ram_gb: null,
-      disk_gb: null,
-      minutes: null,
-      gpu_exclusive: true,
-      source: "unknown",
-    },
+    estimate: unknownEstimate,
     workflow: {
       format: "vlm-workflow",
       schema_version: 1,
       name: "quantize_bench",
       nodes: [
-        { id: "n1", type: "model.hf_pick", version: "1.0.0", params: { model: "qwen3.5-2b" } },
-        { id: "n2", type: "quantize.modelopt_ptq", version: "1.0.0", params: { format: "fp8" } },
         {
-          id: "n3",
-          type: "eval.benchmarks",
+          id: "n1",
+          type: "model.hf_pick",
           version: "1.0.0",
-          params: { groups: ["documents", "charts"] },
+          params: { model: "nemotron-parse-v1.1" },
         },
+        {
+          id: "n2",
+          type: "data.hf_load",
+          version: "1.0.0",
+          params: { repo: "naver-clova-ix/cord-v2" },
+        },
+        { id: "n3", type: "quantize.modelopt_ptq", version: "1.0.0", params: { format: "fp8" } },
+        { id: "n4", type: "eval.benchmarks", version: "1.0.0", params: { suite: "cord_test" } },
       ],
       edges: [
-        { from: ["n1", "model"], to: ["n2", "model"] },
-        { from: ["n2", "quantized"], to: ["n3", "model"] },
+        edge("n1", "model", "n3", "model"),
+        edge("n2", "dataset", "n3", "calib_data"),
+        edge("n3", "quantized", "n4", "model"),
+        edge("n2", "dataset", "n4", "data"),
       ],
     },
   },
@@ -531,15 +537,15 @@ export const mockApi: Api = {
   // The third-party fixture (acme.*) exists for security tests only; the library must not offer it.
   nodeTypes: () =>
     delay<NodeTypesResponse>({
-      node_types: mockNodeTypes.filter((s) => s.origin.kind === "first_party"),
-      port_types: portTypes,
+      node_types: registry.node_types,
+      port_types: registry.port_types,
     }),
   templates: () => delay(templates.map(({ workflow: _w, ...meta }) => meta)),
   template: (id) => {
     const found = templates.find((x) => x.id === id);
     return found ? delay(found) : Promise.reject(new Error(`template ${id} not found`));
   },
-  validate: (workflow) => delay(mockValidate(workflow, mockNodeTypes, portTypes)),
+  validate: (workflow) => delay(mockValidate(workflow, registry.node_types, registry.port_types)),
   system: () =>
     delay({
       mem_total_gb: 121,
@@ -586,7 +592,7 @@ export const mockApi: Api = {
     let t = 200;
     for (const nodeId of order) {
       const heavy =
-        mockNodeTypes.find((s) => s.type_id === wf.nodes.find((n) => n.id === nodeId)?.type)
+        registry.node_types.find((s) => s.type_id === wf.nodes.find((n) => n.id === nodeId)?.type)
           ?.runner === "container";
       const steps = heavy ? 5 : 1;
       for (let i = 0; i < steps; i++) {
@@ -626,6 +632,8 @@ export const mockApi: Api = {
 };
 
 const fakeRuns = new Map<string, Workflow>();
+/** Real registry (REGISTRY.to_api() snapshot from schemas/); the hand-written mockNodeTypes are for tests only. */
+const registry = registrySnapshot as unknown as NodeTypesResponse;
 const fakeCancel = new Map<string, () => void>();
 /** Duration of one fake progress step; tests shorten it via setFakeStepMs. */
 let FAKE_STEP_MS = 400;

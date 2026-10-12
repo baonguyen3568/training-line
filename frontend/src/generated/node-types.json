@@ -1,0 +1,1165 @@
+{
+  "node_types": [
+    {
+      "cacheable": true,
+      "category": "source",
+      "icon": "model",
+      "inputs": {},
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "default": "nemotron-parse-v1.1",
+            "enum": [
+              "nemotron-parse-v1.1",
+              "cosmos-reason2-2b",
+              "cosmos-reason2-8b",
+              "qwen3-vl-2b-instruct",
+              "qwen3.5-0.8b",
+              "qwen3.5-2b",
+              "qwen3.5-4b",
+              "qwen3.5-9b",
+              "gemma-4-e2b-it",
+              "gemma-4-e4b-it",
+              "nemotron-parse-2.0"
+            ],
+            "title": "Model",
+            "type": "string",
+            "x-ui": {
+              "option_meta": {
+                "cosmos-reason2-2b": {
+                  "gated": true,
+                  "label": "NVIDIA Cosmos Reason2 2B",
+                  "license": "nvidia-open-model-license",
+                  "ram_gb": 14.0,
+                  "ram_source": "estimated",
+                  "tier": "template",
+                  "vendor": "nvidia"
+                },
+                "cosmos-reason2-8b": {
+                  "gated": true,
+                  "label": "NVIDIA Cosmos Reason2 8B",
+                  "license": "nvidia-open-model-license",
+                  "ram_gb": 32.0,
+                  "ram_source": "estimated",
+                  "tier": "catalog",
+                  "vendor": "nvidia"
+                },
+                "gemma-4-e2b-it": {
+                  "gated": false,
+                  "label": "Gemma 4 E2B",
+                  "license": "apache-2.0",
+                  "ram_gb": 20.0,
+                  "ram_source": "estimated",
+                  "tier": "catalog",
+                  "vendor": "google"
+                },
+                "gemma-4-e4b-it": {
+                  "gated": false,
+                  "label": "Gemma 4 E4B",
+                  "license": "apache-2.0",
+                  "ram_gb": 28.0,
+                  "ram_source": "estimated",
+                  "tier": "catalog",
+                  "vendor": "google"
+                },
+                "nemotron-parse-2.0": {
+                  "gated": false,
+                  "label": "NVIDIA Nemotron Parse 2.0",
+                  "license": "openmdw-1.1",
+                  "ram_gb": 14.0,
+                  "ram_source": "estimated",
+                  "tier": "rnd",
+                  "vendor": "nvidia"
+                },
+                "nemotron-parse-v1.1": {
+                  "gated": false,
+                  "label": "NVIDIA Nemotron Parse v1.1",
+                  "license": "nvidia-open-model-license",
+                  "ram_gb": 35.0,
+                  "ram_source": "measured",
+                  "tier": "default",
+                  "vendor": "nvidia"
+                },
+                "qwen3-vl-2b-instruct": {
+                  "gated": false,
+                  "label": "Qwen3-VL 2B Instruct",
+                  "license": "apache-2.0",
+                  "ram_gb": 14.0,
+                  "ram_source": "estimated",
+                  "tier": "baseline",
+                  "vendor": "qwen"
+                },
+                "qwen3.5-0.8b": {
+                  "gated": false,
+                  "label": "Qwen3.5 0.8B",
+                  "license": "apache-2.0",
+                  "ram_gb": 13.0,
+                  "ram_source": "measured",
+                  "tier": "catalog",
+                  "vendor": "qwen"
+                },
+                "qwen3.5-2b": {
+                  "gated": false,
+                  "label": "Qwen3.5 2B",
+                  "license": "apache-2.0",
+                  "ram_gb": 16.0,
+                  "ram_source": "estimated",
+                  "tier": "catalog",
+                  "vendor": "qwen"
+                },
+                "qwen3.5-4b": {
+                  "gated": false,
+                  "label": "Qwen3.5 4B",
+                  "license": "apache-2.0",
+                  "ram_gb": 24.0,
+                  "ram_source": "estimated",
+                  "tier": "catalog",
+                  "vendor": "qwen"
+                },
+                "qwen3.5-9b": {
+                  "gated": false,
+                  "label": "Qwen3.5 9B",
+                  "license": "apache-2.0",
+                  "ram_gb": 38.0,
+                  "ram_source": "estimated",
+                  "tier": "catalog",
+                  "vendor": "qwen"
+                }
+              },
+              "order": 0,
+              "summary": true
+            }
+          }
+        },
+        "title": "ModelPickParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "model.hf_pick",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "source",
+      "icon": "dataset",
+      "inputs": {},
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "max_samples": {
+            "default": 0,
+            "enum": [
+              0,
+              100,
+              500,
+              1000
+            ],
+            "title": "Max Samples",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "sample_limit",
+              "order": 1
+            }
+          },
+          "repo": {
+            "const": "naver-clova-ix/cord-v2",
+            "default": "naver-clova-ix/cord-v2",
+            "title": "Repo",
+            "type": "string",
+            "x-ui": {
+              "order": 0,
+              "summary": true
+            }
+          },
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "HubDatasetParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "data.hf_load",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": false,
+      "category": "source",
+      "icon": "folder",
+      "inputs": {},
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "max_image_side_px": {
+            "default": 4096,
+            "maximum": 8192,
+            "minimum": 512,
+            "title": "Max Image Side Px",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "max_samples": {
+            "default": 0,
+            "enum": [
+              0,
+              100,
+              500,
+              1000
+            ],
+            "title": "Max Samples",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "sample_limit",
+              "order": 1
+            }
+          },
+          "path": {
+            "default": "data/sample-invoices",
+            "description": "Folder inside the project with images and labels.jsonl",
+            "format": "local-path",
+            "title": "Path",
+            "type": "string",
+            "x-ui": {
+              "order": 0,
+              "summary": true
+            }
+          },
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "LocalFolderParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "data.local_folder",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "data",
+      "icon": "split",
+      "inputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "train": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "val": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "val_fraction": {
+            "default": 0.1,
+            "maximum": 0.3,
+            "minimum": 0.05,
+            "title": "Val Fraction",
+            "type": "number",
+            "x-ui": {
+              "order": 0,
+              "widget": "slider"
+            }
+          }
+        },
+        "title": "SplitParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "data.split",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "train",
+      "icon": "train",
+      "inputs": {
+        "base_model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        },
+        "train_data": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "val_data": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "adapter": {
+          "many": false,
+          "optional": false,
+          "type": "Adapter"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_checkpointing": {
+            "default": true,
+            "title": "Activation Checkpointing",
+            "type": "boolean",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "epochs": {
+            "default": 3,
+            "enum": [
+              1,
+              3,
+              5
+            ],
+            "title": "Epochs",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "epoch_count",
+              "order": 0,
+              "summary": true,
+              "widget": "segmented"
+            }
+          },
+          "global_batch_size": {
+            "default": 8,
+            "maximum": 64,
+            "minimum": 4,
+            "title": "Global Batch Size",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "local_batch_size": {
+            "default": 1,
+            "maximum": 4,
+            "minimum": 1,
+            "title": "Local Batch Size",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "lora_alpha": {
+            "default": 32,
+            "maximum": 128,
+            "minimum": 8,
+            "title": "Lora Alpha",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "lora_dim": {
+            "default": 8,
+            "maximum": 64,
+            "minimum": 4,
+            "title": "Lora Dim",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "lr_preset": {
+            "default": "medium",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ],
+            "title": "Lr Preset",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "lr_preset",
+              "order": 1,
+              "preset": true,
+              "widget": "segmented"
+            }
+          },
+          "max_recent_checkpoints": {
+            "default": 2,
+            "maximum": 5,
+            "minimum": 1,
+            "title": "Max Recent Checkpoints",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "weight_decay": {
+            "default": 0.01,
+            "maximum": 0.1,
+            "minimum": 0.0,
+            "title": "Weight Decay",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "LoraParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "train.lora_vlm",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "train",
+      "icon": "train",
+      "inputs": {
+        "base_model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        },
+        "train_data": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "val_data": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Checkpoint"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_checkpointing": {
+            "default": true,
+            "title": "Activation Checkpointing",
+            "type": "boolean",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "epochs": {
+            "default": 3,
+            "enum": [
+              1,
+              3,
+              5
+            ],
+            "title": "Epochs",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "epoch_count",
+              "order": 0,
+              "summary": true,
+              "widget": "segmented"
+            }
+          },
+          "freeze_vision_tower": {
+            "default": true,
+            "title": "Freeze Vision Tower",
+            "type": "boolean",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "global_batch_size": {
+            "default": 8,
+            "maximum": 64,
+            "minimum": 4,
+            "title": "Global Batch Size",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "local_batch_size": {
+            "default": 1,
+            "maximum": 4,
+            "minimum": 1,
+            "title": "Local Batch Size",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "lr_preset": {
+            "default": "medium",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ],
+            "title": "Lr Preset",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "lr_preset",
+              "order": 1,
+              "preset": true,
+              "widget": "segmented"
+            }
+          },
+          "max_recent_checkpoints": {
+            "default": 2,
+            "maximum": 5,
+            "minimum": 1,
+            "title": "Max Recent Checkpoints",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "weight_decay": {
+            "default": 0.01,
+            "maximum": 0.1,
+            "minimum": 0.0,
+            "title": "Weight Decay",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "FullFinetuneParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "train.sft_vlm",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "train",
+      "icon": "merge",
+      "inputs": {
+        "adapter": {
+          "many": false,
+          "optional": false,
+          "type": "Adapter"
+        },
+        "base_model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Checkpoint"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Params model of a node without parameters.",
+        "properties": {},
+        "title": "EmptyParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "train.merge_lora",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": false,
+      "category": "test",
+      "icon": "play",
+      "inputs": {
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "endpoint": {
+          "many": false,
+          "optional": false,
+          "type": "Endpoint"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "answer_length": {
+            "default": "medium",
+            "enum": [
+              "short",
+              "medium",
+              "long"
+            ],
+            "title": "Answer Length",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "answer_length",
+              "order": 0,
+              "widget": "segmented"
+            }
+          },
+          "engine": {
+            "default": "vllm",
+            "enum": [
+              "vllm",
+              "hf"
+            ],
+            "title": "Engine",
+            "type": "string",
+            "x-ui": {
+              "advanced": true,
+              "option_keys": "serve_engine"
+            }
+          },
+          "gpu_memory_utilization": {
+            "default": 0.3,
+            "maximum": 0.5,
+            "minimum": 0.2,
+            "title": "Gpu Memory Utilization",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "max_model_len": {
+            "default": 8192,
+            "maximum": 32768,
+            "minimum": 2048,
+            "title": "Max Model Len",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "temperature": {
+            "default": 0.0,
+            "maximum": 1.5,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "top_p": {
+            "default": 1.0,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "title": "Top P",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "InferenceParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "serve.vllm",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "quantize",
+      "icon": "quantize",
+      "inputs": {
+        "calib_data": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        },
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "quantized": {
+          "many": false,
+          "optional": false,
+          "type": "QuantizedModel"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "calib_size": {
+            "default": 512,
+            "enum": [
+              128,
+              512
+            ],
+            "title": "Calib Size",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "calib_size",
+              "order": 1,
+              "widget": "segmented"
+            }
+          },
+          "format": {
+            "const": "fp8",
+            "default": "fp8",
+            "title": "Format",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "quantize_preset",
+              "order": 0,
+              "summary": true
+            }
+          },
+          "kv_cache_quant": {
+            "default": "none",
+            "enum": [
+              "none",
+              "fp8"
+            ],
+            "title": "Kv Cache Quant",
+            "type": "string",
+            "x-ui": {
+              "advanced": true,
+              "option_keys": "kv_cache_quant"
+            }
+          },
+          "quantize_vision": {
+            "default": false,
+            "title": "Quantize Vision",
+            "type": "boolean",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "QuantizeParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "quantize.modelopt_ptq",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "eval",
+      "icon": "eval",
+      "inputs": {
+        "data": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        },
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "report": {
+          "many": false,
+          "optional": false,
+          "type": "EvalReport"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "compare_with": {
+            "default": "base",
+            "enum": [
+              "none",
+              "base",
+              "previous"
+            ],
+            "title": "Compare With",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "compare_with",
+              "order": 2
+            }
+          },
+          "level": {
+            "default": "quick",
+            "enum": [
+              "quick",
+              "standard",
+              "full"
+            ],
+            "title": "Level",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "eval_level",
+              "order": 1,
+              "widget": "segmented"
+            }
+          },
+          "max_new_tokens": {
+            "default": 1024,
+            "maximum": 16384,
+            "minimum": 64,
+            "title": "Max New Tokens",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "suite": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "cord_test",
+              "documents",
+              "charts",
+              "knowledge",
+              "perception",
+              "math",
+              "video",
+              "my_val"
+            ],
+            "title": "Suite",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "eval_suite",
+              "order": 0,
+              "summary": true
+            }
+          },
+          "thinking": {
+            "default": false,
+            "title": "Thinking",
+            "type": "boolean",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "EvalParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "eval.benchmarks",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": false,
+      "category": "eval",
+      "icon": "speed",
+      "inputs": {
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "report": {
+          "many": false,
+          "optional": false,
+          "type": "BenchReport"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "compare_with": {
+            "default": "base",
+            "enum": [
+              "none",
+              "base",
+              "unquantized"
+            ],
+            "title": "Compare With",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "compare_with",
+              "order": 1
+            }
+          },
+          "gpu_memory_utilization": {
+            "default": 0.3,
+            "maximum": 0.5,
+            "minimum": 0.2,
+            "title": "Gpu Memory Utilization",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "num_requests": {
+            "default": 50,
+            "maximum": 500,
+            "minimum": 10,
+            "title": "Num Requests",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "output_tokens": {
+            "default": 256,
+            "maximum": 2048,
+            "minimum": 64,
+            "title": "Output Tokens",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "scenario": {
+            "default": "single_user",
+            "enum": [
+              "single_user",
+              "multi_user"
+            ],
+            "title": "Scenario",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "bench_scenario",
+              "order": 0,
+              "summary": true,
+              "widget": "segmented"
+            }
+          }
+        },
+        "title": "BenchParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "bench.perf",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": false,
+      "category": "export",
+      "icon": "export",
+      "inputs": {
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "artifact": {
+          "many": false,
+          "optional": false,
+          "type": "ExportArtifact"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "Export is always safetensors with the licence notice attached (ADR-003); neither is a parameter.",
+        "properties": {
+          "dest": {
+            "default": "outputs/exports/my-model",
+            "format": "local-path",
+            "title": "Dest",
+            "type": "string",
+            "x-ui": {
+              "order": 0,
+              "summary": true
+            }
+          }
+        },
+        "title": "ExportParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "export.hf_dir",
+      "version": "1.0.0"
+    }
+  ],
+  "port_types": [
+    {
+      "color_token": "color.port.dataset",
+      "id": "Dataset",
+      "label_key": "port.dataset",
+      "parent": null
+    },
+    {
+      "color_token": "color.port.model",
+      "id": "Model",
+      "label_key": "port.model",
+      "parent": null
+    },
+    {
+      "color_token": "color.port.model",
+      "id": "Checkpoint",
+      "label_key": "port.checkpoint",
+      "parent": "Model"
+    },
+    {
+      "color_token": "color.port.model",
+      "id": "QuantizedModel",
+      "label_key": "port.quantized_model",
+      "parent": "Model"
+    },
+    {
+      "color_token": "color.port.model",
+      "id": "Adapter",
+      "label_key": "port.adapter",
+      "parent": null
+    },
+    {
+      "color_token": "color.port.model",
+      "id": "ExportArtifact",
+      "label_key": "port.export_artifact",
+      "parent": null
+    },
+    {
+      "color_token": "color.port.report",
+      "id": "EvalReport",
+      "label_key": "port.eval_report",
+      "parent": null
+    },
+    {
+      "color_token": "color.port.report",
+      "id": "BenchReport",
+      "label_key": "port.bench_report",
+      "parent": null
+    },
+    {
+      "color_token": "color.port.endpoint",
+      "id": "Endpoint",
+      "label_key": "port.endpoint",
+      "parent": null
+    }
+  ]
+}

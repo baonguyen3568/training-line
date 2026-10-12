@@ -76,4 +76,9 @@ for (const f of files) {
   out.push(`export type ${name} = ${ts(schema)};`, "");
 }
 writeFileSync(outFile, out.join("\n"));
+
+// Registry snapshot (REGISTRY.to_api(), exported by the backend) → mock API node types, so the mock never
+// drifts from the real nodes (design review M1 r3). Byte-identical copy; committed and drift-checked.
+const snapshot = readFileSync(resolve(schemaDir, "node_types.snapshot.json"), "utf8");
+writeFileSync(resolve(here, "../src/generated/node-types.json"), snapshot);
 console.log(`schemas: ${emitted.size} types → src/generated/schemas.ts`);

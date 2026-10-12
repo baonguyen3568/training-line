@@ -104,12 +104,13 @@ describe("M1 journey (UI)", () => {
     );
     expect(wfStore.getState().workflow?.nodes).toHaveLength(1);
     await waitFor(
-      () => expect(screen.getByRole("button", { name: /Chạy/ })).toHaveProperty("disabled", false),
+      () =>
+        expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", false),
       {
         timeout: 3000,
       },
     );
-    fireEvent.click(screen.getByRole("button", { name: /Chạy/ }));
+    fireEvent.click(screen.getByRole("button", { name: /▶ Chạy/ }));
     await waitFor(
       () =>
         expect(
@@ -138,10 +139,11 @@ describe("Inspector enum handling", () => {
     const view = render(<Inspector />);
     const sel = view.container.querySelector("select") as HTMLSelectElement;
     const texts = [...sel.options].map((o) => o.textContent ?? "");
-    expect(texts.some((x) => x.includes("Nemotron-Parse 2.0"))).toBe(false); // rnd hidden in Simple
-    expect(texts.some((x) => x.includes("Qwen3.5 0.8B"))).toBe(false); // baseline hidden in Simple
+    expect(texts.some((x) => x.includes("Nemotron Parse 2.0"))).toBe(false); // rnd hidden in Simple
+    expect(texts.some((x) => x.includes("Qwen3-VL 2B"))).toBe(false); // baseline hidden in Simple
     expect(texts.find((x) => x.includes("Cosmos"))).toMatch(/Hugging Face/); // gated badge
-    expect(texts.find((x) => x.includes("Cosmos"))).toMatch(/36 GB.*30 GB/); // 26 + 10 headroom > 30 avail
+    expect(texts.find((x) => x.includes("Cosmos Reason2 8B"))).toMatch(/42 GB.*30 GB/); // 32 + 10 headroom > 30 avail
+    expect(texts.find((x) => x.includes("Cosmos Reason2 2B"))).toMatch(/Vừa với/); // 14 + 10 ≤ 30
     view.unmount();
     const tr = wfStore.getState().addNode("train.sft_vlm", { x: 300, y: 0 }) as string;
     wfStore.getState().select(tr);
