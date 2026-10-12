@@ -26,3 +26,4 @@
 - 2026-10-12 USER (U5): Host dev chặn MỌI plugin chưa review, kể cả không GPU, ngay từ bây giờ.
 - 2026-10-12 USER: "Dùng model NVIDIA" → ưu tiên model VLM của NVIDIA (Nemotron VL…) làm base/template mặc định. Research + security đánh giá lại catalog (ADR-001 sẽ amendment).
 - 2026-10-12 USER: Template mặc định = Nemotron-Parse-v1.1 (NVIDIA, không gated) + CORD-v2. Cosmos-Reason2-2B = template 2 (gated, có hướng dẫn accept). Gate N-4 vẫn chạy cho Cosmos nhưng hạ ưu tiên.
+- 2026-10-12 Parse-v1.1@fd1e3c6b APPROVED-WITH-CONDITIONS (C-RADIOv2-H@0d8f4c18 pin + test build-from-config offline phải pass). Qwen3-VL-2B@89644892 APPROVED. KHÔNG mirror weights Cosmos (ADR-003: chỉ phân phối code) → dùng wizard onboarding gated.
