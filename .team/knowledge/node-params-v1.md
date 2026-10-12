@@ -81,6 +81,7 @@ Vào: `Model` · Ra: `Endpoint` (+ kết quả hiển thị).
 | Simple | Độ dài trả lời | Vừa | Ngắn (256) · Vừa (1024) · Dài (4096) | Cosmos khuyên ≥4096 khi suy luận |
 | Advanced | `engine` | vLLM (nếu model hỗ trợ) → fallback HF generate | vllm · hf | Parse: vLLM ❓ (P-4) |
 | Advanced | `temperature` / `top_p` | 0 / 1.0 | 0–1.5 / 0.1–1 | |
+| Advanced | decoding mặc định | lấy từ `generation_config.json` của model (Parse: greedy + `repetition_penalty` 1.1) | locked trong Simple | không tự đặt greedy thuần khác cấu hình chuẩn của model (001a §10.5) |
 | Advanced | `gpu_memory_utilization` | **0.3** | 0.2–0.5 | >0.3 chỉ khi preflight cho phép (ADR-001) |
 | Advanced | `max_model_len` | 8192 | 2048–32768 | |
 | Advanced | `mm_processor_kwargs` | lấy từ node Fine-tune / catalog, locked | | parity với lúc train |
