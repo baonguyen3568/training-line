@@ -1,0 +1,405 @@
+# Error catalog — single source of truth for error CODES (owner: bao-fixcode; Proposal 007 R9).
+# No user text here: titles/explanations live in src/vlm_pipeline/i18n/{vi,en}.yaml under
+#   error.<code>.title | error.<code>.what[.<variant>] | error.<code>.why (OPTIONAL)   and   action.<id>
+#   `why` is shown only when every placeholder it uses is present in the runtime params; otherwise omitted.
+# Exceptions / validate Issues / events carry only {code, params (+ node_id, port, technical_detail, resumable)}.
+#
+# Entry fields
+#   slug                 engineer-only name (logs, tests); UI shows `code`
+#   severity             error | warn | info   (actions required only for `error`)
+#   prevent_in_preflight true when graph validate / preflight can catch it before Run (same code as at runtime)
+#   params               names, or {name, type: enum|bool|..., values} for params used by variants / `when`
+#                        naming: sizes *_gb, counts *_count, lists *_ids, durations *_minutes, times *_at
+#   variant_by / variants  text variants -> error.<code>.what.<value|key>
+#   match                how a raw failure maps to this code: {kind: regex|exit|preflight|validate|api|executor, value}
+#   actions              {id, kind: patch|resume|navigate, target?, patch?, confirm, when?}
+#                        patch  = change node params (confirm=false: apply + diff + undo; true: preview first)
+#                        resume = continue a run; navigate = open a screen/node (destructive ops ALWAYS navigate
+#                        to a dry-run screen, never patch). `when: {param: value}` filters available_actions().
+#                        `resumable` is set by the executor from a REAL checkpoint, never guessed.
+# Codes are never renamed or reused; retire with `deprecated: true`.
+
+MEM-001:
+  slug: MEM_INSUFFICIENT
+  severity: error
+  prevent_in_preflight: true
+  params: [need_gb, avail_gb, est_peak_gb, est_gb]
+  match:
+    - {kind: preflight, value: NO_MEM}
+  actions:
+    - {id: use_lora, kind: patch, patch: [{param: method, op: set, value: lora}], confirm: false}
+    - {id: use_qlora, kind: patch, patch: [{param: method, op: set, value: qlora}], confirm: false}
+    - {id: reduce_image_size, kind: patch, patch: [{param: max_pixels, op: scale, value: 0.5}], confirm: false}
+    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false}
+    - {id: smaller_model, kind: navigate, target: "node:model", confirm: false}
+
+MEM-002:
+  slug: MEM_PREEMPTED
+  severity: warn
+  prevent_in_preflight: false
+  params: [avail_gb, abort_gb, checkpoint_step, {name: resumable, type: bool}]
+  match:
+    - {kind: exit, value: "75"}
+  actions:
+    - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
+    - {id: resume_lighter, kind: resume, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: true, when: {resumable: true}}
+
+MEM-003:
+  slug: UMA_OOM
+  severity: error
+  prevent_in_preflight: false
+  params: [step, checkpoint_step, image_size_px, batch_size, {name: resumable, type: bool}]  # last two from job config
+  match:
+    - {kind: regex, value: "torch\\.OutOfMemoryError|CUDA out of memory|NV_ERR_NO_MEMORY|cudaErrorMemoryAllocation"}
+    - {kind: exit, value: "137+oom_killed"}
+  actions:
+    - {id: reduce_max_length, kind: patch, patch: [{param: max_seq_len, op: scale, value: 0.5}], confirm: false}
+    - {id: enable_grad_checkpointing, kind: patch, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: false}
+    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false}
+    - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
+
+MEM-004:
+  slug: SERVE_MEM_TOO_HIGH
+  severity: error
+  prevent_in_preflight: true
+  params: [gpu_memory_utilization]
+  match:
+    - {kind: validate, value: "serve.gpu_memory_utilization > 0.3"}
+    - {kind: regex, value: "No available memory for the cache blocks"}
+  actions:
+    - {id: safe_serving_default, kind: patch, patch: [{param: gpu_memory_utilization, op: set, value: 0.25}], confirm: false}
+    - {id: reduce_max_length, kind: patch, patch: [{param: max_model_len, op: scale, value: 0.5}], confirm: false}
+
+DISK-001:
+  slug: DISK_FULL
+  severity: error
+  prevent_in_preflight: true
+  params: [need_gb, avail_gb, checkpoint_step, {name: resumable, type: bool}]
+  match:
+    - {kind: preflight, value: NO_DISK}
+    - {kind: regex, value: "No space left on device|ENOSPC"}
+  actions:
+    - {id: free_space, kind: navigate, target: cleanup_dry_run, confirm: false}
+    - {id: fewer_checkpoints, kind: patch, patch: [{param: max_recent_checkpoints, op: set, value: 1}], confirm: false}
+    - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
+
+DISK-002:
+  slug: STORAGE_APPROVAL_REQUIRED
+  severity: info
+  prevent_in_preflight: true
+  params: [gb, threshold_gb, item_count, item_ids, admin_command]
+  match:
+    - {kind: api, value: "POST /api/storage/apply 403 approval_required"}
+  actions:
+    - {id: show_admin_command, kind: navigate, target: admin_command, confirm: false}
+
+SYS-001:
+  slug: GPU_LOCK_BUSY
+  severity: info
+  prevent_in_preflight: true
+  params: [who, job, since]
+  match:
+    - {kind: preflight, value: LOCK_BUSY}
+  actions:
+    - {id: queue, kind: navigate, target: run_queue, confirm: false}
+    - {id: cancel_run, kind: navigate, target: cancel_run, confirm: false}
+
+SYS-002:
+  slug: GPU_LOCK_TIMEOUT
+  severity: warn
+  prevent_in_preflight: false
+  params: [minutes]
+  match:
+    - {kind: executor, value: queue_wait_timeout}
+  actions:
+    - {id: keep_waiting, kind: navigate, target: run_queue, confirm: false}
+    - {id: cancel_run, kind: navigate, target: cancel_run, confirm: false}
+
+GPU-001:
+  slug: GPU_ENV_INCOMPATIBLE
+  severity: error
+  prevent_in_preflight: true
+  params: []
+  match:
+    - {kind: regex, value: "libcudart\\.so\\.12|libcublas\\.so\\.12|no kernel image is available|torch .*\\+cpu"}
+  actions:
+    - {id: use_app_environment, kind: navigate, target: settings_environment, confirm: false}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+GPU-002:
+  slug: GPU_COMPILE_FAILED
+  severity: error
+  prevent_in_preflight: false
+  params: [checkpoint_step, {name: resumable, type: bool}]
+  match:
+    - {kind: regex, value: "sm_121a?'? is not defined|ptxas fatal|PermissionError: \\[Errno 13\\] Permission denied: ''"}
+  actions:
+    - {id: disable_compile, kind: patch, patch: [{param: torch_compile, op: set, value: false}], confirm: false}
+    - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+GPU-003:
+  slug: QUANT_SLOW_ON_DEVICE
+  severity: warn
+  prevent_in_preflight: true
+  params: []
+  match:
+    - {kind: validate, value: "quantize.format == nvfp4 and device capability == (12, 1)"}
+  actions:
+    - {id: switch_fp8, kind: patch, patch: [{param: format, op: set, value: fp8}], confirm: false}
+    - {id: keep_nvfp4, kind: navigate, target: dismiss, confirm: false}
+
+DATA-001:
+  slug: DATA_IMAGE_TOKEN_MISMATCH
+  severity: error
+  prevent_in_preflight: true
+  params: [idx, image_count, slot_count]
+  match:
+    - {kind: regex, value: "Image features and image tokens do not match"}
+  actions:
+    - {id: view_bad_samples, kind: navigate, target: data_samples, confirm: false}
+    - {id: skip_bad_samples, kind: patch, patch: [{param: skip_invalid_samples, op: set, value: true}], confirm: false}
+    - {id: increase_max_length, kind: patch, patch: [{param: max_seq_len, op: scale, value: 2.0}], confirm: false}
+
+DATA-002:
+  slug: DATA_BAD_IMAGE
+  severity: warn
+  prevent_in_preflight: true
+  params: [image_count]
+  match:
+    - {kind: regex, value: "UnidentifiedImageError|cannot identify image file"}
+  actions:
+    - {id: auto_convert_images, kind: patch, patch: [{param: convert_images_rgb, op: set, value: true}], confirm: false}
+    - {id: skip_bad_samples, kind: patch, patch: [{param: skip_invalid_samples, op: set, value: true}], confirm: false}
+    - {id: view_bad_samples, kind: navigate, target: data_samples, confirm: false}
+
+DATA-003:
+  slug: DATA_NO_LEARNING_SIGNAL
+  severity: warn
+  prevent_in_preflight: true
+  params: []
+  match:
+    - {kind: executor, value: "loss < 0.01 at first logged step or trainable label ratio == 0"}
+  actions:
+    - {id: check_sample_data, kind: navigate, target: data_samples, confirm: false}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+DATA-004:
+  slug: DATA_MISSING_IMAGE
+  severity: error
+  prevent_in_preflight: true
+  params: [sample_count]
+  match:
+    - {kind: validate, value: "dataset image path does not exist"}
+  actions:
+    - {id: view_bad_samples, kind: navigate, target: data_samples, confirm: false}
+    - {id: skip_bad_samples, kind: patch, patch: [{param: skip_invalid_samples, op: set, value: true}], confirm: false}
+
+MODEL-001:
+  slug: CKPT_LOAD_KEY_MISMATCH
+  severity: error
+  prevent_in_preflight: false
+  params: []
+  match:
+    - {kind: regex, value: "Missing key\\(s\\)|Unexpected key\\(s\\)|size mismatch for|KeyError: '?model\\.(language_model\\.)?visual"}
+  actions:
+    - {id: retry_recommended_version, kind: patch, confirm: true}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+MODEL-002:
+  slug: MODEL_VERIFY_FAILED
+  severity: error
+  prevent_in_preflight: false
+  params: []
+  match:
+    - {kind: executor, value: "verify node: missing keys or logits cosine < 0.999"}
+  actions:
+    - {id: view_comparison, kind: navigate, target: verify_report, confirm: false}
+    - {id: use_original_model, kind: patch, confirm: true}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+NET-001:
+  slug: DOWNLOAD_FAILED
+  severity: error
+  prevent_in_preflight: true
+  params: [{name: reason, type: enum, values: [gated, auth, network]}, checkpoint_step, {name: resumable, type: bool}]
+  match:
+    - {kind: regex, value: "GatedRepoError|401 Client Error|403 Client Error|ConnectionError|LocalEntryNotFoundError|ReadTimeout"}
+  actions:
+    - {id: check_connection, kind: navigate, target: settings_network, confirm: false}
+    - {id: enter_token, kind: navigate, target: settings_secrets, confirm: false}
+    - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
+
+CFG-001:
+  slug: GRAPH_PORT_TYPE_MISMATCH
+  severity: error
+  prevent_in_preflight: true
+  params: [a, b, type_a, type_b]
+  match:
+    - {kind: validate, value: "edge port types incompatible"}
+  actions:
+    - {id: preview_converter, kind: patch, confirm: true}
+    - {id: show_guide, kind: navigate, target: docs_port_types, confirm: false}
+
+CFG-002:
+  slug: GRAPH_CYCLE
+  severity: error
+  prevent_in_preflight: true
+  params: [nodes]
+  match:
+    - {kind: validate, value: "cycle detected"}
+  actions:
+    - {id: show_cycle, kind: navigate, target: highlight_cycle, confirm: false}
+
+CFG-003:
+  slug: INPUT_MISSING
+  severity: error
+  prevent_in_preflight: true
+  params: [node, port]
+  match:
+    - {kind: validate, value: "required input port unconnected"}
+  actions:
+    - {id: pick_input_source, kind: navigate, target: "node:port", confirm: false}
+
+CFG-004:
+  slug: NODE_TYPE_UNKNOWN
+  severity: error
+  prevent_in_preflight: true
+  # suggested_package / name_lookalike_of / trust_level are computed by the SERVER from the app registry
+  # (P003 D16): any package/URL/trust hint inside the workflow is only a lookup key, never echoed.
+  params:
+    - node_type
+    - {name: reason, type: enum, values: [not_installed, not_allowed]}
+    - {name: trust_level, type: enum, values: [first_party, reviewed, unverified]}
+    - suggested_package
+    - name_lookalike_of
+  variants:
+    - {when: {reason: not_installed, trust_level: [first_party, reviewed]}, key: not_installed_trusted}
+    - {when: {reason: not_installed, trust_level: unverified}, key: not_installed_unknown}
+    - {when: {reason: not_allowed}, key: not_allowed}
+  match:
+    - {kind: validate, value: "node type not installed or not allowed"}
+  actions:
+    - {id: review_to_install, kind: navigate, target: node_install_dialog, confirm: false, when: {reason: not_installed}}
+    - {id: remove_step, kind: patch, confirm: true}
+    - {id: replace_step, kind: patch, confirm: true}
+
+CFG-005:
+  slug: PARAM_INVALID
+  severity: error
+  prevent_in_preflight: true
+  params: [node, param, value, rule]
+  match:
+    - {kind: validate, value: "node params ValidationError"}
+  actions:
+    - {id: reset_default, kind: patch, confirm: false}
+
+CFG-006:
+  slug: EDGE_DANGLING
+  severity: error
+  prevent_in_preflight: true
+  params: [node_id]
+  match:
+    - {kind: validate, value: "edge endpoint node missing"}
+  actions:
+    - {id: remove_bad_wire, kind: patch, confirm: true}
+
+CFG-007:
+  slug: WORKFLOW_FILE_INVALID
+  severity: error
+  prevent_in_preflight: true
+  # reason: parse | schema | invalid_identifier (node_type/publisher/package must match ^[a-z0-9][a-z0-9_.-]{0,63}$);
+  # the offending VALUE is never echoed, only the field name.
+  params: [field, reason]
+  match:
+    - {kind: validate, value: "workflow parse/schema error or invalid identifier"}
+  actions:
+    - {id: open_other_file, kind: navigate, target: open_workflow, confirm: false}
+    - {id: show_technical, kind: navigate, target: technical_details, confirm: false}
+
+CFG-008:
+  slug: NODE_ID_DUPLICATE
+  severity: error
+  prevent_in_preflight: true
+  params: [node_id, duplicate_count]
+  match:
+    - {kind: validate, value: "duplicate node id"}
+  actions:
+    - {id: auto_rename_ids, kind: patch, confirm: true}
+
+CFG-009:
+  slug: NODE_VERSION_MISMATCH
+  severity: error
+  prevent_in_preflight: true
+  params: [node_id, node_type, workflow_version, installed_version, {name: migratable, type: bool}]
+  variant_by: migratable
+  match:
+    - {kind: validate, value: "NodeSpec version mismatch"}
+  actions:
+    - {id: migrate_node, kind: patch, confirm: true, when: {migratable: true}}
+    - {id: open_node, kind: navigate, target: "node:self", confirm: false}
+
+SEC-001:
+  slug: PATH_OUTSIDE_WORKSPACE
+  severity: error
+  prevent_in_preflight: true
+  params: [path]
+  match:
+    - {kind: validate, value: "resolved path not under workspace root"}
+  actions:
+    - {id: pick_workspace_folder, kind: navigate, target: folder_picker, confirm: false}
+
+SEC-002:
+  slug: SECRET_IN_WORKFLOW
+  severity: error
+  prevent_in_preflight: true
+  params: [param]
+  match:
+    - {kind: validate, value: "secret-like value in node params (value never stored or echoed)"}
+  actions:
+    - {id: move_to_secure_settings, kind: navigate, target: settings_secrets, confirm: false}
+
+SEC-003:
+  slug: LICENSE_BLOCKED
+  severity: error
+  prevent_in_preflight: true
+  params: [name, use]
+  match:
+    - {kind: validate, value: "license check (configs/security/licenses.yaml)"}
+  actions:
+    - {id: pick_other_asset, kind: navigate, target: "node:asset", confirm: false}
+
+CACHE-001:
+  slug: CACHE_ARTIFACT_INVALID
+  severity: warn
+  prevent_in_preflight: false
+  params: [node, saved_at, est_minutes]
+  match:
+    - {kind: executor, value: "cache hit but artifact path missing or manifest hash mismatch -> treated as miss"}
+  actions: []
+
+SYS-003:
+  slug: WORKER_CRASHED
+  severity: error
+  prevent_in_preflight: false
+  # Executor order: cancelled by executor (no error) > exit 75 (MEM-002) > 137 + OOMKilled (MEM-003)
+  #   > error event code > other non-zero exit (SYS-003) > unknown exception (SYS-000)
+  params: [node, exit_code, signal, checkpoint_step, {name: resumable, type: bool}]
+  match:
+    - {kind: exit, value: "nonzero without error event"}
+  actions:
+    - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
+    - {id: rerun_step, kind: resume, confirm: true}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+SYS-000:
+  slug: UNKNOWN_ERROR
+  severity: error
+  prevent_in_preflight: false
+  params: [checkpoint_step, {name: resumable, type: bool}]
+  match:
+    - {kind: executor, value: fallback}
+  actions:
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+    - {id: show_technical, kind: navigate, target: technical_details, confirm: false}
+    - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}

@@ -1,0 +1,41 @@
+{
+  "name": "vlm-studio-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "tokens": "node scripts/build-tokens.mjs && node scripts/build-i18n.mjs",
+    "dev": "npm run tokens && vite --host 127.0.0.1 --port 7875 --strictPort",
+    "build": "npm run tokens && tsc --noEmit && vite build",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run tokens && biome ci . && tsc --noEmit && vitest run",
+    "licenses": "node scripts/list-licenses.mjs"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "3.1.1",
+    "@xyflow/react": "12.12.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "jsdom": "30.1.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.2",
+    "vitest": "5.0.3",
+    "yaml": "2.9.1"
+  }
+}

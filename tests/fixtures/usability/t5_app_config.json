@@ -1,0 +1,7 @@
+{
+  "worker": "fake",
+  "plugins": {
+    "policy_block_gpu_third_party": false
+  },
+  "_scope": "Usability-test instance only (T5). Valid only together with worker=fake; the app must refuse this override with a real worker."
+}

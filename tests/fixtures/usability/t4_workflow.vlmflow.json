@@ -1,0 +1,116 @@
+{
+  "format": "vlm-workflow",
+  "schema_version": 1,
+  "name": "Fine-tune full (T4)",
+  "nodes": [
+    {
+      "id": "model",
+      "type": "model.hf_pick",
+      "version": "1.0.0",
+      "params": {
+        "repo": "Qwen/Qwen3.5-0.8B",
+        "revision": "0000000000000000000000000000000000000000"
+      },
+      "ui": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "data",
+      "type": "data.local_folder",
+      "version": "1.0.0",
+      "params": {
+        "path": "data/samples/invoices-mini"
+      },
+      "ui": {
+        "x": 0,
+        "y": 200
+      }
+    },
+    {
+      "id": "fmt",
+      "type": "data.format_vlm_chat",
+      "version": "1.0.0",
+      "params": {},
+      "ui": {
+        "x": 250,
+        "y": 200
+      }
+    },
+    {
+      "id": "train",
+      "type": "train.sft_vlm",
+      "version": "1.0.0",
+      "params": {},
+      "ui": {
+        "x": 500,
+        "y": 100
+      }
+    },
+    {
+      "id": "eval",
+      "type": "eval.benchmarks",
+      "version": "1.0.0",
+      "params": {
+        "tier": "smoke"
+      },
+      "ui": {
+        "x": 750,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": [
+        "data",
+        "dataset"
+      ],
+      "to": [
+        "fmt",
+        "dataset"
+      ]
+    },
+    {
+      "from": [
+        "fmt",
+        "dataset"
+      ],
+      "to": [
+        "train",
+        "dataset"
+      ]
+    },
+    {
+      "from": [
+        "model",
+        "model"
+      ],
+      "to": [
+        "train",
+        "base_model"
+      ]
+    },
+    {
+      "from": [
+        "model",
+        "model"
+      ],
+      "to": [
+        "eval",
+        "model"
+      ]
+    },
+    {
+      "from": [
+        "train",
+        "adapter"
+      ],
+      "to": [
+        "eval",
+        "adapter"
+      ]
+    }
+  ]
+}

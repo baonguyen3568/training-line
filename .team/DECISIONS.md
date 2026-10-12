@@ -22,3 +22,4 @@
 - 2026-10-12 Dataset template mặc định: CORD-v2 (CC-BY-4.0, chờ security xác nhận nguồn gốc). MedPix loại khỏi template.
 - 2026-10-12 USER: Host dev dùng chung — cấm plugin bên thứ 3 dùng GPU tới khi vá toolkit; sau vá chỉ plugin đã review ở SHA cố định.
 - 2026-10-12 USER: HF token mới (fine-grained) → .env, whoami OK. Driver giữ bản 580.142 (không cập nhật DGX OS lúc này). Toolkit: vẫn chờ user vá.
+- 2026-10-12 ADR-001 Stack + catalog ACCEPTED (26.08-1, vLLM 0.31.0, ModelOpt 0.47, lmms-eval 0.7.3; Qwen3.5-2B template, CORD-v2).

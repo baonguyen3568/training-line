@@ -1,0 +1,7 @@
+{
+  "worker": "fake",
+  "plugins": {
+    "policy_block_gpu_third_party": true
+  },
+  "_scope": "T5b: show the policy_block screen (default on this shared host until NVIDIA Container Toolkit >= 1.19.1)."
+}

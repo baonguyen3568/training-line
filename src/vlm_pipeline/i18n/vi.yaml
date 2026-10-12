@@ -1,0 +1,460 @@
+# UI copy — single source of truth for all user-visible text (ADR-009, P010, 007 R9). Owner: bao-design.
+# Nested YAML. Lookup: node type ids containing dots are ONE key under `node` (e.g. node["train.lora_vlm"].title).
+# Variants: key children (e.g. error.CFG-009.what.migratable). Placeholders {name}: sizes *_gb, counts *_count;
+# vi.yaml and en.yaml must have identical keys and placeholders (tested). Missing key at runtime → show the key.
+# locale: vi
+storage:
+  group:
+    downloaded_model: Model đã tải
+    trained_model: Model bạn đã train
+    dataset: Dữ liệu
+    temp_result: Kết quả tạm (có thể tính lại)
+  lock_reason:
+    IN_USE_BY_RUNNING_WORKFLOW: Workflow "{workflow}" đang chạy và cần mục này. Chờ chạy xong rồi xoá.
+    PINNED_OR_KEEP: Đã được ghim để giữ lại. Bỏ ghim nếu bạn muốn xoá.
+    REQUIRED_PARENT_AT_LOAD: Phần học thêm (LoRA) "{child}" vẫn cần model này để chạy. Xoá phần học thêm trước.
+    SECURITY_PROTECTED: Được bảo vệ theo quy định an toàn của dự án. Liên hệ quản trị viên nếu cần xoá.
+    RUN_NOT_FINISHED: Run "{run}" chưa xong hoặc đang tạm dừng — cần mục này để chạy tiếp.
+    WHITELIST: Lịch sử chạy (nhật ký, số đo) luôn được giữ lại.
+  consequence:
+    WILL_REDOWNLOAD:
+      default: Workflow "{workflow}" sẽ phải tải lại {gb} GB ở lần chạy sau.
+      no_workflow: Sẽ phải tải lại {gb} GB nếu bạn cần dùng lại.
+    WILL_RECOMPUTE: Có thể tạo lại, mất khoảng {minutes} phút.
+    PERMANENT_LOSS: '"{name}" sẽ mất vĩnh viễn — không khôi phục hay tạo lại y hệt được.'
+    RESUME_IMPOSSIBLE: Model vẫn dùng được, nhưng không thể train tiếp run "{run}" từ điểm này.
+  dialog:
+    title: Xoá {item_count} mục, giải phóng {gb} GB?
+    typed_confirm: Gõ  {confirm_text}  để xác nhận
+    typed_reason_permanent: Mục này không tạo lại được.
+    typed_reason_redownload: Phải tải lại {gb} GB.
+    cancel: Huỷ
+    confirm: Xoá vĩnh viễn
+    plan_expired: Danh sách đã cũ (quá 10 phút). Đang kiểm tra lại…
+    approval_needed: Tổng dung lượng xoá lớn hơn {threshold_gb} GB nên cần quản trị viên duyệt trước.
+  event_done: Đã xoá lúc {time} bởi {who}
+  preflight_hint:
+    free_temp: Giải phóng {gb} GB từ kết quả tạm
+  item:
+    temp_result_of_run: Kết quả tạm của run {run_name}
+error:
+  GPU-001:
+    title: Phần mềm không tương thích với GPU của máy
+    what: Một thành phần được cài cho phiên bản CUDA khác với bản máy này hỗ trợ.
+  GPU-002:
+    title: Chế độ chạy nhanh không khởi động được
+    what: Phần tăng tốc chưa hỗ trợ chip GB10 nên không khởi động được; tắt nó thì bước vẫn chạy, chỉ chậm hơn.
+  CACHE-001:
+    title: Kết quả cũ bị hỏng, sẽ chạy lại
+    what: Kết quả đã lưu của bước "{node}" (lúc {saved_at}) không đọc được nên app sẽ chạy lại bước này, mất khoảng {est_minutes} phút.
+  SYS-003:
+    title: Bước này dừng đột ngột
+    what: Bước này dừng giữa chừng mà không báo lý do (có thể do máy khởi động lại hoặc tiến trình bị tắt). Tiến độ đến {checkpoint_step} đã được lưu nếu có.
+  DISK-002:
+    title: Cần duyệt trước khi dọn dung lượng
+    what: Bạn sắp xoá {gb} GB ({item_count} mục), vượt mức {threshold_gb} GB của máy dùng chung nên quản trị viên cần duyệt bằng lệnh. Chưa có gì bị xoá.
+  CFG-008:
+    title: Có hai bước trùng mã định danh
+    what: '{duplicate_count} bước đang dùng chung mã "{node_id}", nên app không biết nối dây vào bước nào. Thường do sửa tay file workflow.'
+  CFG-004:
+    title: Workflow dùng bước app không có
+    what:
+      not_installed_trusted: Bước "{node_type}" là node bên thứ 3 chưa được cài trên máy này. Node có trong nguồn tin cậy của app; bạn xem thông tin rồi quyết định có cài không.
+      not_installed_unknown: Bước "{node_type}" là node bên thứ 3 không có trong nguồn tin cậy — workflow này do người khác chia sẻ. App không cài theo thông tin trong file.
+      not_allowed: Bước "{node_type}" không được phép dùng trên máy này.
+  CFG-009:
+    title: Workflow tạo bằng phiên bản bước khác
+    what:
+      migratable: Bước "{node_id}" được tạo với {node_type} bản {workflow_version}, máy này có bản {installed_version}. App có thể chuyển thiết lập sang bản mới; bạn xem thay đổi trước khi áp dụng.
+      not_migratable: Bước "{node_id}" được tạo với {node_type} bản {workflow_version}, máy này có bản {installed_version} và không tự chuyển được. Mở bước để chỉnh lại thiết lập.
+  MEM-001:
+    title: Không đủ bộ nhớ cho bước này
+    what: Bước này cần khoảng {need_gb} GB nhưng máy chỉ còn {avail_gb} GB trống, vì máy đang dùng chung với ứng dụng khác.
+  MEM-002:
+    title: Đã tạm dừng để bảo vệ máy
+    what: Bộ nhớ trống xuống dưới mức an toàn nên app đã lưu tiến độ và tạm dừng, tránh làm treo máy.
+  MEM-003:
+    title: Hết bộ nhớ khi đang chạy
+    what: Model dùng nhiều bộ nhớ hơn dự kiến giữa chừng, thường do ảnh lớn hoặc câu quá dài.
+    why: Ảnh {image_size_px}px với batch {batch_size} cần nhiều bộ nhớ hơn mức máy còn trống.
+  MEM-004:
+    title: Phục vụ model chiếm quá nhiều bộ nhớ
+    what: Thiết lập phục vụ model đang giữ quá nhiều bộ nhớ cho bộ đệm, có thể làm ảnh hưởng ứng dụng khác.
+  DISK-001:
+    title: Không đủ dung lượng ổ đĩa
+    what: Cần khoảng {need_gb} GB để lưu model và kết quả nhưng chỉ còn {avail_gb} GB.
+  SYS-001:
+    title: Máy đang bận chạy tác vụ khác
+    what: Mỗi lúc chỉ chạy được một tác vụ nặng; {who} đang chạy "{job}" từ {since}.
+  SYS-002:
+    title: Chờ máy rảnh quá lâu
+    what: Workflow đã chờ {minutes} phút nhưng máy vẫn bận với tác vụ khác.
+  GPU-003:
+    title: Kiểu nén này chạy chậm trên máy
+    what: NVFP4 trên máy này có thể chạy chậm hơn FP8 mà chất lượng tương đương.
+  DATA-001:
+    title: Số ảnh trong dữ liệu không khớp
+    what: 'Mẫu #{idx} có {image_count} ảnh nhưng đoạn văn chỉ có {slot_count} chỗ đặt ảnh, hoặc bị cắt mất vì quá dài.'
+  DATA-002:
+    title: Có ảnh bị hỏng hoặc sai định dạng
+    what: '{image_count} ảnh không mở được hoặc có định dạng lạ (CMYK, RGBA, quá nhỏ).'
+  DATA-003:
+    title: Model có vẻ không học được gì
+    what: Sai số gần 0 ngay từ đầu, thường do dữ liệu đánh dấu sai phần cần học.
+  DATA-004:
+    title: Thiếu ảnh trong dữ liệu
+    what: '{sample_count} mẫu dữ liệu trỏ tới ảnh không tồn tại.'
+  MODEL-001:
+    title: Không đọc được model sau khi chuyển đổi
+    what: Các phần trong file model không khớp định dạng mong đợi, thường do khác phiên bản thư viện.
+  MODEL-002:
+    title: Model sau chuyển đổi trả lời sai
+    what: Bước kiểm tra tự động thấy model mới trả lời khác hẳn model gốc.
+  NET-001:
+    title: Không tải được model hoặc dữ liệu
+    what: Không kết nối được tới Hugging Face/NGC, hoặc bạn chưa đăng nhập.
+  CFG-001:
+    title: Hai bước này không nối được với nhau
+    what: Đầu ra của "{a}" là {type_a} nhưng "{b}" cần {type_b}.
+  CFG-002:
+    title: Các bước đang nối thành vòng tròn
+    what: 'Dây nối tạo thành một vòng: {nodes}. Mỗi bước phải chạy sau bước trước, không quay lại được.'
+  CFG-003:
+    title: Bước này còn thiếu đầu vào
+    what: '"{node}" cần "{port}" nhưng chưa có dây nối vào.'
+  CFG-005:
+    title: Một thiết lập không hợp lệ
+    what: '"{param}" của "{node}" đang là {value}, nhưng phải {rule}.'
+  CFG-006:
+    title: Có dây nối tới bước không tồn tại
+    what: Một dây trỏ tới "{node_id}" nhưng bước này đã bị xoá hoặc đổi tên.
+  CFG-007:
+    title: Không mở được file workflow
+    what: File không đúng định dạng workflow hoặc có thông tin lạ ({field}).
+  SEC-001:
+    title: Đường dẫn nằm ngoài thư mục làm việc
+    what: '"{path}" nằm ngoài thư mục dự án nên app không được đọc hay ghi ở đó.'
+  SEC-002:
+    title: Workflow đang chứa mật khẩu hoặc token
+    what: Thiết lập "{param}" có vẻ chứa token. Hãy lưu token trong Cài đặt, workflow chỉ tham chiếu tới nó.
+  SEC-003:
+    title: Giấy phép không cho phép dùng thế này
+    what: Giấy phép của {name} không cho phép {use}.
+  SYS-000:
+    title: Đã xảy ra lỗi chưa được nhận diện
+    what: App chưa biết lỗi này. Tiến độ đã được lưu nếu có; bạn có thể gửi báo cáo để team sửa.
+action:
+  migrate_node: Xem thay đổi và cập nhật
+  open_node: Mở bước này
+  review_to_install: Xem để cài
+  show_admin_command: Xem lệnh cho quản trị viên
+  auto_rename_ids: Tự đặt lại mã cho các bước trùng
+  rerun_step: Chạy lại bước này
+  resume_checkpoint: Tiếp tục từ chỗ đã lưu
+  send_report: Gửi báo cáo lỗi
+  use_lora: Dùng LoRA thay vì train toàn bộ
+  use_qlora: Dùng QLoRA (~{est_gb} GB)
+  reduce_image_size: Giảm kích thước ảnh
+  reduce_batch: Giảm batch
+  smaller_model: Chọn model nhỏ hơn
+  resume_lighter: Tiếp tục với cấu hình nhẹ hơn
+  reduce_max_length: Giảm độ dài tối đa
+  enable_grad_checkpointing: Bật tiết kiệm bộ nhớ (gradient checkpointing)
+  safe_serving_default: Dùng mức an toàn (mặc định)
+  free_space: Giải phóng dung lượng (xem trước)
+  fewer_checkpoints: Lưu ít checkpoint hơn
+  queue: Xếp hàng chờ
+  keep_waiting: Tiếp tục chờ
+  cancel_run: Huỷ
+  use_app_environment: Dùng môi trường chuẩn của app
+  disable_compile: Tắt tăng tốc (chậm hơn nhưng chạy được)
+  switch_fp8: Chuyển sang FP8
+  keep_nvfp4: Vẫn dùng NVFP4
+  view_bad_samples: Xem các mẫu lỗi
+  skip_bad_samples: Bỏ qua các mẫu lỗi
+  increase_max_length: Tăng độ dài tối đa
+  auto_convert_images: Tự chuyển đổi ảnh
+  check_sample_data: Kiểm tra dữ liệu mẫu
+  retry_recommended_version: Thử lại với phiên bản khuyến nghị
+  view_comparison: Xem so sánh
+  use_original_model: Dùng lại model gốc
+  check_connection: Kiểm tra kết nối
+  enter_token: Nhập token (Cài đặt)
+  preview_converter: Thêm bước chuyển đổi phù hợp (xem trước)
+  show_guide: Xem hướng dẫn
+  show_cycle: Chỉ ra dây gây vòng
+  pick_input_source: Chọn nguồn cho đầu vào này
+  remove_step: Xoá bước này
+  replace_step: Chọn bước thay thế
+  reset_default: Đặt về mặc định
+  remove_bad_wire: Xoá dây lỗi
+  open_other_file: Mở file khác
+  show_technical: Xem chi tiết kỹ thuật
+  pick_workspace_folder: Chọn thư mục trong dự án
+  move_to_secure_settings: Chuyển sang Cài đặt bảo mật
+  pick_other_asset: Chọn model/dữ liệu khác
+custom_node:
+  library_group: Đã cài thêm
+  badge:
+    unverified: Bên thứ 3 – chưa xác minh · {publisher}
+    reviewed: Bên thứ 3 · đã được team review · {publisher}
+    policy_block: Bị chặn trên máy này theo chính sách quản trị
+  install_title: 'Cài node bên thứ 3: "{name}"'
+  not_reviewed: Chưa xác minh — do người ngoài team viết, team chưa kiểm tra mã nguồn này.
+  not_bundled: Node này không đi kèm app; bạn tự cài và chịu trách nhiệm khi dùng.
+  source: Nguồn
+  commit_pinned: commit {commit_short} (đã khoá)
+  publisher: Tác giả
+  license: Giấy phép
+  permissions_intro: 'Node này sẽ được phép:'
+  level_high: CAO
+  perm:
+    read_inputs: Đọc dữ liệu bạn nối vào và ghi kết quả ra
+    gpu: 'Dùng GPU: có thể chạy tính toán nặng trên máy bạn, tới {max_runtime}'
+    network: 'Kết nối Internet tới {hosts}: dữ liệu của bạn có thể được gửi tới đó'
+    over_limits: 'Chạy lâu hơn hoặc dùng nhiều bộ nhớ hơn mức thường: tới {max_runtime}, {max_memory_gb} GB'
+    isolation: 'Node chạy trong vùng cách ly: không được cấp quyền đọc file khác, token hay mật khẩu của bạn. Cách ly giảm rủi ro nhưng không loại bỏ hoàn toàn — chỉ cài node từ nguồn bạn tin.'
+  badge_perm:
+    gpu: GPU
+    network: Internet
+  scan_title: Quét tự động (không đảm bảo an toàn)
+  scan_disclaimer: Quét tự động không đảm bảo an toàn.
+  scan_none_found: Không thấy {check}
+  scan_found:
+    subprocess: Có gọi chương trình khác (subprocess)
+    eval_exec: Có chạy mã động (eval/exec)
+    import_network: Kết nối mạng ngay khi được nạp
+    obfuscated: Có đoạn mã bị che giấu/mã hoá
+    pickle_load: Nạp file theo cách có thể chạy mã ẩn (pickle/torch.load)
+    trust_remote_code: Cho phép model tự chạy mã tải về (trust_remote_code)
+    runtime_pip: Tự cài thêm phần mềm khi đang chạy
+  deps_summary: Cài thêm {dep_count} thư viện Python · dung lượng {image_gb} GB
+  acknowledge: Tôi hiểu node này do người ngoài viết và tự chịu trách nhiệm khi dùng
+  typed_confirm_gpu_unverified: 'Node chưa xác minh xin dùng GPU. Gõ  {name}  để xác nhận:'
+  typed_confirm_network: 'Node xin kết nối Internet. Gõ  {name}  để xác nhận:'
+  install: Cài node
+  close: Đóng
+  blocked_title: Không thể cài node này
+  blocked_reason:
+    not_sha_pinned: Link phải trỏ tới một commit cụ thể (40 ký tự), không phải nhánh hay tag, để biết chắc mình đang cài gì.
+    manifest_invalid: Node không khai báo rõ nó cần quyền gì, hoặc xin quyền không được phép.
+    network_wildcard: Node xin kết nối tới mọi nơi trên Internet — không được phép.
+    policy_block: Máy này đang chặn node bên thứ 3 có quyền này theo chính sách quản trị.
+    license_blocked: Giấy phép không cho phép dùng theo cách này.
+    permission_unsupported: Node xin kết nối Internet — phiên bản app này chưa cho node bên thứ 3 dùng Internet.
+    base_image_not_allowed: Node dựa trên một môi trường chạy không nằm trong danh sách được phép.
+    build_failed: Không dựng được node này. Có thể node bị lỗi hoặc thiếu thư viện.
+    image_digest_mismatch: Node đã bị thay đổi sau khi cài nên app không chạy nó. Hãy gỡ và cài lại từ nguồn bạn tin.
+  update_title: Cập nhật "{name}"
+  update_perms_added: 'Bản mới xin thêm quyền: {perms}'
+  update_code_diff: Thay đổi {file_count} file, {line_count} dòng
+  missing_placeholder: Thiếu node {name} {version}
+  see_to_install: Xem để cài
+  uninstall: Gỡ node
+  uninstall_used_by: 'Đang được dùng trong: {workflows}'
+  uninstall_image: Gỡ sẽ xoá luôn bản cài ({image_gb} GB).
+  error_in_third_party: Lỗi trong node bên thứ 3 {name}
+  report_to_author: Báo cho tác giả
+  preflight_info: Workflow này có {node_count} node bên thứ 3, {network_node_count} node kết nối Internet.
+  paste_branch_error: Đây là link nhánh/tag. Mở repo, chọn một commit cụ thể rồi dán link commit đó.
+  shared_wf:
+    in_trusted_source: Node này có trong nguồn tin cậy của app. Xem thông tin trước khi cài.
+    not_in_trusted_source_title: Không có trong nguồn tin cậy — workflow này do người khác chia sẻ
+    not_in_trusted_source_body: App không cài theo thông tin trong file workflow. Nếu bạn tin node "{name}", hãy tự tìm repo gốc của tác giả và dán link commit vào đây. Node sẽ ở mức chưa xác minh.
+    paste_url_label: Link commit của repo
+    paste_url_hint: 'Ví dụ: github.com/<tác giả>/<repo>/commit/<40 ký tự>'
+    check_url: Kiểm tra link
+    alt_remove: Hoặc xoá bước này khỏi workflow
+    name_from_file: (tên do file workflow ghi)
+    lookalike_warning: Tên giống node chính chủ — có thể là giả mạo.
+    url_needs_commit: Link phải trỏ tới một commit đầy đủ 40 ký tự, không phải nhánh hay tag.
+estimate:
+  source:
+    measured: đo thực tế trên máy này
+    formula: ước lượng theo công thức
+    declared: do tác giả node khai, chưa kiểm chứng
+    unknown: chưa có số đo
+  range_minutes: ~{lo}–{hi} phút
+  range_hours: ~{lo}–{hi} giờ
+  range_ram_gb: RAM ~{lo}–{hi} GB
+  range_disk_gb: Disk ~{lo}–{hi} GB
+app:
+  name: VLM Studio
+  mode_simple: Đơn giản
+  mode_advanced: Nâng cao
+  theme_light: Sáng
+  theme_dark: Tối
+  theme_system: Theo hệ thống
+  language: Ngôn ngữ
+  run: Chạy
+  run_smoke: Chạy thử nhanh
+  run_full: Chạy đầy đủ
+  cancel: Huỷ
+  undo: Hoàn tác
+  save: Lưu
+  close: Đóng
+  details_technical: Chi tiết kỹ thuật
+  copy: Sao chép
+  copied: Đã sao chép
+  read_only_small_screen: Màn hình nhỏ chỉ xem được. Dùng màn hình rộng từ 1280px để chỉnh sửa.
+header:
+  gpu_free: GPU · Rảnh
+  gpu_busy: 'GPU · Đang bận: {who} chạy {job} từ {since}'
+  gpu_stale: GPU · Khoá cũ, tiến trình không còn chạy — báo quản trị viên
+  ram: RAM {used_gb}/{total_gb} GB
+  ram_available: còn trống {avail_gb} GB
+  ram_segment_other: Ứng dụng khác
+  ram_segment_vlm: Workflow của bạn
+  ram_segment_cache: Bộ đệm (máy tự thu hồi được)
+  ram_segment_free: Trống
+  disk: Dung lượng
+gallery:
+  title: Bắt đầu nhanh
+  subtitle: Chọn một mẫu, chạy thử ngay, rồi thay bằng dữ liệu của bạn.
+  search: Tìm mẫu…
+  filter_all: Tất cả
+  filter_finetune: Dạy model
+  filter_quantize: Nén model
+  filter_eval: Đánh giá
+  use_template: Dùng mẫu này
+  preview: Xem trước
+  level_basic: Cơ bản
+  level_advanced: Nâng cao
+  sample_data_included: Có dữ liệu mẫu
+  opens_copy: Mở ra là một bản sao — mẫu gốc không bị thay đổi.
+  empty: Chưa có mẫu nào khớp. Thử từ khoá khác.
+  blank_workflow: Workflow trống
+canvas:
+  lane:
+    source: ① Nguồn
+    prepare: ② Chuẩn bị
+    train: ③ Huấn luyện
+    try: ④ Chạy thử
+    quantize: ⑤ Nén
+    eval: ⑥ Đo điểm
+    export: ⑦ Xuất
+  auto_layout: Sắp xếp gọn
+  steps_list: Danh sách bước
+  receive_from: Nhận từ
+  replace_with_your_data: 👉 Thay bằng dữ liệu của bạn
+  show_advanced: Nâng cao ({param_count})
+  customized: '{param_count} tuỳ chỉnh'
+  advanced_only: Bật chế độ Nâng cao để dùng bước này
+  drop_wire_search: Thêm bước nhận {port_type}…
+  wire_rejected: Cổng "{target}" cần {expected}, bạn đang nối {actual}.
+library:
+  title: Thư viện bước
+  search: 'Tìm bước… (vd: nén, LoRA, benchmark)'
+port:
+  dataset: Dữ liệu
+  model: Model
+  adapter: Phần học thêm (LoRA)
+  quantized_model: Model đã nén
+  export_artifact: Model đã xuất
+  eval_report: Điểm benchmark
+  bench_report: Tốc độ & bộ nhớ
+  endpoint: Model đang chạy thử
+  value: Giá trị
+node_state:
+  not_ready: Chưa đủ
+  ready: Sẵn sàng
+  queued: Đang chờ
+  cached: Dùng lại kết quả lúc {time}
+  running: Đang chạy {percent}%
+  done: Xong
+  interrupted: Tạm dừng
+  failed: Lỗi
+  skipped: Bỏ qua
+  blocked_policy: Bị chặn
+preflight:
+  title: Kiểm tra trước khi chạy
+  summary_ok: Mọi thứ đã sẵn sàng
+  summary: '{ok_count}/{total_count} ổn · {error_count} lỗi · {warning_count} cảnh báo'
+  show_details: Xem chi tiết
+  show_me: Chỉ cho tôi
+  run_blocked: Sửa các lỗi trước khi chạy
+  estimate_line: 'Dự kiến: {time} · {ram} · {disk}'
+  queue_when_busy: Xếp hàng — tự chạy khi GPU rảnh
+error_card:
+  what: Chuyện gì xảy ra
+  why: Vì sao
+  fix: Cách sửa
+  copy_report: Sao chép báo cáo lỗi
+  open_full_log: Mở file log đầy đủ
+  applied_change: 'Đã đổi {param}: {old} → {new}'
+benchmark_group:
+  documents: Đọc tài liệu & chữ trong ảnh
+  charts: Hiểu biểu đồ & sơ đồ
+  reasoning: Kiến thức & suy luận đa ngành
+  perception: Nhận thức ảnh tổng quát
+  math: Toán có hình
+  video: Video
+  better: Tốt hơn
+  same: Như cũ
+  worse: Kém hơn ({benchmark})
+quantize_preset:
+  fp8: Nhanh, giữ chất lượng (FP8)
+  nvfp4: Cân bằng (NVFP4)
+  int4_awq: Nhỏ nhất (INT4-AWQ)
+train_preset:
+  fast: Nhanh
+  balanced: Cân bằng
+  quality: Chất lượng
+node:
+  model.hf_pick:
+    title: Chọn model gốc
+    desc: Chọn model có sẵn để bắt đầu. Danh sách đã được kiểm tra giấy phép.
+  data.hf_load:
+    title: Dataset Hugging Face
+    desc: Lấy bộ dữ liệu có sẵn trên Hugging Face.
+  data.local_folder:
+    title: Thư mục ảnh + câu hỏi/đáp án
+    desc: Dùng ảnh và câu hỏi/đáp án của bạn trong thư mục dự án.
+  data.format_vlm_chat:
+    title: Chuyển dữ liệu sang dạng hội thoại
+    desc: Sắp xếp ảnh và câu hỏi/đáp án theo đúng dạng model cần để học.
+  data.split:
+    title: Chia dữ liệu học / kiểm tra
+    desc: Tách một phần dữ liệu để kiểm tra model sau khi học.
+  data.preview:
+    title: Xem trước dữ liệu
+    desc: Xem vài mẫu và các lỗi thường gặp trước khi train.
+  train.lora_vlm:
+    title: Fine-tune nhẹ (LoRA)
+    desc: Dạy model trả lời theo dữ liệu của bạn, tốn ít bộ nhớ.
+  train.sft_vlm:
+    title: Fine-tune toàn bộ
+    desc: Dạy lại toàn bộ model. Tốn nhiều bộ nhớ và thời gian hơn LoRA.
+  train.grpo_vlm:
+    title: Học từ phản hồi (GRPO)
+    desc: Cải thiện model bằng cách chấm điểm các câu trả lời. Dành cho người dùng nâng cao.
+  serve.vllm:
+    title: Bật model để chạy thử
+    desc: Chạy model như một dịch vụ để chat thử hoặc đo tốc độ.
+  playground.chat:
+    title: Chat thử với model
+    desc: Gửi ảnh/video và câu hỏi để xem model trả lời.
+  quantize.modelopt_ptq:
+    title: Nén model
+    desc: Làm model nhỏ và chạy nhanh hơn, chất lượng có thể giảm nhẹ.
+  eval.benchmarks:
+    title: Đo điểm benchmark
+    desc: Chấm điểm model trên các bộ đề chuẩn theo năng lực.
+  bench.perf:
+    title: Đo tốc độ & bộ nhớ
+    desc: Đo model trả lời nhanh cỡ nào và dùng bao nhiêu bộ nhớ.
+  export.hf_dir:
+    title: Lưu model
+    desc: Lưu model theo định dạng Hugging Face để dùng ở nơi khác.
+  export.merge_lora:
+    title: Gộp phần học thêm vào model
+    desc: Gộp LoRA vào model gốc thành một model hoàn chỉnh.
+  export.trtllm:
+    title: Xuất để chạy nhanh (TensorRT-LLM)
+    desc: Chuẩn bị model để phục vụ nhanh nhất trên GPU NVIDIA.
+  compare.reports:
+    title: So sánh kết quả
+    desc: Đặt điểm của các model cạnh nhau để thấy cái nào tốt hơn.
+  note:
+    title: Ghi chú
+    desc: Ghi chú cho người đọc workflow, không chạy gì.

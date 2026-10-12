@@ -1,0 +1,135 @@
+[project]
+name = "vlm-pipeline"
+version = "0.1.0"
+description = "No-code node-graph app for fine-tuning, quantizing and benchmarking VLMs on NVIDIA GPUs"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.13"
+# Host-safe dependencies only. Heavy runtime libs (torch, transformers, nemo_automodel, modelopt, vllm, ...)
+# live in the NGC container images (docker/IMAGES.lock), never here (ADR-004 D1).
+dependencies = [
+    "pydantic>=2.13,<3",
+    "pyyaml>=6.0,<7",
+]
+
+[dependency-groups]
+# Exact pins = newest versions allowed by the 7-day cooldown on 2026-10-12. Bump in a dedicated commit.
+dev = [
+    "ruff==0.16.10",
+    "mypy==2.4.0",
+    "import-linter==2.15",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "prek==0.5.4",
+    "types-PyYAML",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Supply-chain cooldown (ADR-003 / ADR-004). Urgent CVE fix: use exclude-newer-package for that package
+# and state the reason in the commit message.
+exclude-newer = "7 days"
+default-groups = ["dev"]
+
+# ----------------------------------------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["third_party", "frontend", "plugins", ".team", ".claude", "docs", "design"]  # ruff>=0.16 also formats Markdown code blocks
+cache-dir = ".cache/ruff"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "B", "BLE", "UP", "SIM", "C4", "PT", "RUF", "N", "S", "TID", "PTH", "PL", "D",
+]
+ignore = [
+    "D1",       # docstrings required where they add value; enforced in review, not by count
+    "PLR0913",  # trainer/node configs legitimately take many arguments
+    "PLR2004",  # magic values are fine in tests and thresholds named at call site
+    "PLC0415",  # in-function imports are REQUIRED: lazy heavy imports (ADR-004 D3) and spec tests (A1)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["vlm_pipeline"]  # spec tests import modules that do not exist yet
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+# Heavy libs must not be imported at module level outside container-side modules (ADR-004 D3).
+banned-module-level-imports = [
+    "torch", "transformers", "nemo_automodel", "megatron", "modelopt", "tensorrt_llm", "vllm", "nemo_rl",
+    "triton", "flash_attn", "transformer_engine", "bitsandbytes", "peft", "accelerate", "datasets",
+]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"pickle.load".msg = "Unsafe deserialization; use the safe loader in vlm_pipeline.common (ADR-003)"
+"pickle.loads".msg = "Unsafe deserialization; use the safe loader in vlm_pipeline.common (ADR-003)"
+"torch.load".msg = "Use the safe loader in vlm_pipeline.common (weights_only / safetensors, ADR-003)"
+
+[tool.ruff.lint.per-file-ignores]
+"src/vlm_pipeline/*/worker.py" = ["TID253"]
+"src/vlm_pipeline/*/_nvidia_compat.py" = ["TID253"]
+"scripts/probe/*.py" = ["TID253", "N812"]  # runs inside the NGC container, like worker.py
+"tests/**" = ["S101", "S311", "D", "PLR"]
+
+# ----------------------------------------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["vlm_pipeline"]
+plugins = ["pydantic.mypy"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+cache_dir = ".cache/mypy"
+
+[[tool.mypy.overrides]]
+# Strict from day one; the rest of the package is raised to strict after the E2E smoke (ADR-004 §5).
+module = ["vlm_pipeline.common.*", "vlm_pipeline.*.config", "vlm_pipeline.graph.*", "vlm_pipeline.plugin_api.*"]
+strict = true
+
+[[tool.mypy.overrides]]
+# Container-only libraries: not installed on the host venv.
+module = [
+    "torch.*", "transformers.*", "nemo_automodel.*", "megatron.*", "modelopt.*", "tensorrt_llm.*", "vllm.*",
+    "nemo_rl.*", "datasets.*", "peft.*", "accelerate.*", "triton.*", "flash_attn.*", "transformer_engine.*",
+    "bitsandbytes.*",
+]
+ignore_missing_imports = true
+
+# --------------------------------------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "--import-mode=importlib", "-ra"]
+cache_dir = ".cache/pytest"
+markers = [
+    "gpu: needs CUDA and the GPU lock token (runs via scripts/check.sh --container)",
+    "slow: takes more than ~10 s",
+    "integration: needs torch/transformers; runs inside the NGC container",
+    "eval: needs a real benchmark dataset download",
+]
+xfail_strict = true
+
+# --------------------------------------------------------------------------------------- import-linter
+[tool.importlinter]
+root_package = "vlm_pipeline"
+include_external_packages = false
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture (ADR-004 A3)"
+type = "layers"
+containers = ["vlm_pipeline"]
+layers = [
+    "(app) | (cli)",
+    "graph",
+    "nodes",
+    "data | train | quantize | eval | serve | artifacts | plugin_api",
+    "common | (i18n)",
+]

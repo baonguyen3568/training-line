@@ -1,0 +1,6 @@
+node_modules/
+dist/
+coverage/
+src/generated/tokens.css
+*.tsbuildinfo
+src/generated/i18n.*.json

@@ -309,12 +309,34 @@ Mount do orchestrator cố định: `/in` (ro, artifact được nối vào), `/
 - Sau khi vá: node bên thứ 3 trên máy này chỉ cài từ danh sách team đã review (security đọc code ở SHA đó). Không cài node tuỳ ý từ git URL. Lý do: kernel và driver GPU dùng chung, không có sandbox mạnh hơn container cho GPU trên arm64. Một lỗi kernel/driver 0-day ảnh hưởng **dữ liệu của người khác** (banking-rag), không chỉ dự án mình. Rủi ro này không cân xứng với lợi ích trên máy dev.
 - Đây là chính sách **vận hành cho host này**, không giới hạn tính năng sản phẩm. Trên máy của end-user, app vẫn cho cài node bên thứ 3 theo ADR-009, kèm cảnh báo ở trên, và quyết định là của end-user cho máy của họ.
 
+### D17. `deployment.profile`: chính sách theo loại máy (user chấp nhận chính sách host dev, ghi trong ADR-009 A1). DRAFT, bao-security + bao-backend
+- **Một nguồn cấu hình duy nhất** cho các chính sách phụ thuộc loại máy, dùng chung với `storage.approval_policy` của P005:
+  ```toml
+  # ~/.config/vlm-app/policy.toml  — admin-owned, 0644; NOT inside the repo/workspace; NOT writable via any API/UI
+  [deployment]
+  profile = "shared_dev"          # "shared_dev" | "personal" (default when file absent: "personal")
+  [storage]
+  approval_policy = "threshold"   # derived default from profile; may be set explicitly
+  threshold_gb = 20
+  ```
+- **Chống hạ cấp:** UI, API, workflow, manifest và env đều **không** đổi được profile. Server chỉ đọc file lúc khởi động. Nếu có override (env `VLM_PROFILE` cho test/CI) thì chỉ được phép **chặt hơn** (personal → shared_dev), không bao giờ nới ra.
+- **Tự phát hiện trạng thái vá toolkit, không khai báo tay:** lúc khởi động server chạy `nvidia-ctk --version` (argv cố định), parse ra `toolkit_patched = version >= 1.19.1`. Không đọc được hoặc parse lỗi thì coi là `false` (fail-closed). Kết quả được ghi vào `/api/policy` và log khởi động.
+- **Quy tắc plugin khi `profile = shared_dev`:**
+  1. `trust_level = unverified` → `policy_block(reason=not_reviewed)`.
+  2. `gpu = true` và `toolkit_patched = false` → `policy_block(reason=toolkit_unpatched)` (áp cho mọi plugin bên thứ 3, kể cả reviewed).
+  3. first_party không bị policy chặn (vẫn qua GPU_LOCK + memguard).
+  Ghi chú: quy tắc (1) **chặt hơn** chính sách user đã duyệt ở giai đoạn *trước khi vá* (lúc đó chỉ chặn plugin có GPU), vì nó chặn cả plugin không dùng GPU nhưng chưa được review. Lý do: plugin không GPU vẫn chạy code tuỳ ý trên kernel dùng chung. Đã nêu rõ cho PM xác nhận (U5).
+- `personal`: không có policy_block mặc định. Mọi kiểm soát D16 vẫn áp dụng như bình thường.
+- `/api/policy` trả `{profile, toolkit_patched, toolkit_version, sandbox_verified, storage:{approval_policy, threshold_gb}}`. UI hiện banner "Máy dùng chung — chính sách quản trị đang bật" khi `shared_dev`.
+- Trên host này: admin (user) tạo file `~/.config/vlm-app/policy.toml` với `profile = "shared_dev"`. File này **không** nằm trong repo nên không lan sang máy end-user.
+
 ## 5. Việc cần người khác / user
 | # | Việc | Ai |
 |---|------|----|
 | U1 | Vá NVIDIA Container Toolkit lên ≥1.19.1 (sudo + restart docker ảnh hưởng mọi service) | user (qua PM) |
 | U2 | ~~Chọn nhánh A/B~~ → user chốt **F** (miễn phí, phân phối, không bán). Còn chờ: user đồng ý (ii) xây trên MIT + phát hành Apache-2.0, hay chấp nhận fork GPL-3.0 | user (qua PM) |
 | U3 | HF token: token đã đưa bị 401 và đã lộ trong transcript chat → **revoke**, tạo token fine-grained read-only mới, user tự dán vào `.env` (không qua chat) | user |
+| U5 | D17: trên host dev, xác nhận chặn cả plugin **không GPU** nhưng chưa review (chặt hơn bản đã duyệt ở giai đoạn trước vá) | user (qua PM) |
 | U4 | ~~v1 không custom node bên thứ 3~~ → user CHO PHÉP (ADR-009) ⇒ D16. Chờ user duyệt **chính sách host dev**: cấm node bên thứ 3 có GPU tới khi vá toolkit; sau vá chỉ node đã được team review | user (qua PM) |
 | T1 | Implement D2 trong compose/skill backend-gpu-job | bao-backend (đã áp) |
 | T2 | Pre-commit + ruff S + banned-api (P004) | bao-cleancode (đã gộp) |

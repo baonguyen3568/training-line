@@ -1,0 +1,34 @@
+{
+  "t3_wrong_wire_missing_input.vlmflow.json": [
+    {
+      "code": "CFG-001",
+      "node_id": "eval"
+    },
+    {
+      "code": "CFG-003",
+      "node_id": "train"
+    }
+  ],
+  "t4_workflow.vlmflow.json": [
+    {
+      "code": "MEM-001",
+      "node_id": "train",
+      "via": "t4_mem001_preflight.json (stub)"
+    }
+  ],
+  "t5_shared_unverified_gpu_node.vlmflow.json": [
+    {
+      "code": "CFG-004",
+      "node_id": "boost",
+      "params": {
+        "reason": "not_installed",
+        "trust_level": "unverified",
+        "suggested_package": null
+      },
+      "must_not_contain": [
+        "vlm/lora-trainer"
+      ]
+    }
+  ],
+  "t1_lora_template_smoke.vlmflow.json": []
+}

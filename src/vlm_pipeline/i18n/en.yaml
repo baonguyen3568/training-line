@@ -1,0 +1,462 @@
+# UI copy — single source of truth for all user-visible text (ADR-009, P010, 007 R9). Owner: bao-design.
+# Nested YAML. Lookup: node type ids containing dots are ONE key under `node` (e.g. node["train.lora_vlm"].title).
+# Variants: key children (e.g. error.CFG-009.what.migratable). Placeholders {name}: sizes *_gb, counts *_count;
+# vi.yaml and en.yaml must have identical keys and placeholders (tested). Missing key at runtime → show the key.
+# locale: en
+storage:
+  group:
+    downloaded_model: Downloaded models
+    trained_model: Your trained models
+    dataset: Datasets
+    temp_result: Temporary results (can be regenerated)
+  lock_reason:
+    IN_USE_BY_RUNNING_WORKFLOW: Workflow "{workflow}" is running and needs this. Delete it after it finishes.
+    PINNED_OR_KEEP: Pinned to keep. Unpin it if you want to delete it.
+    REQUIRED_PARENT_AT_LOAD: The add-on (LoRA) "{child}" still needs this model to run. Delete the add-on first.
+    SECURITY_PROTECTED: Protected by the project's safety rules. Contact an admin if it must be removed.
+    RUN_NOT_FINISHED: Run "{run}" is unfinished or paused — it needs this to continue.
+    WHITELIST: Run history (logs, metrics) is always kept.
+  consequence:
+    WILL_REDOWNLOAD:
+      default: Workflow "{workflow}" will need to download {gb} GB again next time.
+      no_workflow: You will need to download {gb} GB again if you use it later.
+    WILL_RECOMPUTE: Can be regenerated in about {minutes} minutes.
+    PERMANENT_LOSS: '"{name}" will be lost permanently — it cannot be restored or recreated exactly.'
+    RESUME_IMPOSSIBLE: The model still works, but run "{run}" can no longer continue training from this point.
+  dialog:
+    title: Delete {item_count} items and free {gb} GB?
+    typed_confirm: Type  {confirm_text}  to confirm
+    typed_reason_permanent: This item cannot be recreated.
+    typed_reason_redownload: '{gb} GB would have to be downloaded again.'
+    cancel: Cancel
+    confirm: Delete permanently
+    plan_expired: This list is out of date (over 10 minutes). Checking again…
+    approval_needed: This deletes more than {threshold_gb} GB, so an admin must approve it first.
+  event_done: Deleted at {time} by {who}
+  preflight_hint:
+    free_temp: Free {gb} GB from temporary results
+  item:
+    temp_result_of_run: Temporary results of run {run_name}
+error:
+  GPU-001:
+    title: Software doesn't match this GPU
+    what: A component was built for a different CUDA version than this machine supports.
+  GPU-002:
+    title: Fast mode failed to start
+    what: The speed-up component doesn't support the GB10 chip yet; turning it off lets the step run, just slower.
+  CACHE-001:
+    title: Saved result is damaged, re-running
+    what: The saved result of "{node}" (from {saved_at}) can't be read, so the app will run this step again, about {est_minutes} minutes.
+  SYS-003:
+    title: This step stopped unexpectedly
+    what: This step stopped midway without reporting why (the machine may have restarted or the process was killed). Progress up to {checkpoint_step} was saved if available.
+  DISK-002:
+    title: Approval needed before freeing space
+    what: You're about to delete {gb} GB ({item_count} items), above this shared machine's {threshold_gb} GB limit, so an admin must approve it with a command. Nothing has been deleted yet.
+  CFG-008:
+    title: Two steps share the same ID
+    what: '{duplicate_count} steps share the ID "{node_id}", so the app can''t tell which one the wires belong to. This usually comes from editing the workflow file by hand.'
+  CFG-004:
+    title: Workflow uses a step the app lacks
+    what:
+      not_installed_trusted: '"{node_type}" is a third-party node not installed on this machine. It is in the app''s trusted sources; review it and decide whether to install.'
+      not_installed_unknown: '"{node_type}" is a third-party node not in trusted sources — this workflow was shared by someone else. The app won''t install from details in the file.'
+      not_allowed: '"{node_type}" is not allowed on this machine.'
+  CFG-009:
+    title: Workflow made with another step version
+    what:
+      migratable: '"{node_id}" was made with {node_type} {workflow_version}; this machine has {installed_version}. The app can move the settings to the new version; review the changes first.'
+      not_migratable: '"{node_id}" was made with {node_type} {workflow_version}; this machine has {installed_version} and it can''t be converted automatically. Open the step to adjust its settings.'
+  MEM-001:
+    title: Not enough memory for this step
+    what: This step needs about {need_gb} GB but only {avail_gb} GB is free, because the machine is shared with other apps.
+  MEM-002:
+    title: Paused to protect the machine
+    what: Free memory dropped below the safe level, so the app saved progress and paused to avoid freezing the machine.
+  MEM-003:
+    title: Ran out of memory while running
+    what: The model used more memory than expected midway, usually because of large images or long text.
+    why: Images of {image_size_px}px with batch size {batch_size} need more memory than the machine has free.
+  MEM-004:
+    title: Model server reserves too much memory
+    what: The serving setting reserves too much memory for its cache, which can affect other apps.
+  DISK-001:
+    title: Not enough disk space
+    what: About {need_gb} GB is needed to save the model and results, but only {avail_gb} GB is left.
+  SYS-001:
+    title: The machine is busy with another job
+    what: Only one heavy job can run at a time; {who} has been running "{job}" since {since}.
+  SYS-002:
+    title: Waited too long for the machine
+    what: The workflow has waited {minutes} minutes but the machine is still busy.
+  GPU-003:
+    title: This compression is slow here
+    what: On this machine NVFP4 may run slower than FP8 with similar quality.
+  DATA-001:
+    title: Image count in data doesn't match
+    what: 'Sample #{idx} has {image_count} images but the text has only {slot_count} image slots, or was cut off for being too long.'
+  DATA-002:
+    title: Some images are broken or unusual
+    what: '{image_count} images can''t be opened or have an unusual format (CMYK, RGBA, too small).'
+  DATA-003:
+    title: The model doesn't seem to learn
+    what: The loss is near zero from the start, usually because the data marks the wrong part to learn.
+  DATA-004:
+    title: Images missing from data
+    what: '{sample_count} samples point to images that don''t exist.'
+  MODEL-001:
+    title: Can't read the converted model
+    what: Parts of the model file don't match the expected format, usually due to a library version difference.
+  MODEL-002:
+    title: Converted model gives wrong answers
+    what: The automatic check found the new model answers very differently from the original.
+  NET-001:
+    title: Couldn't download model or data
+    what: Couldn't reach Hugging Face/NGC, or you're not signed in.
+  CFG-001:
+    title: These two steps can't connect
+    what: '"{a}" outputs {type_a} but "{b}" needs {type_b}.'
+  CFG-002:
+    title: Steps are connected in a loop
+    what: 'The wires form a loop: {nodes}. Each step must run after the previous one and can''t go back.'
+  CFG-003:
+    title: This step is missing an input
+    what: '"{node}" needs "{port}" but nothing is connected.'
+  CFG-005:
+    title: A setting is not valid
+    what: '"{param}" of "{node}" is {value}, but it must {rule}.'
+  CFG-006:
+    title: A wire points to a missing step
+    what: A wire points to "{node_id}", but that step was deleted or renamed.
+  CFG-007:
+    title: Can't open the workflow file
+    what: The file isn't a valid workflow or contains unexpected data ({field}).
+  SEC-001:
+    title: Path is outside the workspace
+    what: '"{path}" is outside the project folder, so the app can''t read or write there.'
+  SEC-002:
+    title: Workflow contains a password or token
+    what: Setting "{param}" seems to contain a token. Store tokens in Settings; the workflow should only refer to them.
+  SEC-003:
+    title: License doesn't allow this use
+    what: The license of {name} doesn't allow {use}.
+  SYS-000:
+    title: An unrecognized error occurred
+    what: The app doesn't recognize this error. Progress was saved if possible; you can send a report so the team can fix it.
+action:
+  migrate_node: Review changes and update
+  open_node: Open this step
+  review_to_install: Review to install
+  show_admin_command: Show admin command
+  auto_rename_ids: Rename duplicate steps automatically
+  rerun_step: Run this step again
+  resume_checkpoint: Continue from saved progress
+  send_report: Send error report
+  use_lora: Use LoRA instead of full training
+  use_qlora: Use QLoRA (~{est_gb} GB)
+  reduce_image_size: Use smaller images
+  reduce_batch: Reduce batch size
+  smaller_model: Choose a smaller model
+  resume_lighter: Continue with a lighter setup
+  reduce_max_length: Reduce maximum length
+  enable_grad_checkpointing: Turn on memory saving (gradient checkpointing)
+  safe_serving_default: Use the safe default
+  free_space: Free up space (preview first)
+  fewer_checkpoints: Keep fewer checkpoints
+  queue: Wait in queue
+  keep_waiting: Keep waiting
+  cancel_run: Cancel
+  use_app_environment: Use the app's standard environment
+  disable_compile: Turn off speed-up (slower but works)
+  switch_fp8: Switch to FP8
+  keep_nvfp4: Keep NVFP4
+  view_bad_samples: View problem samples
+  skip_bad_samples: Skip problem samples
+  increase_max_length: Increase maximum length
+  auto_convert_images: Convert images automatically
+  check_sample_data: Check sample data
+  retry_recommended_version: Retry with the recommended version
+  view_comparison: View comparison
+  use_original_model: Use the original model
+  check_connection: Check connection
+  enter_token: Enter token (Settings)
+  preview_converter: Add a matching converter step (preview)
+  show_guide: View guide
+  show_cycle: Show the wire causing the loop
+  pick_input_source: Choose a source for this input
+  remove_step: Remove this step
+  replace_step: Choose a replacement step
+  reset_default: Reset to default
+  remove_bad_wire: Remove the broken wire
+  open_other_file: Open another file
+  show_technical: View technical details
+  pick_workspace_folder: Choose a folder in the project
+  move_to_secure_settings: Move to secure settings
+  pick_other_asset: Choose another model/data
+custom_node:
+  library_group: Installed add-ons
+  badge:
+    unverified: Third-party – unverified · {publisher}
+    reviewed: Third-party · team-reviewed · {publisher}
+    policy_block: Blocked on this machine by admin policy
+  install_title: 'Install third-party node: "{name}"'
+  not_reviewed: Unverified — written outside the team; the team has not reviewed this code.
+  not_bundled: This node isn't part of the app; you install it and use it at your own risk.
+  source: Source
+  commit_pinned: commit {commit_short} (pinned)
+  publisher: Publisher
+  license: License
+  permissions_intro: 'This node will be allowed to:'
+  level_high: HIGH
+  perm:
+    read_inputs: Read the data you connect and write results
+    gpu: 'Use the GPU: may run heavy computation on your machine, up to {max_runtime}'
+    network: 'Connect to {hosts}: your data could be sent there'
+    over_limits: 'Runs longer or uses more memory than usual: up to {max_runtime}, {max_memory_gb} GB'
+    isolation: 'The node runs in an isolated area: it is not granted access to your other files, tokens or passwords. Isolation reduces risk but doesn''t remove it — only install nodes from sources you
+      trust.'
+  badge_perm:
+    gpu: GPU
+    network: Internet
+  scan_title: Automatic scan (does not guarantee safety)
+  scan_disclaimer: An automatic scan does not guarantee safety.
+  scan_none_found: No {check} found
+  scan_found:
+    subprocess: Runs other programs (subprocess)
+    eval_exec: Runs dynamic code (eval/exec)
+    import_network: Connects to the network when loaded
+    obfuscated: Contains hidden or encoded code
+    pickle_load: Loads files in a way that can run hidden code (pickle/torch.load)
+    trust_remote_code: Lets models run downloaded code (trust_remote_code)
+    runtime_pip: Installs software while running
+  deps_summary: Adds {dep_count} Python libraries · {image_gb} GB
+  acknowledge: I understand this node is written by others and I use it at my own risk
+  typed_confirm_gpu_unverified: 'An unverified node asks to use the GPU. Type  {name}  to confirm:'
+  typed_confirm_network: 'This node asks for Internet access. Type  {name}  to confirm:'
+  install: Install node
+  close: Close
+  blocked_title: This node can't be installed
+  blocked_reason:
+    not_sha_pinned: The link must point to an exact commit (40 characters), not a branch or tag, so we know exactly what gets installed.
+    manifest_invalid: The node doesn't clearly declare its permissions, or asks for one that isn't allowed.
+    network_wildcard: The node asks to connect anywhere on the Internet — not allowed.
+    policy_block: This machine blocks third-party nodes with this permission by admin policy.
+    license_blocked: Its license doesn't allow this use.
+    permission_unsupported: The node asks for Internet access — this app version doesn't allow that for third-party nodes yet.
+    base_image_not_allowed: The node is built on a runtime environment that isn't on the allowed list.
+    build_failed: This node couldn't be built. It may be broken or missing libraries.
+    image_digest_mismatch: The node changed after it was installed, so the app won't run it. Uninstall and reinstall it from a source you trust.
+  update_title: Update "{name}"
+  update_perms_added: 'The new version asks for more: {perms}'
+  update_code_diff: '{file_count} files, {line_count} lines changed'
+  missing_placeholder: Missing node {name} {version}
+  see_to_install: Review to install
+  uninstall: Uninstall node
+  uninstall_used_by: 'Used in: {workflows}'
+  uninstall_image: Uninstalling also deletes the installed copy ({image_gb} GB).
+  error_in_third_party: Error inside third-party node {name}
+  report_to_author: Report to author
+  preflight_info: This workflow has {node_count} third-party nodes, {network_node_count} use the Internet.
+  paste_branch_error: That's a branch/tag link. Open the repo, pick a specific commit and paste its link.
+  shared_wf:
+    in_trusted_source: This node is in the app's trusted sources. Review it before installing.
+    not_in_trusted_source_title: Not in trusted sources — this workflow was shared by someone else
+    not_in_trusted_source_body: The app won't install from details inside the workflow file. If you trust "{name}", find the author's original repo yourself and paste a commit link here. It will be treated
+      as unverified.
+    paste_url_label: Repo commit link
+    paste_url_hint: e.g. github.com/<author>/<repo>/commit/<40 characters>
+    check_url: Check link
+    alt_remove: Or remove this step from the workflow
+    name_from_file: (name as written in the workflow file)
+    lookalike_warning: Name looks like an official node — it may be fake.
+    url_needs_commit: The link must point to a full 40-character commit, not a branch or tag.
+estimate:
+  source:
+    measured: measured on this machine
+    formula: estimated by formula
+    declared: declared by the node author, not verified
+    unknown: no measurement yet
+  range_minutes: ~{lo}–{hi} min
+  range_hours: ~{lo}–{hi} h
+  range_ram_gb: RAM ~{lo}–{hi} GB
+  range_disk_gb: Disk ~{lo}–{hi} GB
+app:
+  name: VLM Studio
+  mode_simple: Simple
+  mode_advanced: Advanced
+  theme_light: Light
+  theme_dark: Dark
+  theme_system: System
+  language: Language
+  run: Run
+  run_smoke: Quick test run
+  run_full: Full run
+  cancel: Cancel
+  undo: Undo
+  save: Save
+  close: Close
+  details_technical: Technical details
+  copy: Copy
+  copied: Copied
+  read_only_small_screen: Small screens are view-only. Use a screen at least 1280px wide to edit.
+header:
+  gpu_free: GPU · Free
+  gpu_busy: 'GPU · Busy: {who} running {job} since {since}'
+  gpu_stale: GPU · Stale lock, process is gone — tell an admin
+  ram: RAM {used_gb}/{total_gb} GB
+  ram_available: '{avail_gb} GB available'
+  ram_segment_other: Other apps
+  ram_segment_vlm: Your workflows
+  ram_segment_cache: Cache (the system can reclaim it)
+  ram_segment_free: Free
+  disk: Storage
+gallery:
+  title: Quick start
+  subtitle: Pick a template, try it right away, then swap in your own data.
+  search: Search templates…
+  filter_all: All
+  filter_finetune: Fine-tune
+  filter_quantize: Compress
+  filter_eval: Evaluate
+  use_template: Use template
+  preview: Preview
+  level_basic: Basic
+  level_advanced: Advanced
+  sample_data_included: Sample data included
+  opens_copy: Opens as a copy — the original template stays unchanged.
+  empty: No templates match. Try another keyword.
+  blank_workflow: Blank workflow
+canvas:
+  lane:
+    source: ① Sources
+    prepare: ② Prepare
+    train: ③ Train
+    try: ④ Try
+    quantize: ⑤ Compress
+    eval: ⑥ Evaluate
+    export: ⑦ Export
+  auto_layout: Tidy layout
+  steps_list: Step list
+  receive_from: Receive from
+  replace_with_your_data: 👉 Replace with your data
+  show_advanced: Advanced ({param_count})
+  customized: '{param_count} customized'
+  advanced_only: Turn on Advanced mode to use this step
+  drop_wire_search: Add a step that takes {port_type}…
+  wire_rejected: Port "{target}" needs {expected}, but you connected {actual}.
+library:
+  title: Step library
+  search: Search steps… (e.g. compress, LoRA, benchmark)
+port:
+  dataset: Data
+  model: Model
+  adapter: Add-on (LoRA)
+  quantized_model: Compressed model
+  export_artifact: Exported model
+  eval_report: Benchmark scores
+  bench_report: Speed & memory
+  endpoint: Model being served
+  value: Value
+node_state:
+  not_ready: Incomplete
+  ready: Ready
+  queued: Queued
+  cached: Reusing result from {time}
+  running: Running {percent}%
+  done: Done
+  interrupted: Paused
+  failed: Error
+  skipped: Skipped
+  blocked_policy: Blocked
+preflight:
+  title: Pre-run check
+  summary_ok: Everything is ready
+  summary: '{ok_count}/{total_count} OK · {error_count} errors · {warning_count} warnings'
+  show_details: Show details
+  show_me: Show me
+  run_blocked: Fix the errors before running
+  estimate_line: 'Estimated: {time} · {ram} · {disk}'
+  queue_when_busy: Queue — runs automatically when the GPU is free
+error_card:
+  what: What happened
+  why: Why
+  fix: How to fix
+  copy_report: Copy error report
+  open_full_log: Open full log
+  applied_change: 'Changed {param}: {old} → {new}'
+benchmark_group:
+  documents: Documents & text in images
+  charts: Charts & diagrams
+  reasoning: Multidisciplinary reasoning
+  perception: General image understanding
+  math: Visual math
+  video: Video
+  better: Better
+  same: About the same
+  worse: Worse ({benchmark})
+quantize_preset:
+  fp8: Fast, keeps quality (FP8)
+  nvfp4: Balanced (NVFP4)
+  int4_awq: Smallest (INT4-AWQ)
+train_preset:
+  fast: Fast
+  balanced: Balanced
+  quality: Quality
+node:
+  model.hf_pick:
+    title: Choose base model
+    desc: Pick a ready-made model to start from. The list is license-checked.
+  data.hf_load:
+    title: Hugging Face dataset
+    desc: Use a dataset published on Hugging Face.
+  data.local_folder:
+    title: Image folder + Q&A
+    desc: Use your own images and questions/answers from the project folder.
+  data.format_vlm_chat:
+    title: Format data as chat
+    desc: Arrange images and Q&A into the format the model learns from.
+  data.split:
+    title: Split train / validation
+    desc: Keep part of the data aside to check the model after training.
+  data.preview:
+    title: Preview data
+    desc: Look at a few samples and common problems before training.
+  train.lora_vlm:
+    title: Light fine-tune (LoRA)
+    desc: Teach the model to answer like your data, using little memory.
+  train.sft_vlm:
+    title: Full fine-tune
+    desc: Retrain the whole model. Needs more memory and time than LoRA.
+  train.grpo_vlm:
+    title: Learn from feedback (GRPO)
+    desc: Improve the model by scoring its answers. For advanced users.
+  serve.vllm:
+    title: Start model for testing
+    desc: Run the model as a service to chat with it or measure speed.
+  playground.chat:
+    title: Chat with the model
+    desc: Send images/videos and questions to see how the model answers.
+  quantize.modelopt_ptq:
+    title: Compress model
+    desc: Make the model smaller and faster; quality may drop slightly.
+  eval.benchmarks:
+    title: Run benchmarks
+    desc: Score the model on standard test sets, grouped by skill.
+  bench.perf:
+    title: Measure speed & memory
+    desc: Measure how fast the model answers and how much memory it uses.
+  export.hf_dir:
+    title: Save model
+    desc: Save the model in Hugging Face format to use elsewhere.
+  export.merge_lora:
+    title: Merge add-on into model
+    desc: Combine the LoRA add-on with the base model into one complete model.
+  export.trtllm:
+    title: Export for fast serving (TensorRT-LLM)
+    desc: Prepare the model to serve as fast as possible on NVIDIA GPUs.
+  compare.reports:
+    title: Compare results
+    desc: Put models' scores side by side to see which is better.
+  note:
+    title: Note
+    desc: A note for people reading the workflow; it doesn't run anything.

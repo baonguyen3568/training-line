@@ -1,0 +1,20 @@
+# gitleaks config (ADR-003): default rules + skip gitignored bulk dirs so `gitleaks dir .` stays fast.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Gitignored data/cache dirs (never committed) and the placeholder env template"
+paths = [
+  # Anchored at the repo root on purpose: src/vlm_pipeline/data/ is real code and MUST be scanned.
+  '''^\.venv/''',
+  '''^\.cache/''',
+  '''^outputs/''',
+  '''^data/''',
+  '''^checkpoints/''',
+  '''^\.git/''',
+  '''(^|/)node_modules/''',
+]
+# Known false positives (match = the reported "Secret" value, exact).
+regexes = [
+  '''^missing/unexpected$''',  # prose "missing/unexpected keys" in .claude/skills/fixcode-ckpt-convert
+]

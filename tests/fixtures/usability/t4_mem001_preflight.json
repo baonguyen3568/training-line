@@ -1,0 +1,39 @@
+{
+  "issues": [
+    {
+      "node_id": "train",
+      "port": null,
+      "param": null,
+      "code": "MEM-001",
+      "severity": "error",
+      "params": {
+        "need_gb": 48,
+        "avail_gb": 42
+      }
+    }
+  ],
+  "estimates": {
+    "train": {
+      "ram_gb": [
+        44,
+        48
+      ],
+      "source": "measured"
+    }
+  },
+  "action_estimates": {
+    "use_qlora": {
+      "ram_gb": [
+        20,
+        24
+      ]
+    },
+    "use_lora": {
+      "ram_gb": [
+        30,
+        34
+      ]
+    }
+  },
+  "_note": "Numbers mirror this shared GB10 (~42 GB MemAvailable). use_qlora/use_lora ranges must come from the estimator once S-3 calibration lands - do not show invented numbers to participants."
+}

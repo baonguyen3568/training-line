@@ -1,0 +1,99 @@
+# S-3 GPU smoke (spike only): LoRA 20 steps on Qwen3.5-0.8B, NeMo AutoModel 26.08 (vlm-automodel:26.08-1).
+# Derived from upstream recipes (image /opt/Automodel, nemo_automodel 0.5.0 / v0.6.0 branch):
+#   examples/vlm_finetune/qwen3_5/qwen3_5_4b.yaml + qwen3_6_27b_lora.yaml (peft block).
+# Model/dataset are local snapshots pinned by bao-security (no network inside the container):
+#   Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17 (Apache-2.0)
+#   mmoukouba/MedPix-VQA@69eb219d477ab8699296da1fd6b89beb768042d3 (APPROVED-WITH-CONDITIONS: spike only, never in templates)
+# Paths are container paths (repo mounted at /workspace). RUN_DIR is substituted by the launcher.
+
+recipe: FinetuneRecipeForVLM
+
+step_scheduler:
+  global_batch_size: 4
+  local_batch_size: 1
+  ckpt_every_steps: 10
+  val_every_steps: 1000
+  num_epochs: 1
+  max_steps: 20
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1234
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForImageTextToText.from_pretrained
+  pretrained_model_name_or_path: /workspace/.cache/hf/hub/models--Qwen--Qwen3.5-0.8B/snapshots/2fc06364715b967f1860aea9cf38778875588b17
+  backend:
+    _target_: nemo_automodel.components.models.common.BackendConfig
+    attn: sdpa
+    linear: torch
+    rms_norm: torch
+    rope_fusion: false
+  attn_implementation: sdpa
+  torch_dtype: bfloat16
+
+processor:
+  _target_: transformers.AutoProcessor.from_pretrained
+  pretrained_model_name_or_path: /workspace/.cache/hf/hub/models--Qwen--Qwen3.5-0.8B/snapshots/2fc06364715b967f1860aea9cf38778875588b17
+
+peft:
+  _target_: nemo_automodel.components._peft.lora.PeftConfig
+  match_all_linear: False
+  exclude_modules:
+    - "*vision_tower*"
+    - "*vision*"
+    - "*visual*"
+    - "*image_encoder*"
+    - "*lm_head*"
+    - "*audio*"
+  dim: 8
+  alpha: 32
+  use_triton: True
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: RUN_DIR/checkpoints
+  model_save_format: safetensors
+  save_consolidated: final
+  max_recent_checkpoints: 2
+
+distributed:
+  _target_: nemo_automodel.components.distributed.fsdp2.FSDP2Manager
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 1
+  ep_size: 1
+  sequence_parallel: false
+  activation_checkpointing: true
+
+freeze_config:
+  freeze_vision_tower: true
+  freeze_audio_tower: true
+  freeze_language_model: false
+
+loss_fn:
+  _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
+
+dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_medpix_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--mmoukouba--MedPix-VQA/snapshots/69eb219d477ab8699296da1fd6b89beb768042d3
+  split: train
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.default_collate_fn
+
+optimizer:
+  _target_: torch.optim.AdamW
+  betas: [0.9, 0.95]
+  eps: 1e-8
+  lr: 1.0e-4
+  weight_decay: 0.01

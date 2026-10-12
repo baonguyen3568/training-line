@@ -1,0 +1,31 @@
+# Git hooks (ADR-004 D7). Run with prek (pinned in the dev group): `uv run prek install` once, then automatic.
+# Revs are frozen to commit SHAs; bump with `uv run prek autoupdate --freeze` in a dedicated commit (cooldown applies).
+# mypy/pytest are NOT here (too slow for every commit): they run in scripts/check.sh.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+        exclude: ^(design|docs)/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: f12be1ebaa5351c1fc76472de98db2c3446c8253  # frozen: v0.16.10
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: scripts/tools/gitleaks.sh git --pre-commit --staged --redact --no-banner -c .gitleaks.toml
+        language: system
+        pass_filenames: false
