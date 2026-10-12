@@ -1,0 +1,14 @@
+{
+  "format": "vlm-workflow",
+  "schema_version": 1,
+  "name": "dev: Parse v1.1 SFT on 100 CORD samples",
+  "nodes": [
+    {"id": "m", "type": "model.hf_pick", "version": "1.0.0", "params": {"model": "nemotron-parse-v1.1"}},
+    {"id": "d", "type": "data.hf_load", "version": "1.0.0", "params": {"repo": "naver-clova-ix/cord-v2", "max_samples": 100}},
+    {"id": "t", "type": "train.sft_vlm", "version": "1.0.0", "params": {"epochs": 1}}
+  ],
+  "edges": [
+    {"from": ["m", "model"], "to": ["t", "base_model"]},
+    {"from": ["d", "dataset"], "to": ["t", "train_data"]}
+  ]
+}

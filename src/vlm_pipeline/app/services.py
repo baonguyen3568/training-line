@@ -101,11 +101,20 @@ class DefaultServices:
     worker: str = "fake"  # "fake" (FakeWorker, demo/E2E) | "container" (real jobs)
     fake_delay_s: float = 0.8  # per node, so the canvas visibly animates in demo/E2E
 
+    @property
+    def _state_dir(self) -> Path:
+        """Executor state + run dirs; demo (fake worker) runs are kept apart from real ones."""
+        base = self.root / "outputs" / "graph"
+        return base / "demo" if self.worker == "fake" else base
+
     @functools.cached_property
     def index(self) -> Any:
         """The single cache index shared by executor, retention and the storage panel."""
         artifacts_index = _optional("vlm_pipeline.artifacts.index")
-        idx = artifacts_index.ArtifactIndex(artifacts_index.default_index_path(self.root))
+        path = artifacts_index.default_index_path(self.root)
+        if self.worker == "fake":  # demo artifacts must never satisfy a real run's cache lookup
+            path = self._state_dir / "app.db"
+        idx = artifacts_index.ArtifactIndex(path)
         idx.release_all_except(self._active_external_runs())  # leases left by a crashed app process
         return idx
 
@@ -128,9 +137,7 @@ class DefaultServices:
             from vlm_pipeline.app.workers import RealWorker
 
             worker = RealWorker(self.root)
-        return graph_executor.Executor(
-            self.registry, worker, self.root / "outputs" / "graph", index=self.index, workspace=self.root
-        )
+        return graph_executor.Executor(self.registry, worker, self._state_dir, index=self.index, workspace=self.root)
 
     def validate(self, workflow: Mapping[str, Any]) -> list[dict[str, Any]]:
         graph = _optional("vlm_pipeline.graph")

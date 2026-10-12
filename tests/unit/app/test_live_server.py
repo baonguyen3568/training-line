@@ -83,3 +83,10 @@ def test_run_events_reach_a_real_websocket_client(server: int) -> None:
     assert {("d", "completed"), ("m", "completed"), ("t", "completed")} <= statuses
     final = [e for e in events if e.get("type") == "run_status"][-1]
     assert final["status"] == "completed"
+
+
+def test_fake_and_real_workers_never_share_the_cache(tmp_path: Path) -> None:
+    fake = DefaultServices(registry=make_test_registry(), root=tmp_path, worker="fake")
+    real = DefaultServices(registry=make_test_registry(), root=tmp_path, worker="container")
+    assert fake._state_dir != real._state_dir
+    assert fake.index is not real.index
