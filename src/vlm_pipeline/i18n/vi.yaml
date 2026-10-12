@@ -435,10 +435,6 @@ quantize_preset:
   fp8: Nhanh, giữ chất lượng (FP8)
   nvfp4: Cân bằng (NVFP4)
   int4_awq: Nhỏ nhất (INT4-AWQ)
-train_preset:
-  fast: Nhanh
-  balanced: Cân bằng
-  quality: Chất lượng
 node:
   model.hf_pick:
     title: Chọn model gốc
@@ -458,6 +454,12 @@ node:
       repo:
         label: Bộ dữ liệu
         help: Bộ dữ liệu có sẵn trên Hugging Face, đã được kiểm tra giấy phép.
+      max_samples:
+        label: Giới hạn số mẫu
+        help: Dùng ít mẫu để chạy thử nhanh; chọn "Tất cả" khi chạy thật.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
   data.local_folder:
     title: Thư mục ảnh + câu hỏi/đáp án
     desc: Dùng ảnh và câu hỏi/đáp án của bạn trong thư mục dự án.
@@ -465,6 +467,15 @@ node:
       path:
         label: Thư mục dữ liệu
         help: Thư mục trong dự án chứa ảnh và file câu hỏi/đáp án.
+      max_samples:
+        label: Giới hạn số mẫu
+        help: Dùng ít mẫu để chạy thử nhanh; chọn "Tất cả" khi chạy thật.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
+      max_image_side_px:
+        label: Cạnh ảnh tối đa (px)
+        help: Ảnh lớn hơn sẽ bị bỏ qua để tránh tốn RAM (512–8192).
     port:
       dataset: Dữ liệu
   data.format_vlm_chat:
@@ -477,6 +488,9 @@ node:
       val_fraction:
         label: Phần để kiểm tra
         help: Tỉ lệ dữ liệu giữ lại để kiểm tra model, không dùng để học. Thường 10%.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
     port:
       dataset: Dữ liệu
       train: Dữ liệu học
@@ -488,15 +502,36 @@ node:
     title: Fine-tune nhẹ (LoRA)
     desc: Dạy model trả lời theo dữ liệu của bạn, tốn ít bộ nhớ.
     param:
-      preset:
-        label: Mức
-        help: 'Nhanh: thử ý tưởng. Cân bằng: dùng hằng ngày. Chất lượng: lâu hơn, kết quả tốt hơn.'
       epochs:
-        label: Số vòng học
-        help: Số lần model đọc hết dữ liệu. Nhiều vòng quá dễ học vẹt.
-      learning_rate:
-        label: Tốc độ học (learning rate)
-        help: Cao quá dễ làm hỏng model; nên giữ mặc định.
+        label: Thời lượng huấn luyện
+        help: Số lượt model đọc hết dữ liệu. Nhiều lượt hơn thì lâu hơn và dễ học vẹt.
+      lr_preset:
+        label: Tốc độ học
+        help: Chậm an toàn hơn, nhanh học nhanh hơn nhưng dễ hỏng model. Nên giữ "Vừa".
+      global_batch_size:
+        label: Batch tổng (global_batch_size)
+        help: Số mẫu gộp lại cho mỗi lần cập nhật model (4–64).
+      local_batch_size:
+        label: Batch mỗi lần (local_batch_size)
+        help: Số mẫu xử lý cùng lúc (1–4). Tăng lên thì tốn RAM hơn; 1 là an toàn cho máy dùng chung.
+      weight_decay:
+        label: Weight decay
+        help: Hệ số chống học vẹt (0–0.1).
+      activation_checkpointing:
+        label: Tiết kiệm bộ nhớ (activation checkpointing)
+        help: Bật thì chậm hơn một chút nhưng tốn ít RAM hơn nhiều. Nên để bật.
+      max_recent_checkpoints:
+        label: Số điểm khôi phục giữ lại
+        help: Giữ bao nhiêu bản lưu gần nhất (1–5). Nhiều hơn thì tốn ổ đĩa hơn.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
+      lora_dim:
+        label: Kích thước LoRA (dim)
+        help: Lớn hơn thì học được nhiều hơn nhưng tốn RAM hơn (4–64).
+      lora_alpha:
+        label: LoRA alpha
+        help: Độ mạnh của phần học thêm (8–128). Nên giữ mặc định.
     port:
       base_model: Model gốc
       train_data: Dữ liệu học
@@ -512,17 +547,60 @@ node:
       model: Model hoàn chỉnh
     param:
       epochs:
-        label: Số vòng học
-        help: Số lần model đọc hết dữ liệu. Nhiều vòng quá dễ học vẹt.
-      learning_rate:
-        label: Tốc độ học (learning rate)
-        help: Cao quá dễ làm hỏng model; nên giữ mặc định.
+        label: Thời lượng huấn luyện
+        help: Số lượt model đọc hết dữ liệu. Nhiều lượt hơn thì lâu hơn và dễ học vẹt.
+      lr_preset:
+        label: Tốc độ học
+        help: Chậm an toàn hơn, nhanh học nhanh hơn nhưng dễ hỏng model. Nên giữ "Vừa".
+      global_batch_size:
+        label: Batch tổng (global_batch_size)
+        help: Số mẫu gộp lại cho mỗi lần cập nhật model (4–64).
+      local_batch_size:
+        label: Batch mỗi lần (local_batch_size)
+        help: Số mẫu xử lý cùng lúc (1–4). Tăng lên thì tốn RAM hơn; 1 là an toàn cho máy dùng chung.
+      weight_decay:
+        label: Weight decay
+        help: Hệ số chống học vẹt (0–0.1).
+      activation_checkpointing:
+        label: Tiết kiệm bộ nhớ (activation checkpointing)
+        help: Bật thì chậm hơn một chút nhưng tốn ít RAM hơn nhiều. Nên để bật.
+      max_recent_checkpoints:
+        label: Số điểm khôi phục giữ lại
+        help: Giữ bao nhiêu bản lưu gần nhất (1–5). Nhiều hơn thì tốn ổ đĩa hơn.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
+      freeze_vision_tower:
+        label: Giữ nguyên phần nhìn ảnh
+        help: 'Không dạy lại phần đọc ảnh của model: nhanh hơn, ít RAM hơn, và ít làm hỏng khả năng nhìn.'
   train.grpo_vlm:
     title: Học từ phản hồi (GRPO)
     desc: Cải thiện model bằng cách chấm điểm các câu trả lời. Dành cho người dùng nâng cao.
   serve.vllm:
     title: Bật model để chạy thử
     desc: Chạy model như một dịch vụ để chat thử hoặc đo tốc độ.
+    port:
+      model: Model
+      endpoint: Model đang chạy thử
+    param:
+      answer_length:
+        label: Độ dài trả lời
+        help: Câu trả lời tối đa dài bao nhiêu.
+      engine:
+        label: Bộ chạy (engine)
+        help: vLLM nhanh hơn; HF dùng khi model chưa hỗ trợ vLLM.
+      temperature:
+        label: Độ sáng tạo (temperature)
+        help: 0 = luôn trả lời giống nhau; cao hơn = đa dạng hơn (0–1.5).
+      top_p:
+        label: Top-p
+        help: Giới hạn lựa chọn từ khi sinh câu (0.1–1). Nên giữ 1.
+      gpu_memory_utilization:
+        label: Phần bộ nhớ dành cho phục vụ
+        help: Tỉ lệ bộ nhớ máy giữ cho bộ đệm (0.2–0.5). Cao hơn 0.3 chỉ khi máy rảnh.
+      max_model_len:
+        label: Độ dài hội thoại tối đa (token)
+        help: Câu hỏi + trả lời dài nhất (2048–32768). Dài hơn thì tốn RAM hơn.
   playground.chat:
     title: Chat thử với model
     desc: Gửi ảnh/video và câu hỏi để xem model trả lời.
@@ -533,25 +611,74 @@ node:
       format:
         label: Kiểu nén
         help: FP8 giữ chất lượng tốt nhất; NVFP4 cân bằng; INT4-AWQ nhỏ nhất nhưng có thể giảm chất lượng nhiều hơn.
+      calib_size:
+        label: Số ảnh hiệu chỉnh
+        help: Số ảnh dùng để đo trước khi nén. Nhiều hơn thì chính xác hơn nhưng lâu hơn.
+      quantize_vision:
+        label: Nén cả phần nhìn ảnh
+        help: Thường giữ nguyên để không giảm khả năng đọc ảnh.
+      kv_cache_quant:
+        label: Nén bộ đệm hội thoại (KV cache)
+        help: Giảm RAM khi phục vụ câu dài; có thể giảm chất lượng nhẹ.
     port:
       model: Model
       quantized: Model đã nén
+      calib_data: Dữ liệu hiệu chỉnh
   eval.benchmarks:
     title: Đo điểm benchmark
     desc: Chấm điểm model trên các bộ đề chuẩn theo năng lực.
     param:
-      groups:
-        label: Năng lực cần đo
-        help: Mỗi năng lực gồm một vài bộ đề chuẩn; điểm hiện riêng từng bộ đề.
+      suite:
+        label: Đánh giá trên
+        help: Chọn bộ đề chấm điểm. "Tự động" chọn theo mẫu bạn đang dùng.
+      level:
+        label: Mức độ
+        help: Nhanh để xem sơ bộ; Đầy đủ để có kết quả đáng tin nhất nhưng lâu.
+      compare_with:
+        label: So với
+        help: Đặt điểm cạnh model khác để thấy tốt hơn hay kém đi.
+      max_new_tokens:
+        label: Độ dài trả lời tối đa (token)
+        help: Trả lời bị cắt ở độ dài này (64–16384).
+      thinking:
+        label: Cho model suy nghĩ trước
+        help: 'Model viết phần suy luận trước khi trả lời: có thể chính xác hơn nhưng chậm hơn.'
     port:
       model: Model
       report: Điểm benchmark
+      data: Dữ liệu kiểm tra (tuỳ chọn)
   bench.perf:
     title: Đo tốc độ & bộ nhớ
     desc: Đo model trả lời nhanh cỡ nào và dùng bao nhiêu bộ nhớ.
+    port:
+      model: Model
+      report: Tốc độ & bộ nhớ
+    param:
+      scenario:
+        label: Kịch bản
+        help: 'Một người dùng: đo độ nhanh mỗi câu. Nhiều người: đo khi 4 người hỏi cùng lúc.'
+      compare_with:
+        label: So với
+        help: Đặt số đo cạnh model khác.
+      num_requests:
+        label: Số câu hỏi đo
+        help: Nhiều hơn thì số đo ổn định hơn (10–500).
+      output_tokens:
+        label: Độ dài trả lời khi đo (token)
+        help: Độ dài trả lời cố định để so sánh công bằng (64–2048).
+      gpu_memory_utilization:
+        label: Phần bộ nhớ dành cho phục vụ
+        help: Như ở bước Chạy thử (0.2–0.5).
   export.hf_dir:
     title: Lưu model
     desc: Lưu model theo định dạng Hugging Face để dùng ở nơi khác.
+    port:
+      model: Model
+      artifact: Model đã xuất
+    param:
+      dest:
+        label: Lưu vào
+        help: Thư mục trong dự án. Model xuất kèm sẵn giấy phép và câu ghi công bắt buộc.
   train.merge_lora:
     title: Gộp phần học thêm vào model
     desc: Gộp LoRA vào model gốc thành một model hoàn chỉnh.
@@ -689,3 +816,55 @@ workflow:
   delete: Xoá
   rename: Đổi tên hiển thị
   deleted_undo: Đã xoá "{node}"
+sample_limit:
+  '0': Tất cả
+  '100': 100 mẫu
+  '500': 500 mẫu
+  '1000': 1000 mẫu
+lr_preset:
+  slow: Chậm – an toàn
+  medium: Vừa
+  fast: Nhanh
+epoch_count:
+  '1': 1 lượt
+  '3': 3 lượt
+  '5': 5 lượt
+eval_suite:
+  auto: Tự động theo mẫu
+  cord_test: Hoá đơn (CORD test)
+  documents: Đọc tài liệu & chữ trong ảnh
+  charts: Hiểu biểu đồ & sơ đồ
+  knowledge: Kiến thức & suy luận đa ngành
+  perception: Nhận thức ảnh tổng quát
+  math: Toán có hình
+  video: Video
+  my_val: Dữ liệu kiểm tra của tôi
+eval_level:
+  quick: Nhanh
+  standard: Tiêu chuẩn
+  full: Đầy đủ
+compare_with:
+  none: Không so
+  base: Model gốc
+  previous: Kết quả trước
+  unquantized: Bản chưa nén
+answer_length:
+  short: Ngắn
+  medium: Vừa
+  long: Dài
+bench_scenario:
+  single_user: Một người dùng
+  multi_user: Nhiều người dùng
+serve_engine:
+  vllm: vLLM (nhanh)
+  hf: Hugging Face (tương thích)
+calib_size:
+  '128': 128 ảnh (nhanh)
+  '512': 512 ảnh (chính xác hơn)
+kv_cache_quant:
+  none: Không nén
+  fp8: FP8
+train_preset:
+  fast: Nhanh
+  balanced: Cân bằng
+  quality: Chất lượng

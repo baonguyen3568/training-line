@@ -435,10 +435,6 @@ quantize_preset:
   fp8: Fast, keeps quality (FP8)
   nvfp4: Balanced (NVFP4)
   int4_awq: Smallest (INT4-AWQ)
-train_preset:
-  fast: Fast
-  balanced: Balanced
-  quality: Quality
 node:
   model.hf_pick:
     title: Choose base model
@@ -458,6 +454,12 @@ node:
       repo:
         label: Dataset
         help: A dataset on Hugging Face that has been license-checked.
+      max_samples:
+        label: Sample limit
+        help: Use fewer samples for a quick test; choose "All" for the real run.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
   data.local_folder:
     title: Image folder + Q&A
     desc: Use your own images and questions/answers from the project folder.
@@ -465,6 +467,15 @@ node:
       path:
         label: Data folder
         help: A folder in the project with images and a Q&A file.
+      max_samples:
+        label: Sample limit
+        help: Use fewer samples for a quick test; choose "All" for the real run.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
+      max_image_side_px:
+        label: Max image side (px)
+        help: Larger images are skipped to avoid using too much RAM (512–8192).
     port:
       dataset: Data
   data.format_vlm_chat:
@@ -477,6 +488,9 @@ node:
       val_fraction:
         label: Share kept for checking
         help: Share of data kept aside to check the model, not used for learning. Usually 10%.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
     port:
       dataset: Data
       train: Training data
@@ -488,15 +502,36 @@ node:
     title: Light fine-tune (LoRA)
     desc: Teach the model to answer like your data, using little memory.
     param:
-      preset:
-        label: Level
-        help: 'Fast: try an idea. Balanced: everyday use. Quality: slower, better results.'
       epochs:
-        label: Training rounds
-        help: How many times the model goes through all data. Too many can cause memorizing.
-      learning_rate:
-        label: Learning rate
-        help: Too high can break the model; keep the default.
+        label: Training length
+        help: How many passes over all the data. More passes take longer and can cause memorizing.
+      lr_preset:
+        label: Learning speed
+        help: Slow is safer; fast learns quicker but can break the model. "Medium" is recommended.
+      global_batch_size:
+        label: Global batch size
+        help: Samples combined per model update (4–64).
+      local_batch_size:
+        label: Local batch size
+        help: Samples processed at once (1–4). Higher uses more RAM; 1 is safe on a shared machine.
+      weight_decay:
+        label: Weight decay
+        help: Regularization against overfitting (0–0.1).
+      activation_checkpointing:
+        label: Memory saving (activation checkpointing)
+        help: Slightly slower but uses much less RAM. Keep it on.
+      max_recent_checkpoints:
+        label: Checkpoints to keep
+        help: How many recent saves to keep (1–5). More uses more disk.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
+      lora_dim:
+        label: LoRA rank (dim)
+        help: Larger can learn more but uses more RAM (4–64).
+      lora_alpha:
+        label: LoRA alpha
+        help: Strength of the add-on (8–128). Keep the default.
     port:
       base_model: Base model
       train_data: Training data
@@ -512,17 +547,60 @@ node:
       model: Complete model
     param:
       epochs:
-        label: Training rounds
-        help: How many times the model goes through all data. Too many can cause memorizing.
-      learning_rate:
-        label: Learning rate
-        help: Too high can break the model; keep the default.
+        label: Training length
+        help: How many passes over all the data. More passes take longer and can cause memorizing.
+      lr_preset:
+        label: Learning speed
+        help: Slow is safer; fast learns quicker but can break the model. "Medium" is recommended.
+      global_batch_size:
+        label: Global batch size
+        help: Samples combined per model update (4–64).
+      local_batch_size:
+        label: Local batch size
+        help: Samples processed at once (1–4). Higher uses more RAM; 1 is safe on a shared machine.
+      weight_decay:
+        label: Weight decay
+        help: Regularization against overfitting (0–0.1).
+      activation_checkpointing:
+        label: Memory saving (activation checkpointing)
+        help: Slightly slower but uses much less RAM. Keep it on.
+      max_recent_checkpoints:
+        label: Checkpoints to keep
+        help: How many recent saves to keep (1–5). More uses more disk.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
+      freeze_vision_tower:
+        label: Keep the vision part frozen
+        help: 'Don''t retrain the model''s image reader: faster, less RAM, and less risk of harming its vision.'
   train.grpo_vlm:
     title: Learn from feedback (GRPO)
     desc: Improve the model by scoring its answers. For advanced users.
   serve.vllm:
     title: Start model for testing
     desc: Run the model as a service to chat with it or measure speed.
+    port:
+      model: Model
+      endpoint: Model being served
+    param:
+      answer_length:
+        label: Answer length
+        help: How long an answer can be at most.
+      engine:
+        label: Engine
+        help: vLLM is faster; HF is used when a model doesn't support vLLM.
+      temperature:
+        label: Temperature
+        help: 0 = always the same answer; higher = more varied (0–1.5).
+      top_p:
+        label: Top-p
+        help: Limits word choices when generating (0.1–1). Keep 1.
+      gpu_memory_utilization:
+        label: Serving memory share
+        help: Share of machine memory reserved for the cache (0.2–0.5). Above 0.3 only when the machine is free.
+      max_model_len:
+        label: Max context length (tokens)
+        help: Longest question + answer (2048–32768). Longer uses more RAM.
   playground.chat:
     title: Chat with the model
     desc: Send images/videos and questions to see how the model answers.
@@ -533,25 +611,74 @@ node:
       format:
         label: Compression type
         help: FP8 keeps quality best; NVFP4 balances; INT4-AWQ is smallest but may lose more quality.
+      calib_size:
+        label: Calibration images
+        help: Images measured before compressing. More is more accurate but slower.
+      quantize_vision:
+        label: Also compress the vision part
+        help: Usually kept off so image reading isn't degraded.
+      kv_cache_quant:
+        label: KV cache compression
+        help: Saves RAM when serving long text; may slightly reduce quality.
     port:
       model: Model
       quantized: Compressed model
+      calib_data: Calibration data
   eval.benchmarks:
     title: Run benchmarks
     desc: Score the model on standard test sets, grouped by skill.
     param:
-      groups:
-        label: Skills to test
-        help: Each skill uses a few standard test sets; scores are shown per test set.
+      suite:
+        label: Evaluate on
+        help: Choose the test set. "Automatic" picks one for your template.
+      level:
+        label: Depth
+        help: Quick for a first look; Full for the most reliable result but slow.
+      compare_with:
+        label: Compare with
+        help: Show scores next to another model to see if it got better or worse.
+      max_new_tokens:
+        label: Max answer length (tokens)
+        help: Answers are cut at this length (64–16384).
+      thinking:
+        label: Let the model think first
+        help: 'The model reasons before answering: may be more accurate but slower.'
     port:
       model: Model
       report: Benchmark scores
+      data: Test data (optional)
   bench.perf:
     title: Measure speed & memory
     desc: Measure how fast the model answers and how much memory it uses.
+    port:
+      model: Model
+      report: Speed & memory
+    param:
+      scenario:
+        label: Scenario
+        help: 'Single user: how fast each answer is. Multiple users: 4 people asking at once.'
+      compare_with:
+        label: Compare with
+        help: Show measurements next to another model.
+      num_requests:
+        label: Requests to measure
+        help: More gives steadier numbers (10–500).
+      output_tokens:
+        label: Answer length for measuring (tokens)
+        help: Fixed answer length for a fair comparison (64–2048).
+      gpu_memory_utilization:
+        label: Serving memory share
+        help: Same as in the Try step (0.2–0.5).
   export.hf_dir:
     title: Save model
     desc: Save the model in Hugging Face format to use elsewhere.
+    port:
+      model: Model
+      artifact: Exported model
+    param:
+      dest:
+        label: Save to
+        help: A folder in the project. The export includes the required license and credit text.
   train.merge_lora:
     title: Merge add-on into model
     desc: Combine the LoRA add-on with the base model into one complete model.
@@ -689,3 +816,55 @@ workflow:
   delete: Delete
   rename: Rename
   deleted_undo: Deleted "{node}"
+sample_limit:
+  '0': All
+  '100': 100 samples
+  '500': 500 samples
+  '1000': 1000 samples
+lr_preset:
+  slow: Slow – safe
+  medium: Medium
+  fast: Fast
+epoch_count:
+  '1': 1 pass
+  '3': 3 passes
+  '5': 5 passes
+eval_suite:
+  auto: Automatic for this template
+  cord_test: Receipts (CORD test)
+  documents: Documents & text in images
+  charts: Charts & diagrams
+  knowledge: Multidisciplinary reasoning
+  perception: General image understanding
+  math: Visual math
+  video: Video
+  my_val: My validation data
+eval_level:
+  quick: Quick
+  standard: Standard
+  full: Full
+compare_with:
+  none: Don't compare
+  base: Base model
+  previous: Previous result
+  unquantized: Uncompressed version
+answer_length:
+  short: Short
+  medium: Medium
+  long: Long
+bench_scenario:
+  single_user: Single user
+  multi_user: Multiple users
+serve_engine:
+  vllm: vLLM (fast)
+  hf: Hugging Face (compatible)
+calib_size:
+  '128': 128 images (fast)
+  '512': 512 images (more accurate)
+kv_cache_quant:
+  none: No compression
+  fp8: FP8
+train_preset:
+  fast: Fast
+  balanced: Balanced
+  quality: Quality
