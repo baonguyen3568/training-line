@@ -17,7 +17,7 @@ const byCategory: Record<Category, Lane> = {
 
 export const laneOf = (category: Category): Lane => byCategory[category];
 
-export const LANE_WIDTH = 300;
+export const LANE_WIDTH = 260;
 export const ROW_HEIGHT = 170;
 
 /** Lane-based layout: x from the lane, y from the order within the lane (no dagre for the common case). */

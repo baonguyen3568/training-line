@@ -77,12 +77,16 @@ select {
 }
 
 button.primary {
-  background: var(--color-accent-focus);
-  color: #fff;
+  background: var(--color-action-primary-bg);
+  color: var(--color-action-primary-fg);
   border: 0;
+  font-weight: 600;
   border-radius: var(--radius-sm);
   padding: var(--space-8) var(--space-16);
   cursor: pointer;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--color-action-primary-bg-hover);
 }
 button.primary:disabled {
   opacity: 0.45;
@@ -91,7 +95,7 @@ button.primary:disabled {
 button.link {
   background: none;
   border: 0;
-  color: var(--color-accent-focus);
+  color: var(--color-action-link);
   cursor: pointer;
   text-decoration: underline;
 }
@@ -131,7 +135,8 @@ button.link {
   cursor: pointer;
 }
 .segmented button.on {
-  background: var(--color-canvas-selection);
+  background: var(--color-action-selected-bg);
+  color: var(--color-action-selected-fg);
   font-weight: 600;
 }
 .card-grid {
@@ -262,10 +267,16 @@ button.link {
 }
 
 /* Lanes ①…⑦ (P010 §3) */
+/* Lanes sit under nodes/edges (design review B1). */
+.react-flow__viewport-portal {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
 .lane {
   position: absolute;
-  top: -2000px;
-  height: 6000px;
+  left: 0;
+  top: 0;
   border-right: 1px dashed var(--color-grid);
   pointer-events: none;
 }
@@ -274,11 +285,10 @@ button.link {
 }
 .lane-label {
   position: absolute;
-  top: 2010px;
   left: var(--space-12);
   color: var(--color-canvas-lane-label);
   font-weight: 600;
-  font-size: var(--font-size-caption);
+  white-space: nowrap;
 }
 
 /* Nodes */
@@ -417,4 +427,140 @@ button.link {
   .checkbar {
     grid-column: 1;
   }
+}
+
+/* Navigation */
+.app-nav {
+  display: flex;
+  gap: var(--space-4);
+}
+.app-nav button {
+  background: none;
+  border: 0;
+  padding: var(--space-4) var(--space-8);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.app-nav button[aria-current="page"] {
+  background: var(--color-action-selected-bg);
+  color: var(--color-action-selected-fg);
+  font-weight: 600;
+}
+
+/* Run monitor */
+.run-monitor {
+  padding: var(--space-24) var(--space-32);
+  overflow: auto;
+}
+.run-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+.run-head h1 {
+  font-size: var(--font-size-page);
+  margin: 0;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-12);
+  margin: var(--space-16) 0;
+}
+.tile {
+  background: var(--color-surface);
+  border: 1px solid var(--color-grid);
+  border-radius: var(--radius-md);
+  padding: var(--space-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.tile-label {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.tile-value {
+  font-size: var(--font-size-stat);
+}
+.charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-16);
+  margin-top: var(--space-12);
+}
+.chart {
+  margin: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-grid);
+  border-radius: var(--radius-md);
+  padding: var(--space-12);
+  min-width: 0;
+}
+.chart figcaption {
+  font-size: var(--font-size-panel);
+  font-weight: 600;
+  margin-bottom: var(--space-8);
+}
+.chart .u-legend {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.table-view {
+  margin-top: var(--space-16);
+}
+.table-view table,
+.runs-table {
+  border-collapse: collapse;
+  font-size: var(--font-size-table);
+  font-variant-numeric: tabular-nums;
+}
+.table-view th,
+.table-view td,
+.runs-table th,
+.runs-table td {
+  padding: var(--space-4) var(--space-12);
+  border-bottom: 1px solid var(--color-grid);
+  text-align: right;
+}
+.runs-table th,
+.runs-table td {
+  text-align: left;
+}
+.state.warn {
+  color: var(--color-text-primary);
+}
+
+/* React Flow controls follow the theme (design review r2) */
+.react-flow__controls-button {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-grid);
+  fill: var(--color-text-primary);
+}
+.react-flow__attribution {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.react-flow__attribution a {
+  color: var(--color-text-muted);
+}
+.runs-table tr.run-discarded,
+.runs-table tr.run-evicted {
+  color: var(--color-text-muted);
+}
+.charts > .chart:first-child {
+  grid-column: 1 / -1;
+} /* loss full width, then 2×2 (design review r3) */
+.chip.status-completed {
+  border-color: var(--color-node-state-done);
+}
+.chip.status-failed,
+.chip.status-interrupted {
+  border-color: var(--color-status-critical);
+}
+.chip.status-running,
+.chip.status-queued {
+  border-color: var(--color-node-state-running);
 }

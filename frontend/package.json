@@ -15,7 +15,7 @@
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run tokens && biome ci . && tsc --noEmit && vitest run",
+    "check": "npm run tokens && node scripts/check-run-status.mjs && biome ci . && tsc --noEmit && vitest run",
     "licenses": "node scripts/list-licenses.mjs"
   },
   "dependencies": {
@@ -23,6 +23,7 @@
     "@xyflow/react": "12.12.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "uplot": "1.6.32",
     "zustand": "5.0.15"
   },
   "devDependencies": {

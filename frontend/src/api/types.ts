@@ -35,6 +35,8 @@ export interface UiHint {
   order?: number;
   preset?: boolean;
   advanced?: boolean;
+  /** i18n prefix for enum option labels, e.g. "train_preset" → train_preset.<value>. */
+  option_keys?: string;
 }
 
 export interface ParamSchema {
@@ -172,4 +174,53 @@ export interface SystemStatus {
   mem_available_gb: number;
   gpu_lock: { held: boolean; who?: string; job?: string; since?: string; stale?: boolean };
   disk_free_gb: number;
+}
+
+/** Mirrors `common/runinfo.RunStatus` (source of truth, DECISIONS.md); drift-checked in tests/run-status.test.ts. */
+export const RUN_STATUSES = [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+  "evicted",
+  "discarded",
+] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+export interface RunInfo {
+  schema_version: number;
+  run_id: string;
+  name?: string;
+  task: string;
+  stage?: string;
+  base_model?: string;
+  status: RunStatus;
+  started_at: number;
+  ended_at?: number | null;
+  parent_run_id?: string | null;
+  container_image?: string;
+  max_steps?: number | null;
+  tags?: string[];
+}
+
+/** GET /api/runs/{id}/metrics?after=<cursor>&max_points=<n> — incremental tail of metrics.jsonl. */
+/**
+ * GET /api/runs/{id}/metrics?after=<cursor>&limit=<rows>[&downsample_to=<n>]
+ * - `downsample_to` (first load only): server returns the whole history reduced to ~n points, `downsampled: true`.
+ * - Otherwise a raw page of at most `limit` rows after `cursor`; the client keeps fetching while `has_more`,
+ *   regardless of run status, then tails every few seconds only while the run is live.
+ */
+export interface MetricsPage {
+  points: import("../lib/metrics").MetricPoint[];
+  next_cursor: number; // opaque to the UI (backend: byte offset); pass back as `after`
+  has_more: boolean;
+  downsampled: boolean;
+}
+
+export interface MetricsQuery {
+  after: number;
+  limit: number;
+  downsample_to?: number;
 }

@@ -5,7 +5,9 @@ import { t } from "../i18n";
 
 const POLL_MS = 10_000;
 
-export function Header({ onHome }: { onHome: () => void }) {
+export type Nav = "home" | "runs";
+
+export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; active: Nav }) {
   const [sys, setSys] = useState<SystemStatus | null>(null);
 
   useEffect(() => {
@@ -39,9 +41,25 @@ export function Header({ onHome }: { onHome: () => void }) {
 
   return (
     <header className="app-header">
-      <button type="button" className="brand" onClick={onHome}>
+      <button type="button" className="brand" onClick={() => onNavigate("home")}>
         ▣ {t("app.name")}
       </button>
+      <nav className="app-nav">
+        <button
+          type="button"
+          aria-current={active === "home" ? "page" : undefined}
+          onClick={() => onNavigate("home")}
+        >
+          {t("app.nav_workflows")}
+        </button>
+        <button
+          type="button"
+          aria-current={active === "runs" ? "page" : undefined}
+          onClick={() => onNavigate("runs")}
+        >
+          {t("app.nav_runs")}
+        </button>
+      </nav>
       <div className="header-status">
         <span className={`chip gpu-${gpuState}`} title={gpuText}>
           {gpuText}
@@ -58,7 +76,7 @@ export function Header({ onHome }: { onHome: () => void }) {
         )}
         {sys && (
           <span className="chip">
-            💾 {t("header.disk")} {Math.round(sys.disk_free_gb)} GB
+            💾 {t("header.disk_free", { free_gb: Math.round(sys.disk_free_gb) })}
           </span>
         )}
       </div>

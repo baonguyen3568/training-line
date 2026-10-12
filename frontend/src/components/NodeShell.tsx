@@ -1,7 +1,7 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { memo } from "react";
 import type { NodeSpec, PortType, ValidationIssue } from "../api/types";
-import { t, tp } from "../i18n";
+import { t, tp, tpOptional } from "../i18n";
 import { nodeTitle } from "../lib/nodeText";
 import { tokenVar } from "../lib/ports";
 import { identifierView } from "../lib/safeText";
@@ -15,7 +15,10 @@ export interface ShellData extends Record<string, unknown> {
 }
 export type ShellNode = Node<ShellData, "vlm">;
 
-function portLabel(ports: PortType[], type: string): string {
+/** Node-specific port copy (node.<type>.port.<name>) first, then the generic port-type label. */
+function portLabel(ports: PortType[], typeId: string, name: string, type: string): string {
+  const specific = tpOptional(["node", typeId, "port", name]);
+  if (specific) return specific;
   const pt = ports.find((p) => p.id === type);
   return pt ? tp(pt.label_key.split(".")) : type;
 }
@@ -69,7 +72,9 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
         <span className="step" aria-hidden="true">
           {step}
         </span>
-        <span className="node-title">{nodeTitle(spec, typeId)}</span>
+        <span className="node-title" title={nodeTitle(spec, typeId)}>
+          {nodeTitle(spec, typeId)}
+        </span>
       </div>
       {thirdParty && <ThirdPartyBadge spec={spec} />}
       {spec.policy_block && (
@@ -86,17 +91,14 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
                 className={`port shape-${ps.type}`}
                 style={{ background: portColor(ports, ps.type) }}
               />
-              <span>
-                {portLabel(ports, ps.type)}
-                {ps.optional && <span className="muted"> ·</span>}
-              </span>
+              <span>{portLabel(ports, typeId, name, ps.type)}</span>
             </li>
           ))}
         </ul>
         <ul className="ports out">
           {outputs.map(([name, ps]) => (
             <li key={name}>
-              <span>{portLabel(ports, ps.type)}</span>
+              <span>{portLabel(ports, typeId, name, ps.type)}</span>
               <Handle
                 type="source"
                 position={Position.Right}

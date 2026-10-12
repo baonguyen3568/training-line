@@ -3,7 +3,10 @@
 // readable cookie (cookies are not port-isolated on 127.0.0.1, so other local apps could toss/overwrite them)
 // and never localStorage. It changes on every server restart; a 403 csrf_invalid triggers one refresh + retry.
 import type {
+  MetricsPage,
+  MetricsQuery,
   NodeTypesResponse,
+  RunInfo,
   SystemStatus,
   Template,
   TemplateMeta,
@@ -81,6 +84,9 @@ export interface Api {
   template(id: string): Promise<Template>;
   validate(workflow: Workflow, locale: string): Promise<ValidationResult>;
   system(): Promise<SystemStatus>;
+  runs(): Promise<RunInfo[]>;
+  run(id: string): Promise<RunInfo>;
+  runMetrics(id: string, q: MetricsQuery): Promise<MetricsPage>;
 }
 
 export const httpApi: Api = {
@@ -90,4 +96,11 @@ export const httpApi: Api = {
   validate: (workflow, locale) =>
     request("POST", `/api/graphs/validate?locale=${encodeURIComponent(locale)}`, workflow),
   system: () => request("GET", "/api/system"),
+  runs: () => request("GET", "/api/runs"),
+  run: (id) => request("GET", `/api/runs/${encodeURIComponent(id)}`),
+  runMetrics: (id, q) => {
+    const qs = new URLSearchParams({ after: String(q.after), limit: String(q.limit) });
+    if (q.downsample_to) qs.set("downsample_to", String(q.downsample_to));
+    return request("GET", `/api/runs/${encodeURIComponent(id)}/metrics?${qs}`);
+  },
 };

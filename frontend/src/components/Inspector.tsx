@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { NodeSpec, ParamSchema, PortType, Workflow } from "../api/types";
-import { t, tp } from "../i18n";
+import { t, tp, tpOptional } from "../i18n";
 import { nodeDesc, nodeTitle } from "../lib/nodeText";
 import { isCompatible } from "../lib/ports";
 import { useWorkflow } from "../store/workflow";
@@ -32,6 +32,12 @@ function sourcesFor(
     }
   }
   return out;
+}
+
+/** Enum option label from `x-ui.option_keys` (no per-param hard-coding); raw value if no prefix. */
+function optionLabel(schema: ParamSchema, value: string | number): string {
+  const prefix = schema["x-ui"]?.option_keys;
+  return prefix ? tp([...prefix.split("."), String(value)]) : String(value);
 }
 
 function ParamField({
@@ -67,7 +73,7 @@ function ParamField({
                 onChange(schema.enum?.filter((o) => next.has(o)));
               }}
             />
-            {tp(["benchmark_group", String(opt)])}
+            {optionLabel(schema, opt)}
           </label>
         ))}
       </fieldset>
@@ -80,7 +86,7 @@ function ParamField({
         <select id={id} value={String(current ?? "")} onChange={(e) => onChange(e.target.value)}>
           {schema.enum.map((opt) => (
             <option key={String(opt)} value={String(opt)}>
-              {String(opt)}
+              {optionLabel(schema, opt)}
             </option>
           ))}
         </select>
@@ -134,7 +140,7 @@ export function Inspector() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const node = workflow?.nodes.find((n) => n.id === selectedId);
   if (!workflow || !node) {
-    return <aside className="inspector muted">{t("library.title")}</aside>;
+    return <aside className="inspector muted">{t("inspector.empty_hint")}</aside>;
   }
   const spec = specs.get(node.type);
   if (!spec) return <aside className="inspector">{t("error.CFG-004.title")}</aside>;
@@ -158,7 +164,9 @@ export function Inspector() {
         return (
           <div className="field" key={port}>
             <label htmlFor={id}>
-              {t("canvas.receive_from")} — {pt ? tp(pt.label_key.split(".")) : ps.type}
+              {t("canvas.receive_from")} —{" "}
+              {tpOptional(["node", node.type, "port", port]) ??
+                (pt ? tp(pt.label_key.split(".")) : ps.type)}
             </label>
             <select
               id={id}

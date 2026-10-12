@@ -7,19 +7,28 @@ import type {
   NodeTypesResponse,
   ParamsSchema,
   PortType,
+  RunInfo,
   Template,
   ValidationIssue,
   ValidationResult,
   Workflow,
 } from "../api/types";
 import { tp } from "../i18n";
+import { parseJsonl } from "../lib/metrics";
 import { isCompatible } from "../lib/ports";
+import s3aMetrics from "./fixtures/s3a.metrics.jsonl?raw";
+import s3aRun from "./fixtures/s3a.run.json";
 
 const portTypes: PortType[] = [
   { id: "Dataset", parent: null, color_token: "color.port.dataset", label_key: "port.dataset" },
   { id: "Model", parent: null, color_token: "color.port.model", label_key: "port.model" },
   { id: "Adapter", parent: null, color_token: "color.port.model", label_key: "port.adapter" },
-  { id: "Checkpoint", parent: "Model", color_token: "color.port.model", label_key: "port.model" },
+  {
+    id: "Checkpoint",
+    parent: "Model",
+    color_token: "color.port.model",
+    label_key: "port.checkpoint",
+  },
   {
     id: "QuantizedModel",
     parent: "Model",
@@ -77,7 +86,7 @@ export const mockNodeTypes: NodeSpec[] = [
       properties: {
         repo: {
           type: "string",
-          enum: ["Qwen/Qwen3.5-0.8B", "Qwen/Qwen3.5-2B"],
+          enum: ["nvidia/NVIDIA-Nemotron-Parse-v1.1", "Qwen/Qwen3.5-0.8B", "Qwen/Qwen3.5-2B"],
           default: "Qwen/Qwen3.5-0.8B",
         },
       },
@@ -93,6 +102,23 @@ export const mockNodeTypes: NodeSpec[] = [
       type: "object",
       properties: { path: { type: "string", default: "data/sample-invoices" } },
       required: ["path"],
+    },
+  }),
+  spec({
+    type_id: "data.hf_load",
+    category: "source",
+    runner: "host",
+    outputs: { dataset: { type: "Dataset" } },
+    params_schema: {
+      type: "object",
+      properties: {
+        repo: {
+          type: "string",
+          enum: ["naver-clova-ix/cord-v2"],
+          default: "naver-clova-ix/cord-v2",
+        },
+      },
+      required: ["repo"],
     },
   }),
   spec({
@@ -131,7 +157,7 @@ export const mockNodeTypes: NodeSpec[] = [
           type: "string",
           enum: ["fast", "balanced", "quality"],
           default: "balanced",
-          "x-ui": { widget: "segmented", order: 0, preset: true },
+          "x-ui": { widget: "segmented", order: 0, preset: true, option_keys: "train_preset" },
         },
         epochs: { type: "integer", minimum: 1, maximum: 10, default: 2, "x-ui": { order: 1 } },
         learning_rate: { type: "number", default: 0.0001, "x-ui": { advanced: true, order: 2 } },
@@ -139,8 +165,25 @@ export const mockNodeTypes: NodeSpec[] = [
     },
   }),
   spec({
-    type_id: "export.merge_lora",
-    category: "export",
+    type_id: "train.sft_vlm",
+    category: "train",
+    inputs: {
+      base_model: { type: "Model" },
+      train_data: { type: "Dataset" },
+      val_data: { type: "Dataset", optional: true },
+    },
+    outputs: { model: { type: "Checkpoint" } },
+    params_schema: {
+      type: "object",
+      properties: {
+        epochs: { type: "integer", minimum: 1, maximum: 10, default: 2, "x-ui": { order: 1 } },
+        learning_rate: { type: "number", default: 0.00002, "x-ui": { advanced: true, order: 2 } },
+      },
+    },
+  }),
+  spec({
+    type_id: "train.merge_lora",
+    category: "train",
     inputs: { base_model: { type: "Model" }, adapter: { type: "Adapter" } },
     outputs: { model: { type: "Checkpoint" } },
   }),
@@ -156,7 +199,7 @@ export const mockNodeTypes: NodeSpec[] = [
           type: "string",
           enum: ["fp8", "nvfp4", "int4_awq"],
           default: "fp8",
-          "x-ui": { widget: "segmented", preset: true },
+          "x-ui": { widget: "segmented", preset: true, option_keys: "quantize_preset" },
         },
       },
     },
@@ -173,6 +216,7 @@ export const mockNodeTypes: NodeSpec[] = [
           type: "array",
           enum: ["documents", "charts", "reasoning", "math"],
           default: ["documents"],
+          "x-ui": { option_keys: "benchmark_group" },
         },
       },
     },
@@ -204,6 +248,52 @@ export const mockNodeTypes: NodeSpec[] = [
 ];
 
 const templates: Template[] = [
+  {
+    // Default template (ADR-001 amendment 1): Nemotron-Parse v1.1 full fine-tune on CORD-v2. Estimates are
+    // not measured yet → source "unknown" (UI shows "chưa có số đo" rather than invented numbers).
+    id: "invoice_to_json",
+    title_key: "template.invoice_to_json.title",
+    description_key: "template.invoice_to_json.desc",
+    difficulty: "basic",
+    tags: ["finetune"],
+    sample_data: true,
+    estimate: {
+      ram_gb: null,
+      disk_gb: null,
+      minutes: null,
+      gpu_exclusive: true,
+      source: "unknown",
+    },
+    workflow: {
+      format: "vlm-workflow",
+      schema_version: 1,
+      name: "invoice_to_json",
+      nodes: [
+        {
+          id: "n1",
+          type: "model.hf_pick",
+          version: "1.0.0",
+          params: { repo: "nvidia/NVIDIA-Nemotron-Parse-v1.1" },
+        },
+        {
+          id: "n2",
+          type: "data.hf_load",
+          version: "1.0.0",
+          params: { repo: "naver-clova-ix/cord-v2" },
+        },
+        { id: "n3", type: "data.split", version: "1.0.0", params: { val_fraction: 0.1 } },
+        { id: "n4", type: "train.sft_vlm", version: "1.0.0", params: { epochs: 2 } },
+        { id: "n5", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["documents"] } },
+      ],
+      edges: [
+        { from: ["n2", "dataset"], to: ["n3", "dataset"] },
+        { from: ["n1", "model"], to: ["n4", "base_model"] },
+        { from: ["n3", "train"], to: ["n4", "train_data"] },
+        { from: ["n3", "val"], to: ["n4", "val_data"] },
+        { from: ["n4", "model"], to: ["n5", "model"] },
+      ],
+    },
+  },
   {
     id: "lora_finetune",
     title_key: "template.lora_finetune.title",
@@ -242,7 +332,7 @@ const templates: Template[] = [
           version: "1.0.0",
           params: { preset: "balanced", epochs: 2 },
         },
-        { id: "n5", type: "export.merge_lora", version: "1.0.0", params: {} },
+        { id: "n5", type: "train.merge_lora", version: "1.0.0", params: {} },
         { id: "n6", type: "eval.benchmarks", version: "1.0.0", params: { groups: ["documents"] } },
       ],
       edges: [
@@ -386,4 +476,22 @@ export const mockApi: Api = {
       gpu_lock: { held: false },
       disk_free_gb: 2000,
     }),
+  runs: () => delay([s3aRun as RunInfo]),
+  run: (id) =>
+    id === s3aRun.run_id
+      ? delay(s3aRun as RunInfo)
+      : Promise.reject(new Error(`run ${id} not found`)),
+  // Real fixture: S-3 smoke run (AutoModel 26.08 training.jsonl mapped to the contract, 20 steps).
+  runMetrics: (id, q) => {
+    if (id !== s3aRun.run_id) return Promise.reject(new Error(`run ${id} not found`));
+    const { points } = parseJsonl(s3aMetrics);
+    const page = points.slice(q.after, q.after + q.limit);
+    const next = q.after + page.length;
+    return delay({
+      points: page,
+      next_cursor: next,
+      has_more: next < points.length,
+      downsampled: false,
+    });
+  },
 };

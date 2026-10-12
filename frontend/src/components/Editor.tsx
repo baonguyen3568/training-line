@@ -3,10 +3,10 @@ import {
   type Connection,
   Controls,
   type Edge,
-  MiniMap,
   type NodeChange,
   ReactFlow,
   ReactFlowProvider,
+  useViewport,
   ViewportPortal,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -22,16 +22,31 @@ import { NodeShell, type ShellNode } from "./NodeShell";
 const nodeTypes = { vlm: NodeShell };
 const VALIDATE_DEBOUNCE_MS = 500;
 
+const LANE_TOP = -4000;
+const LANE_HEIGHT = 12000;
+
 function Lanes() {
+  // Labels stick to the top edge of the visible canvas and stay ≥12px on screen at any zoom (design review #2).
+  const { y, zoom } = useViewport();
+  const labelTop = -y / zoom + 8 - LANE_TOP;
   return (
     <ViewportPortal>
       {LANES.map((lane, i) => (
         <div
           key={lane}
           className="lane"
-          style={{ transform: `translate(${i * LANE_WIDTH}px, 0)`, width: LANE_WIDTH }}
+          style={{
+            transform: `translate(${i * LANE_WIDTH}px, ${LANE_TOP}px)`,
+            width: LANE_WIDTH,
+            height: LANE_HEIGHT,
+          }}
         >
-          <span className="lane-label">{t(`canvas.lane.${lane}`)}</span>
+          <span
+            className="lane-label"
+            style={{ top: labelTop, fontSize: `${12 / Math.min(zoom, 1)}px` }}
+          >
+            {t(`canvas.lane.${lane}`)}
+          </span>
         </div>
       ))}
     </ViewportPortal>
@@ -163,13 +178,12 @@ function EditorInner() {
           onPaneClick={() => select(null)}
           isValidConnection={isValidConnection}
           deleteKeyCode={["Delete", "Backspace"]}
-          fitView
+          defaultViewport={{ x: 16, y: 40, zoom: 1 }}
           minZoom={0.3}
           proOptions={{ hideAttribution: false }}
         >
           <Lanes />
           <Background gap={24} color="var(--color-canvas-grid-dot)" />
-          <MiniMap pannable zoomable />
           <Controls />
         </ReactFlow>
         {toast && (

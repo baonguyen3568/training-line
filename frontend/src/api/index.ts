@@ -9,6 +9,9 @@ function lazyMock(): Api {
     template: (id) => load().then((m) => m.template(id)),
     validate: (wf, locale) => load().then((m) => m.validate(wf, locale)),
     system: () => load().then((m) => m.system()),
+    runs: () => load().then((m) => m.runs()),
+    run: (id) => load().then((m) => m.run(id)),
+    runMetrics: (id, q) => load().then((m) => m.runMetrics(id, q)),
   };
 }
 

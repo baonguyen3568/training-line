@@ -54,7 +54,7 @@ export function Gallery({ onOpen }: { onOpen: (id: string) => void }) {
           ))}
         </div>
       </div>
-      {error && <p role="alert">{t("error.SYS-001.title")}</p>}
+      {error && <p role="alert">{t("app.catalog_load_failed")}</p>}
       {!items && !error && <div className="skeleton-grid" aria-busy="true" />}
       {items && shown.length === 0 && <p className="muted">{t("gallery.empty")}</p>}
       <ul className="card-grid">
