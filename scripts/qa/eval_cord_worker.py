@@ -7,9 +7,9 @@ up to and including the position that predicts the first labelled token, so eval
 Decoding follows the model's own generation_config.json (Parse v1.1: greedy, repetition_penalty 1.1), read from
 the required ``--generation-config`` (the pinned base snapshot): an export may carry a regenerated config without
 those keys (AutoModel 26.08 before 23e6aa6); drift is recorded, and fatal with ``--require-no-drift``.
-Only ``max_new_tokens`` and the start token are overridden. A generation that hits ``max_new_tokens`` is flagged
-``truncated`` and still scored. bf16 kernels may depend on the batch size, so compare F1 only across equal
-``batch_size`` (recorded) unless a batch-1 vs batch-N equivalence check passed.
+Only ``max_new_tokens``, the start token and an explicit ``--repetition-penalty`` are overridden. A generation
+that hits ``max_new_tokens`` is flagged ``truncated`` and still scored. bf16 kernels depend on the batch size
+(batch 3 diverged from batch 1 on 3/6 O-1b samples): official numbers use batch 1 (recorded).
 
 Usage (repo mounted at /workspace):
   python /workspace/scripts/qa/eval_cord_worker.py --model <prepared dir> --data <cord-v2 snapshot dir> --split test \
@@ -110,6 +110,13 @@ def generation_config_drift(checkpoint: dict[str, Any], base: dict[str, Any]) ->
     return sorted(k for k in keys if checkpoint.get(k) != base.get(k))
 
 
+def _positive_float(text: str) -> float:
+    value = float(text)
+    if not value > 0:
+        raise argparse.ArgumentTypeError(f"must be > 0, got {text}")
+    return value
+
+
 def _local_dir(path: str, what: str) -> Path:
     """Only pinned local snapshots (prepared + hash-verified, ADR-003): never a hub id resolved to `main`."""
     p = Path(path)
@@ -133,12 +140,22 @@ def _set_decoding(model: Any, model_dir: Path, args: Any) -> dict[str, Any]:
     if drift and args.require_no_drift:
         raise SystemExit(f"checkpoint generation_config differs from {gen_dir} on {drift}: re-export (ckpt_complete)")
     model.generation_config.max_new_tokens = args.max_new_tokens
+    overrides: dict[str, Any] = {"max_new_tokens": args.max_new_tokens}
+    if args.repetition_penalty is not None:
+        # Protocol comparison (001a): the model's decoding vs train-time greedy; the override is recorded.
+        model.generation_config.repetition_penalty = args.repetition_penalty
+        overrides["repetition_penalty"] = args.repetition_penalty
     decoding = {
         k: getattr(model.generation_config, k, None)
         for k in ("do_sample", "num_beams", "repetition_penalty", "no_repeat_ngram_size", "forced_eos_token_id")
     }
     decoding.update(
-        {"max_new_tokens": args.max_new_tokens, "generation_config_dir": str(gen_dir), "checkpoint_drift": drift}
+        {
+            "max_new_tokens": args.max_new_tokens,
+            "generation_config_dir": str(gen_dir),
+            "checkpoint_drift": drift,
+            "overrides": overrides,
+        }
     )
     return decoding
 
@@ -167,6 +184,12 @@ def main() -> int:
     # Required: defaulting to the model dir would silently decode an old export without the base's
     # repetition_penalty (O-1b). For the base model itself, pass its own snapshot.
     ap.add_argument("--generation-config", required=True, help="pinned base snapshot dir (generation_config.json)")
+    ap.add_argument(
+        "--repetition-penalty",
+        type=_positive_float,  # fail at parse time, not in generate() after loading the model under the GPU lock
+        default=None,
+        help="override the base value (1.0 = off), recorded in each record's decoding.overrides",
+    )
     ap.add_argument(
         "--require-no-drift",
         action="store_true",

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import json
+import sys
+import types
 from pathlib import Path
 from typing import Any
 
@@ -49,3 +53,44 @@ def test_generation_config_drift_flags_lost_decoding_keys() -> None:
     assert generation_config_drift({**base, "use_cache": False}, base) == []
     # 23e6aa6 exports keep these from the model config; they do not change the generated tokens
     assert generation_config_drift({**base, "output_attentions": False, "output_hidden_states": False}, base) == []
+
+
+class _FakeGenerationConfig:
+    """Stands in for transformers.GenerationConfig: from_pretrained reads a JSON dict from the directory."""
+
+    def __init__(self, values: dict[str, Any]) -> None:
+        self.__dict__.update(values)
+
+    @classmethod
+    def from_pretrained(cls, path: str) -> _FakeGenerationConfig:
+        return cls(json.loads((Path(path) / "generation_config.json").read_text()))
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self.__dict__)
+
+
+def test_repetition_penalty_override_is_recorded_and_does_not_hide_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(sys.modules, "transformers", types.SimpleNamespace(GenerationConfig=_FakeGenerationConfig))
+    base, ckpt = tmp_path / "base", tmp_path / "ckpt"
+    for d, values in ((base, {"repetition_penalty": 1.1, "num_beams": 1}), (ckpt, {"num_beams": 1})):
+        d.mkdir()
+        (d / "generation_config.json").write_text(json.dumps(values))
+    model = types.SimpleNamespace()
+    args = types.SimpleNamespace(
+        generation_config=str(base), max_new_tokens=1024, repetition_penalty=1.0, require_no_drift=False
+    )
+    decoding = _worker()._set_decoding(model, ckpt, args)
+    assert model.generation_config.repetition_penalty == 1.0  # the override is what generate() will use
+    assert decoding["overrides"] == {"max_new_tokens": 1024, "repetition_penalty": 1.0}
+    assert decoding["checkpoint_drift"] == ["repetition_penalty"]  # drift is checkpoint vs base, before overrides
+    args.require_no_drift = True
+    with pytest.raises(SystemExit, match="repetition_penalty"):
+        _worker()._set_decoding(types.SimpleNamespace(), ckpt, args)
+
+
+@pytest.mark.parametrize("text", ["0", "-1", "nan"])
+def test_repetition_penalty_must_be_positive(text: str) -> None:
+    with pytest.raises(argparse.ArgumentTypeError):
+        _worker()._positive_float(text)
