@@ -74,8 +74,8 @@ File: `nemo_automodel/components/models/nemotron_parse/model.py`
 step -> `<x_0.3906>` repeated forever (golden gate (b) on 26.08-2). Fix: `generation_config.use_cache=False` by
 default and `prepare_inputs_for_generation` always feeds the whole decoder sequence (O(n^2), correct). Proper KV-cache
 support is upstream work (tech debt, see `.team/BOARD.md` "KV cache for the Parse decoder"). Cost: each step
-re-runs the decoder over the whole prefix; the wall-clock of a 50-token / full-page generate on GB10 is recorded by
-bao-backend at golden gate (b) on 26.08-4 and must be noted here before eval budgets rely on it. v2 (2026-10-12, golden gate (b) on 26.08-4 failed with `model_kwargs are not used by the model: ['attention_mask']`): the override must keep the parent's explicit parameters (`attention_mask`, `inputs_embeds`, `is_first_iteration`), because `generate()` validates caller kwargs against this signature and Parse's `forward` only takes `decoder_attention_mask`. Tests: `test_nemotron_parse_generate.py` (v1: 2 FAIL on 26.08-3; v2: 2 more FAIL on 26.08-4 with the exact golden error; all 4 PASS patched); end-to-end
+re-runs the decoder over the whole prefix; measured at golden gate (b) on 26.08-5 (GB10, bf16): 28 tokens in 2.45 s warm
+(~11 tok/s), max_alloc 2.21 GiB; a full CORD page (up to 1536 tokens) is still to be measured before eval budgets rely on it. v2 (2026-10-12, golden gate (b) on 26.08-4 failed with `model_kwargs are not used by the model: ['attention_mask']`): the override must keep the parent's explicit parameters (`attention_mask`, `inputs_embeds`, `is_first_iteration`), because `generate()` validates caller kwargs against this signature and Parse's `forward` only takes `decoder_attention_mask`. Tests: `test_nemotron_parse_generate.py` (v1: 2 FAIL on 26.08-3; v2: 2 more FAIL on 26.08-4 with the exact golden error; all 4 PASS patched); end-to-end
 proof = golden gate (b) on GPU.
 
 ## 0004-nemotron-parse-nvidia-decoder-prefix-and-positional-labels.patch — decoder prefix parity
