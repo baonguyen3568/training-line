@@ -337,3 +337,21 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
 - Đề xuất sửa gốc:
   - native class tự ép không dùng cache trong `prepare_inputs_for_generation`, không dựa vào generation_config;
   - worker pin `use_cache` rõ ràng; bỏ `use_cache` khỏi allowlist drift.
+
+### 10.9 Nguyên nhân thiếu train cụ thể: trọng số bf16 không có master fp32 (backend phát hiện, research xác minh, 2026-10-12)
+- **Bằng chứng backend** (so byte từng tensor base ↔ ckpt): chỉ **5.3%** phần tử decoder thay đổi sau cả 99 lẫn 299 step (O-1b, lr 5e-5: 21.5%). Giữa s99 và s299 chỉ 3.5% phần tử khác nhau. RADIO = bf16(base), nghĩa là freeze đúng.
+- **Cơ chế** (research xác minh trong image 26.08-5):
+  - `model.torch_dtype: bfloat16` cộng `torch.optim.AdamW`, nên param và update đều ở bf16.
+  - Ở world size 1, `FSDP2Manager.parallelize` bỏ qua FSDP ("World size or FSDP mesh size is 1, skipping parallelization"), nên `mp_policy` (param bf16 / master fp32) **không bao giờ được áp**.
+  - Bước Adam ≈ lr = 1e-5 nhỏ hơn nửa ulp bf16 khi |w| ≳ 4e-3, nên bị round-to-nearest nuốt.
+- **Probe GPU** (TE FusedAdam trên GB10): 4096 trọng số ~N(0, 0.02), 100 step, gradient có độ lệch hằng.
+  - torch AdamW bf16: 16.8% phần tử đổi, mean Δ −1.0e-4.
+  - TE FusedAdam `master_weights=True`: 100% phần tử đổi, mean Δ −7.1e-4 (giá trị kỳ vọng ≈ −1e-3).
+  - ⇒ bf16 thuần làm mất khoảng **7 lần** lượng update.
+- **Sửa**: dùng mẫu upstream `transformer_engine.pytorch.optimizers.fused_adam.FusedAdam` với `master_weights: true, store_param_remainders: true`, moment fp32 (ví dụ examples/vlm_finetune/gemma4/…tp2_cp2.yaml). Compute vẫn bf16. Tốn thêm khoảng 2 B/param train (~0.6 GB). TE 2.14 có sẵn trong image, không thêm dependency.
+- **P-3b-A** (`configs/train/smoke/nemotron_parse_v1_1_p3b_fp32master.yaml`): giống hệt P-3, chỉ đổi optimizer; 100 step (~33 phút).
+  - PASS khi val_loss@99 < 0.560 rõ rệt (P-3) **và** tỉ lệ phần tử decoder đổi ≫ 5.3%.
+  - Sau đó mới chạy 300 step (hoặc nhiều hơn) rồi chấm.
+- **Hệ quả rộng**: mọi run full-SFT 1 GPU trong app (train.sft_vlm) đều bị lỗi này. LoRA ít bị hơn (lr 1e-4–2e-4, nhưng adapter bf16 vẫn có thể mất một phần update), cần kiểm dtype adapter.
+  - Đề xuất: `train/recipe.py` mặc định FusedAdam master fp32 cho SFT. Research sẽ cập nhật 11 template sau khi A/B PASS.
+- Giả thuyết use_cache (§10.8) **vẫn độc lập**: có thể cả hai cùng đúng. Thứ tự: A/B cache (đang chạy) rồi P-3b-A.
