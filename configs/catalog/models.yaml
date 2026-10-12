@@ -1,0 +1,399 @@
+# Model catalog (data, not code). Owner: bao-research. Source of truth: ADR-001 + amendment 1,
+# .team/proposals/001-stack-model-catalog.md, .team/proposals/001a-nvidia-default-model.md.
+# Licence/remote-code verdicts: bao-security (configs/security/licenses.yaml, .team/security-reviews/).
+# Adding a model = new entry + security vet + recursive auto_map/_name_or_path scan (scripts/research/hf_model_meta.py).
+#
+# Field conventions (flat on purpose, consumed by nodes as per-model defaults):
+#   display_name        proper name only, language-neutral; descriptions live in i18n model_catalog.<id>.tagline (vi/en)
+#   ("needs a free machine" is NOT stored: UI derives it from ram_gb_train vs live MemAvailable at preflight)
+#   revision            40-char commit SHA vetted by bao-security (never `main`)
+#   tier                default | template | catalog | baseline | rnd   (rnd = never shown in Simple)
+#   train_node          train.sft_vlm | train.lora_vlm | none          (what the "Tự động" template choice maps to)
+#   ram_gb_train        UPPER bound used by preflight for the default train_node (GB, whole job incl. CUDA on UMA)
+#   ram_source          measured | estimated   (estimated -> UI shows "ước lượng")
+#   image_policy        fixed | qwen_pixels | token_budget   (decides which image widget/param exists; parity key)
+#                         fixed        -> fixed_image_hw set, min/max_pixels = 0, image_max_tokens = 0
+#                         qwen_pixels  -> min_pixels/max_pixels set (smart_resize), fixed_image_hw = []
+#                         token_budget -> image_max_tokens set (Gemma 4 max_soft_tokens), pixels 0, fixed_image_hw = []
+#   image_max_tokens    per-image visual token budget (token_budget only; 0 otherwise)
+#   quant_fp8           official | experimental | unsupported   (Quantize node hidden unless official)
+#   serve_engine        vllm | hf | unknown   (default engine for the "Chạy thử" node)
+#   remote_code         none | pinned_prepared   (pinned_prepared = runs only from the hash-verified prepared snapshot)
+#   security            approved | approved_with_conditions | conditional | rejected
+schema_version: 1
+budget_note: "RAM budget on the shared GB10 is ~40GB; preflight = ram_gb_train + 10GB headroom vs MemAvailable."
+models:
+  - id: nemotron-parse-v1.1
+    repo: nvidia/NVIDIA-Nemotron-Parse-v1.1
+    revision: fd1e3c6ba0b61a6dcab5a905f0ff92c5b19f14a4
+    display_name: "NVIDIA Nemotron Parse v1.1"
+    vendor: nvidia
+    tier: default
+    gated: false
+    remote_code: pinned_prepared   # config/processor .py + C-RADIOv2-H@0d8f4c18 (configs/models/pinned/)
+    license: nvidia-open-model-license
+    commercial: "yes"
+    attribution: "NVIDIA Open Model License; tokenizer CC-BY-4.0"
+    security: approved
+    params_b: 0.94
+    disk_gb: 3.8
+    train_node: train.sft_vlm      # full fine-tune of the decoder, vision + embeddings frozen (upstream recipe)
+    ram_gb_train: 35
+    ram_source: measured           # P-1 26.08-2 startup peak +35GB WITH freeze/fused-attn bugs (001a §9); re-measure after fix
+    attn: eager
+    loss: nemotron_parse           # NemotronParseLoss, coord weight 10, threshold read from config (fixcode patch)
+    freeze_vision_tower: true      # = RADIO backbone only (encoder.model_encoder); neck trains (001a §9.3)
+    image_policy: fixed
+    image_max_tokens: 0
+    min_pixels: 0
+    max_pixels: 0
+    fixed_image_hw: [2048, 1648]
+    video: false
+    video_fps: 0
+    min_answer_tokens: 1536        # CORD JSON length - verify at P-2
+    quant_fp8: experimental        # P-5 spike pending -> Quantize node hidden
+    serve_engine: unknown          # vLLM support checked at P-4; fallback hf
+    task_prompt_fixed: true        # "Trích xuất hoá đơn" (no free-form question)
+    gallery_gates: [white_image_probe, train_serve_parity, nvidia_golden, cord_field_f1]
+    min_image: vlm-automodel:26.08-2   # needs normalize patch + albumentations/cv2
+
+  - id: cosmos-reason2-2b
+    repo: nvidia/Cosmos-Reason2-2B
+    revision: 9ce19a195e423419c349abfc86fd07178b230561
+    display_name: "NVIDIA Cosmos Reason2 2B"
+    vendor: nvidia
+    tier: template
+    gated: true                    # user must accept on HF + read-only fine-grained token (wizard)
+    remote_code: none              # Qwen3VLForConditionalGeneration native (config unread until gate accepted)
+    license: nvidia-open-model-license
+    commercial: "yes"
+    attribution: "Built on NVIDIA Cosmos"
+    security: conditional          # final after config.json is readable
+    params_b: 2.4
+    disk_gb: 4.9
+    train_node: train.lora_vlm
+    ram_gb_train: 14
+    ram_source: estimated
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: qwen_pixels
+    image_max_tokens: 0
+    min_pixels: 200704             # 256*28*28, upstream qwen3_vl recipe
+    max_pixels: 1003520            # 1280*28*28
+    fixed_image_hw: []
+    video: true
+    video_fps: 4                   # model card
+    min_answer_tokens: 4096        # model card (CoT)
+    quant_fp8: official            # ModelOpt hf_ptq: Qwen3-VL FP8
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: [white_image_probe, train_serve_parity, image_token_parity, n4_general_ability]
+    min_image: vlm-automodel:26.08-1
+
+  - id: cosmos-reason2-8b
+    repo: nvidia/Cosmos-Reason2-8B
+    revision: a9fae2cf89dc64db96b12860417f0eb403013bb9
+    display_name: "NVIDIA Cosmos Reason2 8B"
+    vendor: nvidia
+    tier: catalog
+    gated: true
+    remote_code: none
+    license: nvidia-open-model-license
+    commercial: "yes"
+    attribution: "Built on NVIDIA Cosmos"
+    security: conditional
+    params_b: 8.8
+    disk_gb: 17.5
+    train_node: train.lora_vlm
+    ram_gb_train: 32
+    ram_source: estimated
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: qwen_pixels
+    image_max_tokens: 0
+    min_pixels: 200704
+    max_pixels: 1003520
+    fixed_image_hw: []
+    video: true
+    video_fps: 4
+    min_answer_tokens: 4096
+    quant_fp8: official
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: qwen3-vl-2b-instruct
+    repo: Qwen/Qwen3-VL-2B-Instruct
+    revision: 89644892e4d85e24eaac8bacfd4f463576704203
+    display_name: "Qwen3-VL 2B Instruct"
+    vendor: qwen
+    tier: baseline                 # N-4 baseline + G1-harness; selectable in Advanced only
+    gated: false
+    remote_code: none
+    license: apache-2.0
+    commercial: "yes"
+    attribution: ""
+    security: approved
+    params_b: 2.1
+    disk_gb: 4.3
+    train_node: train.lora_vlm
+    ram_gb_train: 14
+    ram_source: estimated
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: qwen_pixels
+    image_max_tokens: 0
+    min_pixels: 200704
+    max_pixels: 1003520
+    fixed_image_hw: []
+    video: true
+    video_fps: 2
+    min_answer_tokens: 1024
+    quant_fp8: official
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: qwen3.5-0.8b
+    repo: Qwen/Qwen3.5-0.8B
+    revision: 2fc06364715b967f1860aea9cf38778875588b17
+    display_name: "Qwen3.5 0.8B"
+    vendor: qwen
+    tier: catalog
+    gated: false
+    remote_code: none
+    license: apache-2.0
+    commercial: "yes"
+    attribution: ""
+    security: approved
+    params_b: 0.9
+    disk_gb: 2.0
+    train_node: train.lora_vlm
+    ram_gb_train: 13
+    ram_source: measured           # S-3: steady +6.5GB, peak +12.6GB (host, upper bound)
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: qwen_pixels
+    image_max_tokens: 0
+    min_pixels: 200704
+    max_pixels: 1003520
+    fixed_image_hw: []
+    video: true
+    video_fps: 2
+    min_answer_tokens: 1024
+    quant_fp8: official
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: qwen3.5-2b
+    repo: Qwen/Qwen3.5-2B
+    revision: 15852e8c16360a2fea060d615a32b45270f8a8fc
+    display_name: "Qwen3.5 2B"
+    vendor: qwen
+    tier: catalog
+    gated: false
+    remote_code: none
+    license: apache-2.0
+    commercial: "yes"
+    attribution: ""
+    security: approved
+    params_b: 2.3
+    disk_gb: 5.0
+    train_node: train.lora_vlm
+    ram_gb_train: 16
+    ram_source: estimated          # S-3b will measure
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: qwen_pixels
+    image_max_tokens: 0
+    min_pixels: 200704
+    max_pixels: 1003520
+    fixed_image_hw: []
+    video: true
+    video_fps: 2
+    min_answer_tokens: 1024
+    quant_fp8: official
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: qwen3.5-4b
+    repo: Qwen/Qwen3.5-4B
+    revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+    display_name: "Qwen3.5 4B"
+    vendor: qwen
+    tier: catalog
+    gated: false
+    remote_code: none
+    license: apache-2.0
+    commercial: "yes"
+    attribution: ""
+    security: approved
+    params_b: 5.0
+    disk_gb: 9.3
+    train_node: train.lora_vlm
+    ram_gb_train: 24
+    ram_source: estimated
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: qwen_pixels
+    image_max_tokens: 0
+    min_pixels: 200704
+    max_pixels: 1003520
+    fixed_image_hw: []
+    video: true
+    video_fps: 2
+    min_answer_tokens: 1024
+    quant_fp8: official
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: qwen3.5-9b
+    repo: Qwen/Qwen3.5-9B
+    revision: c202236235762e1c871ad0ccb60c8ee5ba337b9a
+    display_name: "Qwen3.5 9B"
+    vendor: qwen
+    tier: catalog
+    gated: false
+    remote_code: none
+    license: apache-2.0
+    commercial: "yes"
+    attribution: ""
+    security: approved
+    params_b: 10.0
+    disk_gb: 19.3
+    train_node: train.lora_vlm
+    ram_gb_train: 38
+    ram_source: estimated          # close to the 40GB budget -> usually hidden by preflight
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: qwen_pixels
+    image_max_tokens: 0
+    min_pixels: 200704
+    max_pixels: 1003520
+    fixed_image_hw: []
+    video: true
+    video_fps: 2
+    min_answer_tokens: 1024
+    quant_fp8: official
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: gemma-4-e2b-it
+    repo: google/gemma-4-E2B-it
+    revision: 3e22461f65e89153144f8adb70e3b8c2cc9845a7
+    display_name: "Gemma 4 E2B"
+    vendor: google
+    tier: catalog
+    gated: false
+    remote_code: none
+    license: apache-2.0
+    commercial: "yes"
+    attribution: ""
+    security: approved
+    params_b: 5.1
+    disk_gb: 10.2
+    train_node: train.lora_vlm
+    ram_gb_train: 20
+    ram_source: estimated
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: token_budget
+    image_max_tokens: 280
+    min_pixels: 0                  # Gemma 4: variable resolution under a soft-token budget (processor_config:
+                                   # max_soft_tokens 280/image, patch 16, pooling 3; video 70 tokens x 32 frames)
+    max_pixels: 0
+    fixed_image_hw: []
+    video: true
+    video_fps: 1
+    min_answer_tokens: 1024
+    quant_fp8: unsupported         # ModelOpt lists Gemma 3 FP8 only; Gemma 4 not verified
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: gemma-4-e4b-it
+    repo: google/gemma-4-E4B-it
+    revision: ee0ef6023621cff504d758262d4e04895a5af4a2
+    display_name: "Gemma 4 E4B"
+    vendor: google
+    tier: catalog
+    gated: false
+    remote_code: none
+    license: apache-2.0
+    commercial: "yes"
+    attribution: ""
+    security: approved
+    params_b: 8.0
+    disk_gb: 16.0
+    train_node: train.lora_vlm
+    ram_gb_train: 28
+    ram_source: estimated
+    attn: sdpa
+    loss: masked_ce
+    freeze_vision_tower: true
+    image_policy: token_budget
+    image_max_tokens: 280
+    min_pixels: 0
+    max_pixels: 0
+    fixed_image_hw: []
+    video: true
+    video_fps: 1
+    min_answer_tokens: 1024
+    quant_fp8: unsupported
+    serve_engine: vllm
+    task_prompt_fixed: false
+    gallery_gates: []
+    min_image: vlm-automodel:26.08-1
+
+  - id: nemotron-parse-2.0
+    repo: nvidia/NVIDIA-Nemotron-Parse-2.0
+    revision: b6742064f4a8cf22a10383ece5e7fbead355ac04
+    display_name: "NVIDIA Nemotron Parse 2.0"
+    vendor: nvidia
+    tier: rnd                      # v1.1 vs 2.0 comparison (001a §8) decides promotion
+    gated: false
+    remote_code: pinned_prepared
+    license: openmdw-1.1
+    commercial: "yes"
+    attribution: "OpenMDW-1.1 notice; tokenizer CC-BY-4.0"
+    security: approved_with_conditions
+    params_b: 0.95
+    disk_gb: 3.6
+    train_node: train.sft_vlm
+    ram_gb_train: 14
+    ram_source: estimated
+    attn: eager
+    loss: nemotron_parse
+    freeze_vision_tower: true      # = RADIO backbone only (encoder.model_encoder); neck trains (001a §9.3)
+    image_policy: fixed
+    image_max_tokens: 0
+    min_pixels: 0
+    max_pixels: 0
+    fixed_image_hw: [2048, 1664]
+    video: false
+    video_fps: 0
+    min_answer_tokens: 1536        # CORD JSON length - verify at P-2
+    quant_fp8: experimental
+    serve_engine: unknown          # README ships a vllm_tied_patch (vendored, container-only)
+    task_prompt_fixed: true
+    gallery_gates: [white_image_probe, train_serve_parity, cord_field_f1]
+    min_image: vlm-automodel:26.08-2
