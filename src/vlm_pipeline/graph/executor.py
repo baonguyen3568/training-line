@@ -106,6 +106,7 @@ class Executor:
         self.on_event = on_event
         self.workspace = workspace
         self._cancels: dict[str, threading.Event] = {}
+        self._sinks: dict[str, Callable[[Event], None]] = {}  # per-run event sink (one shared Executor per app)
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------------------------------- public
@@ -119,8 +120,27 @@ class Executor:
         event.set()
         return True
 
-    def run(self, workflow: Mapping[str, Any], *, graph_run_id: str | None = None) -> GraphRun:
+    def run(
+        self,
+        workflow: Mapping[str, Any],
+        *,
+        graph_run_id: str | None = None,
+        on_event: Callable[[Event], None] | None = None,
+    ) -> GraphRun:
+        """Run a workflow (blocking; call it from a worker thread). ``on_event`` overrides the executor-wide sink."""
         gid = graph_run_id or f"g-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        with self._lock:
+            if gid in self._cancels or gid in self._sinks:
+                raise ValueError(f"graph run {gid!r} is already running")
+            if on_event is not None:
+                self._sinks[gid] = on_event
+        try:
+            return self._run(workflow, gid)
+        finally:
+            with self._lock:
+                self._sinks.pop(gid, None)
+
+    def _run(self, workflow: Mapping[str, Any], gid: str) -> GraphRun:
         issues = [i for i in validate(workflow, self.registry, self.workspace) if i.severity == "error"]
         if issues:
             run = GraphRun(gid, {}, issues=issues)
@@ -229,10 +249,12 @@ class Executor:
         return True
 
     def _emit(self, gid: str, event: Event) -> None:
-        if self.on_event is None:
+        with self._lock:
+            sink = self._sinks.get(gid, self.on_event)
+        if sink is None:
             return
         try:
-            self.on_event({"graph_run_id": gid, "ts": time.time(), **event})
+            sink({"graph_run_id": gid, "ts": time.time(), **event})
         except Exception:
             logger.exception("on_event callback failed")  # a broken UI stream must never stop a run
 

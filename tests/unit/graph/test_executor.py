@@ -171,3 +171,16 @@ def test_long_chain_validates_without_recursion_error() -> None:
     assert [i.code for i in validate(wf, make_test_registry())] == []
     edges.append({"from": [f"q{n - 1}", "model"], "to": ["q0", "model"]})  # close a loop -> CFG-002, not CFG-007
     assert "CFG-002" in {i.code for i in validate(wf, make_test_registry())}
+
+
+def test_one_executor_many_runs_each_with_its_own_event_sink(tmp_path: Path) -> None:
+    """The app keeps ONE Executor (so cancel() finds the run) and gives every run its own WebSocket sink."""
+    ex = Executor(make_test_registry(), FakeWorker(), tmp_path)
+    a: list[dict[str, Any]] = []
+    b: list[dict[str, Any]] = []
+    ex.run(_wf(), graph_run_id="ga", on_event=a.append)
+    ex.run(_wf(), graph_run_id="gb", on_event=b.append)
+    assert a
+    assert b
+    assert {e["graph_run_id"] for e in a} == {"ga"}
+    assert {e["graph_run_id"] for e in b} == {"gb"}
