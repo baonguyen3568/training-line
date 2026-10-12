@@ -8,10 +8,11 @@ them to catalog codes). Nothing is downloaded: models/datasets must already be i
 from __future__ import annotations
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import ClassVar
 
-from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog
+from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.jobrun import (
     CONTAINER_ROOT,
@@ -25,12 +26,8 @@ from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
 
+logger = logging.getLogger(__name__)
 DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-3"
-# Hub datasets vetted by bao-security, pinned revisions. TODO(research): move into a datasets catalog file.
-HUB_DATASET_REVISIONS = {"naver-clova-ix/cord-v2": "7f0115a4b758a71d6473b8d085751692da2fef98"}
-# Expected trainable-parameter share for full fine-tune with the default freeze (fixcode patch 0002 guard).
-# TODO(research): move into the model catalog next to freeze_* fields.
-EXPECTED_TRAINABLE_PCT_SFT = {"nemotron-parse-v1.1": "29.4:31.4", "nemotron-parse-2.0": "26.8:28.8"}
 PREPARED_DIRS = {"nemotron-parse-v1.1": "nemotron-parse-v1.1_fd1e3c6b"}  # train.prepare outputs (hash-verified)
 
 
@@ -110,9 +107,10 @@ class RealWorker:
 
     def _hub_dataset(self, job: NodeJob) -> NodeResult:
         repo = str(getattr(job.params, "repo"))  # noqa: B009
-        revision = HUB_DATASET_REVISIONS.get(repo)
-        if revision is None:
-            raise NotCachedError("dataset has no pinned revision", params={"repo": repo, "reason": "not_pinned"})
+        entry = next((d for d in load_dataset_catalog().datasets if d.repo == repo), None)
+        if entry is None:
+            raise NotCachedError("dataset not in the catalog", params={"repo": repo, "reason": "not_pinned"})
+        revision = entry.revision
         path = _hub_snapshot(self.root, repo, revision, "dataset")
         ref = ArtifactRef(type="Dataset", path=self._container_path(path), hash=f"{repo}@{revision}")
         return NodeResult(outputs={"dataset": ref})
@@ -199,10 +197,14 @@ class RealWorker:
 
 
 def _trainable_env(entry: CatalogEntry, params: LoraParams | FullFinetuneParams) -> dict[str, str]:
-    expected = EXPECTED_TRAINABLE_PCT_SFT.get(entry.id)
-    if expected is None or not isinstance(params, FullFinetuneParams) or not params.freeze_vision_tower:
+    """Patch-0002 guard: the job fails before step 1 if the trainable share is not what the catalog expects."""
+    if not isinstance(params, FullFinetuneParams) or not params.freeze_vision_tower:
         return {}
-    return {"VLM_EXPECTED_TRAINABLE_PCT": expected}
+    expected = entry.sft_trainable_pct
+    if expected is None:
+        logger.warning("no sft_trainable_pct in the catalog for %s: freeze guard disabled", entry.id)
+        return {}
+    return {"VLM_EXPECTED_TRAINABLE_PCT": f"{expected[0]}:{expected[1]}"}
 
 
 def _tail(path: Path, n: int = 30) -> str:

@@ -55,7 +55,9 @@ def test_model_pick_requires_cached_snapshot(tmp_path: Path) -> None:
 
 def test_hub_dataset_pinned(tmp_path: Path) -> None:
     root = _root(tmp_path)
-    rev = workers.HUB_DATASET_REVISIONS["naver-clova-ix/cord-v2"]
+    from vlm_pipeline.common.catalog import load_dataset_catalog
+
+    rev = next(d.revision for d in load_dataset_catalog().datasets if d.repo == "naver-clova-ix/cord-v2")
     _snap(root, "datasets", "naver-clova-ix/cord-v2", rev)
     out = RealWorker(root).run(_job("data.hf_load", {"repo": "naver-clova-ix/cord-v2"}, root / "r")).outputs
     assert out["dataset"].hash == f"naver-clova-ix/cord-v2@{rev}"
