@@ -89,6 +89,8 @@ def test_thresholds_can_only_be_tightened() -> None:
     assert th.abort_gb == 10.0
     assert th.warn_gb > th.abort_gb > th.emergency_gb
     assert tightened_thresholds(8.0).abort_gb == 8.0
+    with pytest.raises(ThresholdTooLooseError):
+        tightened_thresholds(float("nan"))
     with pytest.raises(ThresholdTooLooseError) as ei:
         tightened_thresholds(6.0)
     assert ei.value.code == "CFG-005"

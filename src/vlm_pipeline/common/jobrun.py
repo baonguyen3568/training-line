@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import os
 import re
 import signal
@@ -150,7 +151,7 @@ def tightened_thresholds(abort_gb: float | None = None) -> MemThresholds:
     """ADR-005 thresholds, optionally with a HIGHER abort level (e.g. 10 GB for a first measurement run)."""
     if abort_gb is None:
         return DEFAULT_THRESHOLDS
-    if abort_gb < DEFAULT_THRESHOLDS.abort_gb:
+    if not math.isfinite(abort_gb) or abort_gb < DEFAULT_THRESHOLDS.abort_gb:
         raise ThresholdTooLooseError(
             "abort threshold below ADR-005",
             params={"param": "abort_gb", "rule": f">={DEFAULT_THRESHOLDS.abort_gb}", "value": abort_gb},
