@@ -30,7 +30,7 @@ from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
 
 logger = logging.getLogger(__name__)
-DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-3"
+DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-4"
 PREPARED_DIRS = {"nemotron-parse-v1.1": "nemotron-parse-v1.1_fd1e3c6b"}  # train.prepare outputs (hash-verified)
 
 
