@@ -54,7 +54,7 @@ models:
     fixed_image_hw: [2048, 1648]
     video: false
     video_fps: 0
-    min_answer_tokens: 1536        # CORD JSON length - verify at P-2
+    min_answer_tokens: 1280        # CORD target incl. EOS: test max 829, train max 1245 (bao-tester); eval uses 1024
     quant_fp8: experimental        # P-5 spike pending -> Quantize node hidden
     serve_engine: unknown          # vLLM support checked at P-4; fallback hf
     task_prompt_fixed: true        # "Trích xuất hoá đơn" (no free-form question)
@@ -415,7 +415,7 @@ models:
     fixed_image_hw: [2048, 1664]
     video: false
     video_fps: 0
-    min_answer_tokens: 1536        # CORD JSON length - verify at P-2
+    min_answer_tokens: 1280        # CORD target incl. EOS: test max 829, train max 1245 (bao-tester); eval uses 1024
     quant_fp8: experimental
     serve_engine: unknown          # README ships a vllm_tied_patch (vendored, container-only)
     task_prompt_fixed: true
