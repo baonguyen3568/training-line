@@ -444,7 +444,7 @@ node:
     title: Chọn model gốc
     desc: Chọn model có sẵn để bắt đầu. Danh sách đã được kiểm tra giấy phép.
     param:
-      repo:
+      model:
         label: Model gốc
         help: Model nhỏ chạy nhanh hơn; model lớn trả lời tốt hơn nhưng cần nhiều bộ nhớ hơn.
     port:

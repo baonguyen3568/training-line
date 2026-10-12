@@ -444,7 +444,7 @@ node:
     title: Choose base model
     desc: Pick a ready-made model to start from. The list is license-checked.
     param:
-      repo:
+      model:
         label: Base model
         help: Smaller models run faster; larger ones answer better but need more memory.
     port:
