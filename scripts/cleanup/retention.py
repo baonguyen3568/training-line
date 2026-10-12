@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
             for item in run.items:
                 roles = ",".join(item.roles) or "-"
                 why = item.blocked_by or item.reason
+                if item.consequence_code:
+                    why += f"  ⚠ {item.consequence_code}"
                 print(f"   {item.action:11} {item.reclaim_bytes / GIB:8.3f} GiB  {item.path}  [{roles}]  {why}")
         total = current.total_reclaim_bytes / GIB
         print(f"total reclaimable: {total:.3f} GiB" + ("  (needs --approved-by)" if current.needs_approval else ""))

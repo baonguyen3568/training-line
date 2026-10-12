@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from string import Formatter
 
 import pytest
 
-from vlm_pipeline.artifacts.retention import RetentionPolicy, apply, plan
+from vlm_pipeline.artifacts.retention import CONSEQUENCE_CODES, RetentionPolicy, apply, plan
 from vlm_pipeline.common.diskguard import LockStatus
 from vlm_pipeline.common.paths import GIB
+from vlm_pipeline.i18n import load as load_i18n
 
 NOW = 1_800_000_000.0
 DAY = 86_400.0
@@ -281,3 +283,35 @@ def test_failed_run_without_ended_at_uses_run_json_mtime(tmp_path: Path) -> None
     ts = NOW - 1 * DAY
     os.utime(run / "run.json", (ts, ts))
     assert _actions(tmp_path) == {"epoch_0_step_10": ("keep", None)}  # still in the 3-day grace
+
+
+def test_touching_latest_carries_the_right_consequence(tmp_path: Path) -> None:
+    _standard_run(tmp_path)  # LATEST=step_30 (strip), LOWEST_VAL=step_20 (strip), step_10 (delete)
+    run = _run(tmp_path, "f", status="cancelled", ended_days_ago=8)
+    _ckpt(run, "epoch_0_step_1", age_days=8)
+    (run / "checkpoints" / "LATEST").symlink_to("epoch_0_step_1")
+    _age_tree(run / "checkpoints", 8)
+    p = plan(tmp_path, now=NOW, lock_reader=no_lock)
+    got = {
+        i.item_id: (i.action, i.consequence_code, dict(i.consequence_params))
+        for r in p.runs
+        for i in r.items
+        if i.action != "keep"
+    }
+    assert got == {
+        "f/checkpoints/epoch_0_step_1": ("delete", "PERMANENT_LOSS", {"name": "f/epoch_0_step_1"}),
+        "r1/checkpoints/epoch_0_step_10": ("delete", None, {}),
+        "r1/checkpoints/epoch_0_step_20": ("strip_optim", None, {}),
+        "r1/checkpoints/epoch_0_step_30": ("strip_optim", "RESUME_IMPOSSIBLE", {"run": "r1"}),
+        "r1/checkpoints/epoch_0_step_50": ("delete", None, {}),
+    }
+
+
+@pytest.mark.parametrize("locale", ["vi", "en"])
+def test_every_consequence_code_has_text_and_params_cover_placeholders(locale: str) -> None:
+    texts = load_i18n(locale)
+    for code, params in CONSEQUENCE_CODES.items():
+        key = f"storage.consequence.{code}"
+        assert key in texts, key
+        placeholders = {name for _, name, _, _ in Formatter().parse(texts[key]) if name}
+        assert placeholders <= params, (key, placeholders - params)

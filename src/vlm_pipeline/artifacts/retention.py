@@ -32,7 +32,7 @@ import os
 import shutil
 import time
 import tomllib
-from collections.abc import Callable, Collection, Iterable
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -82,6 +82,8 @@ class PlanItem:
     rule: str
     reason: str
     blocked_by: str | None = None
+    consequence_code: str | None = None  # i18n key storage.consequence.<code> (CONSEQUENCE_CODES)
+    consequence_params: Mapping[str, str] = field(default_factory=dict)  # fills that text's placeholders
 
     @property
     def item_id(self) -> str:
@@ -90,6 +92,7 @@ class PlanItem:
     def as_dict(self) -> dict[str, object]:
         data = asdict(self)
         data["roles"] = list(self.roles)
+        data["consequence_params"] = dict(self.consequence_params)
         data["item_id"] = self.item_id
         data["reclaim_gb"] = round(self.reclaim_bytes / GIB, 3)
         return data
@@ -201,6 +204,22 @@ def _strip_bytes(ckpt: Path) -> int:
     return sum(du_bytes(ckpt / sub) for sub in STRIP_SUBDIRS if (ckpt / sub).is_dir() and not (ckpt / sub).is_symlink())
 
 
+# consequence code -> placeholders its i18n text needs (storage.consequence.<code> in i18n/{vi,en}.yaml)
+CONSEQUENCE_CODES: Mapping[str, frozenset[str]] = {
+    "RESUME_IMPOSSIBLE": frozenset({"run"}),  # strip LATEST: model still usable, training cannot resume
+    "PERMANENT_LOSS": frozenset({"name"}),  # delete LATEST: the run's last model is gone
+}
+
+
+def _consequence(run_id: str, ckpt_name: str, roles: list[str], action: Action) -> tuple[str | None, dict[str, str]]:
+    """User-facing consequence; only touching LATEST matters (older/incomplete checkpoints are not resumed from)."""
+    if "LATEST" not in roles or action == "keep":
+        return None, {}
+    if action == "strip_optim":
+        return "RESUME_IMPOSSIBLE", {"run": run_id}
+    return "PERMANENT_LOSS", {"name": f"{run_id}/{ckpt_name}"}
+
+
 def _plan_checkpoint(  # noqa: PLR0911 - one return per ADR-005 D3 rule, kept as a flat decision table
     run_id: str,
     ckpt: Path,
@@ -216,7 +235,8 @@ def _plan_checkpoint(  # noqa: PLR0911 - one return per ADR-005 D3 rule, kept as
     age_days = (now - ckpt.lstat().st_mtime) / DAY_S
 
     def item(action: Action, nbytes: int, rule: str, reason: str, blocked_by: str | None = None) -> PlanItem:
-        return PlanItem(run_id, rel, "checkpoint", tuple(roles), action, nbytes, rule, reason, blocked_by)
+        code, params = _consequence(run_id, ckpt.name, roles, action)
+        return PlanItem(run_id, rel, "checkpoint", tuple(roles), action, nbytes, rule, reason, blocked_by, code, params)
 
     if blocked is not None:
         return item("keep", 0, "D7.blocked", f"protected: {blocked}", blocked)
