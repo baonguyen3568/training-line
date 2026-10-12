@@ -219,6 +219,8 @@ class RealWorker:
             )
         port, out_type = next(iter(job.spec.outputs.items()))
         out = run_dir / "checkpoints" / "LATEST" / "model"
+        if (out / "consolidated").is_dir():  # full fine-tune: HF safetensors loadable by downstream nodes
+            out = out / "consolidated"
         ref = ArtifactRef(type=out_type.type, path=str(out), hash=f"{run_id}:{config_hash}")
         return NodeResult(outputs={port: ref})
 
