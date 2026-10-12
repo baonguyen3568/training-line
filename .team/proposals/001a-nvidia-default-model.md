@@ -321,3 +321,4 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - Eval record ghi base_generation_config_sha, applied_overrides và effective config.
   - Gate export `--require-no-drift` giữ nguyên, tách bạch với phần này.
 - Gap ghi metadata (tester bắt): run.json P-3 có `dataset_revision: null`. Dữ liệu thực tế có pin qua path snapshot `cord-v2@7f0115a4…`. Đã giao backend sửa runinfo, và gate phải coi null là gap.
+- Ghi rõ (theo tester): validation CORD được dùng cho **mọi quyết định chọn mô hình**: checkpoint (LOWEST_VAL), decoding (1.0 vs 1.1) và preset thời lượng. Test chỉ dùng để báo số cuối, không quyết định gì. Lưu ý: val_loss khi train chỉ chạy trên 100 ảnh, nên chọn nhiều thứ trên cùng tập này có thể khiến số validation hơi lạc quan. Số công bố là số test.
