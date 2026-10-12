@@ -73,7 +73,8 @@ class RunManifest(BaseModel):
     peak_mem_gb: float | None = None  # host MemAvailable drop during the job (UMA: includes CUDA)
     host_min_available_gb: float | None = None
     trainable_pct: float | None = None  # "Trainable parameters percentage" from the engine log
-    memguard_fast_fall: bool | None = None  # watchdog killed the job because memory fell too fast
+    memguard_fast_fall: bool | None = None
+    memguard_abort_gb: float | None = None  # watchdog killed the job because memory fell too fast
     tags: list[str] = Field(default_factory=list)
 
 

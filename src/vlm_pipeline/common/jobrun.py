@@ -18,9 +18,10 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import ClassVar
 
 from vlm_pipeline.common import gpu_lock
-from vlm_pipeline.common.errors import ExitCode
+from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
@@ -137,6 +138,25 @@ def _run_logged(argv: Sequence[str], log_path: Path) -> int:
 # before step 1, ~1.5 min after start). CUDA on UMA is outside the container cgroup -> host MemAvailable only.
 WATCHDOG_INTERVAL_S = 0.5
 STOP_GRACE_S = 60
+
+
+class ThresholdTooLooseError(VlmPipelineError):
+    """A job asked for memory thresholds looser than ADR-005 (callers may only tighten them)."""
+
+    code: ClassVar[str] = "CFG-005"
+
+
+def tightened_thresholds(abort_gb: float | None = None) -> MemThresholds:
+    """ADR-005 thresholds, optionally with a HIGHER abort level (e.g. 10 GB for a first measurement run)."""
+    if abort_gb is None:
+        return DEFAULT_THRESHOLDS
+    if abort_gb < DEFAULT_THRESHOLDS.abort_gb:
+        raise ThresholdTooLooseError(
+            "abort threshold below ADR-005",
+            params={"param": "abort_gb", "rule": f">={DEFAULT_THRESHOLDS.abort_gb}", "value": abort_gb},
+        )
+    warn = max(DEFAULT_THRESHOLDS.warn_gb, abort_gb + 4.0)  # keep warn > abort for the fast-fall rule
+    return dataclasses.replace(DEFAULT_THRESHOLDS, abort_gb=abort_gb, warn_gb=warn)
 
 
 class MemoryPreemptedBeforeStartError(RuntimeError):
@@ -263,6 +283,7 @@ def run_job(
     lock_path: Path | None = None,
     gate: bool = False,
     cancel: threading.Event | None = None,
+    mem_thresholds: MemThresholds = DEFAULT_THRESHOLDS,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock."""
     from vlm_pipeline.common.preflight import preflight
@@ -319,6 +340,7 @@ def run_job(
             run_dir / "logs" / "stdout.log",
             on_abort=lambda: _docker_stop_async(container),
             hard_exit=lambda: _docker_kill(container),
+            thresholds=mem_thresholds,
         )
         done.set()
         state = _docker_state(container)
@@ -338,6 +360,7 @@ def run_job(
                 "host_min_available_gb": round(guard.min_available_gb, 1),
                 "trainable_pct": _trainable_pct(run_dir / "logs" / "stdout.log"),
                 "memguard_fast_fall": guard.fast_fall_killed or None,
+                "memguard_abort_gb": mem_thresholds.abort_gb,
             }
         )
         write_manifest(run_dir, manifest)

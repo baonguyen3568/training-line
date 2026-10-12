@@ -78,3 +78,18 @@ def test_worktree_overlays_code_read_only() -> None:
     assert "-v /repo:/workspace" in joined
     for d in ("src", "configs", "scripts", "docker"):
         assert f"/repo/.worktrees/r1/{d}:/workspace/{d}:ro" in joined
+
+
+def test_thresholds_can_only_be_tightened() -> None:
+    from vlm_pipeline.common.jobrun import ThresholdTooLooseError, tightened_thresholds
+    from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS
+
+    assert tightened_thresholds(None) == DEFAULT_THRESHOLDS
+    th = tightened_thresholds(10.0)
+    assert th.abort_gb == 10.0
+    assert th.warn_gb > th.abort_gb > th.emergency_gb
+    assert tightened_thresholds(8.0).abort_gb == 8.0
+    with pytest.raises(ThresholdTooLooseError) as ei:
+        tightened_thresholds(6.0)
+    assert ei.value.code == "CFG-005"
+    assert ei.value.params["param"] == "abort_gb"

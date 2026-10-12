@@ -18,14 +18,14 @@ import subprocess
 import time
 from pathlib import Path
 
-from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job
+from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job, tightened_thresholds
 from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.common.runinfo import RunManifest, automodel_to_metrics, write_manifest
 
 DEFAULT_IMAGE = "vlm-automodel:26.08-1"
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m vlm_pipeline.train.smoke")
     p.add_argument("--config", type=Path, required=True)
     p.add_argument("--tag", required=True, help="short run name, e.g. lora-parse-v1.1")
@@ -39,6 +39,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--image", default=DEFAULT_IMAGE)
     p.add_argument("--worktree", metavar="COMMIT", help="run code from a git worktree at COMMIT (ADR-002 A1)")
     p.add_argument("--gate", action="store_true", help="refuse to run unless reproducibility_gaps() == []")
+    p.add_argument("--abort-gb", type=float, help="memguard abort level; may only be HIGHER than ADR-005 (8 GB)")
+    p.add_argument("--max-steps", type=int, help="override step_scheduler.max_steps (measurement runs)")
+    p.add_argument("--expect-trainable-pct", metavar="LO:HI", help="fail fast if the trainable share is outside")
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = _parser()
     a = p.parse_args(argv)
 
     root = project_root()
@@ -59,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
             p.error("config uses PREPARED_MODEL_DIR: pass --prepared")
         prepared = json.loads((root / a.prepared / "prepared.json").read_text(encoding="utf-8"))
         text = text.replace("PREPARED_MODEL_DIR", prepared["container_dir"])
+    if a.max_steps is not None:
+        text = re.sub(r"^(\s*)max_steps:.*$", rf"\g<1>max_steps: {a.max_steps}", text, count=1, flags=re.M)
     (run_dir / "config.yaml").write_text(text, encoding="utf-8")
 
     manifest = RunManifest(
@@ -83,12 +93,14 @@ def main(argv: list[str] | None = None) -> int:
         argv=("automodel", f"{run_dir_c}/config.yaml", "--nproc-per-node", "1"),
         workdir="/opt/Automodel",
         code_root=code_root,
+        env={"VLM_EXPECTED_TRAINABLE_PCT": a.expect_trainable_pct} if a.expect_trainable_pct else {},
     )
+    thresholds = tightened_thresholds(a.abort_gb)
     from vlm_pipeline.common.jobrun import MemoryPreemptedBeforeStartError
 
     try:
         final = run_job(job, manifest, run_dir, project_root=root, who="bao-backend", est_peak_gb=a.est_peak_gb,
-                        ckpt_gb=a.ckpt_gb, gate=a.gate)  # fmt: skip
+                        ckpt_gb=a.ckpt_gb, gate=a.gate, mem_thresholds=thresholds)  # fmt: skip
     except MemoryPreemptedBeforeStartError as exc:
         print(json.dumps({"run_id": run_id, "status": "failed", "error_code": "MEM-001", "detail": str(exc)}))
         return 2
