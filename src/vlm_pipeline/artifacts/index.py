@@ -71,6 +71,12 @@ _BEGIN_EVICT_SQL = (
     " AND NOT EXISTS (SELECT 1 FROM artifact_leases l WHERE l.cache_key = :k)"
 )
 STALE_LEASE_S = 24 * 3600.0
+INDEX_REL = Path("outputs") / "graph" / "app.db"  # same file the executor opens (state_dir / "app.db")
+
+
+def default_index_path(root: Path) -> Path:
+    """The project's cache index; executor, app and CLIs must all open this one file."""
+    return root / INDEX_REL
 
 
 @dataclass(frozen=True)

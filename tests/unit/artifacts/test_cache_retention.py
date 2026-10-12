@@ -161,7 +161,7 @@ def test_trained_models_are_never_evicted_automatically(root: Path, idx: Artifac
     res = evict(root, idx, ["train-run"], by="app")
     assert res.skipped == [("train-run", "TRAINED_MODEL")]
     assert (run / "checkpoints").exists()
-    manual = evict(root, idx, ["train-run"], by="user", manual=True)  # explicit choice in the storage panel
+    manual = evict(root, idx, ["train-run"], by="user", confirmed={"train-run"})  # explicit choice in the storage panel
     assert [i.cache_key for i in manual.evicted] == ["train-run"]
     assert not (run / "checkpoints").exists()
 
@@ -199,6 +199,6 @@ def test_leased_entry_is_skipped_as_in_use(root: Path, idx: ArtifactIndex) -> No
     run = _cached_run(root, idx, "input-of-long-job")
     idx.lease(["input-of-long-job"], run_id="graph-7")
     assert plan_cache(root, idx, cap_gb=0).evict == ()
-    res = evict(root, idx, ["input-of-long-job"], by="user", manual=True)
+    res = evict(root, idx, ["input-of-long-job"], by="user", confirmed={"input-of-long-job"})
     assert res.skipped == [("input-of-long-job", "IN_USE_BY_RUNNING_WORKFLOW")]
     assert (run / "checkpoints").exists()

@@ -10,7 +10,7 @@ an entry frees its heavy bytes and keeps its history:
 Trained models are expensive to recompute (PM decision, DECISIONS 2026-10-12): an entry flagged ``trained_model`` in
 the index (set by the executor from node metadata) or whose run.json says ``stage == "train"`` is never chosen by the
 automatic plan, exported or not; an unreadable run.json is protected too (MANIFEST_UNREADABLE).
-It is listed in ``CachePlan.protected`` (TRAINED_MODEL) and only ``evict(..., manual=True)`` (the user's explicit
+It is listed in ``CachePlan.protected`` (TRAINED_MODEL) and only ``evict(..., confirmed={key})`` (the user's explicit
 choice in the storage panel, after a dry-run) removes it; old non-LATEST/best checkpoints of training runs are
 handled by checkpoint retention (D3), not here. When the cap cannot be met with what is evictable,
 ``CachePlan.shortfall_bytes`` > 0 and the caller reports a DISK error to the user instead of deleting more.
@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -138,15 +139,18 @@ def protection_reason(root: Path, entry: CacheEntry) -> str | None:
     return TRAINED_MODEL if stage == "train" else None
 
 
+def list_cache(root: Path, index: ArtifactIndex) -> list[tuple[CacheItem, str | None]]:
+    """Every evictable entry (LRU first) with its protection reason (None = may be evicted automatically)."""
+    return [(_item(root, e), protection_reason(root, e)) for e in index.evictable()]
+
+
 def plan_cache(
     root: Path, index: ArtifactIndex, *, cap_gb: float = DEFAULT_CAP_GB, need_free_gb: float = 0.0
 ) -> CachePlan:
     """Read-only: LRU entries to evict so the cache fits ``cap_gb`` and at least ``need_free_gb`` is freed."""
     items: list[CacheItem] = []
     protected: list[tuple[CacheItem, str]] = []
-    for entry in index.evictable():  # already LRU ordered
-        item = _item(root, entry)
-        reason = protection_reason(root, entry)
+    for item, reason in list_cache(root, index):
         if reason is None:
             items.append(item)
         else:
@@ -180,10 +184,22 @@ def _log(root: Path, run_dir: Path, record: dict[str, object]) -> None:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def evict(root: Path, index: ArtifactIndex, cache_keys: list[str], *, by: str, manual: bool = False) -> CacheResult:
+def evict(
+    root: Path,
+    index: ArtifactIndex,
+    cache_keys: list[str],
+    *,
+    by: str,
+    manual: bool = False,
+    confirmed: Collection[str] = (),
+    approved_by: str | None = None,
+) -> CacheResult:
     """Evict the given entries (re-checked at ``begin_evict``); updates run.json status and logs ``cache_evicted``.
 
-    Protected entries (see ``protection_reason``) are skipped unless ``manual`` (explicit user choice).
+    ``manual``: a person chose these entries (storage panel / CLI ``--items``), logged and counted against the
+    approval threshold on shared hosts. Protected entries (see ``protection_reason``) are skipped unless their key is
+    in ``confirmed`` (typed confirmation per item), so an entry that became protected after the user looked at the
+    list is still skipped.
     """
     check_project_root(root)
     runs_dir = (root / RUNS_REL).resolve()
@@ -191,7 +207,7 @@ def evict(root: Path, index: ArtifactIndex, cache_keys: list[str], *, by: str, m
     for key in cache_keys:
         entry = index.get(key)
         reason = protection_reason(root, entry) if entry is not None else None
-        if reason is not None and not manual:
+        if reason is not None and key not in confirmed:
             result.skipped.append((key, reason))
             continue
         if entry is None or not index.begin_evict(key):
@@ -234,8 +250,28 @@ def evict(root: Path, index: ArtifactIndex, cache_keys: list[str], *, by: str, m
                 "ts_epoch": now,
                 "by": by,
                 "manual": manual,
-                "approved_by": None,
+                "approved_by": approved_by,
             },
         )
         result.evicted.append(item)
     return result
+
+
+def unapproved_manual_bytes_since(log: Path, since: float) -> int:
+    """Bytes of user-chosen (manual) cache evictions without ``approved_by`` after ``since``.
+
+    Used for the approval threshold on shared hosts; automatic evictions are not counted. Unreadable lines count as 0.
+    """
+    if not log.exists():
+        return 0
+    total = 0
+    for line in log.read_text(encoding="utf-8").splitlines():
+        try:
+            rec = json.loads(line)
+            if rec.get("event") != "cache_evicted" or not rec.get("manual") or rec.get("approved_by"):
+                continue
+            if float(rec.get("ts_epoch", 0)) >= since:
+                total += int(rec.get("bytes", 0))
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return total
