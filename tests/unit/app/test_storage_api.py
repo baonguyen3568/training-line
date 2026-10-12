@@ -32,6 +32,7 @@ def _cached(root: Path, idx: ArtifactIndex, run_id: str, *, train: bool = False)
         node_type="vlm/train.lora" if train else "vlm/eval.benchmark",
         outputs={"out": OutputRef("model", str(run / "checkpoints"), "h")},
         trained_model=train,
+        run_dir=run,
     )
     return run
 

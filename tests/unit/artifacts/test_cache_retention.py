@@ -62,6 +62,7 @@ def _cached_run(
         node_type=node_type,
         outputs={"model": OutputRef("model", str(out), "h"), "named": OutputRef("model", str(run / "export"), "h2")},
         trained_model=train,
+        run_dir=run,
         **record,  # type: ignore[arg-type]
     )
     return run
@@ -120,7 +121,13 @@ def test_outputs_outside_run_dir_are_never_deleted(root: Path, idx: ArtifactInde
     shared.mkdir(parents=True)
     (shared / "w.bin").write_bytes(b"\0" * KB)
     make_fake_run(root / "outputs" / "runs", FakeRunSpec("dl", n_steps=1, checkpoint_every=0))
-    idx.record("dl", run_id="dl", node_type="model.hf_pick", outputs={"model": OutputRef("model", str(shared), "h")})
+    idx.record(
+        "dl",
+        run_id="dl",
+        node_type="model.hf_pick",
+        outputs={"model": OutputRef("model", str(shared), "h")},
+        run_dir=root / "outputs" / "runs" / "dl",
+    )
     evict(root, idx, ["dl"], by="app")
     assert (shared / "w.bin").exists()
 
@@ -133,7 +140,13 @@ def test_symlinked_output_is_not_followed(
     run = make_fake_run(root / "outputs" / "runs", FakeRunSpec("s", n_steps=1, checkpoint_every=0))
     (run / "artifacts").mkdir()
     (run / "artifacts" / "link").symlink_to(outside)
-    idx.record("s", run_id="s", node_type="t", outputs={"m": OutputRef("model", str(run / "artifacts" / "link"), "h")})
+    idx.record(
+        "s",
+        run_id="s",
+        node_type="t",
+        outputs={"m": OutputRef("model", str(run / "artifacts" / "link"), "h")},
+        run_dir=run,
+    )
     evict(root, idx, ["s"], by="app")
     assert (outside / "keep.bin").exists()
 
@@ -153,7 +166,13 @@ def test_trained_models_are_never_evicted_automatically(root: Path, idx: Artifac
     prep_out = root / "outputs" / "runs" / "prep" / "artifacts" / "shards"
     prep_out.mkdir(parents=True)
     (prep_out / "s0.tar").write_bytes(b"\0" * 4 * KB)
-    idx.record("prep", run_id="prep", node_type="data.prepare", outputs={"d": OutputRef("dataset", str(prep_out), "h")})
+    idx.record(
+        "prep",
+        run_id="prep",
+        node_type="data.prepare",
+        outputs={"d": OutputRef("dataset", str(prep_out), "h")},
+        run_dir=root / "outputs" / "runs" / "prep",
+    )
     p = plan_cache(root, idx, cap_gb=0)
     assert [i.cache_key for i in p.evict] == ["prep"]
     assert [(i.cache_key, why) for i, why in p.protected] == [("train-run", "TRAINED_MODEL")]
@@ -189,6 +208,7 @@ def test_namespaced_train_node_with_broken_manifest_is_protected(root: Path, idx
         node_type="vlm/train.lora",
         outputs={"m": OutputRef("model", str(run / "checkpoints"), "h")},
         trained_model=True,
+        run_dir=run,
     )
     p = plan_cache(root, idx, cap_gb=0)
     assert [(i.cache_key, why) for i, why in p.protected] == [("ns", "TRAINED_MODEL")]

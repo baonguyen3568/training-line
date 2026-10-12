@@ -99,7 +99,7 @@ class CacheEntry:
     pinned: bool
     requires_parent_at_load: bool
     trained_model: bool  # set by the executor from the node registry; never evicted automatically
-    run_dir: str | None  # absolute host path of the node's run directory (None: legacy entry)
+    run_dir: str | None  # absolute host path of the node's run directory (None only for legacy rows)
 
 
 def _outputs_to_json(outputs: Mapping[str, OutputRef]) -> str:
@@ -156,7 +156,7 @@ class ArtifactIndex:
         parents: Sequence[str] = (),
         requires_parent_at_load: bool = False,
         trained_model: bool = False,
-        run_dir: Path | None = None,
+        run_dir: Path,
     ) -> None:
         """Register a completed node output (replaces an invalid/evicted entry with the same key).
 
@@ -165,7 +165,7 @@ class ArtifactIndex:
         (``outputs/runs/<id>`` or ``outputs/graph/runs/<id>``); eviction only ever deletes inside it.
         """
         payload = _outputs_to_json(outputs)
-        if run_dir is not None and not run_dir.is_absolute():
+        if not run_dir.is_absolute():
             raise ValueError(f"run_dir must be absolute: {run_dir}")
         with self._tx() as db:
             db.execute(
@@ -184,7 +184,7 @@ class ArtifactIndex:
                     payload,
                     int(requires_parent_at_load),
                     int(trained_model),
-                    None if run_dir is None else str(run_dir),
+                    str(run_dir),
                     self._clock(),
                 ),
             )
