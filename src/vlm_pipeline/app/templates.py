@@ -49,7 +49,7 @@ def _estimate(workflow: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_templates(root: Path) -> list[dict[str, Any]]:
-    """All templates (full, with workflow), sorted by ``order`` then id. Invalid files raise (caught by tests, not at runtime)."""
+    """All templates (full, with workflow), sorted by ``order`` then id. Invalid files raise (tests catch them)."""
     out = []
     for path in (root / TEMPLATE_DIR).glob("*.json"):
         tpl = TemplateFile.model_validate(json.loads(path.read_text(encoding="utf-8")))

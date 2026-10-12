@@ -1,6 +1,7 @@
 [
   {
     "id": "image_video_understanding",
+    "order": 2,
     "difficulty": "basic",
     "tags": [
       "finetune"
@@ -148,6 +149,7 @@
   },
   {
     "id": "invoice_to_json",
+    "order": 1,
     "difficulty": "basic",
     "tags": [
       "finetune"
@@ -268,6 +270,7 @@
   },
   {
     "id": "quantize_bench",
+    "order": 3,
     "difficulty": "basic",
     "tags": [
       "quantize",
