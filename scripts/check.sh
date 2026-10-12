@@ -6,20 +6,48 @@
 # Stops at the first failing gate. pip-audit is informational only (ADR-003).
 set -euo pipefail
 
+# A stray GIT_DIR / GIT_WORK_TREE would point every git command below at another repository.
+unset $(compgen -e GIT_ || true)
+
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 if [[ "${1:-}" == "--clean" ]]; then
-  # Run the host Python gates on a pristine checkout of HEAD: catches code that depends on uncommitted files.
-  WORKTREE="$(mktemp -d "$ROOT/.cache/check-clean.XXXXXX")"
-  trap 'git worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true' EXIT
+  # Gates on a pristine checkout of HEAD: catches code that depends on uncommitted files (ADR-004 A4).
+  # Frontend checks run only when HEAD touches frontend/ or schemas/ (or CLEAN_FRONTEND=1), so Python-only
+  # commits stay ~30 s.
+  # Remove clean worktrees left by runs that died (name carries the owner PID; never touch a live run's tree).
+  for stale in "$ROOT"/.cache/check-clean.*; do
+    [[ -d "$stale" ]] || continue
+    owner="${stale##*/check-clean.}"; owner="${owner%%.*}"
+    if [[ "$owner" =~ ^[0-9]+$ ]] && kill -0 "$owner" 2>/dev/null; then continue; fi
+    if [[ ! "$owner" =~ ^[0-9]+$ ]] && [[ -n "$(find "$stale" -maxdepth 0 -mmin -60)" ]]; then continue; fi
+    git worktree remove --force "$stale" >/dev/null 2>&1 || rm -rf --one-file-system "$stale"
+  done
+  git worktree prune >/dev/null 2>&1 || true
+
+  WORKTREE="$(mktemp -d "$ROOT/.cache/check-clean.$$.XXXXXX")"
+  cleanup() {
+    git worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+    git worktree prune >/dev/null 2>&1 || true
+    rm -rf --one-file-system "$WORKTREE" 2>/dev/null || true  # only the mktemp dir created above
+  }
+  # EXIT alone does not run when bash is killed by a signal (timeout, Ctrl-C): clean up there too.
+  trap cleanup EXIT
+  trap 'cleanup; exit 130' INT
+  trap 'cleanup; exit 143' TERM HUP
   git worktree add --detach --quiet "$WORKTREE" HEAD
   step "clean checkout of $(git rev-parse --short HEAD): unit tests + import layers"
   (cd "$WORKTREE" && VLM_PROJECT_ROOT="$WORKTREE" uv run --quiet lint-imports --no-cache \
     && VLM_PROJECT_ROOT="$WORKTREE" uv run --quiet pytest -q \
        -m "not gpu and not slow and not eval and not integration")
+  if [[ "${CLEAN_FRONTEND:-0}" == "1" ]] \
+     || ! git diff --quiet HEAD~1 HEAD -- frontend schemas 2>/dev/null; then
+    step "clean checkout: frontend (npm ci + npm run check)"
+    (cd "$WORKTREE/frontend" && npm ci --ignore-scripts --silent && npm run check)
+  fi
   printf '\n\033[32mClean-checkout gates passed.\033[0m\n'
   exit 0
 fi
