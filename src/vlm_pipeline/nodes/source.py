@@ -2,26 +2,42 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, create_model
 
+from vlm_pipeline.common.catalog import Catalog, load_catalog
 from vlm_pipeline.common.params import Params, ui
 from vlm_pipeline.data.config import HubDatasetParams, LocalFolderParams
 from vlm_pipeline.nodes.spec import NodeSpec, PortSpec
 
-# Models vetted for v1 (ADR-001 catalog, licenses checked by security). TODO(M1, bao-research): read from the
-# model catalog once configs/catalog/models.yaml exists, so RAM/licence labels and per-model defaults come with it.
-BaseModelRepo = Literal[
-    "nvidia/NVIDIA-Nemotron-Parse-v1.1",
-    "nvidia/Cosmos-Reason2-2B",
-    "Qwen/Qwen3.5-0.8B",
-    "Qwen/Qwen3.5-2B",
-]
+
+def _model_pick_params(catalog: Catalog) -> type[Params]:
+    """Params of ``model.hf_pick``: one choice among the vetted catalog models (configs/catalog/models.yaml).
+
+    Option labels are data, not i18n: ``display_name`` + tier/RAM/licence/gated badges travel in ``x-ui.option_meta``;
+    the descriptive tagline is the i18n key ``model_catalog.<id>.tagline``.
+    """
+    entries = catalog.selectable()
+    option_meta = {
+        m.id: {
+            "label": m.display_name,
+            "tier": m.tier,
+            "ram_gb": m.ram_gb_train,
+            "ram_source": m.ram_source,
+            "gated": m.gated,
+            "license": m.license,
+            "vendor": m.vendor,
+        }
+        for m in entries
+    }
+    model_id: Any = Literal.__getitem__(tuple(m.id for m in entries))
+    field = Field(catalog.default.id, json_schema_extra=ui(order=0, summary=True, option_meta=option_meta))
+    params: type[Params] = create_model("ModelPickParams", __base__=Params, model=(model_id, field))
+    return params
 
 
-class ModelPickParams(Params):
-    repo: BaseModelRepo = Field("nvidia/NVIDIA-Nemotron-Parse-v1.1", json_schema_extra=ui(order=0, summary=True))
+ModelPickParams = _model_pick_params(load_catalog())
 
 
 MODEL_HF_PICK = NodeSpec(

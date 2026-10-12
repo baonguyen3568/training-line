@@ -40,7 +40,7 @@ def test_api_item_matches_frontend_contract(spec: NodeSpec) -> None:
         assert "type" in prop, f"{spec.type_id}.{name}: Optional/union params are not renderable"
         hints = prop.get("x-ui")
         assert hints is not None, f"{spec.type_id}.{name} has no x-ui hints"
-        assert set(hints) <= {"widget", "order", "preset", "advanced", "option_keys", "summary"}
+        assert set(hints) <= {"widget", "order", "preset", "advanced", "option_keys", "summary", "option_meta"}
 
 
 def test_registry_api_lists_port_types() -> None:
@@ -112,3 +112,17 @@ def test_local_path_params_are_marked_for_sec_001() -> None:
     spec = REGISTRY.get("data.local_folder")
     assert spec is not None
     assert spec.params_schema()["properties"]["path"]["format"] == "local-path"
+
+
+def test_model_pick_offers_the_catalog_with_the_default_first_choice() -> None:
+    from vlm_pipeline.common.catalog import load_catalog
+
+    spec = REGISTRY.get("model.hf_pick")
+    assert spec is not None
+    prop = spec.params_schema()["properties"]["model"]
+    catalog = load_catalog()
+    assert prop["default"] == catalog.default.id
+    assert set(prop["enum"]) == {m.id for m in catalog.selectable()}
+    assert set(prop["x-ui"]["option_meta"]) == set(prop["enum"])
+    with pytest.raises(ValidationError):
+        spec.validate_params({"model": "not-in-catalog"})

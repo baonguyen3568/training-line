@@ -47,6 +47,15 @@ def _required_keys(spec: NodeSpec) -> list[tuple[str, ...]]:
 
 
 @pytest.mark.parametrize("locale", LOCALES)
+def test_every_catalog_model_has_a_tagline(locale: str) -> None:
+    from vlm_pipeline.common.catalog import load_catalog
+
+    tree = _load(locale)
+    missing = [m.id for m in load_catalog().models if not _has(tree, "model_catalog", m.id, "tagline")]
+    assert not missing, f"{locale}: model_catalog.<id>.tagline missing for {missing}"
+
+
+@pytest.mark.parametrize("locale", LOCALES)
 @pytest.mark.parametrize("spec", REGISTRY.all(), ids=[s.type_id for s in REGISTRY.all()])
 def test_every_registered_text_key_exists(spec: NodeSpec, locale: str) -> None:
     tree = _load(locale)
