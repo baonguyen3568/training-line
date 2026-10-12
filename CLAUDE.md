@@ -35,7 +35,9 @@ data (thu thập → curate → format) → train (SFT / LoRA / RL) → validate
 - Máy **dùng chung** với service khác (docker: kafka, elastic, banking-rag, comfy-ui…). RAM đang dùng sẵn ~70GB+.
 - Mọi image/wheel phải hỗ trợ **arm64**. Ưu tiên container NGC (`nvcr.io/nvidia/...`) bản arm64.
 - **GPU lock**: chỉ 1 job nặng (train/quantize/benchmark) tại 1 thời điểm. Trước khi chạy: kiểm tra/tạo
-  `.team/GPU_LOCK` (ghi: ai, job gì, bắt đầu lúc nào, PID). Xong thì xoá. Không tự ý giết job của người khác.
+  `.team/GPU_LOCK` **chỉ** qua `uv run python -m vlm_pipeline.common.gpu_lock {status|acquire|release}`
+  (JSON gồm who/job/run_id/host_pid/started_at/token; xem skill `backend-gpu-job`). **Không ghi tay**, vì lock ghi tay
+  bị coi là hỏng. Chạy preflight trước khi acquire (ADR-005). Không tự ý giết job của người khác.
 
 ## Đội ngũ (xem `.team/ROSTER.md`)
 PM = `bao-trainning-1` (điều phối, giải quyết mâu thuẫn, chốt quyết định cùng user).
