@@ -32,3 +32,8 @@ No button to stop someone else's job; GPU busy → queue; >20GB download → app
 
 ## Review output
 Same format as `design-dashboard-review` §4. Test with a non-coder when possible (5 tasks: open template, swap data, fix a wrong wire, read results, free disk).
+
+## Editing i18n (src/vlm_pipeline/i18n/{vi,en}.yaml)
+- Keep vi/en keys + placeholders identical; sizes `*_gb`, counts `*_count`; titles without placeholders.
+- Node copy keys come from the registry (`REGISTRY.to_api()`): title/desc, port.<name>, param.<name>.label|help, options via `x-ui.option_keys`. Gate: `tests/unit/nodes/test_i18n_coverage.py`.
+- After every commit touching i18n: `bash scripts/check.sh --clean` (ADR-004 A4) — red means the commit is missing a file.
