@@ -11,10 +11,11 @@ import sys
 import threading
 import time
 from collections.abc import Awaitable, Callable, Mapping
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Body, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
@@ -164,6 +165,21 @@ def _register_storage(app: FastAPI, services: Services) -> None:
     storage.register_storage_routes(app, api)
 
 
+def _register_spa(app: FastAPI, static_dir: Path) -> None:
+    """Serve the built frontend on the same origin (D13: no CORS); unknown paths fall back to index.html."""
+    root = static_dir.resolve()
+    index = root / "index.html"
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str) -> FileResponse:
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404)
+        candidate = (root / path).resolve()
+        if path and candidate.is_file() and candidate.is_relative_to(root):
+            return FileResponse(candidate)
+        return FileResponse(index, headers={"Cache-Control": "no-store"})
+
+
 def create_app(
     services: Services | None = None,
     *,
@@ -173,6 +189,7 @@ def create_app(
     secret: bytes | None = None,
     ws_auth_timeout_s: float = 5.0,
     secure: bool = True,
+    static_dir: Path | None = None,
 ) -> FastAPI:
     """Build the app (D13 security on by default). ``secure=False`` only for unit tests of the API itself."""
     if not secure and "pytest" not in sys.modules:
@@ -210,4 +227,8 @@ def create_app(
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
     _register_ws(app, bus, ws_auth)
+    if static_dir is None and getattr(services, "root", None) is not None:
+        static_dir = services.root / "frontend" / "dist"  # type: ignore[attr-defined]
+    if static_dir is not None and (static_dir / "index.html").is_file():
+        _register_spa(app, static_dir)  # last: API routes win
     return app

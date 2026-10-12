@@ -180,3 +180,18 @@ def test_internal_value_error_is_500_without_detail(svc: FakeServices) -> None:
     r = TestClient(create_app(svc, secure=False), raise_server_exceptions=False).get("/api/system")
     assert r.status_code == 500
     assert "secret" not in r.text
+
+
+def test_spa_served_same_origin_with_fallback(svc: FakeServices, tmp_path: Path) -> None:
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html>app</html>")
+    (dist / "assets" / "a.js").write_text("console.log(1)")
+    (tmp_path / "secret.txt").write_text("nope")
+    c = TestClient(create_app(svc, secure=False, static_dir=dist))
+    assert c.get("/").text == "<html>app</html>"
+    assert c.get("/assets/a.js").text == "console.log(1)"
+    assert c.get("/canvas/123").text == "<html>app</html>"  # client-side route
+    assert "nope" not in c.get("/../secret.txt").text
+    assert c.get("/api/unknown").status_code == 404
+    assert c.get("/api/system").status_code == 200
