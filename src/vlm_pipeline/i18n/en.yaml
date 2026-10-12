@@ -569,9 +569,10 @@ gated:
     shares_info: When you agree, Hugging Face shares your username and email with {publisher}.
   step3:
     title: Create a read-only token
-    body: Open Access Tokens → click "New token" / "Create new token" → choose type "Read" → name it, e.g. "vlm-studio" → create and copy the token (starts with hf_).
+    body: Open Access Tokens → click "New token" / "Create new token" → choose type "Read" → name it "vlm-app-read" → if there's an expiration option, pick a date → create and copy the token (starts with hf_).
     open: Open Access Tokens page
     never_write: 'Don''t choose "Write": the app only needs to read to download models.'
+    risk: A Read token can read all your repos, including private ones — don't share it.
   step4:
     title: Paste the token into the app
     body: Paste the token below and click Check. The app stores it privately on this machine, never in workflows or logs.
@@ -583,10 +584,12 @@ gated:
     invalid_token: The token is invalid or was deleted. Create a new one in step 3 and paste it again.
     not_accepted: The token works, but account {username} hasn't accepted the model's terms yet. Go back to step 2.
     pending_approval: Your request is waiting for {publisher} to approve. You'll get an email; then click Check again.
-    write_scope_warning: This token can write. The app can still use it, but it's safer to create a "Read" token and paste that instead.
     network_error: Couldn't reach Hugging Face. Check the network and try again.
+    write_token_rejected: This token can write, so the app won't accept it. Create a "Read" token in step 3 and paste that instead.
+    write_token_advanced_warning: 'This token can write: if leaked, others could change or delete your repos. Use it only if you understand the risk.'
+    fine_grained_missing_gated: This fine-grained token can't read gated repos yet. Enable read access to gated repos for it, then check again.
   token_saved: 'Token saved: hf_…{last4}'
-  remove_token: Remove token
+  remove_token: Remove token from app
   recheck: Check again
   later: Later
   continue_template: Continue to template

@@ -384,9 +384,12 @@ security: nội dung D16 (mọi câu cam kết trong dialog phải khớp D16). 
 - Mỗi bước có **1 nút mở đúng trang** (huggingface.co/join, trang model đã pin, settings/tokens), mở ở tab mới. App không nhúng trang HF và không tự điền form.
 - Bước 2 nói rõ HF sẽ chia sẻ username + email với nhà phát hành (theo tài liệu gated của HF). Cosmos-Reason2 là gated tự động duyệt → có quyền ngay. Trạng thái `pending_approval` vẫn có copy cho model duyệt tay.
 - Bước 4: ô token **chỉ ghi** (P003 D12). Bấm Kiểm tra → server gọi `whoami` + thử đọc 1 file của repo đã pin → trả 1 trong các trạng thái:
-  `ok` · `invalid_token` · `not_accepted` (quay về bước 2) · `pending_approval` · `write_scope_warning` (vẫn dùng được, khuyên đổi) · `network_error`.
+  `ok` · `invalid_token` · `not_accepted` (quay về bước 2) · `pending_approval` · `network_error` ·
+  `write_token_rejected` (Simple: token write bị **từ chối**, hướng dẫn tạo lại Read) · `write_token_advanced_warning` (Advanced: cho dùng + cảnh báo đỏ) ·
+  `fine_grained_missing_gated`. Server đọc `auth.accessToken.role` (read|write|fineGrained) từ whoami.
+- Bước 3: tên gợi ý `vlm-app-read`, chọn thời hạn hết hạn nếu HF hỗ trợ, dòng rủi ro "Token Read đọc được mọi repo của bạn, kể cả riêng tư — đừng chia sẻ".
   Lưu xong chỉ hiện `hf_…abcd`, có [Xoá token] [Kiểm tra lại]. Token không vào workflow/log/manifest.
-- **Loại token: "Read"** cho người no-code (1 lựa chọn, vẫn chỉ đọc). Fine-grained hẹp hơn nhưng cần tick đúng quyền "đọc repo gated" trong danh sách dài, nên dễ sai. Fine-grained đưa vào **Advanced**. *Chờ bao-security xác nhận, vì P003 D12 khuyến nghị fine-grained.*
+- **Loại token: "Read"** cho người no-code (1 lựa chọn, vẫn chỉ đọc). Fine-grained hẹp hơn nhưng cần tick đúng quyền "đọc repo gated" trong danh sách dài, nên dễ sai. Fine-grained đưa vào **Advanced**. *bao-security đã đồng ý 2026-10-12 (D12 sửa theo).*
 - Nhãn nút của HF ("New token", "Agree and access repository") có thể đổi theo thời gian → copy ghi "thường là …". Cần kiểm tra lại mỗi lần phát hành.
 
 ## Nguồn
