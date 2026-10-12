@@ -322,3 +322,18 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - Gate export `--require-no-drift` giữ nguyên, tách bạch với phần này.
 - Gap ghi metadata (tester bắt): run.json P-3 có `dataset_revision: null`. Dữ liệu thực tế có pin qua path snapshot `cord-v2@7f0115a4…`. Đã giao backend sửa runinfo, và gate phải coi null là gap.
 - Ghi rõ (theo tester): validation CORD được dùng cho **mọi quyết định chọn mô hình**: checkpoint (LOWEST_VAL), decoding (1.0 vs 1.1) và preset thời lượng. Test chỉ dùng để báo số cuối, không quyết định gì. Lưu ý: val_loss khi train chỉ chạy trên 100 ảnh, nên chọn nhiều thứ trên cùng tập này có thể khiến số validation hơi lạc quan. Số công bố là số test.
+
+### 10.8 ⚠ P-3 số tạm kém và nghi vấn KV cache (research, 2026-10-12 ~22:30)
+- Số tạm P-3 ckpt 299 (test 38/100, penalty 1.0): F1 12.5, truncated 76%. Model lặp cặp field hoặc item đến 1024 token; có ảnh ra EOS ngay token đầu.
+- Hai giả thuyết đang được tách:
+  - (A) **Thiếu train.** Recipe upstream NVIDIA (`examples/vlm_finetune/nemotron/nemotron_parse_v1_1.yaml` trong 26.08-5): GBS 16 × 1000 step, lr 1e-5 ≈ 20 epoch. P-3 = 3 epoch, khoảng 15% ngân sách đó. Loss train cuối ~0.24–0.45. Lỗi của research: đặt preset 1/3 epoch mà không đối chiếu ngân sách upstream.
+  - (B) **Đường generate có cache bị bật nhầm** (tester). Từ 1c62cab, worker nạp generation_config của base. File này không có `use_cache`, nên mặc định True và đè lên `use_cache=False` của patch 0003. Allowlist drift lại chứa `use_cache`, nên gate không bắt được. Triệu chứng khớp BUG-001: class native bỏ qua cache nên sinh lặp.
+  - **Chưa ai kiểm "remote + cache khớp golden".** Golden mới chỉ kiểm với native không cache (07:00). Câu "HF remote (có KV cache)" ở §10.5 là đề xuất, không phải kết quả.
+- Phép quyết định:
+  - A/B use_cache trên ckpt 299, 20 ảnh test;
+  - teacher-forced loss qua đường eval (5 ảnh val).
+- **§10.7 (penalty 1.0 vs 1.1) TẠM HOÃN**: so sánh 6 ảnh O-1b bị confound vì đổi cùng lúc penalty và use_cache. `decode_overrides` trong template giữ nguyên cho tới khi có A/B.
+- Ma trận chấm 99/199 và validation đã huỷ. P-3b (lr 3e-5 cosine, warmup 3%, 6 epoch, greedy F1 trên 20 ảnh val ở mỗi ckpt) chỉ chạy sau A/B.
+- Đề xuất sửa gốc:
+  - native class tự ép không dùng cache trong `prepare_inputs_for_generation`, không dựa vào generation_config;
+  - worker pin `use_cache` rõ ràng; bỏ `use_cache` khỏi allowlist drift.
