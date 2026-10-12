@@ -1,0 +1,36 @@
+{
+ "encoder_has_flag": false,
+ "model_flag": false,
+ "processor_do_normalize": true,
+ "processor_pixel": [
+  1.9303,
+  2.0749,
+  2.1459
+ ],
+ "patch_embed_input": [
+  5.406199932098389,
+  6.1875,
+  6.3125
+ ],
+ "expected_single": [
+  1.9303,
+  2.0749,
+  2.1459
+ ],
+ "expected_double": [
+  5.3936,
+  6.1884,
+  6.3011
+ ],
+ "d_single": 4.171875,
+ "d_double": 0.0,
+ "verdict": "double",
+ "note": null,
+ "probe": "scripts/qa/probe_double_normalize.py",
+ "image": "vlm-automodel:26.08-1 (ffe6834ed990)",
+ "model": "nvidia/NVIDIA-Nemotron-Parse-v1.1@fd1e3c6ba0b61a6dcab5a905f0ff92c5b19f14a4",
+ "run_by": "bao-tester",
+ "date": "2026-10-12",
+ "device": "cpu, offline, random weights",
+ "conclusion": "v1.1 is normalised twice on 26.08-1: patch_embed input == bf16(((1-m)/s - m)/s) exactly; config flag image_processor_normalizes dropped (encoder_has_flag=false)."
+}
