@@ -4,3 +4,7 @@ coverage/
 src/generated/tokens.css
 *.tsbuildinfo
 src/generated/i18n.*.json
+test-results/
+playwright-report/
+test-results/
+playwright-report/
