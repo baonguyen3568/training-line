@@ -754,3 +754,11 @@ button.link {
 .mode-toggle button {
   white-space: nowrap;
 }
+.demo-banner {
+  margin: 0;
+  padding: 2px var(--space-16);
+  font-size: var(--font-size-caption);
+  background: var(--color-canvas-lane-band);
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-grid);
+}

@@ -33,6 +33,12 @@ export function App() {
   return (
     <div className="app">
       <Header onNavigate={navigate} active={view.kind === "home" ? "home" : "runs"} />
+      {import.meta.env.VITE_MOCK_API === "1" && (
+        // Mock API: make it impossible to mistake the FakeWorker for real training (PM request).
+        <p className="demo-banner" role="note">
+          🧪 {t("app.demo_mode")}
+        </p>
+      )}
       {catalogError && (
         <p role="alert" className="banner">
           {t("app.catalog_load_failed")}{" "}

@@ -302,6 +302,7 @@ estimate:
   range_disk_gb: Ổ đĩa ~{lo}–{hi} GB
 app:
   name: VLM Studio
+  demo_mode: Chế độ demo (dữ liệu giả lập) — chưa có gì được train thật.
   mode_simple: Đơn giản
   mode_advanced: Nâng cao
   theme_light: Sáng

@@ -302,6 +302,7 @@ estimate:
   range_disk_gb: Disk ~{lo}–{hi} GB
 app:
   name: VLM Studio
+  demo_mode: Demo mode (simulated data) — nothing is actually being trained.
   mode_simple: Simple
   mode_advanced: Advanced
   theme_light: Light
