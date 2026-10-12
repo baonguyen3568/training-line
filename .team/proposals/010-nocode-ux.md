@@ -362,6 +362,33 @@ Không có badge "📁 thư mục ngoài": D16 không có quyền này, node c�
 security: nội dung D16 (mọi câu cam kết trong dialog phải khớp D16). Backend: API cài 2 bước (dry-run trả manifest/quét/deps/size/license → apply cần ack),
 `origin.kind`, `reviewed`, `policy_block`, diff quyền khi update. Frontend: 009 annex F6d.
 
+## 16. Template mặc định & luồng model gated (user chốt 2026-10-12)
+- **Template 1 (mặc định, đứng đầu gallery): "Đọc hoá đơn → JSON"**, dùng Nemotron-Parse v1.1 + CORD-v2. Không cần tài khoản nên chạy ngay được. Key: `template.invoice_to_json.*`.
+- **Template 2: "Hiểu ảnh và video"**, dùng Cosmos-Reason2-2B. Model **gated** nên thẻ template có chip "Cần tài khoản Hugging Face" + dòng "Built on NVIDIA Cosmos".
+  Bấm "Dùng mẫu này" mà chưa có quyền → mở **hướng dẫn 4 bước** (dưới đây) trước khi vào canvas; nút "Để sau" vẫn cho mở canvas, nhưng preflight chặn (NET-001 reason=gated).
+- Nghĩa vụ license (`license.obligation.*`) hiện ở dialog chọn model và ở bước 2 của hướng dẫn: `attribution_notice` (notice từ licenses.yaml) + `no_guardrail_bypass` (warning).
+
+### 16.1 Hướng dẫn 4 bước (dialog, có thanh "Bước n/4", quay lại được)
+```
+┌ Mở quyền tải model "Cosmos-Reason2-2B" ─────────────────────── Bước 3/4 ┐
+│ ✓ 1  Tạo hoặc đăng nhập tài khoản Hugging Face                          │
+│ ✓ 2  Đồng ý điều khoản của model                                        │
+│ ● 3  Tạo token chỉ đọc                                                  │
+│      Mở trang Access Tokens → "New token" → loại "Read" → đặt tên       │
+│      "vlm-studio" → tạo, sao chép (bắt đầu bằng hf_).                    │
+│      ⚠ Đừng chọn "Write": app chỉ cần đọc.     [Mở trang Access Tokens ↗]│
+│ ○ 4  Dán token vào app                                                  │
+│                                         [Quay lại]  [Để sau]  [Tiếp ▸]   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+- Mỗi bước có **1 nút mở đúng trang** (huggingface.co/join, trang model đã pin, settings/tokens), mở ở tab mới. App không nhúng trang HF và không tự điền form.
+- Bước 2 nói rõ HF sẽ chia sẻ username + email với nhà phát hành (theo tài liệu gated của HF). Cosmos-Reason2 là gated tự động duyệt → có quyền ngay. Trạng thái `pending_approval` vẫn có copy cho model duyệt tay.
+- Bước 4: ô token **chỉ ghi** (P003 D12). Bấm Kiểm tra → server gọi `whoami` + thử đọc 1 file của repo đã pin → trả 1 trong các trạng thái:
+  `ok` · `invalid_token` · `not_accepted` (quay về bước 2) · `pending_approval` · `write_scope_warning` (vẫn dùng được, khuyên đổi) · `network_error`.
+  Lưu xong chỉ hiện `hf_…abcd`, có [Xoá token] [Kiểm tra lại]. Token không vào workflow/log/manifest.
+- **Loại token: "Read"** cho người no-code (1 lựa chọn, vẫn chỉ đọc). Fine-grained hẹp hơn nhưng cần tick đúng quyền "đọc repo gated" trong danh sách dài, nên dễ sai. Fine-grained đưa vào **Advanced**. *Chờ bao-security xác nhận, vì P003 D12 khuyến nghị fine-grained.*
+- Nhãn nút của HF ("New token", "Agree and access repository") có thể đổi theo thời gian → copy ghi "thường là …". Cần kiểm tra lại mỗi lần phát hành.
+
 ## Nguồn
 - ComfyUI links (màu theo kiểu, chỉ nối cùng màu, reroute): https://docs.comfy.org/development/core-concepts/links
 - ComfyUI subgraphs (gom node, expose widget cho template): https://blog.comfy.org/p/subgraphs-are-coming-to-comfyui

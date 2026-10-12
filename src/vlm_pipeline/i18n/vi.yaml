@@ -528,6 +528,15 @@ template:
   quantize_bench:
     title: Nén model & đo lại điểm
     desc: Nén model cho nhỏ và nhanh hơn, rồi đo điểm cùng điều kiện với bản gốc để thấy chất lượng giảm bao nhiêu.
+  invoice_to_json:
+    title: Đọc hoá đơn → JSON
+    desc: Dạy model đọc ảnh hoá đơn và trả về các trường (cửa hàng, món, tổng tiền…) dạng JSON. Chạy được ngay với dữ liệu mẫu CORD-v2, không cần tài khoản.
+    built_on: Dùng NVIDIA Nemotron-Parse v1.1 · dữ liệu CORD-v2
+  image_video_understanding:
+    title: Hiểu ảnh và video
+    desc: Dạy model trả lời câu hỏi về ảnh và video theo dữ liệu của bạn. Cần tài khoản Hugging Face miễn phí để tải model (làm một lần, khoảng 5 phút).
+    built_on: Built on NVIDIA Cosmos
+    needs_account: Cần tài khoản Hugging Face
 inspector:
   empty_hint: Chọn một bước trên canvas để xem và chỉnh thiết lập.
 license:
@@ -545,3 +554,39 @@ license:
     cc_by_attribution: Một phần của model ({component}) dùng giấy phép CC BY 4.0 — cần ghi nguồn khi chia sẻ.
   policy_link: Xem chính sách
   notice_from_license: (câu ghi công lấy nguyên văn từ giấy phép)
+gated:
+  title: Mở quyền tải model "{model}"
+  intro: Model này do {publisher} phát hành và yêu cầu bạn đồng ý điều khoản trước khi tải. Làm một lần, khoảng 5 phút. App không bao giờ thấy mật khẩu của bạn.
+  step_count: Bước {step}/{total_count}
+  step1:
+    title: Tạo hoặc đăng nhập tài khoản Hugging Face
+    body: Mở trang Hugging Face, đăng ký miễn phí bằng email (hoặc đăng nhập nếu đã có), rồi xác nhận email.
+    open: Mở trang đăng ký
+  step2:
+    title: Đồng ý điều khoản của model
+    body: Mở trang model, đọc điều khoản, rồi bấm nút đồng ý (thường là "Agree and access repository"). Với model này, quyền được cấp ngay sau khi đồng ý.
+    open: Mở trang model
+    shares_info: Khi đồng ý, Hugging Face sẽ chia sẻ tên tài khoản và email của bạn với {publisher}.
+  step3:
+    title: Tạo token chỉ đọc
+    body: Mở trang Access Tokens → bấm "New token" / "Create new token" → chọn loại "Read" → đặt tên, ví dụ "vlm-studio" → tạo rồi sao chép token (bắt đầu bằng hf_).
+    open: Mở trang Access Tokens
+    never_write: 'Đừng chọn loại "Write": app chỉ cần đọc để tải model.'
+  step4:
+    title: Dán token vào app
+    body: Dán token vào ô dưới đây rồi bấm Kiểm tra. App lưu token riêng trên máy này, không ghi vào workflow hay nhật ký.
+    field: Token Hugging Face
+    check: Kiểm tra
+  status:
+    checking: Đang kiểm tra…
+    ok: Xong! Tài khoản {username} đã có quyền tải "{model}".
+    invalid_token: Token không hợp lệ hoặc đã bị xoá. Tạo token mới ở bước 3 rồi dán lại.
+    not_accepted: Token đúng, nhưng tài khoản {username} chưa đồng ý điều khoản của model. Quay lại bước 2.
+    pending_approval: Yêu cầu của bạn đang chờ {publisher} duyệt. Bạn sẽ nhận email khi được duyệt, rồi bấm Kiểm tra lại.
+    write_scope_warning: Token này có quyền ghi. App vẫn dùng được, nhưng an toàn hơn nếu bạn tạo token loại "Read" và dán lại.
+    network_error: Không kết nối được tới Hugging Face. Kiểm tra mạng rồi thử lại.
+  token_saved: 'Token đã lưu: hf_…{last4}'
+  remove_token: Xoá token
+  recheck: Kiểm tra lại
+  later: Để sau
+  continue_template: Tiếp tục mở mẫu

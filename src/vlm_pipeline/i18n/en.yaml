@@ -219,8 +219,7 @@ custom_node:
     gpu: 'Use the GPU: may run heavy computation on your machine, up to {max_runtime}'
     network: 'Connect to {hosts}: your data could be sent there'
     over_limits: 'Runs longer or uses more memory than usual: up to {max_runtime}, {max_memory_gb} GB'
-    isolation: 'The node runs in an isolated area: it is not granted access to your other files, tokens or passwords. Isolation reduces risk but doesn''t remove it — only install nodes from sources you
-      trust.'
+    isolation: 'The node runs in an isolated area: it is not granted access to your other files, tokens or passwords. Isolation reduces risk but doesn''t remove it — only install nodes from sources you trust.'
   badge_perm:
     gpu: GPU
     network: Internet
@@ -267,8 +266,7 @@ custom_node:
   shared_wf:
     in_trusted_source: This node is in the app's trusted sources. Review it before installing.
     not_in_trusted_source_title: Not in trusted sources — this workflow was shared by someone else
-    not_in_trusted_source_body: The app won't install from details inside the workflow file. If you trust "{name}", find the author's original repo yourself and paste a commit link here. It will be treated
-      as unverified.
+    not_in_trusted_source_body: The app won't install from details inside the workflow file. If you trust "{name}", find the author's original repo yourself and paste a commit link here. It will be treated as unverified.
     paste_url_label: Repo commit link
     paste_url_hint: e.g. github.com/<author>/<repo>/commit/<40 characters>
     check_url: Check link
@@ -530,6 +528,15 @@ template:
   quantize_bench:
     title: Compress a model & re-check scores
     desc: Make the model smaller and faster, then score it under the same conditions as the original to see how much quality changes.
+  invoice_to_json:
+    title: Read receipts → JSON
+    desc: Teach a model to read receipt photos and return fields (store, items, total…) as JSON. Runs right away on the CORD-v2 sample data, no account needed.
+    built_on: Uses NVIDIA Nemotron-Parse v1.1 · CORD-v2 data
+  image_video_understanding:
+    title: Understand images & video
+    desc: Teach a model to answer questions about images and videos from your data. Needs a free Hugging Face account to download the model (one-time, about 5 minutes).
+    built_on: Built on NVIDIA Cosmos
+    needs_account: Needs a Hugging Face account
 inspector:
   empty_hint: Select a step on the canvas to see and edit its settings.
 license:
@@ -547,3 +554,39 @@ license:
     cc_by_attribution: Part of the model ({component}) is under CC BY 4.0 — you must credit the source when sharing.
   policy_link: View policy
   notice_from_license: (credit line quoted from the license)
+gated:
+  title: Get access to "{model}"
+  intro: '{publisher} requires you to accept its terms before downloading this model. You do this once, about 5 minutes. The app never sees your password.'
+  step_count: Step {step}/{total_count}
+  step1:
+    title: Create or sign in to a Hugging Face account
+    body: Open Hugging Face, sign up for free with your email (or sign in), then confirm your email.
+    open: Open sign-up page
+  step2:
+    title: Accept the model's terms
+    body: Open the model page, read the terms, then click the agree button (usually "Agree and access repository"). For this model, access is granted right after you agree.
+    open: Open model page
+    shares_info: When you agree, Hugging Face shares your username and email with {publisher}.
+  step3:
+    title: Create a read-only token
+    body: Open Access Tokens → click "New token" / "Create new token" → choose type "Read" → name it, e.g. "vlm-studio" → create and copy the token (starts with hf_).
+    open: Open Access Tokens page
+    never_write: 'Don''t choose "Write": the app only needs to read to download models.'
+  step4:
+    title: Paste the token into the app
+    body: Paste the token below and click Check. The app stores it privately on this machine, never in workflows or logs.
+    field: Hugging Face token
+    check: Check
+  status:
+    checking: Checking…
+    ok: Done! Account {username} can now download "{model}".
+    invalid_token: The token is invalid or was deleted. Create a new one in step 3 and paste it again.
+    not_accepted: The token works, but account {username} hasn't accepted the model's terms yet. Go back to step 2.
+    pending_approval: Your request is waiting for {publisher} to approve. You'll get an email; then click Check again.
+    write_scope_warning: This token can write. The app can still use it, but it's safer to create a "Read" token and paste that instead.
+    network_error: Couldn't reach Hugging Face. Check the network and try again.
+  token_saved: 'Token saved: hf_…{last4}'
+  remove_token: Remove token
+  recheck: Check again
+  later: Later
+  continue_template: Continue to template
