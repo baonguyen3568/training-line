@@ -3,6 +3,8 @@
 # generate -> token2json -> scorer end to end before spending ~1h40 on P-3 (001a §10.3).
 # Identical to nemotron_parse_v1_1_cordv2_smoke.yaml except: train limited to the first 20 samples, GBS 4,
 # 60 steps (~12 epochs over the 20 images), lr 5e-5 (memorisation is the goal), no validation, final ckpt only.
+# Sample ids: rows 0-19 of the pinned train split (record index + sha256(ground_truth)); control = 20 test images
+# (expected clearly lower F1). Decoder prefix = collate's task_prompt (default, NOT overridden) - see 001a §10.2.
 # Needs vlm-automodel:26.08-3. RUN_DIR / PREPARED_MODEL_DIR are substituted by the launcher.
 
 recipe: FinetuneRecipeForVLM

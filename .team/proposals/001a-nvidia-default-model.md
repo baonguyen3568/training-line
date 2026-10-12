@@ -242,10 +242,15 @@ Nếu P-2/P-3 cho thấy 1 epoch đã đạt ≥90% F1 của 3 epoch thì giữ 
 
 ### 10.2 (d) mask label PASS (bao-fixcode, 04:45)
 - 4 mẫu thật, 26.08-3: số token có label = số token đích + 1; `decode(labels) == json2token + "</s>"`. Không có token task (`<predict_bbox>`, `<predict_classes>`, `<output_markdown>`), không có câu hỏi user. Cảnh báo turn markers là vô hại với Parse. Có test khoá hành vi: `test_nemotron_parse_freeze.py::test_label_mask…`.
-- ⚠️ **Hệ quả cho P-2 (train/serve parity về prompt)**: model fine-tune học sinh chuỗi CORD **ngay sau prefix decoder mà collate dùng, không có token task**. Khi eval/chạy thử qua đường HF remote, prefix khởi đầu của decoder phải **giống hệt lúc train**. Không được dùng prompt task mặc định của Parse (`</s><s><predict_bbox><predict_classes><output_markdown>`), vì model sẽ rơi vào chế độ parse markdown của bản gốc và F1 thấp giả tạo. Cần backend/tester lấy đúng `decoder_input_ids` khởi đầu từ `nemotron_parse_collate_fn` và assert nó trước khi chấm.
+- ~~Hệ quả cho P-2: collate không đưa token task…~~ **ĐÍNH CHÍNH (bao-tester đọc code 26.08-3, `collate_fns.py::nemotron_parse_collate_fn` ~L1038–1120)**: collate **CÓ** đưa token task vào input. `task_prompt` mặc định = `</s><s><predict_bbox><predict_classes><output_markdown>`, text = task_prompt + đích. Task token chỉ bị **mask khỏi labels**, nên kiểm mask của fixcode (chỉ nhìn labels) không thấy chúng trong input. Research đã kết luận sai vì suy từ labels thay vì đọc code collate.
+  - Hệ quả: model fine-tune học "sau prefix task mặc định → sinh CORD". Prefix khi eval/chạy thử **phải gồm đúng các token task đó**. Bỏ chúng đi cũng làm F1 thấp giả, chỉ là theo chiều ngược lại.
+  - Prompt mặc định của NVIDIA trùng với prefix lúc train, nên base zero-shot và fine-tune dùng **cùng prefix**: so sánh công bằng.
+  - Cách làm không phụ thuộc giả định (tester): chạy chính collate trên 1 mẫu, cắt prefix tại token có label đầu tiên, assert khớp từng id, ghi `decoder_prefix_ids` vào record.
+  - Về sau: dùng `<output_markdown>` để sinh JSON CORD là "mượn" nghĩa token cũ. Khi template hỗ trợ nhiều task, cân nhắc `task_prompt` riêng cho từng task.
 
 ### 10.3 O-1 overfit sanity trước P-3 (đề xuất 05:00)
 - Train Parse-v1.1 trên **20 ảnh train cố định**, 60 step (GBS 4, lr 5e-5), rồi chấm F1 trên CHÍNH 20 ảnh đó. Config: `configs/train/smoke/nemotron_parse_v1_1_overfit20.yaml`. Ước ~10–15 phút GPU.
 - PASS: field-F1 ≥ 90, parse_fail ≈ 0. Chứng minh chuỗi label → prefix → generate → token2json → scorer đúng đầu-cuối. FAIL thì lỗi ở đường ống, sửa trước khi chạy P-3 (1h40).
 - Record gắn `purpose: pipeline_check`; không phải số chất lượng, không đưa vào báo cáo hay catalog.
+- Bổ sung của tester: (1) 20 ảnh **cố định theo id**: `train[:20]` của snapshot đã pin (row index 0–19); record ghi index + sha256 của `ground_truth`, và eval chấm đúng các id đó. (2) Đối chứng: chấm thêm **20 ảnh test**. Kỳ vọng thấp hơn rõ. Nếu test cũng ≥90 thì nghi rò dữ liệu hoặc scorer quá dễ dãi.
 - Checkpoint P-1b (5 step) chỉ dùng để tester kiểm đường eval chạy được.
