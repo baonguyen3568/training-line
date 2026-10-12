@@ -54,6 +54,8 @@ benchmarks/         # kết quả benchmark tổng hợp (commit git, giữ vĩn
 
 \* Docs AutoModel hiện tại (docs.nvidia.com/nemo/automodel/development/checkpointing) ghi `final | false | every`, trong đó `true` = legacy alias của `every` (export mỗi lần save → tốn gấp đôi). Recipe upstream (qwen3_5_4b.yaml) dùng `true` → **bao-backend xác minh trong container 26.08**; nếu bản 26.08 chỉ có bool thì dùng `true` nhưng tính dung lượng như `every`.
 
+**Checkpoint dở dang (xác nhận bởi bao-backend từ S-3, AutoModel 26.08)**: khi bắt đầu save, AutoModel tạo `<ckpt_dir>/.incomplete`; publish = cập nhật `LATEST` atomic (symlink tmp + `os.replace`) rồi xoá `.incomplete`; resume tự bỏ qua thư mục còn `.incomplete`. ⇒ Retention: `epoch_*_step_*` còn `.incomplete` = **không hợp lệ**, không bao giờ tính là LATEST/BEST; xoá được khi run không còn `running` (memguard có handshake `saving()` để hạn chế trường hợp này). Layout thực tế: `checkpoints/{epoch_E_step_S/, LATEST, training.jsonl, validation.jsonl}` — **`training.jsonl`, `validation.jsonl` thuộc whitelist** (dashboard cần).
+
 **Thứ tự ưu tiên khi một checkpoint trùng nhiều vai trò**: `KEEP` > `LATEST` > `LOWEST_VAL`/best > khác. Ví dụ LATEST == LOWEST_VAL → áp luật LATEST (giữ optim 7 ngày). Script resolve symlink trước rồi gán vai trò cao nhất.
 LoRA: adapter có cả trong `checkpoints/epoch_*/model/` và `export/` → tính dung lượng theo inode (không đếm trùng), không coi bản trong checkpoint là "thừa" chỉ vì đã có ở export.
 

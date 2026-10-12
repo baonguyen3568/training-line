@@ -20,5 +20,5 @@ __pycache__/
 *.distcp
 *.nsys-rep
 *.ncu-rep
-core.*
+core.[0-9]*
 *.log

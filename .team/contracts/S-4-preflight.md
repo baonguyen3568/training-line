@@ -6,16 +6,19 @@ Messages crossed several times; **this file wins over any chat message**. Change
 | File | Owner | Reviewer |
 |------|-------|----------|
 | `src/vlm_pipeline/common/errors.py` (`ExitCode`, `VlmPipelineError`, `InsufficientMemoryError`) | bao-fixcode | bao-cleanup |
-| `src/vlm_pipeline/common/memguard.py` (incl. `preflight`) | bao-fixcode | bao-cleanup |
+| `src/vlm_pipeline/common/memguard.py` (watchdog + meminfo only, stdlib) | bao-fixcode | bao-cleanup |
+| `src/vlm_pipeline/common/preflight.py` (`preflight`, `combine`, `Verdict`, `Finding`, `check_memory`) — ENTRY POINT | bao-fixcode | bao-cleanup |
+| `src/vlm_pipeline/common/error_catalog.py` + `error_catalog.yaml` (pydantic, host-only) | bao-fixcode | bao-cleancode |
+| `src/vlm_pipeline/common/paths.py` (`project_root()`, `GIB`) | bao-fixcode | bao-cleancode |
 | `src/vlm_pipeline/common/diskguard.py` | bao-cleanup | bao-fixcode |
 | `scripts/cleanup/preflight.py`, `scripts/cleanup/disk_report.py` | bao-cleanup | bao-fixcode |
 | `src/vlm_pipeline/common/gpu_lock.py` (S-2) | bao-backend | — |
 
-Import direction: `memguard → diskguard` (and later `→ gpu_lock`). `diskguard` imports nothing from `memguard`. Stdlib only.
+Import direction (2026-10-12, after bao-cleancode review): `preflight → {memguard, diskguard, gpu_lock, paths}`; `memguard → {errors, paths}` only (worker imports MemGuard without disk/lock code). `errors`, `memguard`, `preflight`, `diskguard`, `paths` are stdlib only; `error_catalog` (pydantic+yaml) is host-side only.
 
 ## Entry point (the only one callers use)
 ```python
-memguard.preflight(est_peak_gb: float, *, ckpt_gb: float = 0.0,
+preflight.preflight(est_peak_gb: float, *, ckpt_gb: float = 0.0,
                    snapshot: MemSnapshot | None = None,
                    disk: DiskSnapshot | None = None,
                    lock_holder: Callable[[], LockStatus | None] | None = None,
@@ -42,10 +45,10 @@ def check_disk(required_gb: float, snapshot: DiskSnapshot) -> list[str]   # reas
 class LockStatus: who: str; job: str; run_id: str | None; host_pid: int | None; started_at: str | None; alive: bool; corrupt: bool = False
 
 def check_lock(lock_path: Path, *, pid_alive: Callable[[int], bool] = _pid_alive) -> LockStatus | None
-    # read-only; accepts JSON lock or legacy text "who | job | started_at | PID"; None = no lock; dead PID → alive=False (still LOCK_BUSY, "stale lock — tell PM", NEVER delete);
-    # unreadable/corrupt → corrupt=True, alive=True (treated busy). Temporary until gpu_lock.read_lock/is_alive (S-2).
+    # read-only adapter over gpu_lock.read_lock/is_alive (S-2 landed); None = no lock; GpuLockError (malformed, legacy text, missing fields) → corrupt=True; dead PID → alive=False (still LOCK_BUSY, "stale lock — tell PM", NEVER delete);
+    # unreadable/corrupt → corrupt=True, alive=True (treated busy).
 ```
 
 ## Wrappers (bao-cleanup) — implemented 2026-10-12
 - `scripts/cleanup/preflight.py --est-peak-gb N --ckpt-gb M` → prints `Verdict.to_json()`, exits with `ExitCode` (default est 40 GB, ADR-005 D8).
-- `scripts/cleanup/disk_report.py [--no-write]` → `outputs/system/disk_report.json` (schema v1, `common/storage_report.py`); docker images deduped by shared base layers.
+- `scripts/cleanup/disk_report.py [--no-write]` → thin CLI over `artifacts.storage.measure()` → `outputs/system/disk_report.json` (schema v1, levels in `common/storage_report.py`); docker images = label `project=vlm-training` ∪ local `vlm-*` (no namespace) ∪ IMAGES.lock refs, shared base layers counted once.

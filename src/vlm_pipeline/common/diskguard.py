@@ -1,4 +1,4 @@
-"""Disk-space and GPU-lock checks for ``memguard.preflight`` (ADR-005 D8; .team/contracts/S-4-preflight.md).
+"""Disk-space and GPU-lock checks for ``common.preflight`` (ADR-005 D8; .team/contracts/S-4-preflight.md).
 
 Stdlib only and read-only: nothing here writes or deletes files. All I/O is injectable for tests.
 """
@@ -10,10 +10,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from vlm_pipeline.common.gpu_lock import GpuLockError, _pid_alive, is_alive, read_lock
+from vlm_pipeline.common.gpu_lock import GpuLockError, is_alive, read_lock
 from vlm_pipeline.common.paths import GIB
-
-GB = GIB  # kept for callers; prefer common.paths.GIB
 
 
 @dataclass(frozen=True)
@@ -28,8 +26,8 @@ def read_disk(path: Path, *, statvfs: Callable[[str], os.statvfs_result] = os.st
     st = statvfs(str(path))
     return DiskSnapshot(
         path=str(path),
-        total_gb=st.f_blocks * st.f_frsize / GB,
-        free_gb=st.f_bavail * st.f_frsize / GB,
+        total_gb=st.f_blocks * st.f_frsize / GIB,
+        free_gb=st.f_bavail * st.f_frsize / GIB,
     )
 
 
@@ -58,7 +56,7 @@ class LockStatus:
     corrupt: bool = False
 
 
-def check_lock(lock_path: Path, *, pid_alive: Callable[[int], bool] = _pid_alive) -> LockStatus | None:
+def check_lock(lock_path: Path, *, pid_alive: Callable[[int], bool] | None = None) -> LockStatus | None:
     """Read-only view of the GPU lock for preflight, via ``gpu_lock.read_lock``/``is_alive`` (single parser).
 
     ``None`` means no lock. A dead holder gives ``alive=False``: callers still treat it as busy and must report it
@@ -77,5 +75,5 @@ def check_lock(lock_path: Path, *, pid_alive: Callable[[int], bool] = _pid_alive
         run_id=info.run_id,
         host_pid=info.host_pid,
         started_at=info.started_at,
-        alive=is_alive(info, pid_alive=pid_alive),
+        alive=is_alive(info) if pid_alive is None else is_alive(info, pid_alive=pid_alive),
     )

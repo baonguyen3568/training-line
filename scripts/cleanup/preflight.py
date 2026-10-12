@@ -1,4 +1,4 @@
-"""Pre-run check before taking the GPU lock (ADR-005 D8). Thin wrapper over ``memguard.preflight``.
+"""Pre-run check before taking the GPU lock (ADR-005 D8). Thin wrapper over ``common.preflight.preflight``.
 
 Prints the verdict as JSON on stdout and exits with ``ExitCode`` (0 ok, 2 memory/swap, 3 disk, 4 lock busy).
 Read-only: never drops caches, never touches a lock.
@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from vlm_pipeline.common.memguard import preflight
+from vlm_pipeline.common.preflight import preflight
 
 # ADR-005 D8: a job that does not declare its peak is assumed to need 40 GB.
 DEFAULT_EST_PEAK_GB = 40.0

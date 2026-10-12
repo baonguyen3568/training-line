@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from vlm_pipeline.common.diskguard import (
-    GB,
+    GIB,
     DiskSnapshot,
     check_disk,
     check_lock,
@@ -28,7 +28,7 @@ def _fake_statvfs(blocks: int, bavail: int, frsize: int = 4096):  # type: ignore
 
 def test_read_disk_uses_bavail_not_bfree() -> None:
     frsize = 4096
-    snap = read_disk(Path("/x"), statvfs=_fake_statvfs(blocks=1000 * GB // frsize, bavail=100 * GB // frsize))
+    snap = read_disk(Path("/x"), statvfs=_fake_statvfs(blocks=1000 * GIB // frsize, bavail=100 * GIB // frsize))
     assert snap.total_gb == pytest.approx(1000)
     assert snap.free_gb == pytest.approx(100)
     assert snap.path == "/x"
@@ -53,19 +53,38 @@ def test_check_disk_ok_and_fail() -> None:
     assert "107.0" in reasons[0]
 
 
+def _lock_json(**over: object) -> str:
+    data: dict[str, object] = {
+        "who": "bao-backend",
+        "job": "smoke",
+        "run_id": "r1",
+        "host_pid": 4242,
+        "started_at": "t0",
+        "token": "secret",
+    }
+    data.update(over)
+    return json.dumps(data)
+
+
 def test_check_lock_absent(tmp_path: Path) -> None:
     assert check_lock(tmp_path / "GPU_LOCK") is None
 
 
 def test_check_lock_alive_and_stale_never_deletes(tmp_path: Path) -> None:
     lock = tmp_path / "GPU_LOCK"
-    lock.write_text(json.dumps({"who": "bao-backend", "job": "smoke", "host_pid": 4242, "started_at": "t0"}))
+    lock.write_text(_lock_json())
 
     alive = check_lock(lock, pid_alive=lambda pid: pid == 4242)
     assert alive is not None
     assert alive.alive
     assert not alive.corrupt
-    assert (alive.who, alive.job, alive.host_pid, alive.started_at) == ("bao-backend", "smoke", 4242, "t0")
+    assert (alive.who, alive.job, alive.run_id, alive.host_pid, alive.started_at) == (
+        "bao-backend",
+        "smoke",
+        "r1",
+        4242,
+        "t0",
+    )
 
     stale = check_lock(lock, pid_alive=lambda _pid: False)
     assert stale is not None
@@ -73,30 +92,20 @@ def test_check_lock_alive_and_stale_never_deletes(tmp_path: Path) -> None:
     assert lock.exists()  # read-only: stale lock is reported, never removed
 
 
-@pytest.mark.parametrize("content", ["not json", "[1, 2]", json.dumps({"who": "x", "host_pid": "abc"})])
-def test_check_lock_corrupt_is_treated_busy(tmp_path: Path, content: str) -> None:
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not json",
+        "[1, 2]",
+        _lock_json(host_pid="abc"),
+        json.dumps({"who": "x", "job": "manual"}),  # missing fields: not written by gpu_lock.acquire
+        "bao-backend | smoke LoRA | 2026-10-12T17:00 | 4242\n",  # legacy text lock
+    ],
+)
+def test_check_lock_malformed_is_treated_busy(tmp_path: Path, content: str) -> None:
     lock = tmp_path / "GPU_LOCK"
     lock.write_text(content)
     status = check_lock(lock, pid_alive=lambda _pid: False)
     assert status is not None
     assert status.corrupt
     assert status.alive
-
-
-def test_check_lock_without_pid_is_treated_alive(tmp_path: Path) -> None:
-    lock = tmp_path / "GPU_LOCK"
-    lock.write_text(json.dumps({"who": "someone", "job": "manual"}))
-    status = check_lock(lock, pid_alive=lambda _pid: False)
-    assert status is not None
-    assert status.alive
-    assert status.host_pid is None
-
-
-def test_check_lock_legacy_text_format(tmp_path: Path) -> None:
-    lock = tmp_path / "GPU_LOCK"
-    lock.write_text("bao-backend | smoke LoRA | 2026-10-12T17:00 | 4242\n")
-    status = check_lock(lock, pid_alive=lambda pid: pid == 4242)
-    assert status is not None
-    assert not status.corrupt
-    assert status.alive
-    assert (status.who, status.job, status.host_pid) == ("bao-backend", "smoke LoRA", 4242)

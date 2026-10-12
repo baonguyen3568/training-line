@@ -15,9 +15,9 @@ import tempfile
 from pathlib import Path
 
 from vlm_pipeline.artifacts.storage import measure
+from vlm_pipeline.common.paths import project_root
 
-ROOT = Path(__file__).resolve().parents[2]  # TODO: common.paths.project_root() once it lands
-REPORT = ROOT / "outputs" / "system" / "disk_report.json"
+REPORT_REL = Path("outputs") / "system" / "disk_report.json"
 
 
 def write_atomic(path: Path, payload: dict[str, object]) -> None:
@@ -32,9 +32,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-write", action="store_true", help="print only, do not write the report file")
     args = parser.parse_args(argv)
 
-    report = measure(ROOT)
+    root = project_root()
+    report = measure(root)
     if not args.no_write:
-        write_atomic(REPORT, report)
+        write_atomic(root / REPORT_REL, report)
     for section in ("disk", "mem", "project"):
         values = report[section]
         if isinstance(values, dict):
