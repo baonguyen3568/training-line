@@ -70,7 +70,8 @@ class RunManifest(BaseModel):
     error_code: str | None = None  # catalog code when status is failed
     started_at: float = Field(default_factory=time.time)  # unix seconds UTC
     ended_at: float | None = None
-    peak_mem_gb: float | None = None
+    peak_mem_gb: float | None = None  # host MemAvailable drop during the job (UMA: includes CUDA)
+    host_min_available_gb: float | None = None
     tags: list[str] = Field(default_factory=list)
 
 

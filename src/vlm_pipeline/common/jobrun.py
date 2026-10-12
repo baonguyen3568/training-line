@@ -19,7 +19,7 @@ from pathlib import Path
 
 from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode
-from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds
+from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
 CONTAINER_ROOT = "/workspace"
@@ -280,6 +280,7 @@ def run_job(
             }
         )
         write_manifest(run_dir, manifest)
+        baseline_gb = read_meminfo().mem_available_gb
         _, guard = run_guarded(
             docker_args(job, project_root, lock_token=handle.info.token),
             run_dir / "logs" / "stdout.log",
@@ -296,17 +297,20 @@ def run_job(
                 "exit_code": info.exit_code,
                 "oom_killed": info.oom_killed,
                 "ended_at": time.time(),
+                # Host-level estimate (includes CUDA on UMA, which the container cgroup misses) + shared-host noise.
+                "peak_mem_gb": round(max(0.0, baseline_gb - guard.min_available_gb), 1),
+                "host_min_available_gb": round(guard.min_available_gb, 1),
             }
         )
         write_manifest(run_dir, manifest)
         return manifest
-    except BaseException:
+    except BaseException as exc:
         if not manifest.status.is_terminal:  # runner itself failed: never leave "running" behind
+            # Not launched because memory was already below abort -> MEM-001 (insufficient), not an unknown error.
+            code = "MEM-001" if isinstance(exc, MemoryPreemptedBeforeStartError) else "SYS-000"
             write_manifest(
                 run_dir,
-                manifest.model_copy(
-                    update={"status": RunStatus.FAILED, "error_code": "SYS-000", "ended_at": time.time()}
-                ),
+                manifest.model_copy(update={"status": RunStatus.FAILED, "error_code": code, "ended_at": time.time()}),
             )
         raise
     finally:

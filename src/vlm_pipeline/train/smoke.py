@@ -84,8 +84,17 @@ def main(argv: list[str] | None = None) -> int:
         workdir="/opt/Automodel",
         code_root=code_root,
     )
-    final = run_job(job, manifest, run_dir, project_root=root, who="bao-backend", est_peak_gb=a.est_peak_gb,
-                    ckpt_gb=a.ckpt_gb, gate=a.gate)  # fmt: skip
+    from vlm_pipeline.common.jobrun import MemoryPreemptedBeforeStartError
+
+    try:
+        final = run_job(job, manifest, run_dir, project_root=root, who="bao-backend", est_peak_gb=a.est_peak_gb,
+                        ckpt_gb=a.ckpt_gb, gate=a.gate)  # fmt: skip
+    except MemoryPreemptedBeforeStartError as exc:
+        print(json.dumps({"run_id": run_id, "status": "failed", "error_code": "MEM-001", "detail": str(exc)}))
+        return 2
+    except RuntimeError as exc:  # preflight refusal / gate refusal
+        print(json.dumps({"run_id": run_id, "status": "refused", "detail": str(exc)}))
+        return 2
     for src, split in (("training.jsonl", "train"), ("validation.jsonl", "val")):
         path = run_dir / "checkpoints" / src
         if path.exists():
