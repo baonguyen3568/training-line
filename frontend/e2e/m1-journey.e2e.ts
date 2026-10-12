@@ -112,3 +112,13 @@ test("M1 journey: build, run, save, reopen", async ({ page }, testInfo) => {
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
   for (const t of NODES) await expect(node(page, t)).toBeVisible();
 });
+
+test("work survives a page reload (autosave)", async ({ page }) => {
+  // Expected to fail until autosave lands (bao-design M1 review r1). Like a strict xfail: when it starts
+  // passing, Playwright reports it so the marker gets removed and this becomes a regression guard.
+  test.fail(true, "no autosave yet: a reload loses the workflow");
+  await buildGraph(page);
+  await page.reload();
+  await expect(page.locator(".react-flow__node")).toHaveCount(3, { timeout: 5_000 });
+  await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+});
