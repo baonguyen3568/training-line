@@ -1,9 +1,10 @@
 .env
 *.env
-data/
-outputs/
-checkpoints/
-wandb/
+# Anchored at repo root: src/vlm_pipeline/data/ is code and must be tracked.
+/data/
+/outputs/
+/checkpoints/
+/wandb/
 __pycache__/
 .venv/
 *.safetensors
