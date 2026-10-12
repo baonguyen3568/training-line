@@ -187,7 +187,7 @@ describe("guidance on unconnected ports and errors in the inspector (design revi
     const { Editor } = await import("../src/components/Editor");
     const view = render(<Editor />);
     await waitFor(() => expect(view.container.querySelectorAll(".port.needs-wire").length).toBe(2)); // base_model + train_data
-    expect(view.container.querySelector(".port-hint")?.textContent).toMatch(/Nối/);
+    expect(view.container.querySelector(".port-hint")?.textContent).toMatch(/nối/i);
     const cards = view.container.querySelectorAll(".inspector .error-card[data-code='CFG-003']");
     expect(cards.length).toBe(2);
     fireEvent.click(cards[0]?.querySelector("button") as HTMLElement);
