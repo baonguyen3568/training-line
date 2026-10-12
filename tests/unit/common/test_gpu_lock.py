@@ -113,8 +113,10 @@ def test_verify_token_and_holds_lock(tmp_path: Path) -> None:
     gpu_lock.verify_token(lock, h.info.token)
     assert gpu_lock.holds_lock(h.info.token, lock)
     assert not gpu_lock.holds_lock("deadbeef", lock)
-    with pytest.raises(GpuLockError):
+    with pytest.raises(gpu_lock.GpuLockNotHeldError) as ei:
         gpu_lock.verify_token(lock, "deadbeef")
+    assert ei.value.code == "SYS-004"
+    assert ei.value.params == {}
 
 
 def test_default_lock_path_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

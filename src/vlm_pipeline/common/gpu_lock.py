@@ -35,6 +35,12 @@ class GpuLockError(VlmPipelineError):
     code: ClassVar[str] = "SYS-001"
 
 
+class GpuLockNotHeldError(GpuLockError):
+    """The caller's token does not own the lock (no lock, or another job's lock): a runner/worker protocol error."""
+
+    code: ClassVar[str] = "SYS-004"
+
+
 @dataclass(frozen=True)
 class LockInfo:
     who: str
@@ -173,9 +179,9 @@ def verify_token(path: Path, token: str) -> None:
     """Raise ``GpuLockError`` unless ``path`` holds a lock whose token equals ``token``."""
     current = read_lock(path)
     if current is None:
-        raise GpuLockError("GPU lock not held", params={"who": "-", "job": "-", "since": "-", "state": "not_held"})
+        raise GpuLockNotHeldError("GPU lock not held")
     if not secrets.compare_digest(current.token, token):
-        raise GpuLockError("GPU lock held by another job", params=_busy_params(current))
+        raise GpuLockNotHeldError(f"GPU lock held by another job (who={current.who}, run_id={current.run_id})")
 
 
 def holds_lock(token: str, path: Path | None = None) -> bool:
