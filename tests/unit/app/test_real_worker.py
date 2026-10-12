@@ -191,3 +191,22 @@ def test_user_jobs_require_approved_image(tmp_path: Path) -> None:
     assert not images.is_approved(lock, "vlm-automodel:u")
     assert not images.is_approved(lock, "vlm-automodel:d")
     assert not images.is_approved(lock, "vlm-automodel:p")
+
+
+def test_full_finetune_output_is_completed_from_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import vlm_pipeline.train.ckpt_complete as ckpt_complete
+
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    calls: list[tuple[Path, Path]] = []
+    monkeypatch.setattr(ckpt_complete, "complete_from_base", lambda base, out: calls.append((base, out)) or [])
+
+    def fake_run_job(job: Any, manifest: RunManifest, run_dir: Path, **kw: Any) -> RunManifest:
+        (run_dir / "checkpoints" / "LATEST" / "model" / "consolidated").mkdir(parents=True)
+        return manifest.model_copy(update={"status": RunStatus.COMPLETED, "exit_code": 0})
+
+    monkeypatch.setattr(workers, "run_job", fake_run_job)
+    run_dir = root / "outputs" / "graph" / "runs" / "t-x"
+    out = w.run(_job("train.sft_vlm", {"epochs": 1}, run_dir, _train_inputs(w))).outputs["model"]
+    assert out.path.endswith("checkpoints/LATEST/model/consolidated")
+    assert calls == [(w.root / "m", Path(out.path))]

@@ -222,6 +222,10 @@ class RealWorker:
         out = run_dir / "checkpoints" / "LATEST" / "model"
         if (out / "consolidated").is_dir():  # full fine-tune: HF safetensors loadable by downstream nodes
             out = out / "consolidated"
+            from vlm_pipeline.train.ckpt_complete import complete_from_base
+
+            # BUG-002: consolidation drops buffers (RADIO input conditioner) -> restore them from the base model.
+            complete_from_base(self._host_path(base.path), out)
         ref = ArtifactRef(type=out_type.type, path=str(out), hash=f"{run_id}:{config_hash}")
         return NodeResult(outputs={port: ref})
 
