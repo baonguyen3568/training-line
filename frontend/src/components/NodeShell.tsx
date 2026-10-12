@@ -20,11 +20,6 @@ export interface ShellData extends Record<string, unknown> {
 }
 export type ShellNode = Node<ShellData, "vlm">;
 
-function portTypeLabel(ports: PortType[], type: string): string {
-  const pt = ports.find((p) => p.id === type);
-  return pt ? tp(pt.label_key.split(".")) : type;
-}
-
 /** Node-specific port copy (node.<type>.port.<name>) first, then the generic port-type label. */
 function portLabel(ports: PortType[], typeId: string, name: string, type: string): string {
   const specific = tpOptional(["node", typeId, "port", name]);
@@ -175,9 +170,7 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
               <span>{portLabel(ports, typeId, name, ps.type)}</span>
               {missing.has(name) && (
                 // Users stumble exactly here (design M1 r1): name what to connect, from CFG-003.
-                <span className="port-hint">
-                  ← {t("canvas.hint.connect_port", { port_type: portTypeLabel(ports, ps.type) })}
-                </span>
+                <span className="port-hint">← {t("canvas.hint.connect_port")}</span>
               )}
             </li>
           ))}
