@@ -91,6 +91,7 @@ def test_train_builds_recipe_and_runs_job(tmp_path: Path, monkeypatch: pytest.Mo
         return manifest.model_copy(update={"status": RunStatus.COMPLETED, "exit_code": 0})
 
     monkeypatch.setattr(workers, "run_job", fake_run_job)
+    monkeypatch.setattr(workers, "check_pinned_image", lambda *a: None)
     run_dir = root / "outputs" / "graph" / "g1" / "n"
     out = w.run(_job("train.lora_vlm", {"epochs": 1}, run_dir, _train_inputs(w))).outputs["adapter"]
     cfg = (run_dir / "config.yaml").read_text()
@@ -117,6 +118,7 @@ def test_train_failure_raises_container_exit(
     monkeypatch.setattr(
         workers, "run_job", lambda job, m, d, **kw: m.model_copy(update={"status": status, "exit_code": exit_code})
     )
+    monkeypatch.setattr(workers, "check_pinned_image", lambda *a: None)
     with pytest.raises(ContainerExit) as ei:
         w.run(_job("train.lora_vlm", {}, root / "outputs" / "graph" / "g" / "n", _train_inputs(w)))
     assert ei.value.exit_code == expected_exit
@@ -133,3 +135,33 @@ def test_identity_keys_container_nodes_by_image(tmp_path: Path, monkeypatch: pyt
     assert pick is not None
     assert w.identity(train) == "container/vlm-automodel:26.08-3@sha256:abc"
     assert w.identity(pick) == "host/real-1"
+
+
+LOCK = """# header
+vlm-automodel | vlm-automodel:26.08-5 (local build) | (local) | base arm64 sha256:aaa | sha256:111 (rebuilt) | 29GB | ok
+vlm-automodel | vlm-automodel:26.08-4 (local build) | (local) | base arm64 sha256:aaa | sha256:222 | 29GB | ok
+"""
+
+
+def test_pinned_image_id_parsing() -> None:
+    assert workers.pinned_image_id(LOCK, "vlm-automodel:26.08-5") == "sha256:111"
+    assert workers.pinned_image_id(LOCK, "vlm-automodel:26.08-4") == "sha256:222"
+    assert workers.pinned_image_id(LOCK, "vlm-automodel:9") is None
+
+
+def test_check_pinned_image(tmp_path: Path) -> None:
+    (tmp_path / "docker").mkdir()
+    (tmp_path / "docker" / "IMAGES.lock").write_text(LOCK)
+    workers.check_pinned_image(tmp_path, "vlm-automodel:26.08-5", "sha256:111")
+    for actual in ("sha256:999", None):
+        with pytest.raises(workers.ImageMismatchError):
+            workers.check_pinned_image(tmp_path, "vlm-automodel:26.08-5", actual)
+    with pytest.raises(workers.ImageMismatchError):
+        workers.check_pinned_image(tmp_path, "vlm-automodel:unpinned", "sha256:111")
+
+
+def test_real_lock_pins_default_image() -> None:
+    from vlm_pipeline.common.paths import project_root
+
+    text = (project_root() / "docker" / "IMAGES.lock").read_text()
+    assert workers.pinned_image_id(text, workers.DEFAULT_TRAIN_IMAGE) is not None
