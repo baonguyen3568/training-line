@@ -40,8 +40,8 @@ models:
     params_b: 0.94
     disk_gb: 3.8
     train_node: train.sft_vlm      # full fine-tune of the decoder, vision + embeddings frozen (upstream recipe)
-    ram_gb_train: 35
-    ram_source: measured           # P-1 26.08-2 startup peak +35GB WITH freeze/fused-attn bugs (001a §9); re-measure after fix
+    ram_gb_train: 20
+    ram_source: measured           # P-1b 26.08-3 (freeze fixed, 30.4% trainable): host peak +17.8GB, cold Triton, 5 steps + val 100 + export
     sft_trainable_pct_min: 29.4
     sft_trainable_pct_max: 31.4
     attn: eager
@@ -59,7 +59,7 @@ models:
     serve_engine: unknown          # vLLM support checked at P-4; fallback hf
     task_prompt_fixed: true        # "Trích xuất hoá đơn" (no free-form question)
     gallery_gates: [white_image_probe, train_serve_parity, nvidia_golden, cord_field_f1]
-    min_image: vlm-automodel:26.08-2   # needs normalize patch + albumentations/cv2
+    min_image: vlm-automodel:26.08-3   # normalize patch + encoder freeze adapter + albumentations/cv2
 
   - id: cosmos-reason2-2b
     repo: nvidia/Cosmos-Reason2-2B
