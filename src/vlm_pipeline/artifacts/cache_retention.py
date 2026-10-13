@@ -23,6 +23,7 @@ marks the entry ``invalid`` so it is never hit again). Least recently used entri
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import time
 from collections.abc import Collection
@@ -39,6 +40,8 @@ RUN_ROOTS = (RUNS_REL, Path("outputs") / "graph" / "runs")  # node run dirs live
 HEAVY_SUBDIRS = ("checkpoints", "engines")
 KEPT_SUBDIRS = ("export", "logs")
 DEFAULT_CAP_GB = 200.0  # ADR-005: min(200 GB, 10 % of free disk at install); the app passes the configured value
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -229,13 +232,13 @@ def evict(
             result.skipped.append((key, reason))
             continue
         if entry is None or not index.begin_evict(key):
-            why = "IN_USE_BY_RUNNING_WORKFLOW" if index.leased_by(key) else "not evictable (pinned, needed or gone)"
+            why = "IN_USE_BY_RUNNING_WORKFLOW" if index.leased_by(key) else "NOT_EVICTABLE"  # pinned, needed or gone
             result.skipped.append((key, why))
             continue
         found = entry_run_dir(root, entry)
         if found is None:
             index.finish_evict(key, ok=False)
-            result.skipped.append((key, "run dir missing or outside outputs/runs | outputs/graph/runs"))
+            result.skipped.append((key, "RUN_DIR_INVALID"))  # missing or outside outputs/runs | outputs/graph/runs
             continue
         run_dir = found
         item = _item(root, entry)
@@ -250,7 +253,8 @@ def evict(
                     target.unlink()
         except OSError as exc:
             index.finish_evict(key, ok=False)
-            result.skipped.append((key, f"delete failed: {exc}"))
+            result.skipped.append((key, "DELETE_FAILED"))
+            logger.warning("evicting %s failed: %s", key, exc)
             continue
         index.finish_evict(key, ok=True)
         if (run_dir / "run.json").is_file():

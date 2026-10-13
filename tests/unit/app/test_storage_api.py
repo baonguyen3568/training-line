@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from vlm_pipeline.app.storage import StorageApi, StorageSettings, _Plans, register_storage_routes
-from vlm_pipeline.app.storage_scheduler import LAST_PASS_REL, RetentionScheduler, mode_from_env
+from vlm_pipeline.app.storage_scheduler import LAST_PASS_REL, RetentionScheduler, mode_from_env, policy_path
 from vlm_pipeline.artifacts.index import ArtifactIndex, OutputRef
 from vlm_pipeline.artifacts.retention import CLEANUP_LOCK_REL
 from vlm_pipeline.artifacts.testing import FakeRunSpec, make_fake_run
@@ -405,27 +405,73 @@ def test_concurrent_pass_is_skipped(tmp_path: Path) -> None:
         assert s.run_once()["reason"] == "PASS_IN_PROGRESS"
 
 
-def test_mode_defaults_follow_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mode_defaults_follow_profile(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    absent = tmp_path / "no-policy.toml"
     monkeypatch.delenv("VLM_RETENTION_SCHEDULE", raising=False)
     monkeypatch.delenv("VLM_PROFILE", raising=False)
-    assert mode_from_env() == "dry_run"  # unset profile fails closed
+    assert mode_from_env(absent) == "dry_run"  # unset profile fails closed
     monkeypatch.setenv("VLM_RETENTION_SCHEDULE", "apply")
-    assert mode_from_env() == "dry_run"
+    assert mode_from_env(absent) == "dry_run"
     monkeypatch.delenv("VLM_RETENTION_SCHEDULE")
     monkeypatch.setenv("VLM_PROFILE", "shared_dev")
-    assert mode_from_env() == "dry_run"
+    assert mode_from_env(absent) == "dry_run"
     monkeypatch.setenv("VLM_RETENTION_SCHEDULE", "apply")
-    assert mode_from_env() == "dry_run"  # env may only tighten on a shared host (D17)
+    assert mode_from_env(absent) == "dry_run"  # env may only tighten on a shared host (D17)
     monkeypatch.setenv("VLM_RETENTION_SCHEDULE", "off")
-    assert mode_from_env() == "off"
+    assert mode_from_env(absent) == "off"
     monkeypatch.delenv("VLM_RETENTION_SCHEDULE")
     monkeypatch.setenv("VLM_PROFILE", "personal")
-    assert mode_from_env() == "apply"
+    assert mode_from_env(absent) == "apply"
     monkeypatch.setenv("VLM_RETENTION_SCHEDULE", "off")
-    assert mode_from_env() == "off"
+    assert mode_from_env(absent) == "off"
     monkeypatch.setenv("VLM_RETENTION_SCHEDULE", "yes")
     with pytest.raises(ValueError, match=r"off\|dry_run\|apply"):
-        mode_from_env()
+        mode_from_env(absent)
+
+
+def _policy(tmp_path: Path, text: str, mode: int = 0o644) -> Path:
+    path = tmp_path / "policy.toml"
+    path.write_text(text)
+    path.chmod(mode)
+    return path
+
+
+def test_admin_policy_turns_apply_on_for_a_shared_host(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("VLM_RETENTION_SCHEDULE", raising=False)
+    monkeypatch.setenv("VLM_PROFILE", "shared_dev")
+    policy = _policy(tmp_path, '[deployment]\nprofile = "shared_dev"\n[storage]\nschedule = "apply"\n')
+    assert mode_from_env(policy) == "apply"
+    monkeypatch.setenv("VLM_RETENTION_SCHEDULE", "dry_run")
+    assert mode_from_env(policy) == "dry_run"  # env may still lower it
+    monkeypatch.setenv("VLM_PROFILE", "personal")
+    monkeypatch.delenv("VLM_RETENTION_SCHEDULE")
+    assert mode_from_env(_policy(tmp_path, '[storage]\nschedule = "off"\n')) == "off"  # admin also lowers
+
+
+@pytest.mark.parametrize(
+    ("text", "mode"),
+    [
+        ('[storage]\nschedule = "apply"\n', 0o666),  # writable by others
+        ('[storage]\nschedule = "yes"\n', 0o644),  # unknown value
+        ("[storage\nschedule = apply", 0o644),  # not TOML
+        ("[storage]\n", 0o644),  # no key
+    ],
+)
+def test_unusable_admin_policy_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, text: str, mode: int
+) -> None:
+    monkeypatch.delenv("VLM_RETENTION_SCHEDULE", raising=False)
+    monkeypatch.delenv("VLM_PROFILE", raising=False)
+    assert mode_from_env(_policy(tmp_path, text, mode)) == "dry_run"
+
+
+def test_symlinked_admin_policy_is_ignored(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("VLM_RETENTION_SCHEDULE", raising=False)
+    monkeypatch.delenv("VLM_PROFILE", raising=False)
+    real = _policy(tmp_path, '[storage]\nschedule = "apply"\n')
+    link = tmp_path / "link.toml"
+    link.symlink_to(real)
+    assert mode_from_env(link) == "dry_run"
 
 
 def test_admin_command_quotes_item_ids_from_directory_names(tmp_path: Path) -> None:
@@ -481,3 +527,21 @@ def test_cleanup_lock_refuses_a_symlink(tmp_path: Path) -> None:
     lock.symlink_to(tmp_path / "elsewhere")
     with pytest.raises(OSError, match="Too many levels of symbolic links"), cleanup_lock(tmp_path):
         pass
+
+
+def test_policy_path_ignores_home_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake_home = tmp_path / "home"
+    (fake_home / ".config" / "vlm-app").mkdir(parents=True)
+    (fake_home / ".config" / "vlm-app" / "policy.toml").write_text('[storage]\nschedule = "apply"\n')
+    monkeypatch.setenv("HOME", str(fake_home))
+    assert not policy_path().is_relative_to(fake_home)  # from the passwd database, not $HOME
+
+
+def test_policy_in_a_group_writable_dir_is_ignored(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("VLM_RETENTION_SCHEDULE", raising=False)
+    monkeypatch.delenv("VLM_PROFILE", raising=False)
+    policy = _policy(tmp_path, '[storage]\nschedule = "apply"\n')
+    tmp_path.chmod(0o775)
+    assert mode_from_env(policy) == "dry_run"
+    tmp_path.chmod(0o755)
+    assert mode_from_env(policy) == "apply"

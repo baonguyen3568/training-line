@@ -528,7 +528,7 @@ def apply(
     }
     result = ApplyResult()
     selected = [by_id[i] for i in sorted(wanted) if i in by_id]
-    result.skipped.extend((i, "no longer planned (state changed)") for i in sorted(wanted - by_id.keys()))
+    result.skipped.extend((i, "STATE_CHANGED") for i in sorted(wanted - by_id.keys()))  # no longer planned
     if not approved_by:
         recent = unapproved_bytes_since(root / CLEANUP_LOG_REL, ts - policy.approval_window_s)
         total_gb = (recent + sum(i.reclaim_bytes for i in selected)) / GIB

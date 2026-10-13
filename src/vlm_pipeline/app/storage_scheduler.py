@@ -11,11 +11,9 @@ Every ``interval_s`` (first run ``first_delay_s`` after start) one pass:
    what does not fit waits for a later pass. Cache evictions of regenerable results are not counted (ADR-005: the
    cache cap is enforced automatically by design);
 4. ``mode``: ``apply`` deletes (``by="app-scheduler"``); ``dry_run`` only writes the pass to
-   ``outputs/system/retention_plan.json``; ``off`` does nothing. Default: ``apply`` only for an explicit
-   ``VLM_PROFILE=personal``, otherwise (``shared_dev`` or unset) ``dry_run``. ``VLM_RETENTION_SCHEDULE`` may only
-   tighten (D17): unless the profile is ``personal`` it accepts ``off|dry_run`` and ignores ``apply``. Turning
-   ``apply`` on for a shared host is an admin setting in the shared policy file, which does not exist yet (TODO with
-   ``StorageSettings.from_env``), so until then a shared host never deletes on a schedule.
+   ``outputs/system/retention_plan.json``; ``off`` does nothing. See ``mode_from_env``: the admin policy file
+   (``~/.config/vlm-app/policy.toml``, ``[storage] schedule``) or else the profile default decides, and
+   ``VLM_RETENTION_SCHEDULE`` may only lower it.
 
 The pass holds ``retention.cleanup_lock`` (shared with ``scripts/cleanup/{retention,cache}.py --apply``).
 """
@@ -25,8 +23,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import pwd
+import stat
 import threading
 import time
+import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -47,22 +48,78 @@ FIRST_DELAY_S = 600.0
 INTERVAL_S = 6 * 3600.0
 
 
-def mode_from_env() -> Mode:
-    """Profile default, tightened (never loosened) by ``VLM_RETENTION_SCHEDULE``.
+_RANK: dict[str, int] = {"off": 0, "dry_run": 1, "apply": 2}
+POLICY_REL = Path(".config") / "vlm-app" / "policy.toml"  # admin-owned (P003 D17), never written by the app
 
-    Fails closed: only an explicit ``VLM_PROFILE=personal`` deletes on a schedule; an unset profile (e.g. the app
-    started on a shared host without scripts/dev/app.sh) is treated like ``shared_dev`` until the policy loader exists.
+
+def policy_path() -> Path:
+    """``~/.config/vlm-app/policy.toml`` of the *process user* from the passwd database, never from ``$HOME``."""
+    return Path(pwd.getpwuid(os.getuid()).pw_dir) / POLICY_REL
+
+
+def _unsafe(st: os.stat_result) -> bool:
+    return bool(st.st_mode & 0o022) or st.st_uid not in (0, os.getuid())
+
+
+def _read_policy(path: Path) -> dict[str, Any] | None:
+    """The parsed policy file, or None when absent or unusable (reason logged). Checks the opened fd itself."""
+    try:
+        if _unsafe(path.parent.stat()):  # others could swap the file by rename
+            logger.warning("policy dir %s is group/other-writable or foreign-owned: ignored", path.parent)
+            return None
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:  # ELOOP for a symlink
+        logger.warning("policy file %s unusable (%s): ignored", path, exc)
+        return None
+    with os.fdopen(fd, "rb") as fh:
+        st = os.fstat(fh.fileno())
+        if _unsafe(st) or not stat.S_ISREG(st.st_mode):
+            logger.warning("policy file %s is not a regular file owned by this user/root and 0644: ignored", path)
+            return None
+        try:
+            return tomllib.load(fh)
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+            logger.warning("policy file %s invalid (%s): ignored", path, exc)
+            return None
+
+
+def admin_schedule(path: Path | None = None) -> Mode | None:
+    """``[storage] schedule`` from the admin policy file, or None (absent / unusable -> no admin decision).
+
+    Interim reader for this one key until the shared ``app/policy.py`` loader (D17) exists; other keys are ignored.
+    Fails closed: a symlink, a file or parent dir writable by group/others or not owned by this user or root, an
+    unreadable file or an unknown value is ignored (logged), leaving the profile default (dry_run on a shared host).
     """
-    shared = os.environ.get(PROFILE_ENV) != "personal"
-    default: Mode = "dry_run" if shared else "apply"
+    data = _read_policy(path if path is not None else policy_path())
+    storage = data.get("storage") if data is not None else None
+    value = storage.get("schedule") if isinstance(storage, dict) else None
+    if value is None:
+        return None
+    if value not in _RANK:
+        logger.warning("storage.schedule must be off|dry_run|apply, got %r: ignored", value)
+        return None
+    return value  # type: ignore[no-any-return]
+
+
+def mode_from_env(policy: Path | None = None) -> Mode:
+    """Effective mode: admin policy (or the profile default), then only tightened by ``VLM_RETENTION_SCHEDULE``.
+
+    Profile default fails closed: ``apply`` only for an explicit ``VLM_PROFILE=personal``; ``shared_dev`` or unset ->
+    ``dry_run``. On a shared host only the admin file (``[storage] schedule = "apply"``) turns deleting on; env can
+    lower the mode (``off``/``dry_run``) but never raise it (D17).
+    """
+    default: Mode = "apply" if os.environ.get(PROFILE_ENV) == "personal" else "dry_run"
+    base = admin_schedule(policy) or default
     value = os.environ.get(MODE_ENV)
     if value is None:
-        return default
-    if value not in ("off", "dry_run", "apply"):
+        return base
+    if value not in _RANK:
         raise ValueError(f"{MODE_ENV} must be off|dry_run|apply, got {value!r}")
-    if shared and value == "apply":
-        logger.warning("%s=apply ignored unless VLM_PROFILE=personal: only an admin policy may enable it", MODE_ENV)
-        return default
+    if _RANK[value] > _RANK[base]:
+        logger.warning("%s=%s ignored: env may only lower the mode (%s)", MODE_ENV, value, base)
+        return base
     return value  # type: ignore[return-value]
 
 
