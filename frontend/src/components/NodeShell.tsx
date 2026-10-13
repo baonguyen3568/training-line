@@ -1,10 +1,10 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import { memo } from "react";
+import { type CSSProperties, memo } from "react";
 import type { NodeSpec, PortType, ValidationIssue } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
-import { tokenVar } from "../lib/ports";
+import { portShape, tokenVar } from "../lib/ports";
 import { runWarningText } from "../lib/runWarning";
 import { identifierView, untrustedText } from "../lib/safeText";
 import { useUi } from "../store/ui";
@@ -196,8 +196,13 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
                 type="target"
                 position={Position.Left}
                 id={name}
-                className={`port shape-${ps.type}${missing.has(name) ? " needs-wire" : ""}`}
-                style={{ background: portColor(ports, ps.type) }}
+                className={`port shape-${ps.type} hg-${portShape(ps.type)}${missing.has(name) ? " needs-wire" : ""}`}
+                style={
+                  {
+                    background: portColor(ports, ps.type),
+                    "--pc": portColor(ports, ps.type),
+                  } as CSSProperties
+                }
               />
               <span>{portLabel(ports, typeId, name, ps.type)}</span>
               {missing.has(name) && (
@@ -215,8 +220,13 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
                 type="source"
                 position={Position.Right}
                 id={name}
-                className={`port shape-${ps.type}`}
-                style={{ background: portColor(ports, ps.type) }}
+                className={`port shape-${ps.type} hg-${portShape(ps.type)}`}
+                style={
+                  {
+                    background: portColor(ports, ps.type),
+                    "--pc": portColor(ports, ps.type),
+                  } as CSSProperties
+                }
               />
             </li>
           ))}

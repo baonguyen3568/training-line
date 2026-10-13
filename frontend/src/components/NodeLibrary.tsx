@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { type CSSProperties, useMemo, useRef, useState } from "react";
 import type { NodeSpec } from "../api/types";
 import { t, tp } from "../i18n";
 import { LANES, type Lane, laneOf } from "../lib/lanes";
 import { nodeDesc, nodeTitle } from "../lib/nodeText";
-import { tokenVar } from "../lib/ports";
+import { portShape, tokenVar } from "../lib/ports";
 import { expandQuery, matches } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
 
@@ -130,8 +130,8 @@ export function NodeLibrary({
                       {out && (
                         // what this step produces: port shape + colour (+ the name in the tooltip/label)
                         <span
-                          className={`out-port shape-${out.type}`}
-                          style={{ background: portColor(out.type) }}
+                          className={`out-port pg pg-${portShape(out.type)}`}
+                          style={{ "--pc": portColor(out.type) } as CSSProperties}
                           title={portName(out.type)}
                           aria-hidden="true"
                         />

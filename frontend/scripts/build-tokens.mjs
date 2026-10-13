@@ -61,6 +61,17 @@ function main() {
   ].join("\n");
   mkdirSync(dirname(outFile), { recursive: true });
   writeFileSync(outFile, css);
+  // Port glyph shapes (shape.port.<Type>: square, circle, triangle…) for the UI's port glyphs; string tokens have
+  // no CSS form, so they go next to tokens.css as JSON.
+  const shapes = Object.fromEntries(
+    Object.entries(
+      JSON.parse(readFileSync(resolve(tokensDir, "base.tokens.json"), "utf8")).shape?.port ?? {},
+    ).map(([type, tok]) => [type, tok.$value]),
+  );
+  writeFileSync(
+    resolve(dirname(outFile), "port-shapes.json"),
+    `${JSON.stringify(shapes, null, 2)}\n`,
+  );
   console.log(`tokens: ${base.length + light.length} light, ${dark.length} dark → ${outFile}`);
 }
 
