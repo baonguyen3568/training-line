@@ -1,7 +1,7 @@
 ---
 title: Điều khoản sử dụng
 description: "{{PRODUCT_NAME}} miễn phí, mã nguồn mở Apache-2.0. Bạn tự chịu trách nhiệm với model và dữ liệu mình dùng."
-effective_date: "{{TODO_USER: ngày hiệu lực (U10)}}"
+effective_date: "{{TODO_USER: ngày hiệu lực = ngày publish site, điền lúc release (U10)}}"
 ---
 
 # Điều khoản sử dụng
@@ -47,12 +47,11 @@ của NVIDIA Corporation. Các nhãn hiệu khác thuộc chủ sở hữu tươ
 phần mềm mà {{PRODUCT_NAME}} chạy trên đó.
 
 ## 8. Website
-Nội dung website (văn bản, hình minh hoạ do dự án tạo) được cấp phép theo {{TODO_USER: license cho nội dung site,
-đề xuất CC BY 4.0 hoặc Apache-2.0 giống mã nguồn}}, trừ khi ghi khác. Tài nguyên của bên thứ ba được liệt kê ở trang
+Nội dung website (văn bản, hình minh hoạ do dự án tạo) được cấp phép theo [Creative Commons Ghi công 4.0 Quốc tế (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/), trừ khi ghi khác. Tài nguyên của bên thứ ba được liệt kê ở trang
 [Giấy phép & ghi công](./giay-phep-va-ghi-cong.md).
 
 ## 9. Luật áp dụng và liên hệ
-{{TODO_USER: luật áp dụng (U8) và thông tin liên hệ (U7)}}.
+Điều khoản này được điều chỉnh theo pháp luật Việt Nam. Đơn vị vận hành: **NTC**. Liên hệ: [www.whatareme@gmail.com](mailto:www.whatareme@gmail.com).
 
 ## 10. Thay đổi
 Chúng tôi có thể cập nhật điều khoản này. Bản mới có ngày hiệu lực ở đầu trang và được nêu trong Changelog.

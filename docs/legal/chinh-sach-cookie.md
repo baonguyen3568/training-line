@@ -1,7 +1,7 @@
 ---
 title: Chính sách cookie
 description: "Website không dùng cookie theo dõi. Ứng dụng chỉ dùng 1 cookie bảo mật."
-effective_date: "{{TODO_USER: ngày hiệu lực (U10)}}"
+effective_date: "{{TODO_USER: ngày hiệu lực = ngày publish site, điền lúc release (U10)}}"
 ---
 
 # Chính sách cookie

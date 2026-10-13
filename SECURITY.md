@@ -5,7 +5,7 @@ Vietnamese version (source for the website): [`docs/legal/bao-mat-va-bao-cao-lo-
 ## Reporting a vulnerability
 
 Please **do not** open a public issue. Report privately to:
-**{{TODO_USER: security contact email or GitHub Private Vulnerability Reporting link (U7)}}**
+**[www.whatareme@gmail.com](mailto:www.whatareme@gmail.com)**
 
 Include the version or commit, OS and hardware, steps to reproduce (a proof of concept if you have one) and the impact
 you expect.

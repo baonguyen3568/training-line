@@ -7,7 +7,7 @@ description: "Cách {{PRODUCT_NAME}} được thiết kế để an toàn, và c
 
 ## Báo cáo lỗ hổng
 Nếu bạn tìm thấy lỗ hổng bảo mật, xin **đừng** tạo issue công khai. Hãy gửi riêng tới:
-**{{TODO_USER: email bảo mật hoặc link GitHub Private Vulnerability Reporting (U7)}}**
+**[www.whatareme@gmail.com](mailto:www.whatareme@gmail.com)**
 
 Xin gửi kèm:
 - phiên bản (hoặc commit) đang dùng và hệ điều hành / phần cứng;

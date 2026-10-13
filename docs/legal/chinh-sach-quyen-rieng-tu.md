@@ -1,7 +1,7 @@
 ---
 title: Chính sách bảo mật
 description: "{{PRODUCT_NAME}} chạy trên máy của bạn và không thu thập dữ liệu của bạn."
-effective_date: "{{TODO_USER: ngày hiệu lực (U10)}}"
+effective_date: "{{TODO_USER: ngày hiệu lực = ngày publish site, điền lúc release (U10)}}"
 ---
 
 # Chính sách bảo mật
@@ -10,7 +10,7 @@ effective_date: "{{TODO_USER: ngày hiệu lực (U10)}}"
 của bạn và không thu thập dữ liệu sử dụng (không telemetry). Dữ liệu, model và kết quả train đều nằm trên ổ đĩa của bạn.
 
 ## 1. Ai chịu trách nhiệm
-{{TODO_USER: tên cá nhân/đơn vị vận hành, địa chỉ, email liên hệ (U7)}}.
+Đơn vị vận hành: **NTC**. Email liên hệ: [www.whatareme@gmail.com](mailto:www.whatareme@gmail.com).
 Chính sách này áp dụng cho (a) ứng dụng {{PRODUCT_NAME}} bạn cài trên máy và (b) website giới thiệu này.
 
 ## 2. Ứng dụng {{PRODUCT_NAME}}
@@ -63,8 +63,7 @@ Nếu bạn gửi email (kể cả báo lỗ hổng), chúng tôi chỉ dùng đ
 Chúng tôi không chia sẻ chúng cho bên thứ ba và xoá khi không còn cần cho việc xử lý.
 
 ## 5. Quyền của bạn
-Theo pháp luật về bảo vệ dữ liệu cá nhân ({{TODO_USER: luật áp dụng (U8), đề xuất: Luật Bảo vệ dữ liệu cá nhân
-2025 và Nghị định 13/2023/NĐ-CP của Việt Nam}}), bạn có quyền biết, truy cập, chỉnh sửa và yêu cầu xoá dữ liệu cá nhân.
+Theo pháp luật về bảo vệ dữ liệu cá nhân (Luật Bảo vệ dữ liệu cá nhân 2025 và Nghị định 356/2025/NĐ-CP hướng dẫn thi hành (thay thế Nghị định 13/2023/NĐ-CP từ 01/01/2026) của Việt Nam), bạn có quyền biết, truy cập, chỉnh sửa và yêu cầu xoá dữ liệu cá nhân.
 Vì chúng tôi gần như không giữ dữ liệu nào của bạn (ngoài email bạn tự gửi), hãy liên hệ theo mục 1 nếu cần.
 
 ## 6. Trẻ em

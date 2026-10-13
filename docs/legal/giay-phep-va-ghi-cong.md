@@ -34,8 +34,8 @@ NVIDIA NeMo AutoModel (Apache-2.0), PyTorch (BSD-3-Clause), Hugging Face Transfo
 |---|---|
 | Astro, Starlight | MIT |
 | Pagefind (tìm kiếm tài liệu, nếu dùng) | MIT |
-| {{TODO_SITE: icon set, vd Lucide}} | {{TODO_SITE: license icon, vd ISC; một phần từ Feather, MIT}} |
-| {{TODO_SITE: font, vd Be Vietnam Pro / Inter / JetBrains Mono}} | SIL Open Font License 1.1 |
+| Lucide 1.51.0 (icon) | ISC; một phần từ Feather, MIT |
+| Be Vietnam Pro, JetBrains Mono (font) | SIL Open Font License 1.1 |
 | Hình minh hoạ | Xem danh sách `site/ASSETS.md` (nguồn, tác giả, giấy phép từng file) |
 
 Danh sách đầy đủ phần mềm bên thứ ba được gửi kèm website, cùng toàn văn giấy phép, có ở trang
