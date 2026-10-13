@@ -1312,6 +1312,8 @@ pipelines:
   more_steps: "+{step_count} steps"
   metric:
     field_f1: Field F1
+  score_compare: On the same test set, the "{other}" pipeline scores {other_value}.
+  score_single_run: Each score comes from a single run (one seed), so it may still vary.
   title: Reference pipelines
   search: Search pipelines…
   filter:

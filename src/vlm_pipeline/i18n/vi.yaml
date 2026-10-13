@@ -1312,6 +1312,8 @@ pipelines:
   more_steps: "+{step_count} bước"
   metric:
     field_f1: F1 theo trường
+  score_compare: Trên cùng bộ kiểm tra, pipeline "{other}" đạt {other_value}.
+  score_single_run: Mỗi điểm là kết quả của một lần chạy (một seed), nên còn có thể dao động.
   title: Pipeline tham chiếu
   search: Tìm pipeline…
   filter:
