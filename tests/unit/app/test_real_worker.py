@@ -392,9 +392,11 @@ def test_eval_of_a_catalog_model_compares_nothing(tmp_path: Path, monkeypatch: p
 
     root = _root(tmp_path)
     w = RealWorker(root)
-    entry = w.catalog.get("qwen3.5-0.8b")
+    entry = w.catalog.get("nemotron-parse-v1.1")  # the model the eval engine supports today
     assert entry is not None
-    snap = _snap(root, "models", entry.repo, entry.revision)
+    prepared = root / ".cache" / "prepared" / workers.PREPARED_DIRS[entry.id] / "model"
+    prepared.mkdir(parents=True)
+    (prepared / "config.json").write_text("{}")
     seen: dict[str, Any] = {}
 
     def fake_eval(req: Any) -> EvalOutcome:
@@ -402,7 +404,7 @@ def test_eval_of_a_catalog_model_compares_nothing(tmp_path: Path, monkeypatch: p
         return EvalOutcome(req.run_dir / "r.json", "h", "PASS")
 
     monkeypatch.setattr(node_worker, "run_eval_benchmarks", fake_eval)
-    model = ArtifactRef("Model", str(snap), f"{entry.repo}@{entry.revision}")
+    model = ArtifactRef("Model", str(prepared), f"{entry.repo}@{entry.revision}")
     w.run(_job("eval.benchmarks", {}, root / "outputs" / "graph" / "runs" / "e-2", {"model": model}))
     assert seen["req"].model.hash == seen["req"].base.hash  # the engine then skips the base comparison
 

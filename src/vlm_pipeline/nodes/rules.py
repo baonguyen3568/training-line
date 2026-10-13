@@ -32,6 +32,36 @@ def origin_model_id(view: GraphView, node_id: str, port: str) -> str | None:
     return None
 
 
+_DATA_PASS_THROUGH = frozenset({"data.split"})  # nodes that hand on the same data under another name
+
+
+def input_kinds(view: GraphView, node_id: str) -> dict[str, str]:
+    """Wired input ports -> ``dataset:hub`` | ``dataset:local`` | ``model`` | ``other`` (SupportQuery.inputs).
+
+    Data is traced through pass-through nodes (``data.split``) to its source: a split of a local folder is local.
+    """
+    kinds: dict[str, str] = {}
+    for port, pspec in view.specs[node_id].inputs.items():
+        src = view.source(node_id, port)
+        if src is None:
+            continue
+        if is_compatible(pspec.type, "Model"):
+            kinds[port] = "model"
+            continue
+        seen: set[str] = set()
+        while src is not None and src not in seen and view.specs[src].type_id in _DATA_PASS_THROUGH:
+            seen.add(src)
+            src = view.source(src, next(iter(view.specs[src].inputs)))
+        source_type = view.specs[src].type_id if src is not None else ""
+        kinds[port] = {"data.local_folder": "dataset:local", "data.hf_load": "dataset:hub"}.get(source_type, "other")
+    return kinds
+
+
+def model_input(view: GraphView, node_id: str) -> str | None:
+    """The node's model input port (first input that accepts a Model), if any."""
+    return _model_input(view, node_id)
+
+
 def train_node_matches_model(view: GraphView) -> Iterator[Issue]:
     """CFG-010: a fine-tune node the catalog has not vetted for the picked model (e.g. LoRA on Nemotron-Parse)."""
     catalog = load_catalog()
@@ -60,3 +90,4 @@ def export_needs_portable_model(view: GraphView) -> Iterator[Issue]:
 
 
 RULES = (train_node_matches_model, export_needs_portable_model)
+__all__ = ["RULES", "input_kinds", "model_input", "origin_model_id"]

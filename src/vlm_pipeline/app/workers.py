@@ -32,8 +32,8 @@ from vlm_pipeline.common.jobrun import (
 )
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest
 from vlm_pipeline.graph.errors import ContainerExit
-from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, ArtifactRef, NodeJob, NodeResult
-from vlm_pipeline.nodes.spec import NodeSpec
+from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, ArtifactRef, NodeJob, NodeResult, SupportQuery
+from vlm_pipeline.nodes.spec import NodeSpec, is_compatible
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
 
@@ -153,7 +153,39 @@ class RealWorker:
             raise NodeNotRunnableError(
                 f"no worker for {job.spec.type_id}", params={"node": job.node_id, "node_type": job.spec.type_id}
             )
+        self.check_support(self.support_query(job))  # the SAME check graph validate ran on the canvas
         return handler(job)
+
+    # ------------------------------------------------------------------------------------------ support
+    def support_query(self, job: NodeJob) -> SupportQuery:
+        """The run-time SupportQuery of ``job`` (same fields graph validate derives from the canvas)."""
+        model: CatalogEntry | None = None
+        inputs: dict[str, str] = {}
+        for port, ref in job.inputs.items():
+            port_spec = job.spec.inputs.get(port)
+            if port_spec is not None and is_compatible(port_spec.type, "Model"):
+                inputs[port] = "model"
+                if model is None:
+                    try:
+                        model = self.base_of(ref)
+                    except VlmPipelineError:
+                        model = None  # untraceable: the handler reports it (not a support question)
+            elif ref.type == "Dataset":
+                data = self.dataset_input(ref)
+                inputs[port] = "dataset:local" if data.records else ("dataset:hub" if data.repo else "other")
+            else:
+                inputs[port] = "other"
+        return SupportQuery(job.node_id, job.spec, job.params, model, inputs)
+
+    def check_support(self, query: SupportQuery) -> None:
+        """Raise the catalog error for a node this worker will not run with this model / params / inputs.
+
+        Pure (repo config only, never user or run-time files) so graph validate can call it: a clean canvas means
+        the worker does not refuse later for a support reason. Each node type's rule lives with its owner.
+        """
+        check = _SUPPORT_CHECKS.get(query.spec.type_id)
+        if check is not None:
+            check(query)
 
     def _model_pick(self, job: NodeJob) -> NodeResult:
         model_id = str(getattr(job.params, "model"))  # noqa: B009 - dynamic params model (catalog Literal)
@@ -302,11 +334,6 @@ class RealWorker:
             )
         base, data = job.inputs["base_model"], job.inputs["train_data"]
         entry = self._entry_for(base)
-        if not entry.supports_train_node(job.spec.type_id):  # graph validate blocks it first; this is the backstop
-            raise TrainModeUnsupportedError(
-                "train node not vetted for this model",
-                params={"node": job.node_id, "model": entry.display_name, "supported": entry.train_node},
-            )
         class_token = None
         if entry.loss == "nemotron_parse":
             from vlm_pipeline.train.recipe_checks import resolve_parse_class_token_start_idx
@@ -425,9 +452,6 @@ class RealWorker:
         """LoRA adapter + its base -> one HF checkpoint (CPU job in the training image; B-1)."""
         base, adapter = job.inputs["base_model"], job.inputs["adapter"]
         entry = self._entry_for(base)
-        if entry.auto_class != "AutoModelForImageTextToText":  # remote-code models never train LoRA (CFG-010)
-            raise NodeNotRunnableError("merge needs a native model", params={"node": job.node_id,
-                                                                            "node_type": job.spec.type_id})  # fmt: skip
         run_dir = job.run_dir.resolve()
         (run_dir / "logs").mkdir(parents=True, exist_ok=True)
         out = run_dir / "merged"
@@ -518,6 +542,57 @@ def _set_aside_checkpoints(run_dir: Path, model_id: str) -> None:
 MERGE_FP32_MAX_PARAMS_B = 4.0  # fp32 merge (exact delta) while the model fits the shared host comfortably
 
 
+def _check_train(q: SupportQuery) -> None:
+    if q.model is not None and not q.model.supports_train_node(q.spec.type_id):
+        raise TrainModeUnsupportedError(
+            "train node not vetted for this model",
+            params={"node": q.node_id, "model": q.model.display_name, "supported": q.model.train_node},
+        )
+
+
+def _check_merge(q: SupportQuery) -> None:
+    if q.model is not None and q.model.auto_class != "AutoModelForImageTextToText":  # remote code never trains LoRA
+        raise NodeNotRunnableError(
+            "merge needs a native model", params={"node": q.node_id, "node_type": q.spec.type_id}
+        )
+
+
+def _check_export(q: SupportQuery) -> None:
+    from vlm_pipeline.app.export_worker import ExportUnsupportedError
+
+    if q.model is not None and q.model.remote_code != "none":  # the folder's real content is re-checked at run time
+        raise ExportUnsupportedError(
+            "model runs its own code", params={"node": q.node_id, "model": q.model.display_name}
+        )
+
+
+def _owner_check(module: str) -> Callable[[SupportQuery], None]:
+    """The node owner's pure ``check_support(node_id, params, model, inputs)``.
+
+    Plain arguments, not SupportQuery: eval and quantize may only import common (ADR-004 A3); app modules use the
+    same signature for one convention. A missing function fails at import, never silently disables a check.
+    """
+    import importlib
+
+    fn = getattr(importlib.import_module(module), "check_support", None)
+    if not callable(fn):
+        raise ImportError(f"{module}.check_support is missing: the node's support check would be silently off")
+    return lambda q: fn(q.node_id, q.params, q.model, q.inputs)
+
+
+def _support_checks() -> dict[str, Callable[[SupportQuery], None]]:
+    return {
+        "train.lora_vlm": _check_train,
+        "train.sft_vlm": _check_train,
+        "train.merge_lora": _check_merge,
+        "export.hf_dir": _check_export,
+        "quantize.modelopt_ptq": _owner_check("vlm_pipeline.quantize.scope"),
+        "eval.benchmarks": _owner_check("vlm_pipeline.eval.node_worker"),
+        "bench.perf": _owner_check("vlm_pipeline.app.bench_worker"),
+        "serve.vllm": _owner_check("vlm_pipeline.app.trial_worker"),
+    }
+
+
 def _merge_dtype(entry: CatalogEntry) -> str:
     return "fp32" if entry.params_b <= MERGE_FP32_MAX_PARAMS_B else "bf16"
 
@@ -549,3 +624,5 @@ __all__ = [
     "TrainModeUnsupportedError",
     "UnknownModelError",
 ]
+
+_SUPPORT_CHECKS = _support_checks()

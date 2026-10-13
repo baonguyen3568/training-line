@@ -35,6 +35,7 @@ from vlm_pipeline.graph.worker import (
     Worker,
     read_checkpoint_step,
     worker_identity,
+    worker_support_problem,
     worker_supports,
 )
 from vlm_pipeline.nodes.spec import NodeSpec, Registry
@@ -225,8 +226,11 @@ class Executor:
 
     def _run(self, workflow: Mapping[str, Any], gid: str) -> GraphRun:
         can_run = functools.partial(worker_supports, self.worker)
+        support = functools.partial(worker_support_problem, self.worker)
         issues = [
-            i for i in validate(workflow, self.registry, self.workspace, can_run=can_run) if i.severity == "error"
+            i
+            for i in validate(workflow, self.registry, self.workspace, can_run=can_run, support=support)
+            if i.severity == "error"
         ]
         if issues:
             run = GraphRun(gid, {}, issues=issues)

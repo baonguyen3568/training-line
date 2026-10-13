@@ -16,6 +16,8 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from vlm_pipeline.common.catalog import CatalogEntry
+from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.nodes.spec import NodeSpec
 
 CHECKPOINT_MARKER = Path("checkpoints") / "LATEST"
@@ -60,6 +62,37 @@ class Worker(Protocol):
     """
 
     def run(self, job: NodeJob) -> NodeResult: ...
+
+
+@dataclass(frozen=True)
+class SupportQuery:
+    """What decides whether a worker can run a node, known both on the canvas and at run time (no file access).
+
+    ``model``: the catalog model at the origin of the node's model input (None: no model input, or not traceable).
+    ``inputs``: wired ports only, ``port -> "dataset:hub" | "dataset:local" | "model" | "other"``.
+    """
+
+    node_id: str
+    spec: NodeSpec
+    params: BaseModel
+    model: CatalogEntry | None = None
+    inputs: Mapping[str, str] = field(default_factory=dict)
+
+
+def worker_support_problem(worker: object, query: SupportQuery) -> VlmPipelineError | None:
+    """The catalog error a worker would raise for ``query`` before running it (optional ``check_support``), or None.
+
+    ONE function decides, for the canvas (graph validate) and for the run: "validate is clean" implies "the worker
+    does not refuse for a support reason".
+    """
+    check = getattr(worker, "check_support", None)
+    if not callable(check):
+        return None
+    try:
+        check(query)
+    except VlmPipelineError as exc:
+        return exc
+    return None
 
 
 def worker_supports(worker: object, spec: NodeSpec) -> bool:
@@ -113,8 +146,10 @@ __all__ = [
     "ArtifactRef",
     "NodeJob",
     "NodeResult",
+    "SupportQuery",
     "Worker",
     "read_checkpoint_step",
     "worker_identity",
+    "worker_support_problem",
     "worker_supports",
 ]

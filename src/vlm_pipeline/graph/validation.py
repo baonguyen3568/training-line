@@ -12,10 +12,14 @@ import re
 import unicodedata
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote
 
 from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    from vlm_pipeline.common.errors import VlmPipelineError
+    from vlm_pipeline.graph.worker import SupportQuery
 
 from vlm_pipeline.graph.workflow import WORKFLOW_FORMAT, WorkflowEdge, WorkflowFile, WorkflowNode, allowed_keys
 from vlm_pipeline.nodes.spec import LOCAL_PATH_FORMAT, GraphView, Issue, NodeSpec, Registry, is_compatible
@@ -184,23 +188,32 @@ def _find_cycle(nodes: Iterable[str], edges: Iterable[tuple[str, str]]) -> list[
 
 
 CanRun = Callable[[NodeSpec], bool]  # the worker that will run the graph: can it run this node type? (CFG-011)
+Support = Callable[["SupportQuery"], "VlmPipelineError | None"]  # graph.worker.worker_support_problem bound to it
 
 
 def validate(
-    workflow: object, registry: Registry, workspace: Path | None = None, *, can_run: CanRun | None = None
+    workflow: object,
+    registry: Registry,
+    workspace: Path | None = None,
+    *,
+    can_run: CanRun | None = None,
+    support: Support | None = None,
 ) -> list[Issue]:
     """All problems of ``workflow`` that block a run. Empty list = runnable (as far as static checks go).
 
     ``can_run`` (from ``graph.worker.worker_supports``): nodes the actual worker cannot run yet are reported before
-    the run (CFG-011) instead of failing halfway through it.
+    the run (CFG-011) instead of failing halfway through it. ``support`` (``worker_support_problem`` bound to the
+    worker) asks the SAME check the worker runs before each node, per node x model x params x input kinds.
     """
     try:
-        return _validate(workflow, registry, workspace, can_run)
+        return _validate(workflow, registry, workspace, can_run, support)
     except Exception:  # noqa: BLE001 - contract: never raise on bad input
         return [Issue("CFG-007", params={"field": "workflow"})]
 
 
-def _validate(workflow: object, registry: Registry, workspace: Path | None, can_run: CanRun | None) -> list[Issue]:
+def _validate(
+    workflow: object, registry: Registry, workspace: Path | None, can_run: CanRun | None, support: Support | None
+) -> list[Issue]:
     if not isinstance(workflow, Mapping):
         return [Issue("CFG-007", params={"field": "workflow"})]
     issues = [Issue("CFG-007", params={"field": str(k)}) for k in sorted(map(str, set(workflow) - _TOP_KEYS))]
@@ -226,11 +239,29 @@ def _validate(workflow: object, registry: Registry, workspace: Path | None, can_
             for node_id, spec in specs.items()
             if not can_run(spec)
         ]
-    if registry.rules:
-        view = GraphView(specs=specs, params=_valid_params(specs, raw_params), sources=sources)
-        for rule in registry.rules:
-            issues.extend(rule(view))
+    view = GraphView(specs=specs, params=_valid_params(specs, raw_params), sources=sources)
+    for rule in registry.rules:
+        issues.extend(rule(view))
+    if support is not None:
+        issues += _support_issues(view, support, already={(i.code, i.node_id) for i in issues})
     return issues
+
+
+def _support_issues(view: GraphView, support: Support, *, already: set[tuple[str, str | None]]) -> list[Issue]:
+    from vlm_pipeline.common.catalog import load_catalog
+    from vlm_pipeline.graph.worker import SupportQuery
+    from vlm_pipeline.nodes.rules import input_kinds, model_input, origin_model_id
+
+    catalog = load_catalog()
+    out: list[Issue] = []
+    for node_id, params in view.params.items():
+        port = model_input(view, node_id)
+        model = catalog.get(origin_model_id(view, node_id, port) or "") if port else None
+        query = SupportQuery(node_id, view.specs[node_id], params, model, input_kinds(view, node_id))
+        problem = support(query)
+        if problem is not None and (problem.code, node_id) not in already:  # e.g. CFG-010 also comes from a rule
+            out.append(Issue(problem.code, node_id=node_id, params=dict(problem.params)))
+    return out
 
 
 def _valid_params(specs: Mapping[str, NodeSpec], raw_params: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
