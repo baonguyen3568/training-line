@@ -44,6 +44,8 @@ to include. Research supplies it from the licence and security approves it; back
   LICENSE.upstream               the snapshot's own LICENSE file, when there is one
   NOTICE                         human-readable: per component -> name, repo@revision, licence id + URL, notice
                                  text, and the modification statement (fine-tuned by <user tool> on <date>)
+  README.md                      minimal model card (PM): base model, datasets, licences, notices, 3-line usage,
+                                 known limitations from the catalog
   ATTRIBUTION.json               machine-readable, same content + sha256 of every licence file and weight file
 ```
 The modification statement is generated from the run manifests (task lora/sft, dates, datasets with repo@revision),
@@ -86,5 +88,6 @@ About 1 day of code after §6 is answered. The licence texts and notice fields a
    Is the guardrail clause something the NOTICE must restate, or only the licence text?
 2. **research/security:** does CC-BY-4.0 data used for training require attribution in the *model* (debatable) or
    only good practice? PM asked to include it in either case. Proposal: include it, labelled "training data".
-3. **PM:** should the exported folder also get a generated model card (README.md) now, or later (M2)?
+3. ~~PM: model card now or M2?~~ **Answered (PM 2026-10-13): now, minimal, generated per export.** README.md =
+   base model name, datasets, licence(s), notice text, 3-line usage, known limitations from the catalog. Fuller card later.
 4. **fixcode:** EXP-001 naming and i18n text.
