@@ -14,7 +14,7 @@ Cập nhật: 2026-10-12. Nguồn ở cuối file. Ký hiệu: ✅ đã đo/xác
 |---|---|
 | GPU | NVIDIA GB10, compute capability **(12,1)** = sm_121 |
 | Driver / CUDA driver API | 580.142 / 13.0 |
-| RAM | 121GB tổng, ~77GB used, ~44GB available, swap 8/15GB dùng |
+| RAM | Spec DGX Spark: **128 GB** LPDDR5x unified (NVIDIA product page). OS thấy MemTotal **121.7 GiB** (127,601,432 kB, `/proc/meminfo` 2026-10-13). ~77GB used, ~44GB available (2026-10-12), swap 8/15GB dùng |
 | nvidia-smi memory | "Not Supported" (bình thường với iGPU) → đo bằng `/proc/meminfo` MemAvailable, `free -g` |
 | Băng thông bộ nhớ | ~273GB/s (spec) → decode bị giới hạn băng thông → lợi thế cho MoE ít active + FP8/NVFP4 |
 | Disk | 3.7TB, còn ~2TB (dùng chung) |
