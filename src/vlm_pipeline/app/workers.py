@@ -26,7 +26,7 @@ from vlm_pipeline.common.jobrun import (
     MemoryPreemptedBeforeStartError,
     run_job,
 )
-from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics
+from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, ArtifactRef, NodeJob, NodeResult
 from vlm_pipeline.nodes.spec import NodeSpec
@@ -126,6 +126,7 @@ class RealWorker:
             "train.lora_vlm": self._train,
             "train.sft_vlm": self._train,
             "train.merge_lora": self._merge_lora,
+            "eval.benchmarks": self._eval,
             "serve.vllm": functools.partial(run_trial, self),  # B-7 "Chạy thử" (app/trial_worker.py)
         }
 
@@ -145,15 +146,56 @@ class RealWorker:
         entry = self.catalog.get(model_id)
         if entry is None:
             raise UnknownModelError("unknown catalog model", params={"model": model_id})
+        path = self._catalog_model_path(entry)
+        ref = ArtifactRef(type="Model", path=str(path.resolve()), hash=f"{entry.repo}@{entry.revision}")
+        return NodeResult(outputs={"model": ref})
+
+    def _catalog_model_path(self, entry: CatalogEntry) -> Path:
+        """Host dir of a catalog model: the pinned prepared copy (remote code) or the hub snapshot."""
         if entry.remote_code == "pinned_prepared":
             prepared = PREPARED_DIRS.get(entry.id)
             path = self.root / ".cache" / "prepared" / (prepared or "") / "model"
             if prepared is None or not (path / "config.json").is_file():
                 raise NotCachedError("prepared snapshot missing", params={"repo": entry.repo, "reason": "not_prepared"})
-        else:
-            path = _hub_snapshot(self.root, entry.repo, entry.revision, "model")
-        ref = ArtifactRef(type="Model", path=str(path.resolve()), hash=f"{entry.repo}@{entry.revision}")
-        return NodeResult(outputs={"model": ref})
+            return path
+        return _hub_snapshot(self.root, entry.repo, entry.revision, "model")
+
+    def _base_of(self, model: ArtifactRef) -> CatalogEntry:
+        """Catalog model a Model/Checkpoint artifact comes from: itself, or the base recorded in its run.json."""
+        if "@" in model.hash.split(":", 1)[0]:
+            return self._entry_for(model)
+        path = self._host_path(model.path).resolve()
+        outputs = self.root / "outputs"
+        within = [d for d in (path, *path.parents) if d.is_relative_to(outputs) and d != outputs]  # never above
+        run_dir = next((d for d in within if (d / "run.json").is_file()), None)
+        if run_dir is None:
+            raise UnknownModelError("model has no run record", params={"hash": model.hash})
+        manifest = read_manifest(run_dir)
+        ref = ArtifactRef("Model", "", f"{manifest.base_model}@{manifest.base_model_revision}")
+        return self._entry_for(ref)
+
+    def _eval(self, job: NodeJob) -> NodeResult:
+        """Benchmark node (B-5): bao-tester's engine (eval/node_worker.py) on the model and its catalog base."""
+        from vlm_pipeline.eval.node_worker import EvalJobFailed, EvalRequest, ModelRef, run_eval_benchmarks
+
+        model = job.inputs["model"]
+        entry = self._base_of(model)
+        base_path = self._catalog_model_path(entry)
+        request = EvalRequest(
+            root=self.root, node_id=job.node_id, params=job.params,  # type: ignore[arg-type]
+            model=ModelRef(self._host_path(model.path), model.hash),
+            base=ModelRef(base_path.resolve(), f"{entry.repo}@{entry.revision}"),
+            entry=entry, run_dir=job.run_dir.resolve(), image=self.image, who=self.who,
+            cancel=job.cancel, on_wait=job.on_wait,
+        )  # fmt: skip
+        try:
+            outcome = run_eval_benchmarks(request)
+        except EvalJobFailed as exc:
+            raise ContainerExit(exc.exit_code, oom_killed=bool(exc.final.oom_killed),
+                                cancelled_by_executor=exc.final.status == RunStatus.CANCELLED,
+                                log_tail=exc.log_tail) from exc  # fmt: skip
+        report = ArtifactRef(type="EvalReport", path=str(outcome.report_path), hash=outcome.report_hash)
+        return NodeResult(outputs={"report": report})
 
     def _hub_dataset(self, job: NodeJob) -> NodeResult:
         repo = str(getattr(job.params, "repo"))  # noqa: B009

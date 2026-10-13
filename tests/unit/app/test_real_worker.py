@@ -348,3 +348,74 @@ def test_merge_lora_runs_on_cpu_and_completes_from_base(tmp_path: Path, monkeypa
     assert seen["manifest"].parent_run_id == "t-1"
     assert (out.type, out.path) == ("Checkpoint", str(run_dir.resolve() / "merged"))
     assert completed == [(root / "m", run_dir.resolve() / "merged")]
+
+
+def test_eval_resolves_the_base_of_a_trained_checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.common.runinfo import write_manifest
+    from vlm_pipeline.eval import node_worker
+    from vlm_pipeline.eval.node_worker import EvalOutcome
+
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    parse = w.catalog.get("nemotron-parse-v1.1")
+    assert parse is not None
+    prepared = root / ".cache" / "prepared" / workers.PREPARED_DIRS[parse.id] / "model"
+    prepared.mkdir(parents=True)
+    (prepared / "config.json").write_text("{}")
+    train_dir = root / "outputs" / "graph" / "runs" / "t-abc"
+    ckpt = train_dir / "checkpoints" / "LATEST" / "model" / "consolidated"
+    ckpt.mkdir(parents=True)
+    write_manifest(train_dir, RunManifest(run_id="t-abc", name="t", stage="train", task="sft",
+                                          base_model=parse.repo, base_model_revision=parse.revision))  # fmt: skip
+    seen: dict[str, Any] = {}
+
+    def fake_eval(request: Any) -> EvalOutcome:
+        seen["request"] = request
+        report = request.run_dir / "report.json"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text("{}")
+        return EvalOutcome(report, "h", "PASS")
+
+    monkeypatch.setattr(node_worker, "run_eval_benchmarks", fake_eval)
+    model = ArtifactRef("Checkpoint", str(ckpt), "t-abc:cfg")
+    out = w.run(_job("eval.benchmarks", {}, root / "outputs" / "graph" / "runs" / "e-1", {"model": model}))
+    req = seen["request"]
+    assert (req.entry.id, req.base.hash, req.model.hash) == (parse.id, f"{parse.repo}@{parse.revision}", "t-abc:cfg")
+    assert req.base.path == prepared.resolve()
+    assert out.outputs["report"].type == "EvalReport"
+    assert w.supports(REGISTRY.get("eval.benchmarks"))  # type: ignore[arg-type]
+
+
+def test_eval_of_a_catalog_model_compares_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.eval import node_worker
+    from vlm_pipeline.eval.node_worker import EvalOutcome
+
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    entry = w.catalog.get("qwen3.5-0.8b")
+    assert entry is not None
+    snap = _snap(root, "models", entry.repo, entry.revision)
+    seen: dict[str, Any] = {}
+
+    def fake_eval(req: Any) -> EvalOutcome:
+        seen["req"] = req
+        return EvalOutcome(req.run_dir / "r.json", "h", "PASS")
+
+    monkeypatch.setattr(node_worker, "run_eval_benchmarks", fake_eval)
+    model = ArtifactRef("Model", str(snap), f"{entry.repo}@{entry.revision}")
+    w.run(_job("eval.benchmarks", {}, root / "outputs" / "graph" / "runs" / "e-2", {"model": model}))
+    assert seen["req"].model.hash == seen["req"].base.hash  # the engine then skips the base comparison
+
+
+def test_eval_of_an_untraceable_checkpoint_runs_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.eval import node_worker
+
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    (tmp_path / "run.json").write_text("{}")  # a stray record ABOVE the project must never be read
+    ckpt = root / "outputs" / "graph" / "runs" / "lost" / "model"
+    ckpt.mkdir(parents=True)
+    monkeypatch.setattr(node_worker, "run_eval_benchmarks", lambda req: pytest.fail("no job may start"))
+    with pytest.raises(workers.UnknownModelError):
+        w.run(_job("eval.benchmarks", {}, root / "outputs" / "graph" / "runs" / "e-3",
+                   {"model": ArtifactRef("Checkpoint", str(ckpt), "lost:cfg")}))  # fmt: skip
