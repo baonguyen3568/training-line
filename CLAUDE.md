@@ -43,7 +43,7 @@ data (thu thập → curate → format) → train (SFT / LoRA / RL) → validate
 - Máy **dùng chung** với service khác (docker: kafka, elastic, banking-rag, comfy-ui…). RAM đang dùng sẵn ~70GB+.
 - Mọi image/wheel phải hỗ trợ **arm64**. Ưu tiên container NGC (`nvcr.io/nvidia/...`) bản arm64.
 - **GPU lock**: chỉ 1 job nặng (train/quantize/benchmark) tại 1 thời điểm. Trước khi chạy: kiểm tra/tạo
-  `.team/GPU_LOCK` **chỉ** qua `uv run python -m vlm_pipeline.common.gpu_lock {status|acquire|release}`
+  `.team/lock/GPU_LOCK` (thư mục riêng, compose mount đúng thư mục này) **chỉ** qua `uv run python -m vlm_pipeline.common.gpu_lock {status|acquire|release}`
   (JSON gồm who/job/run_id/host_pid/started_at/token; xem skill `backend-gpu-job`). **Không ghi tay**, vì lock ghi tay
   bị coi là hỏng. Chạy preflight trước khi acquire (ADR-005). Không tự ý giết job của người khác.
 
@@ -89,6 +89,7 @@ data/ outputs/                                              # gitignored
 ## Quy tắc commit (nhiều agent cùng một working tree)
 - **Index git là của chung.** Commit bằng `git commit -m ... -- <path1> <path2>` (pathspec) để chỉ lấy file của mình, KHÔNG dựa vào những gì đang staged. Không `git reset` (kể cả --soft) sau commit.
 - File CHUNG (vd i18n yaml) mà chỉ commit 1 phần: kiểm `git diff --cached --quiet` (index sạch) → `git apply --cached <patch>` → `git commit -m ...` KHÔNG pathspec → kiểm `git show --stat HEAD`. (`git commit -- <path>` lấy NGUYÊN file trong working tree.)
+- **Push:** chỉ PM push nhánh `main` lên GitHub (https://github.com/baonguyen3568/training-line, PUBLIC), định kỳ theo mốc, sau khi check --clean xanh + scan_tokens = 0. Agent KHÔNG push.
 - Chỉ `git add <path cụ thể>` cho file của mình. **Cấm** `git add -A`, `git add .`, `git commit -a` (sẽ gom file người khác đang làm dở).
 - Code chỉ commit sau khi có review theo ADR-004 (security review với Docker/deps/network). Tài liệu do mình viết trong `.team/` (proposal, knowledge, security-reviews, bugs, upstream) thì tác giả tự commit. File dùng chung `.team/{BOARD,DECISIONS,ROSTER,CONFLICTS}.md`, `.team/log/`, `docs/adr/`, `CLAUDE.md` thì chỉ PM commit (ai cũng được sửa nội dung, PM gom commit).
 - **Cấm** `git stash`, `git checkout -- .`, `git reset --hard`, `git clean` trên working tree chung (sẽ cuốn file của người khác). Cần trạng thái sạch → `scripts/check.sh --clean` / git worktree.
