@@ -165,6 +165,18 @@
       "default": null,
       "title": "Error Code"
     },
+    "est_peak_gb": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Est Peak Gb"
+    },
     "exit_code": {
       "anyOf": [
         {
@@ -323,6 +335,18 @@
       ],
       "default": null,
       "title": "Resumed From"
+    },
+    "retried_after": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retried After"
     },
     "run_id": {
       "title": "Run Id",
