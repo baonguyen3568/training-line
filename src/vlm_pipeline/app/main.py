@@ -205,7 +205,8 @@ def _register_storage(app: FastAPI, services: Services) -> None:
         return  # test doubles without a project root
     from vlm_pipeline.app import storage
 
-    api = storage.StorageApi(root, services.index, storage.StorageSettings.from_env(root))
+    app.state.storage_settings = settings = storage.StorageSettings.from_env(root)  # shared with the scheduler
+    api = storage.StorageApi(root, services.index, settings)
     storage.register_storage_routes(app, api)
 
 
