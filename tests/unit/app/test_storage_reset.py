@@ -89,3 +89,39 @@ def test_typed_confirmation_ignores_case_accents_and_spaces(typed: str | None, o
 
     assert same_text(typed, "Dạy model") is ok
     assert same_text("đường", "Duong") is True
+
+
+def test_plan_items_name_their_node_for_the_reset_button(tmp_path: Path) -> None:
+    """G-4: the storage panel groups rows of one node by ``node_base``; non-node runs carry null."""
+    from vlm_pipeline.artifacts.index import OutputRef
+
+    client = _client(tmp_path)
+    idx = ArtifactIndex(tmp_path / "outputs" / "graph" / "app.db")
+    for name in (NODE, f"{NODE}-g1-a2"):
+        run = _attempt(tmp_path, name, "completed")
+        out = run / "out"
+        out.mkdir()
+        (out / "w").write_bytes(b"w" * 4096)
+        idx.record(f"k-{name}", run_id=name, node_type="vlm/eval.benchmark", run_dir=run,
+                   outputs={"o": OutputRef("model", str(out), "h")})  # fmt: skip
+    cli_run = tmp_path / "outputs" / "runs" / "20261013-0900-smoke-ab12"
+    (cli_run / "checkpoints" / "epoch_0_step_1").mkdir(parents=True)
+    (cli_run / "checkpoints" / "epoch_0_step_1" / "w").write_bytes(b"w" * 4096)
+    (cli_run / "KEEP").touch()
+    (cli_run / "run.json").write_text(json.dumps({"run_id": "x", "status": "completed"}))
+    items = client.get("/api/storage/plan").json()["items"]
+    by_run = {i["run_id"]: i["node_base"] for i in items}
+    assert by_run[NODE] == NODE
+    assert by_run[f"{NODE}-g1-a2"] == NODE
+    assert by_run["20261013-0900-smoke-ab12"] is None  # a CLI run is not a step of a workflow
+
+
+@pytest.mark.parametrize(
+    ("name", "base"),
+    [(NODE, NODE), (f"{NODE}-a3", NODE), (f"{NODE}-g2-a10", NODE), (f"{NODE}-model", NODE),
+     ("20261013-0900-smoke-ab12", None), ("../n1-0123456789abcdef", None)],
+)  # fmt: skip
+def test_node_base_of(name: str, base: str | None) -> None:
+    from vlm_pipeline.artifacts.node_reset import node_base_of
+
+    assert node_base_of(name) == base

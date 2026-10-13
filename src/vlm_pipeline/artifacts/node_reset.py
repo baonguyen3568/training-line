@@ -68,6 +68,15 @@ def _attempt_re(node: str) -> re.Pattern[str]:
     return re.compile(rf"{re.escape(node)}(?:-g[0-9]{{1,3}})?(?:-a[0-9]{{1,2}})?(?:-[a-z0-9_]{{1,32}})?", re.ASCII)
 
 
+_BASE_OF = re.compile(r"(.+-[0-9a-f]{16})(?:-g[0-9]{1,3})?(?:-a[0-9]{1,2})?(?:-[a-z0-9_]{1,32})?", re.ASCII)
+
+
+def node_base_of(run_dir_name: str) -> str | None:
+    """``<nid>-<key16>`` of a graph node run dir name (any generation/attempt/job suffix), else None."""
+    match = _BASE_OF.fullmatch(run_dir_name)
+    return match.group(1) if match and NODE_BASE.fullmatch(match.group(1)) else None
+
+
 def attempt_dirs(root: Path, node: str) -> list[Path]:
     """Real attempt dirs of ``node`` directly in ``outputs/graph/runs`` (symlinks are never listed or followed)."""
     if not NODE_BASE.fullmatch(node):
@@ -258,4 +267,13 @@ def unapproved_reset_bytes_since(log: Path, since: float) -> int:
     return total
 
 
-__all__ = ["PERMANENT_LOSS", "Attempt", "ResetPlan", "ResetResult", "apply_reset", "attempt_dirs", "plan_reset"]
+__all__ = [
+    "PERMANENT_LOSS",
+    "Attempt",
+    "ResetPlan",
+    "ResetResult",
+    "apply_reset",
+    "attempt_dirs",
+    "node_base_of",
+    "plan_reset",
+]

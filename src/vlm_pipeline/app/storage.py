@@ -231,6 +231,9 @@ def _retention_item(
         if item.kind == "set_aside"
         else "storage.item.checkpoint_of_run",
         "display_params": {"run_name": item.run_id, "checkpoint": ckpt},
+        "node_base": node_reset.node_base_of(item.run_id)
+        if item.runs_rel == retention.GRAPH_RUNS_REL.as_posix()
+        else None,
         "size_gb": round((kept_bytes if kept else item.reclaim_bytes) / GIB, 3),
         "run_id": item.run_id,
         "action": item.action,
@@ -365,6 +368,11 @@ class StorageApi:
             for item, reason in cache_retention.list_cache(self.root, self.index)
             if item.reclaim_bytes > 0
         ]
+        graph_runs = self.root / retention.GRAPH_RUNS_REL
+        for row in items:  # G-4: the panel groups a node's rows and offers "Reset step" per node
+            run_dir = graph_runs / row["run_id"]
+            in_graph = run_dir.is_dir() and not run_dir.is_symlink()
+            row["node_base"] = node_reset.node_base_of(row["run_id"]) if in_graph else None
         kept_or_actionable = self._retention_items()
         items += [
             _retention_item(
