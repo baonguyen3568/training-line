@@ -78,6 +78,11 @@ Nguồn: https://build.nvidia.com/spark/vlm-finetuning/troubleshooting ; https:/
 ## 7. Công cụ
 - `du -xsh`, `ncdu -x` (nếu có), `find -size +1G -printf`, `fuser`/`lsof`, `df -h`, `free -g`.
 - `hf cache ls|rm|prune|verify` (qua `uvx --from huggingface_hub hf`).
+- **Kho blob chung của dự án `.cache/hf/hub/blobs/<xx>/<name>`** (quan sát 2026-10-13): do chính huggingface_hub tạo khi tải
+  (marker `blobs/.huggingface-shared-blobs`, kèm `<name>.refs` liệt kê repo blob trỏ vào, và `<name>.lock`; tải qua hf_xet,
+  có `.cache/hf/xet/`). `models--*/blobs/<etag>` là symlink vào kho này. `<name>` KHÔNG phải sha256 nội dung (đoán là Xet
+  hash, chưa kiểm) → chỉ là khoá dedupe; toàn vẹn kiểm bằng sha256 = etag LFS. **Không xoá** file trong `blobs/<xx>/` chỉ vì
+  không thấy symlink: phải xét `.refs`, và chỉ dọn bằng `hf cache rm/prune` của đúng phiên bản huggingface_hub đã tạo kho.
 - `docker system df -v` (chỉ đọc — OK), docker filters.
 - Script dự án (sắp viết): `scripts/cleanup/disk_report.sh`, `scripts/cleanup/retention.py --dry-run` (mặc định) / `--apply`.
 
