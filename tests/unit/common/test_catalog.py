@@ -138,3 +138,26 @@ def test_auto_class_matches_remote_code(remote_code: str, auto_class: str, ok: b
     else:
         with pytest.raises(ValidationError, match="auto_class"):
             CatalogEntry.model_validate(raw)
+
+
+def _template_model_ids() -> dict[str, set[str]]:
+    """Catalog model id -> ids of the shipped templates whose model.hf_pick uses it (no param = catalog default)."""
+    from vlm_pipeline.app.templates import load_templates
+    from vlm_pipeline.common.paths import project_root
+
+    used: dict[str, set[str]] = {}
+    for template in load_templates(project_root()):
+        for node in template["workflow"]["nodes"]:
+            if node["type"] == "model.hf_pick":
+                model = node.get("params", {}).get("model", load_catalog().default.id)
+                used.setdefault(model, set()).add(template["id"])
+    return used
+
+
+def test_templates_use_template_tier_models_and_every_template_tier_model_is_used() -> None:
+    tiers = {m.id: m.tier for m in load_catalog().models}
+    used = _template_model_ids()
+    wrong = {m: sorted(t) for m, t in used.items() if tiers.get(m) not in ("default", "template")}
+    assert wrong == {}, f"templates use models whose catalog tier is not default/template: {wrong}"
+    unused = sorted(m for m, tier in tiers.items() if tier == "template" and m not in used)
+    assert unused == [], f"tier: template but no shipped template uses it: {unused}"
