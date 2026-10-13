@@ -116,16 +116,14 @@ def _params(params: Mapping[str, object]) -> Iterable[str]:
 
 
 def _error_line(code: str) -> str:
+    """Code + slug only: common must not import the i18n layer (ADR-004 A3); the card already shows the title."""
     try:
         from vlm_pipeline.common.error_catalog import load_catalog
-        from vlm_pipeline.i18n import load
 
         entry = load_catalog().get(code)
-        title = load("vi").get(f"error.{code}.title") or ""
-        title_en = load("en").get(f"error.{code}.title") or ""
-    except Exception:  # noqa: BLE001 - a report must never fail because of the text layer
+    except Exception:  # noqa: BLE001 - a report must never fail because of the catalog
         return f"Error: {code}"
-    return f"Error: {code} {entry.slug if entry else ''} — {title} / {title_en}"
+    return f"Error: {code} {entry.slug}" if entry else f"Error: {code}"
 
 
 @dataclass(frozen=True)
