@@ -91,11 +91,12 @@ class UnknownModelError(VlmPipelineError):
     code: ClassVar[str] = "SYS-000"
 
 
-def _hub_snapshot(root: Path, repo: str, revision: str, kind: str) -> Path:
+def _hub_snapshot(root: Path, repo: str, revision: str, kind: str, *, catalog_id: str, size_gb: float) -> Path:
     prefix = "models" if kind == "model" else "datasets"
     path = root / ".cache" / "hf" / "hub" / f"{prefix}--{repo.replace('/', '--')}" / "snapshots" / revision
-    if not path.is_dir():
-        raise NotCachedError(f"{repo}@{revision} not in cache", params={"repo": repo, "reason": "not_cached"})
+    if not path.is_dir():  # NET-002: catalog_id + kind feed POST /api/downloads (G-5), size_gb the card
+        params = {"repo": repo, "reason": "not_cached", "catalog_id": catalog_id, "kind": kind, "size_gb": size_gb}
+        raise NotCachedError(f"{repo}@{revision} not in cache", params=params)
     return path
 
 
@@ -279,9 +280,11 @@ class RealWorker:
             prepared = PREPARED_DIRS.get(entry.id)
             path = self.root / ".cache" / "prepared" / (prepared or "") / "model"
             if prepared is None or not (path / "config.json").is_file():
-                raise NotCachedError("prepared snapshot missing", params={"repo": entry.repo, "reason": "not_prepared"})
+                raise NotCachedError("prepared snapshot missing", params={
+                    "repo": entry.repo, "reason": "not_prepared", "catalog_id": entry.id, "kind": "model",
+                    "size_gb": entry.disk_gb})  # fmt: skip
             return path
-        return _hub_snapshot(self.root, entry.repo, entry.revision, "model")
+        return _hub_snapshot(self.root, entry.repo, entry.revision, "model", catalog_id=entry.id, size_gb=entry.disk_gb)
 
     def base_of(self, model: ArtifactRef) -> CatalogEntry:
         """Catalog model a Model/Checkpoint artifact comes from: itself, or the base recorded in its run.json."""
@@ -326,7 +329,7 @@ class RealWorker:
         if entry is None:
             raise NotCachedError("dataset not in the catalog", params={"repo": repo, "reason": "not_pinned"})
         revision = entry.revision
-        path = _hub_snapshot(self.root, repo, revision, "dataset")
+        path = _hub_snapshot(self.root, repo, revision, "dataset", catalog_id=entry.id, size_gb=entry.disk_gb)
         limit = int(getattr(job.params, "max_samples", 0) or 0)
         # The artifact is a small descriptor (snapshot + split + sample limit), so "quick run" sizes cost no copy.
         ref = DatasetRef(repo=repo, revision=revision, path=self.container_path(path), limit=limit)

@@ -14,6 +14,7 @@ The job is untrusted: everything it wrote is re-checked here, in the app process
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import secrets
@@ -138,6 +139,54 @@ def verify(stage: Path, *, kind: Kind, pins: dict[str, str], name: str) -> dict[
     return _check_tree(stage / "files", _read_plan(stage, params), kind=kind, pins=pins, params=params)
 
 
+INSTALLED_REL = Path("outputs") / "system" / "downloads" / "installed"
+
+
+def record_path(root: Path, kind: Kind, repo: str, revision: str) -> Path:
+    """The app's record of a verified snapshot (security P3): written by the host, never by a job."""
+    return root / INSTALLED_REL / f"{kind}--{repo.replace('/', '--')}@{revision}.json"
+
+
+def _write_record(root: Path, kind: Kind, repo: str, revision: str, planned: dict[str, dict[str, Any]]) -> None:
+    path = record_path(root, kind, repo, revision)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    files = [{k: f.get(k) for k in ("name", "size", "sha256", "git_sha1")} for f in planned.values()]
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(4)}")
+    tmp.write_text(json.dumps({"files": sorted(files, key=lambda f: str(f["name"]))}, indent=1), encoding="utf-8")
+    tmp.chmod(0o644)
+    tmp.replace(path)
+
+
+def verified(root: Path, kind: Kind, repo: str, revision: str) -> bool:
+    """A cheap re-check of a snapshot the app installed: its record exists and names + sizes still match.
+
+    "verified" means: matches the install record by name and size. The full hash check is the Check action
+    (``verify_existing``); the cache is written by the host only.
+    """
+    target = snapshot_dir(root, kind, repo, revision)
+    try:
+        record = read_small_json(record_path(root, kind, repo, revision), max_bytes=PLAN_MAX_BYTES)
+        files = {str(f["name"]): int(f["size"]) for f in record["files"]}  # type: ignore[index]
+        on_disk = {rel: path.stat().st_size for rel, path in _walk(target).items()}
+    except (OSError, ValueError, KeyError, TypeError, DownloadIntegrityError):
+        return False
+    return files == on_disk
+
+
+def verify_existing(root: Path, run_dir: Path, *, kind: Kind, repo: str, revision: str, catalog_id: str,
+                    name: str) -> Path:  # fmt: skip
+    """The Check action (plan-only job): an existing snapshot must match the hub's plan, then it gets its record."""
+    target = snapshot_dir(root, kind, repo, revision)
+    params: dict[str, object] = {"name": name, "reason": "cached_differs"}
+    if target.is_symlink() or not target.is_dir():
+        raise DownloadIntegrityError("no snapshot to check", params=params)
+    planned = _read_plan(run_dir / "stage", params)
+    pins = pinned_hashes(root, catalog_id, revision) if kind == "model" else {}
+    _check_tree(target, planned, kind=kind, pins=pins, params=params)
+    _write_record(root, kind, repo, revision, planned)
+    return target
+
+
 def snapshot_dir(root: Path, kind: Kind, repo: str, revision: str) -> Path:
     check_repo(repo, revision)
     prefix = "models" if kind == "model" else "datasets"
@@ -157,6 +206,7 @@ def install(root: Path, run_dir: Path, *, kind: Kind, repo: str, revision: str, 
         if target.is_symlink():
             raise DownloadIntegrityError("the cached snapshot is a link", params=cached)
         _check_tree(target, planned, kind=kind, pins=pins, params=cached)  # differs: never used, never overwritten
+        _write_record(root, kind, repo, revision, planned)
         shutil.rmtree(stage / "files", ignore_errors=True)
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -171,7 +221,17 @@ def install(root: Path, run_dir: Path, *, kind: Kind, repo: str, revision: str, 
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
+    _write_record(root, kind, repo, revision, planned)
     return target
 
 
-__all__ = ["DownloadIntegrityError", "install", "pinned_hashes", "snapshot_dir", "verify"]
+__all__ = [
+    "DownloadIntegrityError",
+    "install",
+    "pinned_hashes",
+    "record_path",
+    "snapshot_dir",
+    "verified",
+    "verify",
+    "verify_existing",
+]

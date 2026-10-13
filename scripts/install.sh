@@ -3,11 +3,19 @@
 # policy file, builds the two images and starts the stack. Safe to run again: nothing that exists is overwritten.
 #   scripts/install.sh              install / update and start
 #   scripts/install.sh --dry-run    print what it would do, change nothing
+#   scripts/install.sh --skip-download   do not offer to fetch the default template's model + dataset
 # Never run as root: the app, the runner and every job run as YOUR user id (security F2).
 set -euo pipefail
 
 DRY_RUN=0
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
+SKIP_DOWNLOAD=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=1 ;;
+    --skip-download) SKIP_DOWNLOAD=1 ;;
+    *) printf 'unknown option: %s\n' "$arg" >&2; exit 2 ;;
+  esac
+done
 ROOT="${VLM_INSTALL_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}"
 CONFIG_DIR="${HOME}/.config/ntc-training"
 
@@ -128,6 +136,19 @@ if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && [[ "$ours" != *":$PORT->"
 fi
 run "${COMPOSE[@]}" build
 run "${COMPOSE[@]}" up -d
+# The default template's model + dataset, through THE app's download path (vlm-runner, egress proxy, verify, install).
+if (( ! SKIP_DOWNLOAD )); then
+  answer="y"
+  large=()
+  if [[ -t 0 ]]; then
+    read -r -p "Download the default template's model and data now (a few GB)? [Y/n] " answer || true
+    [[ "${answer:-y}" =~ ^[Nn] ]] || large=(--yes-large)  # typed at a terminal: big files confirmed too
+  fi
+  if [[ ! "${answer:-y}" =~ ^[Nn] ]]; then  # no terminal: never confirms a download over the threshold (security P1)
+    run "${COMPOSE[@]}" exec -T app python -m vlm_pipeline.app.downloads --template invoice_to_json "${large[@]}" \
+      || say "WARNING: the download did not finish; the app offers it again (\"Download\" on the step)."
+  fi
+fi
 say ""
 say "NTC-Training is starting on http://127.0.0.1:$PORT/"
 say "Open the link printed by:  ${COMPOSE[*]} logs app | grep 'http://127.0.0.1'"

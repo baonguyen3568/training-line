@@ -102,6 +102,8 @@ def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = No
     (stage / "plan.json").write_text(json.dumps({"files": files, "total_bytes": total}, indent=1), encoding="utf-8")
     if kind == "model" and not any(f["name"].endswith(".safetensors") for f in files):
         return EXIT_NO_SAFETENSORS  # pickle-only weights are never fetched (security A.3)
+    if spec.get("plan_only") is True:  # "Check": the host compares an existing snapshot with this plan, no blob
+        return 0
     if total > spec["max_bytes"]:
         return EXIT_OVER_BUDGET
     out = stage / "files"

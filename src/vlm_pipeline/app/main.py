@@ -14,10 +14,11 @@ import time
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import Body, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
@@ -302,6 +303,74 @@ def _rendered_event(event: dict[str, Any], locale: str, labels: Labels | None) -
     return {**event, "error": {**error, **{k: text.get(k) for k in ("title", "what", "why", "title_key")}}}
 
 
+class DownloadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["model", "dataset"]
+    catalog_id: str = Field(min_length=1, max_length=96, pattern=r"^[a-z0-9][a-z0-9.\-]*$")
+    confirm: bool = False
+    check: bool = False  # verify a snapshot already in the cache against the hub (plan only, nothing re-downloaded)
+
+
+def _register_download_routes(
+    app: FastAPI, services: Services, bus: EventBus, ws_auth: Callable[[WebSocket], Awaitable[None]] | None
+) -> None:
+    """G-5 (P018): start a catalog download, list them; progress over WS ``/api/downloads/{id}/events``."""
+    root = getattr(services, "root", None)
+    if root is None:
+        return
+    from vlm_pipeline.app.downloads import DownloadService
+
+    def emit(download_id: str, event: dict[str, Any]) -> None:
+        bus.publish(download_id, {"download_id": download_id, "ts": time.time(), **event})
+        if event.get("type") == "status" and event.get("status") in ("completed", "failed"):
+            bus.close(download_id)
+
+    def token() -> str | None:
+        store = getattr(app.state, "secret_store", None)
+        return store.reveal("HF_TOKEN") if store is not None else None
+
+    service = DownloadService(root, emit=emit, token=token)
+    app.state.downloads = service
+
+    @app.post("/api/downloads", status_code=202)
+    def start_download(body: DownloadRequest) -> dict[str, Any]:
+        from vlm_pipeline.common.errors import VlmPipelineError
+
+        try:
+            result = service.start(body.kind, body.catalog_id, confirm=body.confirm, check=body.check)
+        except VlmPipelineError as exc:  # quota, disk, unknown, busy: the card's code and params, never a trace
+            status = 404 if exc.code == "CFG-004" else 409
+            raise HTTPException(status_code=status, detail={"code": exc.code, "params": exc.params}) from None
+        if result.get("download_id"):
+            bus.open(result["download_id"])
+        return result
+
+    @app.get("/api/downloads")
+    def list_downloads() -> list[dict[str, Any]]:
+        return [d.to_api() for d in service.downloads.values()]
+
+    @app.websocket("/api/downloads/{download_id}/events")
+    async def download_events(websocket: WebSocket, download_id: str) -> None:
+        if ws_auth is not None:
+            try:
+                await ws_auth(websocket)  # same auth as the run events (D13)
+            except PermissionError:
+                return
+        else:
+            await websocket.accept()
+        if not bus.known(download_id):
+            await websocket.send_json({"type": "download_not_found", "download_id": download_id})
+            await websocket.close(code=4404)
+            return
+        try:
+            async for event in bus.follow(download_id):
+                await websocket.send_json(event)
+            await websocket.close(code=1000)
+        except WebSocketDisconnect:
+            return
+
+
 def _register_ws(
     app: FastAPI,
     bus: EventBus,
@@ -458,6 +527,7 @@ def create_app(
     _register_run_routes(app, services)
     _register_info_routes(app, services, bus)
     _register_advanced_routes(app, services)
+    _register_download_routes(app, services, bus, ws_auth)
     _register_template_routes(app, services)
     _register_ws(app, bus, ws_auth, services.registry)
     if static_dir is None and getattr(services, "root", None) is not None:

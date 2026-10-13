@@ -20,7 +20,7 @@ import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
@@ -72,6 +72,10 @@ class ContainerJob:
     egress: bool = False
     secret_file: Path | None = None
     egress_auth: str | None = None  # "<job>:<key>" registered with the proxy (its byte budget); not the HF token
+    # What the APP hands vlm-runner for a download job (RunnerLauncher sends both; never on a docker argv): the
+    # proxy's byte budget and the HF token, kept in memory only (repr=False: never in a log or a traceback).
+    download_budget: int | None = None
+    hf_token: str | None = field(default=None, repr=False)
 
 
 # Env every first-party job gets (P003 D2, ADR-005 D1 caches); never secrets.
@@ -797,6 +801,19 @@ def _is_team_worktree(root: Path, code: Path) -> bool:
     return project and git_state(code)[0] is not None
 
 
+def _gpu_turn(
+    job: ContainerJob, queue: tuple[RunManifest, Path, Path, float, float], *, take: bool, **wait: Any
+) -> gpu_lock.LockHandle | RunManifest | None:
+    """The GPU lock (or the cancelled manifest) for a job that holds it; None for one that never does."""
+    if not take:
+        if job.gpu:
+            raise ValueError("a GPU job always holds the GPU lock")
+        return None
+    if job.egress:
+        raise ValueError("a download job never holds the GPU lock")
+    return _wait_for_gpu(*queue, **wait)  # (manifest, run_dir, lock path, est_peak_gb, ckpt_gb)
+
+
 def run_job(
     job: ContainerJob,
     manifest: RunManifest,
@@ -815,8 +832,12 @@ def run_job(
     memory_wait_s: float = 1800.0,
     lock_wait_s: float = 12 * 3600.0,
     launcher: JobLauncher | None = None,
+    take_gpu_lock: bool = True,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock.
+
+    ``take_gpu_lock=False`` only for jobs that never touch the GPU and must not wait behind a training run (catalog
+    downloads: their own one-at-a-time lock, P018); CPU-heavy jobs such as a LoRA merge keep the GPU lock.
 
     ``require_approved_image`` is fail-closed: only a team probe passes False explicitly (``jobrun_cli
     --allow-unapproved-image``); every other job needs a ``bao-security APPROVED`` row in docker/IMAGES.lock.
@@ -842,13 +863,14 @@ def run_job(
     )
     if waited is not None:  # cancelled while waiting: nothing started, nothing to clean up
         return waited
-    path = lock_path or gpu_lock.default_lock_path()
-    handle = _wait_for_gpu(
-        manifest, run_dir, path, est_peak_gb, ckpt_gb, who=who, project_root=project_root, cancel=cancel,
-        on_wait=on_wait, timeout_s=lock_wait_s, thresholds=mem_thresholds,
+    queue = (manifest, run_dir, lock_path or gpu_lock.default_lock_path(), est_peak_gb, ckpt_gb)
+    taken = _gpu_turn(
+        job, queue, take=take_gpu_lock, who=who, project_root=project_root, cancel=cancel, on_wait=on_wait,
+        timeout_s=lock_wait_s, thresholds=mem_thresholds,
     )  # fmt: skip
-    if isinstance(handle, RunManifest):  # cancelled while queued for the GPU
-        return handle
+    if isinstance(taken, RunManifest):  # cancelled while queued for the GPU
+        return taken
+    handle = taken
     container = f"vlm-{job.name}"
     try:
         # One job per run dir, ever (P017): the atomic claim is the real gate (the early check above only avoids
@@ -884,7 +906,11 @@ def run_job(
         log_path = run_dir / "logs" / "stdout.log"
         _, guard = run_guarded(
             lambda: launcher.run(
-                job, project_root, lock_token=handle.info.token, log_path=log_path, image_id=pinned_id
+                job,
+                project_root,
+                lock_token=handle.info.token if handle else None,
+                log_path=log_path,
+                image_id=pinned_id,
             ),
             log_path,
             on_abort=lambda: launcher.stop(container, STOP_GRACE_S),
@@ -940,4 +966,5 @@ def run_job(
         raise
     finally:
         launcher.remove(container)
-        gpu_lock.release(handle)
+        if handle is not None:
+            gpu_lock.release(handle)

@@ -64,6 +64,8 @@ class LocalDockerLauncher:
 
         from vlm_pipeline.common.jobrun import docker_args
 
+        if job.download_budget is not None or job.hf_token is not None:  # no egress proxy outside the compose stack
+            raise RunnerError("downloads_need_runner")
         pinned = dataclasses.replace(job, image=image_id) if image_id else job  # run by id, never re-resolve the tag
         argv = docker_args(pinned, project_root, lock_token=lock_token, image_id=image_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,7 +155,13 @@ class RunnerLauncher:
         kind = job_kind(argv)
         if kind is None:
             raise RunnerError("argv_not_allowed")
+        extra: dict[str, object] = {}
+        if job.download_budget is not None:  # a catalog download (P018): its budget, and the token if the user set one
+            extra["max_bytes"] = job.download_budget
+            if job.hf_token:
+                extra["hf_token"] = job.hf_token
         reply = self._call({
+            **extra,
             "command": "submit", "run_id": job.name, "job_kind": kind, "image_tag": job.image, "argv": list(argv),
             "gpu": job.gpu, "memory_gb": job.memory_gb, "lock_token": lock_token,
             "run_dir": _app_path(job.rw_dirs[0], project_root),
