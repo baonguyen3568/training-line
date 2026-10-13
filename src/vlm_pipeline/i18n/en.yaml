@@ -1359,6 +1359,7 @@ pipelines:
     advanced: Advanced
   not_assessed: not assessed
   time: Time
+  measured: Measured on DGX Spark
   ram_peak: peak RAM {gb} GB
   hf_terms: Accept the model's terms on Hugging Face before downloading
   hf_terms_detail: This model requires a Hugging Face login and your own acceptance of the author's terms, including the NVIDIA Open Model License guardrail terms. The app never accepts them for you.
