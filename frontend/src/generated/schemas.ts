@@ -27,6 +27,7 @@ export type RunManifest = {
   ended_at?: number | null;
   engine_warnings?: string[] | null;
   error_code?: string | null;
+  est_peak_gb?: number | null;
   exit_code?: number | null;
   git_commit?: string | null;
   git_dirty?: boolean | null;
@@ -45,6 +46,7 @@ export type RunManifest = {
   resumed_from?: {
     [extra: string]: string | undefined;
   } | null;
+  retried_after?: string | null;
   run_id: string;
   schema_version?: number;
   seed?: number | null;
