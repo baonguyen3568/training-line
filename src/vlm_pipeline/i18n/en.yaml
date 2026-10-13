@@ -996,7 +996,7 @@ template:
     desc: Lightly fine-tune a vision-language model on your images and Q&A. Try it right away with the sample invoice data.
   quantize_bench:
     title: Compress a model & re-check scores
-    desc: Make the model smaller and faster, then score it under the same conditions as the original to see how much quality changes.
+    desc: Make the model smaller so it uses less memory, then score it under the same conditions as the original to see how much quality changes.
   invoice_to_json:
     title: Read receipts → JSON
     desc: Teach a model to read receipt photos and return fields (store, items, total…) as JSON. Runs right away on the CORD-v2 sample data, no account needed.

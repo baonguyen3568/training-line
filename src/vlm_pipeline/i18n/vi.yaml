@@ -996,7 +996,7 @@ template:
     desc: Fine-tune nhẹ một model nhìn-hiểu-ảnh bằng ảnh và câu hỏi/đáp án của bạn. Chạy thử ngay với dữ liệu mẫu hoá đơn.
   quantize_bench:
     title: Nén model & đo lại điểm
-    desc: Nén model cho nhỏ và nhanh hơn, rồi đo điểm cùng điều kiện với bản gốc để thấy chất lượng giảm bao nhiêu.
+    desc: Nén model cho nhỏ hơn và tốn ít bộ nhớ hơn, rồi đo điểm cùng điều kiện với bản gốc để thấy chất lượng giảm bao nhiêu.
   invoice_to_json:
     title: Đọc hoá đơn → JSON
     desc: Dạy model đọc ảnh hoá đơn và trả về các trường (cửa hàng, món, tổng tiền…) dạng JSON. Chạy được ngay với dữ liệu mẫu CORD-v2, không cần tài khoản.
