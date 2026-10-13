@@ -15,6 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
+from vlm_pipeline.app.trial_worker import run_trial
 from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
 from vlm_pipeline.common.dataset_ref import DatasetRef, read_dataset_ref, write_dataset_ref
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
@@ -124,6 +125,7 @@ class RealWorker:
             "data.split": self._split,
             "train.lora_vlm": self._train,
             "train.sft_vlm": self._train,
+            "serve.vllm": functools.partial(run_trial, self),  # B-7 "Chạy thử" (app/trial_worker.py)
         }
 
     def supports(self, spec: NodeSpec) -> bool:

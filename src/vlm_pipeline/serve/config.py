@@ -12,12 +12,22 @@ from pydantic import Field
 
 from vlm_pipeline.common.params import Params, ui
 
+# An upload id from `POST /api/uploads` (frontend contract, P014): the server stores <workspace>/uploads/<id>.png
+# (uuid name, re-encoded PNG, EXIF dropped) and maps the id to that file at run time, so workflows carry no paths.
+UPLOAD_ID_PATTERN = r"^([0-9a-f]{32})?$"
+
+
 ANSWER_TOKENS = {"short": 256, "medium": 1024, "long": 4096}
 
 
 class InferenceParams(Params):
+    # Image to answer: an upload id ("" = not chosen yet -> DATA-005). The worker re-checks the stored file before the
+    # GPU lock (regular file, no symlink, size) and the container checks format and pixels (bao-security).
+    image: str = Field("", pattern=UPLOAD_ID_PATTERN, json_schema_extra=ui(order=0, widget="image_upload"))
+    # Question for chat VLMs; ignored by models with a fixed task prompt (Nemotron-Parse, catalog task_prompt_fixed).
+    prompt: str = Field("", max_length=2000, json_schema_extra=ui(order=1, widget="textarea"))
     answer_length: Literal["short", "medium", "long"] = Field(
-        "medium", json_schema_extra=ui(order=0, widget="segmented", option_keys="answer_length")
+        "medium", json_schema_extra=ui(order=2, widget="segmented", option_keys="answer_length")
     )
     engine: Literal["vllm", "hf"] = Field("vllm", json_schema_extra=ui(advanced=True, option_keys="serve_engine"))
     temperature: float = Field(0.0, ge=0.0, le=1.5, json_schema_extra=ui(advanced=True))

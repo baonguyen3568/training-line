@@ -248,6 +248,25 @@ DATA-004:
     - {id: view_bad_samples, kind: navigate, target: data_samples, confirm: false}
     - {id: skip_bad_samples, kind: patch, patch: [{param: skip_invalid_samples, op: set, value: true}], confirm: false}
 
+DATA-005:
+  slug: TRIAL_IMAGE_UNUSABLE
+  severity: error
+  prevent_in_preflight: true
+  # The image of a trial-inference node ("Chạy thử", serve.vllm) cannot be used (bao-security rules, serve/trial.py):
+  # missing, not a regular file under uploads/, > 20 MB, > 40 MP, or not a readable PNG/JPEG/WEBP.
+  params:
+    - {name: node, ref: node}
+    - {name: reason, type: enum, values: [missing, not_a_file, too_large, too_many_pixels, unreadable]}
+  variants:
+    - {when: {reason: missing}, key: missing}
+    - {when: {reason: [not_a_file, unreadable]}, key: unreadable}
+    - {when: {reason: too_large}, key: too_large}
+    - {when: {reason: too_many_pixels}, key: too_many_pixels}
+  match:
+    - {kind: executor, value: "app/workers.py RealWorker._serve image checks + serve/trial.py TrialInputError"}
+  actions:
+    - {id: open_node, kind: navigate, target: "node:self", confirm: false}
+
 MODEL-001:
   slug: CKPT_LOAD_KEY_MISMATCH
   severity: error
