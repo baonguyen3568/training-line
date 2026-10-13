@@ -63,3 +63,26 @@ Footer chia 4 cột:
 - **Chốt slug `mau` → `template`:** frontend/cleancode đổi nếu đồng ý.
 - **Trang #24:** fixcode và mình làm generator (một trang, đọc YAML lúc build).
 - **Copy trang #1, #2, #7, #8, #9:** mình viết sau khi user chọn hướng (M2-1), vì giọng văn phụ thuộc hướng thiết kế.
+
+## Release 1.0 — bản chốt (2026-10-13, 30 trang)
+Thay cho bảng trên. Các trang đã có giữ nguyên slug.
+
+**Sản phẩm (9):** `/`, `/tinh-nang`, `/template`, `/truong-hop-su-dung`, `/gioi-thieu`, `/ma-nguon-mo`, `/lo-trinh` (mới), `/thay-doi` (mới), `/lien-he`
+**Tài liệu (14):** bat-dau, cai-dat, chuan-bi-du-lieu, node-va-cong, kiem-tra-truoc-khi-chay, catalog-model, doc-diem-benchmark,
+phan-cung-va-bo-nho, quan-ly-dung-luong, chinh-sach-luu-giu, xu-ly-su-co-bo-nho, ma-loi, gioi-han-da-biet, faq-ky-thuat
+**Pháp lý (6):** 5 trang `/chinh-sach/*` + `ben-thu-ba`
+**Khác (1):** `/404`
+
+Thay đổi so với bản 1:
+1. **Bỏ 3 trang con `/template/*` (#4–6).** `/template` trở thành thư viện pipeline tham chiếu (≥8 theo luồng C), mỗi pipeline là một khối có anchor
+   (`/template#doc-hoa-don`…). Dữ liệu sinh lúc build từ `configs/templates/*.json` + i18n, giống cách làm `/docs/ma-loi`, để site không lệch app.
+   Mỗi khối gồm: việc làm được, model, dữ liệu mẫu, giấy phép, số đo (thời gian, RAM, điểm) có nguồn hoặc "chưa có số đo", và nguồn công bố gốc.
+   "Built on NVIDIA Cosmos" chỉ hiện ở khối Cosmos. Owner: research (dữ liệu) + frontend (generator) + design (copy khung).
+2. **Gộp `/docs/yeu-cau-he-thong` vào `/docs/cai-dat`** thành mục "Trước khi cài" (anchor `#yeu-cau-he-thong`). Hai trang cùng trả lời
+   câu "máy tôi cài được không". Trang cũ giữ lại dạng chuyển hướng giống `/mau`. Owner: cleanup.
+3. **Hoãn `/docs/node-ben-thu-ba` (#25)** tới khi tính năng cài node bên thứ ba chạy được (quy tắc: không mô tả tính năng chưa có).
+4. **`/lo-trinh`:** design viết từ BOARD (Release 1.0, M3, M4). Chỉ ghi "đã xong" hoặc "đang làm", không hứa ngày.
+5. **`/thay-doi`:** cleancode làm generator đọc git tag. Khi chưa có tag 1.0 thì trang ghi "Chưa có bản phát hành", không viết tay.
+6. **Bung bước lớn (subgraph) và chế độ Nâng cao:** thêm mục vào `/docs/node-va-cong` khi P016 ship (research). **Trang Cài đặt:** thêm mục vào
+   `/docs/cai-dat`, giải thích mục bị khoá bởi quản trị (cleanup/backend).
+7. FAQ phổ thông giữ dạng accordion ở Trang chủ + `/tinh-nang`, không có trang riêng.
