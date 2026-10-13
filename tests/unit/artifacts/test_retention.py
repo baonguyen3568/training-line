@@ -798,3 +798,21 @@ def test_eval_cache_symlinks_fresh_files_and_broken_manifests_are_kept(tmp_path:
     _age_tree(broken, 9)
     assert _cache_items(tmp_path) == {broken.name: ("delete", "RUN_NOT_FINISHED")}
     assert (outside / "keep.txt").exists()
+
+
+def test_eval_cache_names_with_a_catalog_id_prefix(tmp_path: Path) -> None:
+    """bao-tester: CORD caches gain the catalog id (cord-v2-<24hex>); old bare-hash leftovers are still cleaned."""
+    stale = time.strftime("%Y%m%d-%H%M%S", time.localtime(NOW - 9 * DAY))
+    _cache_entry(tmp_path, f"cord-v2-{H24}", age_days=90)  # the cache: never
+    _cache_entry(tmp_path, f"cord-v2-{H24}.tmp-77-def456", age_days=9, status="failed")
+    _cache_entry(tmp_path, f"cord-v2-{H24}.stale-{stale}", age_days=9, status=None)
+    _cache_entry(tmp_path, f"cord-v2-{H24}.run-5-abcdef", age_days=9)
+    _cache_entry(tmp_path, f".cord-v2-{H24}.json.0123abcd.tmp", age_days=2, file=True)
+    _cache_entry(tmp_path, f"{H24}.stale-{stale}", age_days=9, status=None)  # old bare-hash leftover
+    assert set(_cache_items(tmp_path)) == {
+        f"cord-v2-{H24}.tmp-77-def456",
+        f"cord-v2-{H24}.stale-{stale}",
+        f"cord-v2-{H24}.run-5-abcdef",
+        f".cord-v2-{H24}.json.0123abcd.tmp",
+        f"{H24}.stale-{stale}",
+    }

@@ -75,11 +75,14 @@ EVAL_INVALID_RE = re.compile(r"\.([A-Za-z0-9._-]+)\.invalid-([0-9]{8}-[0-9]{6})-
 EVAL_TMP_RE = re.compile(r"\.([A-Za-z0-9._-]+)\.[0-9a-f]{8}\.tmp", re.ASCII)  # fullmatch: an install that crashed
 DOWNLOAD_ACTIVE_REL = Path("outputs") / "system" / "downloads" / "active"  # O_EXCL while a download/install runs
 EVAL_CACHE_REL = Path("outputs") / "eval-cache"  # base-model scores reused across runs; only leftovers are items
-# fullmatch, names from eval/node_worker.py and eval_cord_worker (bao-tester). Never: <suite>-<24hex>.json, <24hex>/
-EVAL_CACHE_RUN_RE = re.compile(r"[a-z][a-z0-9_]*-[0-9a-f]{24}\.run-[0-9]+-[0-9a-f]{6}", re.ASCII)  # job run dir
-EVAL_CACHE_CORD_TMP_RE = re.compile(r"[0-9a-f]{24}\.tmp-[0-9]+-[0-9a-f]{6}", re.ASCII)  # CORD generation turn
-EVAL_CACHE_STALE_RE = re.compile(r"[0-9a-f]{24}\.stale-([0-9]{8}-[0-9]{6})", re.ASCII)  # replaced CORD cache
-EVAL_CACHE_JSON_TMP_RE = re.compile(r"\.[a-z][a-z0-9_]*-[0-9a-f]{24}\.json\.[0-9a-f]{8}\.tmp", re.ASCII)  # file
+# fullmatch, names from eval/node_worker.py and eval_cord_worker (bao-tester). Never: <ds>-<24hex>.json, [<ds>-]<24hex>/
+# <ds> = a dataset catalog id ("ocrbench", "cord-v2"); old CORD caches have no prefix (bare <24hex>).
+_DS = r"[a-z][a-z0-9_-]*"
+EVAL_CACHE_KEY_RE = re.compile(rf"(?:({_DS})-)?[0-9a-f]{{24}}", re.ASCII)  # fullmatch of a cache name's stem
+EVAL_CACHE_RUN_RE = re.compile(rf"{_DS}-[0-9a-f]{{24}}\.run-[0-9]+-[0-9a-f]{{6}}", re.ASCII)  # job run dir
+EVAL_CACHE_CORD_TMP_RE = re.compile(rf"(?:{_DS}-)?[0-9a-f]{{24}}\.tmp-[0-9]+-[0-9a-f]{{6}}", re.ASCII)  # CORD turn
+EVAL_CACHE_STALE_RE = re.compile(rf"(?:{_DS}-)?[0-9a-f]{{24}}\.stale-([0-9]{{8}}-[0-9]{{6}})", re.ASCII)  # replaced
+EVAL_CACHE_JSON_TMP_RE = re.compile(rf"\.{_DS}-[0-9a-f]{{24}}\.json\.[0-9a-f]{{8}}\.tmp", re.ASCII)  # file
 MANUAL_REASON = "MANUAL_ONLY"  # blocked_by of items a person may delete from the panel, never the scheduler
 GRAPH_RUNS_REL = Path("outputs") / "graph" / "runs"  # node run dirs of the graph executor (set-aside data only)
 SET_ASIDE_RE = re.compile(r"(checkpoints|metrics\.jsonl)\.not-resumable-([0-9]{8}-[0-9]{6})", re.ASCII)  # fullmatch

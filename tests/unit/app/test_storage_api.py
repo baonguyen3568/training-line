@@ -786,3 +786,24 @@ def test_an_old_eval_cache_leftover_is_an_auto_row(env: tuple[TestClient, Artifa
     resp = client.post("/api/storage/apply", json={"plan_id": plan_id, "item_ids": [f"evalcache:{name}"]})
     assert resp.status_code == 200, resp.text
     assert not run.exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
+        ("ocrbench-0123456789abcdef01234567.run-4242-abc123", "OCRBench"),
+        ("cord-v2-0123456789abcdef01234567.tmp-7-abc123", "CORD v2"),
+        ("0123456789abcdef01234567.tmp-7-abc123", "CORD v2"),  # old bare-hash CORD leftover
+    ],
+)
+def test_eval_cache_rows_show_the_catalog_name(
+    env: tuple[TestClient, ArtifactIndex, Path, Clock], name: str, shown: str
+) -> None:
+    client, _, root, _ = env
+    run = root / "outputs" / "eval-cache" / name
+    (run / "logs").mkdir(parents=True)
+    (run / "out.jsonl").write_bytes(b"x" * 4 * KB)
+    (run / "run.json").write_text(json.dumps({"run_id": name, "status": "completed"}))
+    _aged(run, 9)
+    _, items = _plan_items(client)
+    assert items[f"evalcache:{name}"]["display_params"]["dataset"] == shown

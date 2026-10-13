@@ -214,15 +214,16 @@ def _needs_confirm(item: retention.PlanItem) -> bool:
     return item.blocked_by == retention.CONFIRM_REASON or item.consequence_code == PERMANENT_LOSS
 
 
-def _dataset_name(suite: str) -> str:
+def _dataset_name(dataset_id: str | None) -> str:
     """Catalog ``display_name`` of an eval-cache entry's dataset ("OCRBench", "CORD v2"), else the raw id.
 
-    Named caches start with the dataset id (``ocrbench-<key>``); the bare-hash ones are the Parse/CORD cache.
+    Caches start with the dataset catalog id (``ocrbench-<key>``, ``cord-v2-<key>``); None = an old bare-hash
+    cache, which is the Parse/CORD one.
     """
     from vlm_pipeline.common.catalog import load_dataset_catalog  # local: only these rows need the catalog
     from vlm_pipeline.eval.node_worker import CORD_DATASET_ID
 
-    dataset_id = CORD_DATASET_ID if len(suite) == 24 or "." in suite else suite
+    dataset_id = dataset_id or CORD_DATASET_ID
     try:
         entry = load_dataset_catalog().get(dataset_id)
     except (OSError, ValueError):
@@ -245,8 +246,9 @@ def _eval_display(item: retention.PlanItem) -> dict[str, str]:
     For an eval-cache leftover ``dataset`` is its dataset's catalog display name (``_dataset_name``).
     """
     if item.kind == "eval_cache":
-        suite = item.run_id.lstrip(".").split("-", 1)[0]
-        return {"dataset": _dataset_name(suite), "stamp": ""}
+        stem = item.run_id.lstrip(".").split(".", 1)[0]  # [<ds>-]<24hex>
+        key = retention.EVAL_CACHE_KEY_RE.fullmatch(stem)
+        return {"dataset": _dataset_name(key.group(1) if key else None), "stamp": ""}
     invalid = retention.EVAL_INVALID_RE.fullmatch(item.run_id)
     if invalid is not None:
         stamp = invalid.group(2)
