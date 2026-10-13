@@ -61,6 +61,7 @@ storage:
   item:
     temp_result_of_run: Kết quả tạm của run {run_name}
     checkpoint_of_run: Checkpoint {checkpoint} của run {run_name}
+    eval_cache_leftover: "Phần còn lại sau khi chấm điểm \"{dataset}\" (điểm đã lưu vẫn giữ)"
     eval_data_invalid: "Dữ liệu chấm điểm \"{dataset}\" bị lỗi (app cất riêng lúc {stamp})"
     eval_data_unfinished: "Bản cài dở của dữ liệu chấm điểm \"{dataset}\""
     set_aside_of_run: Bản train cũ đã cất của run {run_name}

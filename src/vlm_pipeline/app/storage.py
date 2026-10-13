@@ -44,7 +44,7 @@ from vlm_pipeline.common.runinfo import read_small_json
 logger = logging.getLogger(__name__)
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 ApprovalPolicy = Literal["none", "threshold"]
-Source = Literal["node_cache", "checkpoint", "set_aside", "eval_data"]
+Source = Literal["node_cache", "checkpoint", "set_aside", "eval_data", "eval_cache"]
 CACHE: Source = "node_cache"
 PERMANENT_LOSS = "PERMANENT_LOSS"
 CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
@@ -215,6 +215,8 @@ def _needs_confirm(item: retention.PlanItem) -> bool:
 
 
 def _retention_display_key(item: retention.PlanItem) -> str:
+    if item.kind == "eval_cache":
+        return "storage.item.eval_cache_leftover"
     if item.kind == "eval_data":
         invalid = retention.EVAL_INVALID_RE.fullmatch(item.run_id) is not None
         return "storage.item.eval_data_invalid" if invalid else "storage.item.eval_data_unfinished"
@@ -222,7 +224,13 @@ def _retention_display_key(item: retention.PlanItem) -> str:
 
 
 def _eval_display(item: retention.PlanItem) -> dict[str, str]:
-    """``{dataset, stamp}`` of ``.<dataset>.invalid-<YYYYmmdd-HHMMSS>-<hex>`` / ``.<dataset>.<hex8>.tmp``."""
+    """``{dataset, stamp}`` of ``.<dataset>.invalid-<YYYYmmdd-HHMMSS>-<hex>`` / ``.<dataset>.<hex8>.tmp``.
+
+    For an eval-cache leftover ``dataset`` is its suite (``ocrbench``, or "CORD" for the bare-hash Parse cache).
+    """
+    if item.kind == "eval_cache":
+        suite = item.run_id.lstrip(".").split("-", 1)[0]
+        return {"dataset": "CORD" if len(suite) == 24 or "." in suite else suite, "stamp": ""}
     invalid = retention.EVAL_INVALID_RE.fullmatch(item.run_id)
     if invalid is not None:
         stamp = invalid.group(2)
@@ -249,13 +257,13 @@ def _retention_item(
     ckpt = item.path.removeprefix("checkpoints/")
     confirm = section == "manual" and _needs_confirm(item)
     kept = section == "kept"
-    eval_data = item.kind == "eval_data"
+    eval_data = item.kind in ("eval_data", "eval_cache")
     return {
         "item_id": item.item_id,
-        "source": item.kind if item.kind in ("checkpoint", "set_aside", "eval_data") else "checkpoint",
+        "source": item.kind if item.kind in ("checkpoint", "set_aside", "eval_data", "eval_cache") else "checkpoint",
         "section": section,
         "auto": section == "auto",
-        "group": "dataset" if eval_data else "trained_model",
+        "group": {"eval_data": "dataset", "eval_cache": "temp_result"}.get(item.kind, "trained_model"),
         "display_name": None,
         "display_key": _retention_display_key(item),
         "display_params": _eval_display(item) if eval_data else {"run_name": item.run_id, "checkpoint": ckpt},

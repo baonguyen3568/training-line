@@ -764,3 +764,25 @@ def test_a_young_faulty_eval_copy_is_a_manual_row_without_typing(
     resp = client.post("/api/storage/apply", json={"plan_id": plan_id, "item_ids": [f"eval:{copy.name}"]})
     assert resp.status_code == 200, resp.text
     assert not copy.exists()
+
+
+def test_an_old_eval_cache_leftover_is_an_auto_row(env: tuple[TestClient, ArtifactIndex, Path, Clock]) -> None:
+    client, _, root, _ = env
+    name = "ocrbench-0123456789abcdef01234567.run-4242-abc123"
+    run = root / "outputs" / "eval-cache" / name
+    (run / "logs").mkdir(parents=True)
+    (run / "out.jsonl").write_bytes(b"x" * 4 * KB)
+    (run / "run.json").write_text(json.dumps({"run_id": name, "status": "completed"}))
+    _aged(run, 9)
+    plan_id, items = _plan_items(client)
+    row = items[f"evalcache:{name}"]
+    assert (row["source"], row["section"], row["group"], row["regenerable"]) == (
+        "eval_cache",
+        "auto",
+        "temp_result",
+        True,
+    )
+    assert (row["display_key"], row["display_params"]["dataset"]) == ("storage.item.eval_cache_leftover", "ocrbench")
+    resp = client.post("/api/storage/apply", json={"plan_id": plan_id, "item_ids": [f"evalcache:{name}"]})
+    assert resp.status_code == 200, resp.text
+    assert not run.exists()

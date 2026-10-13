@@ -718,3 +718,83 @@ def test_eval_data_waits_for_a_running_download_and_honors_keep(tmp_path: Path) 
     active.parent.mkdir(parents=True)
     active.touch()
     assert _eval_items(tmp_path) == {}
+
+
+H24 = "0123456789abcdef01234567"
+
+
+def _cache_entry(
+    root: Path, name: str, *, age_days: float, status: str | None = "completed", file: bool = False
+) -> Path:
+    if not (root / "pyproject.toml").exists():
+        (root / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
+    p = root / "outputs" / "eval-cache" / name
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if file:
+        p.write_text("{}")
+    else:
+        (p / "logs").mkdir(parents=True)
+        (p / "out.jsonl").write_text("{}\n" * 50)
+        if status is not None:
+            (p / "run.json").write_text(json.dumps({"run_id": name, "status": status}))
+    _age_tree(p, age_days)
+    return p
+
+
+def _cache_items(root: Path, **kw: object) -> dict[str, tuple[str, str | None]]:
+    p = plan(root, now=NOW, lock_reader=kw.pop("lock_reader", no_lock))  # type: ignore[arg-type]
+    return {i.run_id: (i.action, i.blocked_by) for r in p.runs for i in r.items if i.kind == "eval_cache"}
+
+
+def test_eval_cache_leftovers_go_after_seven_days_the_caches_never(tmp_path: Path) -> None:
+    """bao-tester's layout (eval/node_worker.py, eval_cord_worker): only leftovers are items."""
+    stale = time.strftime("%Y%m%d-%H%M%S", time.localtime(NOW - 9 * DAY))
+    _cache_entry(tmp_path, f"ocrbench-{H24}.json", age_days=90, file=True)  # the cache: never
+    _cache_entry(tmp_path, H24, age_days=90)  # the CORD cache: never
+    _cache_entry(tmp_path, f"ocrbench-{H24}.run-4242-abc123", age_days=9)
+    _cache_entry(tmp_path, f"ocrbench-{H24}.run-4243-abc124", age_days=2)  # too young: not shown
+    _cache_entry(tmp_path, f"ocrbench-{H24}.run-4244-abc125", age_days=9, status="running")
+    _cache_entry(tmp_path, f"ocrbench-{H24}.run-4245-abc126", age_days=9, status=None)  # never wrote run.json
+    _cache_entry(tmp_path, f"{H24}.tmp-77-def456", age_days=9, status="failed")
+    _cache_entry(tmp_path, f"{H24}.stale-{stale}", age_days=9, status=None)
+    _cache_entry(tmp_path, f".ocrbench-{H24}.json.0123abcd.tmp", age_days=2, file=True)
+    _cache_entry(tmp_path, f"ocrbench-{H24}.run-x-abc127", age_days=90)  # not our name
+    assert _cache_items(tmp_path) == {
+        f"ocrbench-{H24}.run-4242-abc123": ("delete", None),
+        f"ocrbench-{H24}.run-4244-abc125": ("delete", "RUN_NOT_FINISHED"),
+        f"ocrbench-{H24}.run-4245-abc126": ("delete", None),
+        f"{H24}.tmp-77-def456": ("delete", None),
+        f"{H24}.stale-{stale}": ("delete", None),
+        f".ocrbench-{H24}.json.0123abcd.tmp": ("delete", None),
+    }
+    done = apply(tmp_path, [f"evalcache:ocrbench-{H24}.run-4242-abc123"], by="t", now=NOW, lock_reader=no_lock).done
+    assert len(done) == 1
+    assert (tmp_path / "outputs" / "eval-cache" / f"ocrbench-{H24}.json").exists()
+    rec = json.loads((tmp_path / "outputs" / "system" / "cleanup.jsonl").read_text().splitlines()[-1])
+    assert rec["event"] == "eval_cache_pruned"
+
+
+def test_eval_cache_run_holding_the_gpu_lock_is_kept(tmp_path: Path) -> None:
+    name = f"ocrbench-{H24}.run-4242-abc123"
+    _cache_entry(tmp_path, name, age_days=9, status="completed")
+    held = LockStatus(who="t", job="j", run_id=name, host_pid=1, started_at="s", alive=True)
+    assert _cache_items(tmp_path, lock_reader=lambda _p: held) == {name: ("delete", "GPU_LOCK_HOLDER")}
+
+
+def test_eval_cache_symlinks_fresh_files_and_broken_manifests_are_kept(tmp_path: Path) -> None:
+    """bao-tester: a link is never listed/followed; a fresh file deep in the tree keeps it; a broken run.json too."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep.txt").write_text("x")
+    _cache_entry(tmp_path, f"ocrbench-{H24}.json", age_days=1, file=True)  # creates the folder
+    link = tmp_path / "outputs" / "eval-cache" / f"ocrbench-{H24}.run-1-aaaaaa"
+    link.symlink_to(outside)
+    fresh = _cache_entry(tmp_path, f"ocrbench-{H24}.run-2-bbbbbb", age_days=9)
+    (fresh / "logs" / "stdout.log").write_text("still writing")  # mtime now, the dir itself 9 days old
+    os.utime(fresh, (NOW - 9 * DAY, NOW - 9 * DAY))
+    os.utime(fresh / "logs" / "stdout.log", (NOW - 3600, NOW - 3600))
+    broken = _cache_entry(tmp_path, f"ocrbench-{H24}.run-3-cccccc", age_days=9)
+    (broken / "run.json").write_text("{not json")
+    _age_tree(broken, 9)
+    assert _cache_items(tmp_path) == {broken.name: ("delete", "RUN_NOT_FINISHED")}
+    assert (outside / "keep.txt").exists()

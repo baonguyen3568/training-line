@@ -74,6 +74,12 @@ EVAL_DATA_REL = (
 EVAL_INVALID_RE = re.compile(r"\.([A-Za-z0-9._-]+)\.invalid-([0-9]{8}-[0-9]{6})-[0-9a-f]{4}", re.ASCII)  # fullmatch
 EVAL_TMP_RE = re.compile(r"\.([A-Za-z0-9._-]+)\.[0-9a-f]{8}\.tmp", re.ASCII)  # fullmatch: an install that crashed
 DOWNLOAD_ACTIVE_REL = Path("outputs") / "system" / "downloads" / "active"  # O_EXCL while a download/install runs
+EVAL_CACHE_REL = Path("outputs") / "eval-cache"  # base-model scores reused across runs; only leftovers are items
+# fullmatch, names from eval/node_worker.py and eval_cord_worker (bao-tester). Never: <suite>-<24hex>.json, <24hex>/
+EVAL_CACHE_RUN_RE = re.compile(r"[a-z][a-z0-9_]*-[0-9a-f]{24}\.run-[0-9]+-[0-9a-f]{6}", re.ASCII)  # job run dir
+EVAL_CACHE_CORD_TMP_RE = re.compile(r"[0-9a-f]{24}\.tmp-[0-9]+-[0-9a-f]{6}", re.ASCII)  # CORD generation turn
+EVAL_CACHE_STALE_RE = re.compile(r"[0-9a-f]{24}\.stale-([0-9]{8}-[0-9]{6})", re.ASCII)  # replaced CORD cache
+EVAL_CACHE_JSON_TMP_RE = re.compile(r"\.[a-z][a-z0-9_]*-[0-9a-f]{24}\.json\.[0-9a-f]{8}\.tmp", re.ASCII)  # file
 MANUAL_REASON = "MANUAL_ONLY"  # blocked_by of items a person may delete from the panel, never the scheduler
 GRAPH_RUNS_REL = Path("outputs") / "graph" / "runs"  # node run dirs of the graph executor (set-aside data only)
 SET_ASIDE_RE = re.compile(r"(checkpoints|metrics\.jsonl)\.not-resumable-([0-9]{8}-[0-9]{6})", re.ASCII)  # fullmatch
@@ -131,6 +137,7 @@ class RetentionPolicy:
     interrupted_days: float = 7.0  # interrupted: resumable this long after the last activity, then like failed
     invalid_eval_days: float = 7.0  # data/eval/.<name>.invalid-<stamp>-<hex>: kept for investigation, then deleted
     eval_tmp_days: float = 1.0  # data/eval/.<name>.<hex8>.tmp left by a crashed install
+    eval_cache_days: float = 7.0  # outputs/eval-cache job run dirs / replaced copies: investigation value only
     approval_threshold_gb: float = 20.0  # D7.4: above this the CLI needs --approved-by
     approval_window_s: float = DAY_S  # unapproved deletes are summed over this window (no splitting into batches)
 
@@ -158,6 +165,8 @@ class PlanItem:
     def item_id(self) -> str:
         if self.runs_rel == EVAL_DATA_REL.as_posix():
             return f"eval:{self.run_id}"
+        if self.runs_rel == EVAL_CACHE_REL.as_posix():
+            return f"evalcache:{self.run_id}"
         prefix = "graph:" if self.runs_rel == GRAPH_RUNS_REL.as_posix() else ""
         return f"{prefix}{self.run_id}/{self.path}"
 
@@ -640,9 +649,86 @@ def plan(
         if set_aside:  # node checkpoints themselves belong to the node cache (cache_retention), not to D3
             status, _ = read_run_status(run_dir)
             runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(set_aside)))
-    eval_items = _plan_eval_data(root, now=ts, policy=policy) if run_ids is None else []
-    eval_run = [RunPlan(EVAL_DATA_REL.as_posix(), "n/a", False, tuple(eval_items))] if eval_items else []
-    return Plan(ts=ts, runs=(*runs, *eval_run), policy=policy, lock=lock)
+    extra = _plan_eval_leftovers(root, lock, now=ts, policy=policy) if run_ids is None else []
+    return Plan(ts=ts, runs=(*runs, *extra), policy=policy, lock=lock)
+
+
+def _plan_eval_leftovers(root: Path, lock: LockStatus | None, *, now: float, policy: RetentionPolicy) -> list[RunPlan]:
+    """Pseudo-runs for ``data/eval`` and ``outputs/eval-cache`` leftovers (only when there are any)."""
+    out = []
+    for rel, items in (
+        (EVAL_DATA_REL, _plan_eval_data(root, now=now, policy=policy)),
+        (EVAL_CACHE_REL, _plan_eval_cache(root, lock, now=now, policy=policy)),
+    ):
+        if items:
+            out.append(RunPlan(rel.as_posix(), "n/a", False, tuple(items)))
+    return out
+
+
+def _eval_cache_decision(  # noqa: PLR0911 - flat table: not ours / too young / blocked why / due
+    entry: Path, lock: LockStatus | None, *, now: float, policy: RetentionPolicy
+) -> tuple[str, str | None] | None:
+    """(rule, blocked_by) for an eval-cache leftover, or None when it is not one (or still too young to show)."""
+    name = entry.name
+    if entry.is_file() and EVAL_CACHE_JSON_TMP_RE.fullmatch(name):
+        young = (now - _newest_mtime(entry)) / DAY_S < policy.eval_tmp_days
+        return None if young else ("EVALCACHE.tmp_file", None)
+    if not entry.is_dir():
+        return None
+    stale = EVAL_CACHE_STALE_RE.fullmatch(name)
+    if not (stale or EVAL_CACHE_RUN_RE.fullmatch(name) or EVAL_CACHE_CORD_TMP_RE.fullmatch(name)):
+        return None
+    born = 0.0
+    if stale is not None:
+        try:
+            born = time.mktime(time.strptime(stale.group(1), "%Y%m%d-%H%M%S"))
+        except (ValueError, OverflowError):
+            return None
+    if (now - max(born, _newest_mtime(entry))) / DAY_S < policy.eval_cache_days:
+        return None
+    if lock is not None and (lock.corrupt or lock.run_id == name):
+        return "EVALCACHE.blocked", "GPU_LOCK_HOLDER"
+    status, _ = read_run_status(entry)
+    ended = CLEANABLE_STATUSES | FAILED_STATUSES | {RunStatus.INTERRUPTED, RunStatus.EVICTED}
+    if stale is None and status != "unknown" and status not in ended:
+        return "EVALCACHE.blocked", "RUN_NOT_FINISHED"  # running/queued, or an unreadable run.json (fail closed)
+    if (entry / "KEEP").exists():
+        return "EVALCACHE.blocked", "PINNED_OR_KEEP"
+    return "EVALCACHE.after_days", None
+
+
+def _plan_eval_cache(root: Path, lock: LockStatus | None, *, now: float, policy: RetentionPolicy) -> list[PlanItem]:
+    """Leftovers in ``outputs/eval-cache``; the caches themselves are never items.
+
+    Job run dirs, CORD generation turns and replaced copies after ``eval_cache_days``; half-written cache files after
+    ``eval_tmp_days``.
+    """
+    base = root / EVAL_CACHE_REL
+    if base.is_symlink() or not base.is_dir():
+        return []
+    items: list[PlanItem] = []
+    for entry in sorted(base.iterdir()):
+        if entry.is_symlink():
+            continue
+        decision = _eval_cache_decision(entry, lock, now=now, policy=policy)
+        if decision is None:
+            continue
+        rule, blocked = decision
+        items.append(
+            PlanItem(
+                entry.name,
+                ".",
+                "eval_cache",
+                (),
+                "delete",
+                du_bytes(entry),
+                rule,
+                "eval cache leftover (the cached scores stay)",
+                blocked,
+                runs_rel=EVAL_CACHE_REL.as_posix(),
+            )
+        )
+    return items
 
 
 def _plan_eval_data(root: Path, *, now: float, policy: RetentionPolicy) -> list[PlanItem]:
@@ -701,7 +787,7 @@ def item_path(root: Path, item: PlanItem) -> Path:
     Raises:
         ValueError: unknown runs root, a symlink, or a path that resolves outside its runs root.
     """
-    if item.runs_rel not in (RUNS_REL.as_posix(), GRAPH_RUNS_REL.as_posix(), EVAL_DATA_REL.as_posix()):
+    if item.runs_rel not in {r.as_posix() for r in (RUNS_REL, GRAPH_RUNS_REL, EVAL_DATA_REL, EVAL_CACHE_REL)}:
         raise ValueError(f"unknown runs root: {item.runs_rel}")
     runs_dir = (root / item.runs_rel).resolve()
     target = root / item.runs_rel / item.run_id / item.path
@@ -741,7 +827,7 @@ def unapproved_bytes_since(log: Path, since: float) -> int:
     for line in log.read_text(encoding="utf-8").splitlines():
         try:
             rec = json.loads(line)
-            if rec.get("event") not in ("checkpoint_pruned", "eval_data_pruned"):
+            if rec.get("event") not in ("checkpoint_pruned", "eval_data_pruned", "eval_cache_pruned"):
                 continue  # cache evictions / worktree removals free regenerable data; not part of this quota
             if not rec.get("approved_by") and float(rec.get("ts_epoch", 0)) >= since:
                 total += int(rec.get("bytes", 0))
@@ -808,9 +894,9 @@ def apply(
                 if sub_path.is_dir() and not sub_path.is_symlink():
                     shutil.rmtree(sub_path)
         result.done.append(item)
-        eval_data = item.runs_rel == EVAL_DATA_REL.as_posix()
+        eval_data = item.runs_rel in (EVAL_DATA_REL.as_posix(), EVAL_CACHE_REL.as_posix())
         event: dict[str, object] = {
-            "event": "eval_data_pruned" if eval_data else "checkpoint_pruned",
+            "event": f"{item.kind}_pruned" if eval_data else "checkpoint_pruned",
             "path": item.path,
             "action": item.action,
             "bytes": item.reclaim_bytes,
