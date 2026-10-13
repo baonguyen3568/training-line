@@ -769,7 +769,7 @@ node:
         label: Batch mỗi lần (local_batch_size)
         help: Số mẫu xử lý cùng lúc (1–4). Tăng lên thì tốn RAM hơn; 1 là an toàn cho máy dùng chung.
       weight_decay:
-        label: Weight decay
+        label: Hệ số giảm trọng số (weight_decay)
         help: Hệ số chống học vẹt (0–0.1).
       activation_checkpointing:
         label: Tiết kiệm bộ nhớ (activation checkpointing)
@@ -822,7 +822,7 @@ node:
         label: Batch mỗi lần (local_batch_size)
         help: Số mẫu xử lý cùng lúc (1–4). Tăng lên thì tốn RAM hơn; 1 là an toàn cho máy dùng chung.
       weight_decay:
-        label: Weight decay
+        label: Hệ số giảm trọng số (weight_decay)
         help: Hệ số chống học vẹt (0–0.1).
       activation_checkpointing:
         label: Tiết kiệm bộ nhớ (activation checkpointing)
