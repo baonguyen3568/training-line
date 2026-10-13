@@ -27,6 +27,7 @@ import {
 import { nodeTitle } from "../lib/nodeText";
 import { isCompatible, tokenVar } from "../lib/ports";
 import { selfAndDownstream, stepNumbers } from "../lib/topo";
+import { connectionBetween, type HandleRef, handleUnder } from "../lib/wire";
 import { useUi } from "../store/ui";
 import { graphKey, useWorkflow } from "../store/workflow";
 import { CheckBar } from "./CheckBar";
@@ -302,33 +303,83 @@ function EditorInner() {
     [connect, label],
   );
 
-  // A rejected drag (isValidConnection=false) never reaches onConnect: explain it on release (no modal).
-  const onConnectEnd = useCallback(
+  // Safety net: a drag that ends without onConnectEnd (Esc, alt-tab, window blur) must not leave ports dimmed.
+  useEffect(() => {
+    const clear = () => {
+      if (useUi.getState().wireDrag) useUi.getState().setWireDrag(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") clear();
+    };
+    window.addEventListener("blur", clear);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("blur", clear);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  const onConnectStart = useCallback(
     (
       _e: MouseEvent | TouchEvent,
+      p: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
+    ) => {
+      if (!p.nodeId || !p.handleType) return;
+      const type = typeOf(p.nodeId, p.handleId, p.handleType === "source" ? "out" : "in");
+      if (type) useUi.getState().setWireDrag({ nodeId: p.nodeId, side: p.handleType, type });
+    },
+    [typeOf],
+  );
+
+  // A rejected drag (isValidConnection=false) never reaches onConnect: explain it on release (no modal).
+  // A drop React Flow did not match to a port (stale handle bounds right after a node mounts, ~1/100) is matched
+  // from the DOM and connected when valid, so a wire dropped on a port always sticks or explains why.
+  const onConnectEnd = useCallback(
+    (
+      e: MouseEvent | TouchEvent,
       state: {
         isValid: boolean | null;
         fromHandle: { nodeId: string; id?: string | null; type: string } | null;
-        toHandle: { nodeId: string; id?: string | null } | null;
+        toHandle: { nodeId: string; id?: string | null; type?: string } | null;
       },
     ) => {
-      if (state.isValid !== false || !state.fromHandle || !state.toHandle) return;
-      const fromOut = state.fromHandle.type === "source";
-      const out = fromOut ? state.fromHandle : state.toHandle;
-      const inp = fromOut ? state.toHandle : state.fromHandle;
-      const actual = typeOf(out.nodeId, out.id, "out") ?? "";
-      const expected = typeOf(inp.nodeId, inp.id, "in") ?? "";
+      useUi.getState().setWireDrag(null);
+      if (state.isValid === true || !state.fromHandle) return; // onConnect has it
+      let to: HandleRef | null = state.toHandle?.type
+        ? { ...state.toHandle, type: state.toHandle.type }
+        : null;
+      if (!to) {
+        const p = "changedTouches" in e ? e.changedTouches[0] : e;
+        if (!p) return;
+        to = handleUnder(document.elementFromPoint(p.clientX, p.clientY));
+        if (!to) return; // dropped on empty canvas: nothing to say
+      }
+      const conn = connectionBetween(state.fromHandle, to);
+      if (!conn) {
+        // two outputs, two inputs, or the step's own port: say how wires go (design; ports were dimmed meanwhile)
+        setToast(t("canvas.wire_same_side"));
+        return;
+      }
+      if (isValidConnection(conn)) {
+        // Keep until the root cause is fixed: each line means React Flow's stored handle bounds were stale (debt:
+        // refresh node internals when a node's layout changes without a resize). E2E counts these (tester).
+        console.debug("[wire] connected from the DOM drop target", conn);
+        onConnect(conn);
+        return;
+      }
+      const actual = typeOf(conn.source, conn.sourceHandle, "out") ?? "";
+      const expected = typeOf(conn.target, conn.targetHandle, "in") ?? "";
       if (actual && expected) {
         setToast(
           t("canvas.wire_rejected", {
-            target: inp.id ?? "",
+            target: conn.targetHandle ?? "",
             expected: label(expected),
             actual: label(actual),
           }),
         );
       }
     },
-    [typeOf, label],
+    [typeOf, label, isValidConnection, onConnect],
   );
 
   const onNodesChange = useCallback(
@@ -448,6 +499,7 @@ function EditorInner() {
           onNodesDelete={onNodesDelete}
           onConnect={onConnect}
           onConnectEnd={onConnectEnd}
+          onConnectStart={onConnectStart}
           onEdgesDelete={onEdgesDelete}
           onPaneClick={() => select(null)}
           isValidConnection={isValidConnection}

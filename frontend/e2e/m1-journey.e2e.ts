@@ -54,7 +54,29 @@ async function dragHandle(page: Page, from: Locator, to: Locator): Promise<void>
   const a = await from.boundingBox();
   const b = await to.boundingBox();
   if (!a || !b) throw new Error("handle not visible");
-  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  const x = a.x + a.width / 2;
+  const y = a.y + a.height / 2;
+  await page.mouse.move(x, y);
+  // Diagnosis for the rare "drag pans the canvas" flake (tester x100, 2026-10-13): what is under the pointer
+  // right before mouse.down. React Flow handles only take the pointer with class connectionindicator.
+  const under = await page.evaluate(
+    ([px, py]) => {
+      const el = document.elementFromPoint(px, py);
+      const h = el?.closest(".react-flow__handle");
+      return {
+        el: `${el?.tagName}.${el?.className}`,
+        node: el?.closest("[data-id]")?.getAttribute("data-id") ?? null,
+        handle: h ? h.className : null,
+        narrow: window.matchMedia("(max-width: 1279px)").matches,
+        width: `${window.innerWidth}/${document.documentElement.clientWidth}`,
+      };
+    },
+    [x, y] as const,
+  );
+  if (!under.handle?.includes("connectionindicator")) {
+    console.log(`[drag-diag] pointer not on a connectable handle: ${JSON.stringify(under)}`);
+    test.info().annotations.push({ type: "drag-diag", description: JSON.stringify(under) });
+  }
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 12 });
   await page.mouse.up();

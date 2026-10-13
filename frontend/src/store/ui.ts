@@ -38,6 +38,15 @@ interface UiState {
   setDockOpen(open: boolean): void;
   libraryOpen: boolean;
   setLibraryOpen(open: boolean): void;
+  /** The wire being dragged (port it started from), so ports it cannot reach are dimmed (design). */
+  wireDrag: WireDrag | null;
+  setWireDrag(drag: WireDrag | null): void;
+}
+
+export interface WireDrag {
+  nodeId: string;
+  side: "source" | "target";
+  type: string;
 }
 
 export const useUi = create<UiState>((set) => ({
@@ -50,6 +59,10 @@ export const useUi = create<UiState>((set) => ({
   libraryOpen: false,
   setLibraryOpen(libraryOpen) {
     set({ libraryOpen });
+  },
+  wireDrag: null,
+  setWireDrag(wireDrag) {
+    set({ wireDrag });
   },
   setMode(mode) {
     try {

@@ -459,6 +459,7 @@ canvas:
   advanced_only: Turn on Advanced mode to use this step
   drop_wire_search: Add a step that takes {port_type}…
   wire_rejected: Port "{target}" needs {expected}, but you connected {actual}.
+  wire_same_side: 'Not connected: a wire goes from an output (right side) to an input (left side) of another step.'
   empty:
     drop_here: Drag "Data" here
     or_click: or click to choose

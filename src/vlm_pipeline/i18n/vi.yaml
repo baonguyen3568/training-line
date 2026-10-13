@@ -459,6 +459,7 @@ canvas:
   advanced_only: Bật chế độ Nâng cao để dùng bước này
   drop_wire_search: Thêm bước nhận {port_type}…
   wire_rejected: Cổng "{target}" cần {expected}, bạn đang nối {actual}.
+  wire_same_side: 'Chưa nối được: dây phải đi từ cổng ra (bên phải) sang cổng vào (bên trái) của một bước khác.'
   empty:
     drop_here: Kéo "Dữ liệu" vào đây
     or_click: hoặc bấm để chọn

@@ -1104,3 +1104,8 @@ textarea {
   margin: 0 0 var(--space-8);
   color: var(--color-text-secondary);
 }
+
+/* While a wire is dragged: ports it cannot reach fade (opacity only: no layout shift under the pointer). */
+.ports li.port-dim {
+  opacity: 0.3;
+}

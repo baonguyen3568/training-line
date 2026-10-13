@@ -4,7 +4,7 @@ import type { NodeSpec, PortType, ValidationIssue } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
-import { portShape, tokenVar } from "../lib/ports";
+import { isCompatible, portShape, tokenVar } from "../lib/ports";
 import { runWarningText } from "../lib/runWarning";
 import { identifierView, untrustedText } from "../lib/safeText";
 import { useUi } from "../store/ui";
@@ -124,9 +124,19 @@ function RunBadge({ state }: { state: NodeRunState }) {
   );
 }
 
-function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
+function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
   const { spec, ports, issues, typeId, step, params, runState } = data;
   const mode = useUi((s) => s.mode);
+  const wireDrag = useUi((s) => s.wireDrag);
+  // While a wire is dragged, ports it cannot reach fade (same side, own node, incompatible type): opacity only,
+  // never layout, so handle positions stay where React Flow measured them.
+  const unreachable = (side: "source" | "target", type: string): boolean => {
+    if (!wireDrag) return false;
+    if (wireDrag.nodeId === id || wireDrag.side === side) return true;
+    return side === "target"
+      ? !isCompatible(wireDrag.type, type, ports)
+      : !isCompatible(type, wireDrag.type, ports);
+  };
   const d4 = useUi((s) => s.skin) === "d4";
   const customized = mode === "simple" ? customizedAdvanced(spec, params) : [];
   // Key choices on the node face (x-ui.summary), e.g. the chosen model/dataset; repo ids shortened to the name.
@@ -191,7 +201,7 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
       <div className="node-ports">
         <ul className="ports in">
           {inputs.map(([name, ps]) => (
-            <li key={name}>
+            <li key={name} className={unreachable("target", ps.type) ? "port-dim" : undefined}>
               <Handle
                 type="target"
                 position={Position.Left}
@@ -214,7 +224,7 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
         </ul>
         <ul className="ports out">
           {outputs.map(([name, ps]) => (
-            <li key={name}>
+            <li key={name} className={unreachable("source", ps.type) ? "port-dim" : undefined}>
               <span>{portLabel(ports, typeId, name, ps.type)}</span>
               <Handle
                 type="source"

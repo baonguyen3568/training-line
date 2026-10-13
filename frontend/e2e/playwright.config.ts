@@ -6,7 +6,9 @@ import { defineConfig } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 7879);
 const TIER = process.env.E2E_TIER ?? "mock";
-const DIST = `../.cache/e2e-dist-${TIER}`; // never frontend/dist (served by the developer app)
+// never frontend/dist (served by the developer app); one per port, so two runs side by side never rebuild each
+// other's files mid-run (2026-10-13: a second run wiped the dist a x100 run was serving)
+const DIST = `../.cache/e2e-dist-${TIER}-${PORT}`;
 // One results folder per run (path is relative to this file), so a later run cannot overwrite the screenshot/trace of a failure (tester 2026-10-13).
 // Workers re-load this file: keep the main process's stamp (inherited env) so all artifacts land together.
 process.env.E2E_STAMP ??= new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, "");
@@ -14,7 +16,7 @@ const STAMP = process.env.E2E_STAMP;
 const build = `npx vite build --outDir ${DIST} --emptyOutDir --logLevel warn`;
 const server =
   TIER === "app"
-    ? `${build} && cd .. && uv run --quiet python scripts/qa/e2e_app.py ${PORT} .cache/e2e-dist-app`
+    ? `${build} && cd .. && uv run --quiet python scripts/qa/e2e_app.py ${PORT} .cache/e2e-dist-${TIER}-${PORT}`
     : `VITE_MOCK_API=1 ${build} && npx vite preview --outDir ${DIST} --host 127.0.0.1 --port ${PORT} --strictPort`;
 
 export default defineConfig({
