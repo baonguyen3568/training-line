@@ -146,6 +146,21 @@ export interface Workflow {
   name: string;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+  /** P016 subgraph definitions; instances are ordinary nodes whose `type` is a group id. Validated by the backend. */
+  groups?: GroupDefinition[];
+}
+
+/** P016 group (subgraph) definition, as stored in the workflow file. */
+export interface GroupDefinition {
+  id: string;
+  version: string;
+  title: string;
+  description?: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  inputs: Record<string, [string, string][]>;
+  outputs: Record<string, [string, string]>;
+  params: Record<string, [string, string]>;
 }
 
 export interface TemplateMeta {

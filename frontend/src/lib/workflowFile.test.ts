@@ -25,6 +25,40 @@ describe("workflow file (untrusted)", () => {
     if (res.ok) expect(JSON.parse(serializeWorkflow(res.workflow))).toEqual(wf);
   });
 
+  it("keeps P016 group definitions through a round-trip, and rejects a malformed groups key", () => {
+    const group = {
+      id: "user.prep",
+      version: "1.0.0",
+      title: "Chuẩn bị",
+      nodes: [{ id: "a", type: "data.split", version: "1.0.0", params: {} }],
+      edges: [],
+      inputs: { data: [["a", "dataset"]] },
+      outputs: { train: ["a", "train"] },
+      params: {},
+    };
+    const withGroups = { ...wf, groups: [group] };
+    const res = parseWorkflowFile(JSON.stringify(withGroups));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(JSON.parse(serializeWorkflow(res.workflow))).toEqual(withGroups);
+    const { edges: _edges, ...noEdges } = group;
+    expect(parseWorkflowFile(JSON.stringify({ ...wf, groups: [noEdges] })).ok).toBe(true); // optional
+    const rejected: [unknown, string][] = [
+      [{}, "groups"],
+      [Array(51).fill(group), "groups"],
+      [[{ ...group, id: "group.official" }], "groups.id"], // first-party namespace never comes from a file
+      [[{ ...group, id: "user.a/b" }], "groups.id"],
+      [[{ ...group, title_key: "template.invoice_to_json.title" }], "groups.title_key"],
+      [[{ ...group, install_url: "https://evil.example" }], "groups.install_url"],
+      [
+        [{ ...group, nodes: [{ ...group.nodes[0], install_url: "x" }] }],
+        "groups.nodes.install_url",
+      ],
+      [[{ ...group, inputs: { data: "a" } }], "groups.inputs"],
+    ];
+    for (const [groups, field] of rejected)
+      expect(parseWorkflowFile(JSON.stringify({ ...wf, groups }))).toEqual({ ok: false, field });
+  });
+
   it("rejects install sources and other unknown fields (P003 D11)", () => {
     const bad = { ...wf, nodes: [{ ...wf.nodes[0], install_url: "https://evil.example/x.git" }] };
     expect(parseWorkflowFile(JSON.stringify(bad))).toEqual({
