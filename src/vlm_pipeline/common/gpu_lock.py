@@ -69,6 +69,8 @@ class LockHandle:
 
 LOCK_REL = Path(".team") / "lock" / "GPU_LOCK"  # its own folder: compose mounts exactly it (security, PM 2026-10-13)
 LEGACY_REL = Path(".team") / "GPU_LOCK"  # before 2026-10-13: a lock still there means BUSY (never two locks at once)
+# TODO(bao-backend, transition end): once app 7870 and every job run post-2026-10-13 code, drop LEGACY_REL, the
+# acquire guard, the old-path mirror (_link_legacy / _release_legacy) and lock_present's legacy branch (BOARD G).
 
 
 def lock_path_for(root: Path) -> Path:
@@ -84,16 +86,20 @@ def default_lock_path() -> Path:
     return lock_path_for(project_root())
 
 
-def _legacy_of(path: Path) -> Path | None:
-    """The pre-move lock file next to a ``.team/lock/GPU_LOCK`` path, when it still exists (transition guard).
+def _legacy_path(path: Path) -> Path | None:
+    """The pre-move lock path (``.team/GPU_LOCK``) of a ``.team/lock/GPU_LOCK`` path, existing or not.
 
     Only a parent named ``lock`` qualifies: compose's ``/run/vlm-lock/GPU_LOCK`` never had a legacy file (by design).
     """
     if path.name == "GPU_LOCK" and path.parent.name == "lock":
-        legacy = path.parent.parent / "GPU_LOCK"
-        if os.path.lexists(legacy):
-            return legacy
+        return path.parent.parent / "GPU_LOCK"
     return None
+
+
+def _legacy_of(path: Path) -> Path | None:
+    """The pre-move lock file next to ``path``, when it still exists (transition guard)."""
+    legacy = _legacy_path(path)
+    return legacy if legacy is not None and os.path.lexists(legacy) else None
 
 
 def lock_present(path: Path) -> bool:
@@ -201,7 +207,9 @@ def acquire(
 ) -> LockHandle:
     """Create the lock atomically or raise ``GpuLockError`` (with the holder's public info) if it already exists.
 
-    While a lock still sits at the old path (``.team/GPU_LOCK``), the GPU is busy: never two locks at once.
+    Transition (both directions, PM 2026-10-13): a lock at the old path (``.team/GPU_LOCK``) means busy, and a new
+    lock is ALSO linked there (same inode, ``O_EXCL``) so processes still running the old code see the GPU busy too.
+    The old path is the shared arbiter: if an old-code job takes it between our two links, ours is rolled back.
     """
     legacy = _legacy_of(path)
     if legacy is not None:
@@ -231,9 +239,31 @@ def acquire(
             raise GpuLockError("GPU busy (lock unreadable)", params=exc.params) from None
         params = _busy_params(current) if current is not None else dict(_CORRUPT_PARAMS)  # vanished mid-race
         raise GpuLockError("GPU busy", params=params) from None
+    try:
+        _link_legacy(tmp, path)
     finally:
         tmp.unlink(missing_ok=True)
     return LockHandle(path=path, info=info)
+
+
+def _link_legacy(tmp: Path, path: Path) -> None:
+    """Mirror a just-created lock at the old path; on a race with old code, undo ours and report that holder."""
+    legacy = _legacy_path(path)
+    if legacy is None:
+        return
+    try:
+        os.link(tmp, legacy)
+    except FileExistsError:
+        path.unlink(missing_ok=True)  # ours, created a moment ago: the old-path holder won
+        try:
+            held = read_lock(legacy)
+        except GpuLockError as exc:
+            raise GpuLockError("GPU busy (old lock unreadable)", params=exc.params) from None
+        busy = _busy_params(held) if held else dict(_CORRUPT_PARAMS)
+        raise GpuLockError("GPU busy (old lock path)", params=busy) from None
+    except OSError:
+        path.unlink(missing_ok=True)  # e.g. no write access to .team/: never hold a lock old code cannot see
+        raise
 
 
 def verify_token(path: Path, token: str) -> None:
@@ -251,9 +281,24 @@ def release(handle: LockHandle) -> None:
         verify_token(handle.path, handle.info.token)
     except GpuLockError:
         if read_lock(handle.path) is None:
+            _release_legacy(handle)
             return
         raise
     handle.path.unlink()
+    _release_legacy(handle)
+
+
+def _release_legacy(handle: LockHandle) -> None:
+    """Remove the old-path mirror of our lock (token match only: an old-code holder's lock is never touched)."""
+    legacy = _legacy_path(handle.path)
+    if legacy is None or not os.path.lexists(legacy):
+        return
+    try:
+        held = _parse(legacy.read_text(encoding="utf-8")) if not legacy.is_symlink() else None
+    except (OSError, ValueError, TypeError, KeyError):  # not a lock this module wrote: leave it alone
+        return
+    if held is not None and secrets.compare_digest(held.token.encode(), handle.info.token.encode()):
+        legacy.unlink(missing_ok=True)
 
 
 # ------------------------------------------------------------------------------------------------------- CLI

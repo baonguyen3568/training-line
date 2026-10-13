@@ -212,3 +212,49 @@ def test_a_lock_left_at_the_old_path_keeps_the_gpu_busy(tmp_path: Path) -> None:
         gpu_lock.acquire(new, who="new", job="t", run_id="r-new")
     gpu_lock.release(old)
     assert gpu_lock.acquire(new, who="new", job="t", run_id="r-new").info.who == "new"
+
+
+def test_a_new_lock_is_mirrored_at_the_old_path_and_released_from_both(tmp_path: Path) -> None:
+    """PM 2026-10-13: processes still running pre-move code read .team/GPU_LOCK; they must see the GPU busy too."""
+    new, old = gpu_lock.lock_path_for(tmp_path), tmp_path / gpu_lock.LEGACY_REL
+    handle = _acquire(new)
+    assert old.exists()
+    assert old.stat().st_ino == new.stat().st_ino  # one inode: the same lock, never two diverging copies
+    assert gpu_lock.read_lock(old) == handle.info
+    gpu_lock.release(handle)
+    assert not new.exists()
+    assert not old.exists()
+
+
+def test_an_old_code_holder_taking_the_old_path_between_our_links_wins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    new, old = gpu_lock.lock_path_for(tmp_path), tmp_path / gpu_lock.LEGACY_REL
+    old.parent.mkdir(parents=True, exist_ok=True)
+    other = gpu_lock.acquire(tmp_path / "elsewhere" / "GPU_LOCK", who="old-app", job="train", run_id="r0")
+    old.write_text((tmp_path / "elsewhere" / "GPU_LOCK").read_text())  # old code wrote its lock at the old path
+    monkeypatch.setattr(gpu_lock, "_legacy_of", lambda _p: None)  # ...right after our "old path is free" check
+    with pytest.raises(GpuLockError, match="old lock path") as err:
+        _acquire(new)
+    assert err.value.params["who"] == "old-app"
+    assert not new.exists()  # ours rolled back: never two jobs on the GPU
+    assert gpu_lock.read_lock(old) == other.info
+
+
+def test_release_never_removes_an_old_path_lock_that_is_not_ours(tmp_path: Path) -> None:
+    new, old = gpu_lock.lock_path_for(tmp_path), tmp_path / gpu_lock.LEGACY_REL
+    handle = _acquire(new)
+    old.unlink()
+    foreign = gpu_lock.acquire(tmp_path / "x" / "GPU_LOCK", who="old-app", job="train", run_id="r0")
+    old.write_text((tmp_path / "x" / "GPU_LOCK").read_text())
+    gpu_lock.release(handle)
+    assert not new.exists()
+    assert gpu_lock.read_lock(old) == foreign.info
+
+
+def test_a_lock_outside_a_lock_folder_has_no_mirror(tmp_path: Path) -> None:
+    """compose: /run/vlm-lock/GPU_LOCK never had an old path."""
+    lock = tmp_path / "vlm-lock" / "GPU_LOCK"
+    handle = _acquire(lock)
+    assert sorted(p.name for p in tmp_path.rglob("*")) == ["GPU_LOCK", "vlm-lock"]
+    gpu_lock.release(handle)
