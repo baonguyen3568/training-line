@@ -273,8 +273,8 @@ models:
     params_b: 5.0
     disk_gb: 9.3
     train_node: train.lora_vlm
-    ram_gb_train: 24
-    ram_source: estimated
+    ram_gb_train: 25
+    ram_source: measured           # 2026-10-13 run n4-f9097f984a8f74ca (clean a015390): LoRA 1 epoch, 200 CORD images, pixel cap on, peak 24.4GB
     sft_trainable_pct_min: 0
     sft_trainable_pct_max: 0
     attn: sdpa
@@ -310,8 +310,8 @@ models:
     params_b: 10.0
     disk_gb: 19.3
     train_node: train.lora_vlm
-    ram_gb_train: 38
-    ram_source: estimated          # close to the 40GB budget -> usually hidden by preflight
+    ram_gb_train: 34
+    ram_source: measured           # 2026-10-13 run n4-5b8db7ae779edb01 (clean a015390): LoRA 1 epoch, 200 CORD images, pixel cap on, peak 33.1GB
     sft_trainable_pct_min: 0
     sft_trainable_pct_max: 0
     attn: sdpa
