@@ -1,8 +1,16 @@
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "../api";
 import type { Range } from "../api/types";
 import data from "../generated/reference-pipelines.json";
-import { getLocale, t } from "../i18n";
+import { getLocale, t, tpOptional } from "../i18n";
 import { formatMinutesRange } from "../lib/format";
 import { portShape, tokenVar } from "../lib/ports";
 import { fold } from "../lib/search";
@@ -23,6 +31,10 @@ interface Pipeline {
   requires_hf_terms?: boolean;
   notice?: string;
   steps: { node: string | null; label: Text }[];
+  /** i18n key of the one-line "what you get" (design gallery r2 #3). */
+  summary_key?: string;
+  /** Numbers from a real run on this machine (research), with their source in the data file. */
+  measured?: { train_minutes?: number; peak_ram_gb?: number } | null;
 }
 const pipelines = (data as { pipelines: Pipeline[] }).pipelines;
 type Filter = "all" | Pipeline["kind"];
@@ -46,6 +58,18 @@ const host = (url: string) => {
   }
 };
 
+/**
+ * Time on the card: a run research measured on this machine (data file, with its source) first, else the server's
+ * template estimate, else "no measurement yet". Peak RAM joins when measured.
+ */
+function timeText(p: Pipeline, estimate: Range | null | undefined): string {
+  const m = p.measured;
+  const time = formatMinutesRange(
+    m?.train_minutes ? { lo: m.train_minutes, hi: m.train_minutes } : (estimate ?? null),
+  );
+  return m?.peak_ram_gb ? `${time} · ${t("pipelines.ram_peak", { gb: m.peak_ram_gb })}` : time;
+}
+
 /** "?" + native popover (DESIGN.md "?" Popover): secondary detail never sits on the card itself. */
 function Help({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -64,13 +88,37 @@ function Help({ id, title, children }: { id: string; title: string; children: Re
 // Two rows of chips at most so every card has the same height (design gallery r1 #1); the rest folds into "+N".
 const MAX_CHIPS = 5;
 
+/**
+ * At most two rows of chips (design gallery r2 #1): every card's title then starts at the same height. Chips that
+ * would wrap to a third row fold into "+N bước", measured after layout (and again when the card resizes).
+ */
 function MiniDiagram({ steps }: { steps: Pipeline["steps"] }) {
   const specs = useWorkflow((s) => s.specs);
   const ports = useWorkflow((s) => s.ports);
-  const shown = steps.length > MAX_CHIPS ? steps.slice(0, MAX_CHIPS - 1) : steps;
+  const ref = useRef<HTMLOListElement>(null);
+  const [fit, setFit] = useState(Math.min(steps.length, MAX_CHIPS));
+  const shown = fit < steps.length ? steps.slice(0, Math.max(1, fit - 1)) : steps;
   const rest = steps.slice(shown.length);
+  useLayoutEffect(() => {
+    const ol = ref.current;
+    if (!ol) return;
+    const rows = new Set([...ol.children].map((li) => (li as HTMLElement).offsetTop)).size;
+    if (rows > 2 && fit > 1) setFit(fit - 1);
+  });
+  useEffect(() => {
+    const ol = ref.current;
+    if (!ol || typeof ResizeObserver === "undefined") return;
+    let width = ol.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (ol.clientWidth === width) return;
+      width = ol.clientWidth;
+      setFit(Math.min(steps.length, MAX_CHIPS)); // re-measure from the start at the new width
+    });
+    ro.observe(ol);
+    return () => ro.disconnect();
+  }, [steps.length]);
   return (
-    <ol className="mini" aria-hidden="true">
+    <ol className="mini" aria-hidden="true" ref={ref}>
       {shown.map((st, i) => {
         const spec = st.node ? specs.get(st.node) : undefined;
         const out = spec && Object.values(spec.outputs)[0];
@@ -176,14 +224,14 @@ export function PipelineGallery() {
             <li key={p.id} className={`rp-card ${p.kind}${p.status !== "available" ? " dim" : ""}`}>
               <MiniDiagram steps={p.steps} />
               <h2>{loc(p.title)}</h2>
+              {p.summary_key && (
+                <p className="rp-summary">{tpOptional(p.summary_key.split(".")) ?? ""}</p>
+              )}
+              {/* where it comes from; the status (candidate, planned…) is said once, in the footer */}
               <p className="rp-src">
                 {p.kind === "app_template" ? (
                   <>
                     <Icon name="boxes" size={14} /> {t("pipelines.kind.app_template")}
-                  </>
-                ) : p.kind === "candidate" ? (
-                  <>
-                    <Icon name="clock" size={14} /> {t("pipelines.kind.candidate")}
                   </>
                 ) : (
                   <>
@@ -228,9 +276,7 @@ export function PipelineGallery() {
                 </div>
                 <div>
                   <dt>{t("pipelines.time")}</dt>
-                  <dd>
-                    {formatMinutesRange((p.template_id && minutes.get(p.template_id)) || null)}
-                  </dd>
+                  <dd>{timeText(p, p.template_id ? minutes.get(p.template_id) : undefined)}</dd>
                 </div>
               </dl>
               {p.requires_hf_terms && (

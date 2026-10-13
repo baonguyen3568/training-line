@@ -780,3 +780,25 @@
   color: var(--color-text-primary);
   font-size: var(--font-size-caption);
 }
+/* gallery card: "what you get" under the title, two lines at most (design gallery r2 #3) */
+.rp-summary {
+  margin-top: 0;
+  margin-bottom: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+/* settings: placeholders are words for people (sans); the typed token stays mono (Mono-Means-Machine) */
+.set-input input::placeholder {
+  font-family: var(--font-family-ui);
+}
+/* compact lanes show only their number: the name appears on hover (title on the label, which takes the pointer) */
+.lane.compact .lane-label {
+  pointer-events: auto;
+  cursor: default;
+}

@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Editor } from "./components/Editor";
 import { Gallery } from "./components/Gallery";
 import { Header, type Nav } from "./components/Header";
+import { Icon } from "./components/Icon";
 import { PipelineGallery } from "./components/PipelineGallery";
 import { HomeBarD4 } from "./components/ShellD4";
 import { t } from "./i18n";
@@ -98,7 +99,7 @@ export function App() {
       {(import.meta.env.VITE_MOCK_API === "1" || worker === "fake") && (
         // Mock API: make it impossible to mistake the FakeWorker for real training (PM request).
         <p className="demo-banner" role="note">
-          🧪 {t("app.demo_mode")}
+          <Icon name="flask-conical" size={14} /> {t("app.demo_mode")}
         </p>
       )}
       {catalogError && (

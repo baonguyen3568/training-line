@@ -38,7 +38,10 @@ async function inspectQuantize(params: Record<string, unknown>) {
 describe("disabled_options", () => {
   it("dims fp8 and locks quantize_vision off, with the reason readable", async () => {
     const { container } = await inspectQuantize({});
-    const fp8 = [...container.querySelectorAll("option")].find((o) => o.value === "fp8");
+    // scoped: `format` also offers fp8 (enabled), only the KV-cache fp8 is unsupported
+    const fp8 = [...container.querySelectorAll("#param-kv_cache_quant option")].find(
+      (o) => (o as HTMLOptionElement).value === "fp8",
+    ) as HTMLOptionElement | undefined;
     expect(fp8?.disabled).toBe(true);
     expect(fp8?.textContent).toContain("chưa hỗ trợ");
     const box = container.querySelector<HTMLInputElement>("#param-quantize_vision");

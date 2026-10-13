@@ -77,15 +77,16 @@ function Lanes({ boxes }: { boxes: readonly LaneBox[] }) {
           <div
             key={box.lane}
             className={box.compact ? "lane compact" : "lane"}
+            data-lane={box.lane}
             style={{
               transform: `translate(${box.x}px, ${LANE_TOP}px)`,
               width: box.width,
               height: LANE_HEIGHT,
             }}
-            title={box.compact ? name : undefined}
           >
             <span
               className="lane-label"
+              title={box.compact ? name : undefined}
               style={{ top: labelTop, fontSize: `${12 / Math.min(zoom, 1)}px` }}
             >
               {/* compact: only the circled number ①…⑦, full name in the tooltip */}
