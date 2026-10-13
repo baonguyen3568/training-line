@@ -32,6 +32,7 @@ from vlm_pipeline import i18n
 from vlm_pipeline.artifacts import cache_retention, retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
 from vlm_pipeline.artifacts.storage import du_bytes
+from vlm_pipeline.common.app_config import effective_profile, read_policy
 from vlm_pipeline.common.diskguard import read_disk
 from vlm_pipeline.common.gpu_lock import PATH_ENV as GPU_LOCK_PATH_ENV
 from vlm_pipeline.common.paths import GIB
@@ -62,13 +63,15 @@ class StorageSettings:
     node_cache_max_gb: float = cache_retention.DEFAULT_CAP_GB
 
     @classmethod
-    def from_env(cls, root: Path) -> StorageSettings:
-        """Profile default (``shared_dev`` -> threshold 20 GB, else none); env may only make it stricter.
+    def from_env(cls, root: Path, policy_file: Path | None = None) -> StorageSettings:
+        """Profile default (``personal`` -> none, else threshold 20 GB); env may only make it stricter.
 
-        TODO(bao-backend): read the profile through the shared app/policy loader once it exists.
+        The profile is ``effective_profile``: the admin policy file is the base and ``VLM_PROFILE`` may only tighten
+        it. Fails closed (P013 N3): no profile anywhere counts as a shared host. ``policy_file`` defaults to the admin
+        file (``app_config.policy_path()``).
         """
-        shared = os.environ.get(PROFILE_ENV, "personal") == "shared_dev"
-        policy: ApprovalPolicy = "threshold" if shared else "none"
+        profile = effective_profile(os.environ.get(PROFILE_ENV), read_policy(policy_file))
+        policy: ApprovalPolicy = "none" if profile == "personal" else "threshold"
         env_policy = os.environ.get(POLICY_ENV)
         if env_policy is not None:
             if env_policy not in ("none", "threshold"):

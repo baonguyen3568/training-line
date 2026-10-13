@@ -12,7 +12,7 @@ Every ``interval_s`` (first run ``first_delay_s`` after start) one pass:
    cache cap is enforced automatically by design);
 4. ``mode``: ``apply`` deletes (``by="app-scheduler"``); ``dry_run`` only writes the pass to
    ``outputs/system/retention_plan.json``; ``off`` does nothing. See ``mode_from_env``: the admin policy file
-   (``~/.config/vlm-app/policy.toml``, ``[storage] schedule``) or else the profile default decides, and
+   (``~/.config/ntc-training/policy.toml``, ``[storage] schedule``) or else the profile default decides, and
    ``VLM_RETENTION_SCHEDULE`` may only lower it.
 
 The pass holds ``retention.cleanup_lock`` (shared with ``scripts/cleanup/{retention,cache}.py --apply``).
@@ -33,10 +33,7 @@ from typing import Any, Literal
 from vlm_pipeline.app.storage import APPROVAL_WINDOW_S, CLEANUP_LOG_REL, PERMANENT_LOSS, PROFILE_ENV, StorageSettings
 from vlm_pipeline.artifacts import cache_retention, retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
-from vlm_pipeline.common.app_config import (  # noqa: F401 - policy_path re-exported (tests, callers)
-    policy_path,
-    read_policy,
-)
+from vlm_pipeline.common.app_config import effective_profile, read_policy
 from vlm_pipeline.common.paths import GIB
 
 logger = logging.getLogger(__name__)
@@ -52,14 +49,7 @@ INTERVAL_S = 6 * 3600.0
 _RANK: dict[str, int] = {"off": 0, "dry_run": 1, "apply": 2}
 
 
-def admin_schedule(path: Path | None = None) -> Mode | None:
-    """``[storage] schedule`` from the admin policy file, or None (absent / unusable -> no admin decision).
-
-    Interim reader for this one key until the shared ``app/policy.py`` loader (D17) exists; other keys are ignored.
-    Fails closed: a symlink, a file or parent dir writable by group/others or not owned by this user or root, an
-    unreadable file or an unknown value is ignored (logged), leaving the profile default (dry_run on a shared host).
-    """
-    data = read_policy(path)  # the one reader of the admin file (common.app_config)
+def _schedule(data: dict[str, Any] | None) -> Mode | None:
     storage = data.get("storage") if data is not None else None
     value = storage.get("schedule") if isinstance(storage, dict) else None
     if value is None:
@@ -70,15 +60,26 @@ def admin_schedule(path: Path | None = None) -> Mode | None:
     return value  # type: ignore[no-any-return]
 
 
+def admin_schedule(path: Path | None = None) -> Mode | None:
+    """``[storage] schedule`` from the admin policy file, or None (absent / unusable -> no admin decision).
+
+    Fails closed: ``read_policy`` ignores a symlink, a file or parent dir writable by group/others or not owned by this
+    user or root, an unreadable file; an unknown value is ignored too (logged), leaving the profile default.
+    """
+    return _schedule(read_policy(path))
+
+
 def mode_from_env(policy: Path | None = None) -> Mode:
     """Effective mode: admin policy (or the profile default), then only tightened by ``VLM_RETENTION_SCHEDULE``.
 
-    Profile default fails closed: ``apply`` only for an explicit ``VLM_PROFILE=personal``; ``shared_dev`` or unset ->
-    ``dry_run``. On a shared host only the admin file (``[storage] schedule = "apply"``) turns deleting on; env can
-    lower the mode (``off``/``dry_run``) but never raise it (D17).
+    The profile is ``effective_profile`` (admin ``[deployment] profile`` first, ``VLM_PROFILE`` only tightens).
+    Profile default fails closed: ``apply`` only for an effective ``personal``; ``shared_dev`` or none -> ``dry_run``.
+    On a shared host only the admin file (``[storage] schedule = "apply"``) turns deleting on; env can lower the mode
+    (``off``/``dry_run``) but never raise it (D17). ``policy`` defaults to ``app_config.policy_path()``.
     """
-    default: Mode = "apply" if os.environ.get(PROFILE_ENV) == "personal" else "dry_run"
-    base = admin_schedule(policy) or default
+    data = read_policy(policy)
+    default: Mode = "apply" if effective_profile(os.environ.get(PROFILE_ENV), data) == "personal" else "dry_run"
+    base = _schedule(data) or default
     value = os.environ.get(MODE_ENV)
     if value is None:
         return base

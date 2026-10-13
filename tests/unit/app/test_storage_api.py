@@ -13,10 +13,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from vlm_pipeline.app.storage import StorageApi, StorageSettings, _Plans, register_storage_routes
-from vlm_pipeline.app.storage_scheduler import LAST_PASS_REL, RetentionScheduler, mode_from_env, policy_path
+from vlm_pipeline.app.storage_scheduler import LAST_PASS_REL, RetentionScheduler, mode_from_env
 from vlm_pipeline.artifacts.index import ArtifactIndex, OutputRef
 from vlm_pipeline.artifacts.retention import CLEANUP_LOCK_REL
 from vlm_pipeline.artifacts.testing import FakeRunSpec, make_fake_run
+from vlm_pipeline.common.app_config import POLICY_REL, policy_path
 from vlm_pipeline.common.paths import GIB
 
 KB = 1024
@@ -132,18 +133,41 @@ def test_settings_follow_profile_and_env_only_tightens(tmp_path: Path, monkeypat
     for var in ("VLM_PROFILE", "VLM_STORAGE_APPROVAL_POLICY", "VLM_STORAGE_APPROVAL_THRESHOLD_GB"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("VLM_NODE_CACHE_MAX_GB", "50")
-    assert StorageSettings.from_env(tmp_path).approval_policy == "none"  # personal install
+    absent = tmp_path / "no-policy.toml"
+    assert StorageSettings.from_env(tmp_path, absent).approval_policy == "threshold"  # no profile: fails closed (N3)
+    monkeypatch.setenv("VLM_PROFILE", "personal")
+    assert StorageSettings.from_env(tmp_path, absent).approval_policy == "none"  # personal install
     monkeypatch.setenv("VLM_PROFILE", "shared_dev")
-    shared = StorageSettings.from_env(tmp_path)
+    shared = StorageSettings.from_env(tmp_path, absent)
     assert (shared.approval_policy, shared.approval_threshold_gb, shared.node_cache_max_gb) == ("threshold", 20.0, 50.0)
     monkeypatch.setenv("VLM_STORAGE_APPROVAL_POLICY", "none")  # cannot relax a shared host
     monkeypatch.setenv("VLM_STORAGE_APPROVAL_THRESHOLD_GB", "500")  # cannot raise the threshold
-    assert StorageSettings.from_env(tmp_path) == shared
+    assert StorageSettings.from_env(tmp_path, absent) == shared
     monkeypatch.setenv("VLM_STORAGE_APPROVAL_THRESHOLD_GB", "5")
-    assert StorageSettings.from_env(tmp_path).approval_threshold_gb == 5.0
+    assert StorageSettings.from_env(tmp_path, absent).approval_threshold_gb == 5.0
     monkeypatch.setenv("VLM_STORAGE_APPROVAL_POLICY", "yolo")
     with pytest.raises(ValueError, match=r"none\|threshold"):
-        StorageSettings.from_env(tmp_path)
+        StorageSettings.from_env(tmp_path, absent)
+
+
+def test_admin_profile_cannot_be_loosened_by_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in ("VLM_STORAGE_APPROVAL_POLICY", "VLM_STORAGE_APPROVAL_THRESHOLD_GB", "VLM_RETENTION_SCHEDULE"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("VLM_NODE_CACHE_MAX_GB", "50")
+    monkeypatch.setenv("VLM_PROFILE", "personal")
+    shared = _policy(tmp_path, '[deployment]\nprofile = "shared_dev"\n')
+    assert StorageSettings.from_env(tmp_path, shared).approval_policy == "threshold"
+    assert mode_from_env(shared) == "dry_run"
+    odd = _policy(tmp_path, '[deployment]\nprofile = "lab"\n')  # unknown admin value -> shared_dev
+    assert StorageSettings.from_env(tmp_path, odd).approval_policy == "threshold"
+    assert mode_from_env(odd) == "dry_run"
+    personal = _policy(tmp_path, '[deployment]\nprofile = "personal"\n')
+    assert (StorageSettings.from_env(tmp_path, personal).approval_policy, mode_from_env(personal)) == ("none", "apply")
+    monkeypatch.setenv("VLM_PROFILE", "shared_dev")  # env may tighten an admin "personal"
+    assert (StorageSettings.from_env(tmp_path, personal).approval_policy, mode_from_env(personal)) == (
+        "threshold",
+        "dry_run",
+    )
 
 
 def test_small_manual_batches_still_need_approval_on_shared_host(tmp_path: Path) -> None:
@@ -532,8 +556,8 @@ def test_cleanup_lock_refuses_a_symlink(tmp_path: Path) -> None:
 
 def test_policy_path_ignores_home_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     fake_home = tmp_path / "home"
-    (fake_home / ".config" / "vlm-app").mkdir(parents=True)
-    (fake_home / ".config" / "vlm-app" / "policy.toml").write_text('[storage]\nschedule = "apply"\n')
+    (fake_home / POLICY_REL).parent.mkdir(parents=True)
+    (fake_home / POLICY_REL).write_text('[storage]\nschedule = "apply"\n')
     monkeypatch.setenv("HOME", str(fake_home))
     assert not policy_path().is_relative_to(fake_home)  # from the passwd database, not $HOME
 
