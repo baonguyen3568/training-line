@@ -1,12 +1,40 @@
 ---
-title: Bắt đầu
-description: Trang tài liệu mẫu của khung site.
-sources: []
+title: Bắt đầu với mẫu "Đọc hoá đơn → JSON"
+description: "Ba bước để chạy workflow đầu tiên: mở mẫu, xem phần kiểm tra trước khi chạy, rồi bấm Chạy."
 sidebar:
-  order: 1
+  order: 0
+sources:
+  - configs/templates/invoice_to_json.json
+  - src/vlm_pipeline/i18n/vi.yaml
+  - configs/catalog/models.yaml
+  - configs/catalog/datasets.yaml
 ---
-import Hint from "~/components/Hint.astro";
+import Hint from '~/components/Hint.astro';
 
-Trang tài liệu mẫu (M2-3). Nội dung do bao-research và bao-cleancode viết (M2-5).
+Cách nhanh nhất để hiểu app là chạy mẫu **Đọc hoá đơn → JSON**. Mẫu này dạy model đọc ảnh hoá đơn và trả về các trường (cửa hàng, món, tổng tiền…) dạng JSON. Mẫu có sẵn dữ liệu và không cần tài khoản.
 
-<Hint title="Node là gì?">Mỗi bước của quy trình là một node; nối dây để tạo workflow.</Hint>
+## 1. Mở mẫu
+
+Ở màn hình **Bắt đầu nhanh**, chọn **Đọc hoá đơn → JSON** rồi bấm **Dùng mẫu này**. Bảng vẽ hiện ra các bước đã nối sẵn.
+
+<Hint title="Node là gì?">
+Mỗi bước của workflow là một node; nối dây giữa các node để tạo workflow. [Đọc thêm](/docs/node-va-cong/).
+</Hint>
+
+## 2. Xem phần kiểm tra trước khi chạy
+
+Thanh **Kiểm tra trước khi chạy** cho biết workflow đã sẵn sàng chưa, kèm dự kiến thời gian, bộ nhớ và ổ đĩa. Nếu có lỗi, bấm **Chỉ cho tôi** để tới đúng bước cần sửa.
+
+## 3. Bấm Chạy
+
+Bấm **Chạy**. Nếu máy đang bận với tác vụ khác, workflow tự xếp hàng và chạy khi máy rảnh. Khi xong, bấm **Xem kết quả**.
+
+## Tiếp theo
+
+- Thay dữ liệu mẫu bằng ảnh hoá đơn của bạn.
+- Xem [mẫu này dùng model và dữ liệu nào](/mau/).
+- Đọc [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/) để hiểu vì sao app có thể yêu cầu chờ.
+
+<Hint title="Model và dữ liệu của mẫu">
+Model: NVIDIA Nemotron Parse v1.1. Dữ liệu: CORD v2 (hoá đơn bán lẻ, giấy phép CC BY 4.0).
+</Hint>

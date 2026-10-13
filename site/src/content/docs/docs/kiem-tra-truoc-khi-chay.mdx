@@ -1,10 +1,10 @@
 ---
 title: Kiểm tra trước khi chạy
-description: App kiểm tra sơ đồ, bộ nhớ, ổ đĩa và GPU trước khi bắt đầu, và tự dừng an toàn nếu bộ nhớ xuống quá thấp khi đang chạy.
+description: App kiểm tra sơ đồ, bộ nhớ và ổ đĩa trước khi bắt đầu, và tự dừng an toàn nếu bộ nhớ xuống quá thấp khi đang chạy.
 sidebar:
   order: 3
 sources:
-  - src/vlm_pipeline/common/memguard.py
+  - .team/knowledge/research.md
   - docs/adr/ADR-005-storage-retention.md
   - src/vlm_pipeline/i18n/vi.yaml
   - configs/catalog/models.yaml
@@ -20,41 +20,32 @@ Train một model có thể mất vài giờ. Lỗi phát hiện ở phút thứ
 - Thiết lập của từng node nằm trong khoảng cho phép.
 - Cách train hợp với model đã chọn.
 
-Lỗi được báo ngay trên node có vấn đề, bằng lời dễ hiểu. Xem danh sách mã lỗi ở [Node và cổng nối](/docs/node-va-cong/).
+Lỗi hiện ngay trên node có vấn đề, bằng lời dễ hiểu. Danh sách mã lỗi sơ đồ ở [Node và cổng nối](/docs/node-va-cong/).
 
 ## 2. Kiểm tra bộ nhớ
 
-DGX Spark dùng **bộ nhớ hợp nhất**: CPU và GPU dùng chung 128 GB. Máy thường chạy cùng các ứng dụng khác, nên phần trống thực tế ít hơn nhiều.
+Máy có 128 GB bộ nhớ, dùng chung cho cả máy và các ứng dụng khác, nên phần còn trống ít hơn nhiều ([vì sao](/docs/phan-cung-va-bo-nho/)). Trước khi chạy một bước nặng, app so **bộ nhớ đang trống** với **bộ nhớ bước đó cần**. Một bước chỉ được dùng tối đa 80% phần bộ nhớ còn trống lúc bắt đầu.
 
-Trước khi chạy một bước nặng, app so **bộ nhớ đang trống** với **bộ nhớ bước đó cần**:
-
-> Cần trống ≥ mức cao nhất dự kiến + dự phòng (lớn hơn trong hai giá trị: 10 GB, hoặc 20% mức cao nhất), và không dưới 20 GB.
-
-Ví dụ: train Nemotron Parse v1.1 cần khoảng 20 GB, nên máy phải còn trống ít nhất 30 GB. Không đủ thì app báo **MEM-001** và chưa chạy gì.
+Ví dụ: train Nemotron Parse v1.1 cần khoảng 20 GB. Nếu máy đang trống 30 GB thì chạy được; nếu không đủ, app báo **MEM-001**, chưa chạy gì và xếp hàng chờ máy rảnh.
 
 <Hint title="Mức bộ nhớ dự kiến lấy từ đâu?">
-Từ cột "RAM khi train" trong [catalog model](/docs/catalog-model/). Với model ghi "đã đo", đó là mức cao nhất team đo được khi train thật. Với model ghi "ước tính", con số chưa được kiểm bằng lần chạy thật.
+Từ cột "Bộ nhớ khi train" trong [danh sách model](/docs/catalog-model/). Với model ghi "đã đo", đó là mức cao nhất chúng tôi đo được khi train thật. Với model ghi "ước lượng", con số chưa được kiểm bằng lần chạy thật. App cộng thêm một phần dự phòng vào con số này.
 </Hint>
 
 ## 3. Bảo vệ khi đang chạy
 
-Trong lúc chạy, app theo dõi bộ nhớ trống mỗi giây:
+Nếu app dừng bước của bạn, đó là để bảo vệ máy, không phải lỗi của bạn. Tiến độ được lưu nếu kịp.
 
-| Bộ nhớ trống | App làm gì |
-|---|---|
-| Dưới 14 GB | Ghi cảnh báo |
-| Dưới 8 GB | Yêu cầu dừng có kiểm soát: lưu tiến độ rồi dừng (**MEM-002**) |
-| Đang lưu checkpoint | Cho thêm tới 5 phút để lưu xong, trừ khi bộ nhớ trống xuống dưới 4 GB |
-| Giảm quá nhanh | Dừng ngay, không chờ, để máy không bị treo |
+Trong lúc chạy, app theo dõi bộ nhớ trống mỗi giây. Khi bước đang chạy đã dùng gần hết phần được phép, app lưu tiến độ rồi dừng (**MEM-002**). Nếu bộ nhớ giảm quá nhanh, app dừng ngay để máy không bị treo. Khi đang lưu checkpoint, app chờ thêm một lúc để lưu xong.
 
 <Hint title="Vì sao app ưu tiên dừng hơn chạy tiếp?">
 Máy dùng chung. Nếu bộ nhớ cạn, cả máy có thể treo, ảnh hưởng mọi ứng dụng khác chứ không chỉ bước train của bạn. Mất một checkpoint dở dang ít tệ hơn.
 </Hint>
 
-## 4. GPU chỉ chạy một việc nặng
+## 4. Mỗi lúc một việc nặng
 
-Mỗi lúc chỉ một tác vụ nặng (train, nén, đo điểm) được dùng GPU. Nếu GPU đang bận, app báo **SYS-001** kèm tên tác vụ đang chạy và workflow của bạn sẽ chờ. Chờ quá lâu thì app báo **SYS-002**.
+Mỗi lúc chỉ một tác vụ nặng (train, nén, đo điểm) được chạy; workflow của bạn tự chờ tới lượt. Các thông báo liên quan xem ở [Xử lý sự cố bộ nhớ, ổ đĩa và GPU](/docs/xu-ly-su-co-bo-nho/).
 
 ## 5. Ổ đĩa
 
-App ước lượng dung lượng cần để lưu model và checkpoint. Không đủ thì báo **DISK-001**. Ví dụ: mỗi checkpoint khi fine-tune toàn bộ Nemotron Parse v1.1 chiếm khoảng 8 GB.
+App ước lượng dung lượng cần để lưu model và checkpoint. Không đủ thì báo **DISK-001**. Ví dụ: mỗi checkpoint khi fine-tune toàn bộ Nemotron Parse v1.1 chiếm khoảng 8,1 GB.

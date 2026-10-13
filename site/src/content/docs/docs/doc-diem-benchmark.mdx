@@ -1,5 +1,5 @@
 ---
-title: Benchmark và cách đọc điểm
+title: Cách đọc điểm benchmark
 description: Các benchmark app dùng, ý nghĩa từng chỉ số, và khi nào hai con số so sánh được với nhau.
 sidebar:
   order: 8
@@ -20,9 +20,11 @@ CORD v2 là bộ hoá đơn bán lẻ có nhãn từng trường (tên món, s�
 |---|---|---|
 | **Field F1** (chính) | Model điền đúng bao nhiêu trường, cân bằng giữa "bỏ sót" và "điền thừa" | Cao |
 | JSON khớp hoàn toàn | Tỉ lệ hoá đơn mà toàn bộ kết quả khớp đáp án, không sai trường nào | Cao |
-| nTED | Độ giống cấu trúc cây giữa kết quả và đáp án | Cao |
-| Tỉ lệ không đọc được | Tỉ lệ kết quả không chuyển được thành JSON | Thấp |
 | Tỉ lệ bị cắt | Tỉ lệ kết quả chạm giới hạn độ dài trước khi model kết thúc | Thấp |
+
+<Hint title="Các chỉ số phụ">
+**nTED**: độ giống cấu trúc giữa kết quả và đáp án (cao là tốt). **Tỉ lệ không đọc được**: tỉ lệ kết quả không chuyển được thành JSON (thấp là tốt).
+</Hint>
 
 <Hint title="Field F1 tính thế nào?">
 Mỗi hoá đơn được tách thành các cặp (tên trường, giá trị). F1 so tập cặp model sinh ra với tập cặp đáp án: thiếu cặp làm giảm độ phủ, thừa hoặc sai cặp làm giảm độ chính xác, F1 là trung bình điều hoà của hai thứ đó. App chấm theo đúng cách của bài báo Donut: chỉ bỏ khoảng trắng ở hai đầu giá trị, không sửa gì khác.
@@ -36,16 +38,20 @@ Thường là model rơi vào vòng lặp, viết đi viết lại một đoạn
 
 Dùng để kiểm tra model **không quên kiến thức chung** sau khi fine-tune, và để so với số mà hãng công bố.
 
-| Benchmark | Đo khả năng | Chỉ số |
-|---|---|---|
-| MMMU | Kiến thức và suy luận đa ngành | Độ chính xác trắc nghiệm |
-| MMBench (EN) | Nhận thức hình ảnh tổng quát | Độ chính xác |
-| DocVQA | Đọc tài liệu | ANLS |
-| ChartQA | Hiểu biểu đồ | Độ chính xác nới lỏng (±5%) |
-| OCRBench | Đọc chữ trong ảnh | Điểm/1000, quy ra thang 100 |
-| AI2D | Hiểu sơ đồ | Độ chính xác |
-| MathVista (testmini) | Toán có hình | Độ chính xác, cần model chấm phụ nên chỉ dùng nội bộ |
-| Video-MME | Hiểu video | Độ chính xác trắc nghiệm |
+| Benchmark | Đo khả năng |
+|---|---|
+| MMMU | Kiến thức và suy luận đa ngành |
+| MMBench (EN) | Nhận thức hình ảnh tổng quát |
+| DocVQA | Đọc tài liệu |
+| ChartQA | Hiểu biểu đồ |
+| OCRBench | Đọc chữ trong ảnh |
+| AI2D | Hiểu sơ đồ |
+| MathVista (testmini) | Toán có hình (chỉ dùng nội bộ) |
+| Video-MME | Hiểu video |
+
+<Hint title="Mỗi benchmark chấm thế nào?">
+MMMU, MMBench, AI2D, Video-MME: độ chính xác trắc nghiệm. DocVQA: ANLS. ChartQA: độ chính xác nới lỏng (±5%). OCRBench: điểm trên 1000, quy ra thang 100. MathVista cần một model chấm phụ nên không so với số công bố.
+</Hint>
 
 <Hint title="Vì sao app không tự tải sẵn mọi benchmark?">
 Một số benchmark có giấy phép hạn chế (ví dụ ChartQA dùng GPL-3.0). Chúng chỉ được dùng để đo điểm, không dùng để train. App không đóng gói các bộ này; bạn tự tải từ nguồn gốc, và app chỉ công bố điểm tổng hợp, không công bố câu hỏi hay ảnh.
@@ -56,7 +62,7 @@ Một số benchmark có giấy phép hạn chế (ví dụ ChartQA dùng GPL-3.
 Hai điểm chỉ so được khi chạy cùng điều kiện: cùng benchmark và tập con, cùng cách sinh chữ, cùng giới hạn độ dài, cùng độ phân giải ảnh, cùng phiên bản bộ chấm. App lưu toàn bộ điều kiện này cùng mỗi kết quả, và **cảnh báo** khi bạn so hai kết quả chạy khác điều kiện.
 
 - **Sau fine-tune**, app hiện thay đổi trên bài toán của bạn **cạnh** thay đổi trên benchmark chung. Nếu điểm chung tụt rõ ở từ hai benchmark trở lên, app cảnh báo "model quên kiến thức chung".
-- **Sau khi nén**, mức tụt chấp nhận được là trung bình không quá 1 điểm với FP8, và 2–3 điểm với NVFP4 (không benchmark nào tụt quá 5 điểm).
+- **Sau khi nén**, mức tụt chấp nhận được là trung bình không quá 1 điểm với FP8 (NVFP4: chưa có trong app).
 - App **không gộp** các benchmark thành một điểm tổng. Mỗi nhóm năng lực có ký hiệu ↑ / ≈ / ↓ dựa trên khoảng tin cậy 95%.
 
 <Hint title="Khoảng tin cậy 95% là gì?">
@@ -65,4 +71,6 @@ Hai điểm chỉ so được khi chạy cùng điều kiện: cùng benchmark v
 
 ## So với số hãng công bố
 
-Hãng thường công bố điểm với cài đặt riêng (ví dụ chế độ "suy nghĩ" dài, nhiều lần lấy mẫu). App ghi rõ cài đặt của mình. Khi đối chiếu, team yêu cầu điểm của app lệch số công bố **không quá 1,5 điểm** trên benchmark chấm theo luật, cùng cài đặt, rồi mới coi đường đo là đáng tin.
+Hãng thường công bố điểm với cài đặt riêng (ví dụ chế độ "suy nghĩ" dài, nhiều lần lấy mẫu). Chúng tôi chỉ coi cách đo của app là đáng tin khi điểm lệch số công bố không quá 1,5 điểm, cùng cài đặt.
+
+**Trạng thái:** chưa đối chiếu xong. Việc đối chiếu đang tạm hoãn vì nguồn tải một bộ dữ liệu chưa phản hồi ([Giới hạn đã biết](/docs/gioi-han-da-biet/)).

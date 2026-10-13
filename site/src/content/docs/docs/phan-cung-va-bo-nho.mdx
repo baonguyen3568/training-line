@@ -1,6 +1,6 @@
 ---
-title: Phần cứng và bộ nhớ
-description: App chạy trên NVIDIA DGX Spark (GB10). Đặc điểm bộ nhớ hợp nhất và chuyện máy dùng chung ảnh hưởng thế nào tới việc train.
+title: Vì sao máy 128 GB vẫn báo thiếu bộ nhớ?
+description: Máy chạy chung với ứng dụng khác nên bộ nhớ còn trống ít hơn nhiều so với 128 GB. Trang này giải thích và đưa số đo thực tế.
 sidebar:
   order: 9
 sources:
@@ -8,28 +8,26 @@ sources:
   - configs/catalog/models.yaml
   - benchmarks/perf/s3-lora-qwen3.5-0.8b-20261012.json
   - .team/proposals/001a-nvidia-default-model.md
+  - docs/adr/ADR-005-storage-retention.md
 ---
 import Hint from '~/components/Hint.astro';
 
-## Máy đang dùng
+Máy có 128 GB bộ nhớ (hệ điều hành thấy khoảng 121 GB) nhưng thường chỉ còn trống khoảng 40 GB, vì máy chạy chung với ứng dụng khác. Vì vậy một model lớn có thể phải chờ tới khi máy rảnh, hoặc bạn chọn model nhỏ hơn.
 
-- **NVIDIA DGX Spark**, chip **GB10**, kiến trúc **ARM (aarch64)**.
-- **128 GB bộ nhớ hợp nhất**: CPU và GPU dùng chung một vùng nhớ.
-- Phần mềm train chạy trong container NVIDIA NGC (NeMo AutoModel), phiên bản cố định.
+Thông số máy xem ở [Yêu cầu hệ thống](/docs/yeu-cau-he-thong/).
 
-<Hint title="Bộ nhớ hợp nhất khác gì card đồ hoạ rời?">
-Card rời có bộ nhớ GPU riêng (ví dụ 24 GB hoặc 80 GB). Trên DGX Spark, GPU dùng chung 128 GB với CPU. Ưu điểm: model lớn hơn vẫn vừa. Nhược điểm: mọi ứng dụng khác trên máy cũng lấy bớt từ cùng vùng nhớ đó.
+<Hint title="Bộ nhớ hợp nhất là gì?">
+Trên máy này, bộ nhớ của GPU và của cả máy là một. Mọi ứng dụng khác đang chạy cũng lấy bớt từ cùng chỗ đó, nên phần còn lại cho việc train thay đổi theo thời điểm.
 </Hint>
 
-## Máy dùng chung
+## App xử lý chuyện này thế nào?
 
-Máy chạy cùng các dịch vụ khác, nên bộ nhớ trống thực tế ít hơn 128 GB rất nhiều: ví dụ lần đo train LoRA Qwen3.5 0.8B bắt đầu khi máy chỉ còn trống **42 GB**. Vì vậy:
-
-- App kiểm tra bộ nhớ trống ngay trước mỗi bước nặng (xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/)).
-- Catalog ghi mức bộ nhớ từng model cần khi train; model lớn như Qwen3.5 9B (ước tính 38 GB) có thể phải chờ máy rảnh.
-- Mỗi lúc chỉ một tác vụ nặng được dùng GPU.
+- Trước mỗi bước nặng, app so bộ nhớ đang trống với bộ nhớ bước đó cần. Không đủ thì app báo và chờ, không chạy liều. Chi tiết ở [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
+- Mỗi model trong [danh sách model](/docs/catalog-model/) ghi mức bộ nhớ cần khi train. Model lớn như Qwen3.5 9B (ước lượng 38 GB) thường phải chờ máy rảnh.
 
 ## Số đo thực tế
+
+Khi chúng tôi đo, máy chỉ còn trống khoảng 42 GB.
 
 | Việc | Model | Kết quả đo |
 |---|---|---|
@@ -37,14 +35,6 @@ Máy chạy cùng các dịch vụ khác, nên bộ nhớ trống thực tế í
 | Train LoRA, 20 bước | Qwen3.5 0.8B | Bộ nhớ máy tăng cao nhất 12,6 GB; 308 giây cả lần chạy |
 | Chấm điểm CORD, từng ảnh một | Nemotron Parse v1.1 | Khoảng 7 ảnh mỗi phút |
 
-<Hint title="Vì sao bộ nhớ đo được khác số trong log train?">
-Trên bộ nhớ hợp nhất, phần GPU cấp phát và phần các tiến trình biên dịch phụ không hiện đủ trong số liệu của từng tiến trình. Team đo theo bộ nhớ trống của cả máy, là con số quyết định máy có bị treo hay không.
-</Hint>
-
-## Độ chính xác số học khi train
-
-GPU tính bằng **bf16** (16 bit) cho nhanh. Riêng bản sao trọng số dùng để cập nhật được giữ ở **fp32** (32 bit). Thiếu bản sao này, phần lớn các bước cập nhật nhỏ bị làm tròn mất và model gần như không học. Team đã đo được điều này trên Nemotron Parse: chỉ 5,3% trọng số thay đổi sau 300 bước, so với 63,8% sau 100 bước khi có bản sao fp32.
-
-<Hint title="Bạn có cần chỉnh gì không?">
-Không. Template Nemotron Parse đã bật sẵn bản sao fp32; các template còn lại đang được chuyển sau khi kiểm xong. Cái giá là mỗi checkpoint lớn hơn khoảng 1,6 GB.
+<Hint title="Vì sao số này khác số trong log train?">
+Chúng tôi đo bộ nhớ trống của cả máy, vì đó là con số quyết định máy có bị treo hay không.
 </Hint>

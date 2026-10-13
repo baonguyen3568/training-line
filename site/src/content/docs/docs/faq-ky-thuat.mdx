@@ -1,6 +1,6 @@
 ---
 title: Câu hỏi kỹ thuật thường gặp
-description: Trả lời ngắn cho các câu hỏi kỹ thuật hay gặp khi train, đo điểm và lưu model.
+description: Dành cho người đã quen train model. Trả lời ngắn về train, đo điểm, bộ nhớ và giấy phép.
 sidebar:
   order: 11
 sources:
@@ -8,57 +8,54 @@ sources:
   - configs/catalog/datasets.yaml
   - .team/proposals/001a-nvidia-default-model.md
   - .team/proposals/002-eval-benchmark-protocol.md
-  - src/vlm_pipeline/common/memguard.py
   - .team/bugs/BUG-003-parse-resume-missing-conditioner-keys.md
+  - src/vlm_pipeline/export/notices.py
 ---
 import Hint from '~/components/Hint.astro';
 
 ## Train
 
 ### Tôi nên chọn model nào?
-Bắt đầu bằng template có sẵn. Với hoá đơn, chứng từ: **Nemotron Parse v1.1**. Để thử nhanh trên ảnh hỏi–đáp: **Qwen3.5 0.8B** (nhỏ nhất, đã đo bộ nhớ thật). Xem [Catalog model](/docs/catalog-model/).
+Bắt đầu bằng mẫu có sẵn. Với hoá đơn, chứng từ: **Nemotron Parse v1.1**. Với ảnh và video: **Qwen3.5 2B**. Để thử thật nhanh: **Qwen3.5 0.8B**. Xem [Các model có sẵn trong app](/docs/catalog-model/).
 
 ### Val loss giảm đều, sao kết quả chạy thử vẫn tệ?
 Val loss đo khi model được "nhắc" đáp án đúng ở từng bước. Khi tự sinh, một lỗi sớm có thể kéo theo cả chuỗi sai hoặc lặp. Hãy xem **điểm benchmark** và **tỉ lệ bị cắt**, không chỉ val loss.
 
-<Hint title="Ví dụ thật">
-Trong một lần train lỗi của team, val loss đạt 0,195 nhưng model vẫn lặp và bị cắt ở 86% hoá đơn. Nguyên nhân: trọng số được cập nhật ở bf16 thuần nên phần lớn bước học bị làm tròn mất. Lỗi này đã được sửa trong template.
-</Hint>
+Một lần train của chúng tôi đạt val loss 0,195 nhưng model vẫn lặp và bị cắt ở 86% hoá đơn. Nguyên nhân là lỗi số học bf16, ở mục ngay dưới.
 
-### Train bao lâu thì đủ?
-Tuỳ model và dữ liệu. Với template hoá đơn, team đang đo điểm sau 1 epoch và nhiều epoch để chọn mặc định; trang template sẽ ghi số khi có.
+### Lỗi bf16 khi fine-tune toàn bộ trên một GPU là gì?
+GPU tính bằng **bf16** cho nhanh. Bản sao trọng số dùng để cập nhật phải giữ ở **fp32**. Khi train trên một GPU, engine bỏ qua lớp lo việc này, nên trọng số và bước cập nhật đều ở bf16, và phần lớn bước cập nhật nhỏ bị làm tròn mất.
+
+Chúng tôi đo trên Nemotron Parse: chỉ 5,3% trọng số thay đổi sau 300 bước. Khi có bản sao fp32 thì 63,8% trọng số thay đổi sau 100 bước. Các mẫu fine-tune toàn bộ trong app đã bật sẵn bản sao fp32; cái giá là mỗi checkpoint lớn hơn khoảng 1,6 GB.
 
 ### Tôi bấm Dừng rồi chạy tiếp được không?
-Được. Khi bạn bấm Dừng, app giữ lại checkpoint gần nhất; lần chạy sau tiếp tục từ đó thay vì làm lại từ đầu. Phần đã train sau checkpoint cuối cùng sẽ phải chạy lại.
+Thường là được: app giữ checkpoint gần nhất và chạy tiếp từ đó. Một số model chưa hỗ trợ chạy tiếp; khi đó app train lại từ đầu và giữ bản cũ ([Chính sách lưu giữ dữ liệu](/docs/chinh-sach-luu-giu/)).
 
 ### App có dùng dữ liệu kiểm tra để train không?
-Không. Tập test của dataset (ví dụ 100 hoá đơn test của CORD v2) bị khoá, không bao giờ đưa vào train. Mọi quyết định chọn checkpoint hay cài đặt đều dựa trên tập validation; tập test chỉ dùng để báo điểm cuối.
+Không. Tập test của dataset (ví dụ 100 hoá đơn test của CORD v2) bị khoá, không bao giờ đưa vào train. Mọi lựa chọn checkpoint hay cài đặt đều dựa trên tập validation; tập test chỉ dùng để báo điểm cuối.
 
 ## Đo điểm
 
 ### Vì sao điểm của tôi khác số hãng công bố?
-Hãng thường đo với cài đặt riêng: chế độ suy nghĩ dài, nhiều lần lấy mẫu, prompt riêng. App ghi rõ cài đặt của mình và chỉ so khi cùng điều kiện. Xem [Benchmark và cách đọc điểm](/docs/doc-diem-benchmark/).
+Hãng thường đo với cài đặt riêng. Xem [Cách đọc điểm benchmark](/docs/doc-diem-benchmark/).
 
-### Vì sao template hoá đơn tắt "phạt lặp từ"?
-Cấu hình gốc của Nemotron Parse phạt các token lặp lại (`repetition_penalty` 1,1). Kết quả JSON của hoá đơn lặp thẻ cấu trúc theo bản chất, và trong một phép thử ban đầu, phạt lặp làm hỏng cấu trúc. Template đặt 1,0 khi đo điểm và chạy thử. Model bạn lưu vẫn giữ nguyên cấu hình gốc của NVIDIA. Team đang đo lại trên model đã train đúng để chốt.
+### Vì sao mẫu hoá đơn tắt "phạt lặp từ"?
+Cấu hình gốc của Nemotron Parse phạt các token lặp lại (`repetition_penalty` 1,1). JSON của hoá đơn lặp thẻ cấu trúc theo bản chất, và trong một phép thử ban đầu, phạt lặp làm hỏng cấu trúc. Mẫu đặt 1,0, áp dụng giống nhau cho cả đo điểm lẫn chạy thử. Model bạn lưu vẫn giữ nguyên cấu hình gốc của NVIDIA.
 
 <Hint title="Ghi chú thận trọng">
-Phép thử ban đầu chỉ có 6 ảnh và đổi hai thứ cùng lúc, nên kết luận đang để ở trạng thái tạm. Trang này sẽ cập nhật khi có số đo trên tập validation.
+Phép thử ban đầu chỉ có 6 ảnh và đổi hai thứ cùng lúc, nên kết luận đang ở trạng thái tạm. Chúng tôi sẽ cập nhật khi có số đo trên tập validation.
 </Hint>
 
-## Bộ nhớ và máy
+## Bộ nhớ
 
 ### App báo thiếu bộ nhớ dù máy có 128 GB?
-Máy dùng chung với ứng dụng khác, và app giữ thêm phần dự phòng (ít nhất 10 GB, không dưới 20 GB tổng) để máy không bị treo. Xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
-
-### Train bị dừng giữa chừng với lỗi MEM-002?
-Bộ nhớ trống xuống dưới 8 GB nên app đã lưu tiến độ (nếu kịp) và dừng để bảo vệ máy. Chạy lại khi máy rảnh hơn, hoặc chọn model nhỏ hơn.
+Xem [Vì sao máy 128 GB vẫn báo thiếu bộ nhớ?](/docs/phan-cung-va-bo-nho/) và [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
 
 ## Giấy phép
 
 ### Tôi dùng model đã train vào việc thương mại được không?
-Phụ thuộc giấy phép của **model gốc** và **dữ liệu**. Mọi model trong catalog hiện cho phép dùng thương mại theo giấy phép của chúng. CORD v2 dùng CC BY 4.0: được dùng, kể cả thương mại, nhưng phải ghi công và ghi rõ nếu đã chỉnh sửa. Khi chia sẻ model, bạn cần gửi kèm giấy phép và dòng ghi công bên dưới. App chưa tự đính kèm chúng vào thư mục model đã lưu; tính năng này đang được làm.
+Phụ thuộc giấy phép của model gốc và của dữ liệu; các model trong app hiện đều cho phép dùng thương mại ([Các model có sẵn trong app](/docs/catalog-model/)). Khi lưu model, app tự đính kèm giấy phép và dòng ghi công.
 
 <Hint title="Ghi công CORD v2">
-"CORD: A Consolidated Receipt Dataset for Post-OCR Parsing (Park et al., NAVER Clova), CC BY 4.0."
+"CORD: A Consolidated Receipt Dataset for Post-OCR Parsing (Park et al., NAVER Clova), CC BY 4.0." Dữ liệu dùng giấy phép CC BY 4.0: được dùng, kể cả thương mại, nhưng phải ghi công và ghi rõ nếu đã chỉnh sửa.
 </Hint>

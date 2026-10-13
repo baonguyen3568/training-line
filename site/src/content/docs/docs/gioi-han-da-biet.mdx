@@ -12,19 +12,21 @@ sources:
 ---
 import Hint from '~/components/Hint.astro';
 
+Cập nhật: 2026-10-13.
+
 Trang này liệt kê thẳng những gì **chưa** dùng được, để bạn không mất thời gian thử. Mỗi mục ghi trạng thái hiện tại.
 
-## Template hoá đơn (Nemotron Parse v1.1)
+## Mẫu Đọc hoá đơn (Nemotron Parse v1.1)
 
 | Giới hạn | Ảnh hưởng | Trạng thái |
 |---|---|---|
-| **Chưa có điểm chính thức** | Trang template chưa ghi Field F1 | Lần train đã sửa lỗi bf16 cho kết quả train tốt; đang chấm trên tập kiểm tra |
+| **Chưa có điểm chính thức** | Trang mẫu chưa ghi Field F1 và chưa có số epoch mặc định | Đang chấm điểm trên tập kiểm tra |
 | **Chưa nén được** | Không dùng được node **Nén model** với Parse | Nén FP8 với Parse ở mức thử nghiệm, chưa chạy thật |
-| **Chạy thử còn chậm** | Mỗi hoá đơn mất khoảng 8–9 giây | Chưa chạy qua vLLM, đường phục vụ nhanh vẫn đang kiểm |
+| **Chạy thử còn chậm** | Mỗi hoá đơn mất khoảng 8–9 giây | Đang thử cách chạy nhanh hơn |
 | **Chỉ fine-tune toàn bộ** | Không dùng LoRA với Parse | Có chủ đích; app chặn bằng lỗi CFG-010 |
 
 <Hint title="Vì sao chạy thử Parse chậm?">
-Parse chạy bằng mã gốc của NVIDIA, sinh từng token một. Một hoá đơn dài khoảng 250 token trở lên. Chạy qua vLLM sẽ nhanh hơn nhiều, nhưng team cần kiểm rằng kết quả qua vLLM giống hệt trước khi bật.
+Parse chạy bằng mã gốc của NVIDIA, sinh từng token một. Một hoá đơn dài khoảng 250 token trở lên. Chạy qua vLLM sẽ nhanh hơn nhiều, nhưng chúng tôi cần kiểm rằng kết quả qua vLLM giống hệt trước khi bật.
 </Hint>
 
 ## Model khác
@@ -32,20 +34,19 @@ Parse chạy bằng mã gốc của NVIDIA, sinh từng token một. Một hoá 
 | Giới hạn | Trạng thái |
 |---|---|
 | **Cosmos Reason2 2B/8B cần chấp nhận điều khoản** | Bạn phải đăng nhập Hugging Face và đồng ý điều khoản của NVIDIA trên trang model trước; app không tải hộ |
-| **Cosmos Reason2 chỉ ở mức ứng viên** | Chưa có template chính thức. NVIDIA chỉ hỗ trợ chính thức chạy suy luận (không phải train) dòng model này trên DGX Spark, và dòng Cosmos Reason2 đã chuyển sang bảo trì hạn chế |
+| **Cosmos Reason2 chỉ ở mức ứng viên** | Chưa có mẫu. Hướng dẫn của NVIDIA cho DGX Spark chỉ có phần chạy thử, chưa có phần train. Dòng Cosmos Reason2 đang ở chế độ bảo trì hạn chế |
 | **Gemma 4 không nén FP8** | App ẩn lựa chọn FP8 cho Gemma 4 |
-| **RAM của đa số model là ước tính** | Chỉ Nemotron Parse v1.1 và Qwen3.5 0.8B đã đo thật; con số khác có thể lệch |
-| **Nemotron Parse 2.0 chưa vào template** | Đang so với v1.1, chỉ đổi khi tốt hơn rõ |
+| **Bộ nhớ khi train của đa số model là ước lượng** | Chỉ Nemotron Parse v1.1 và Qwen3.5 0.8B đã đo thật; con số khác có thể lệch |
+| **Nemotron Parse 2.0 chưa có mẫu** | Đang so với v1.1, chỉ đổi khi tốt hơn rõ |
 
 ## Đo điểm
 
 | Giới hạn | Trạng thái |
 |---|---|
-| **Chưa đối chiếu với số công bố của hãng** | Cần MMBench v1.1, máy chủ tải đang không phản hồi; tạm hoãn |
+| **Chưa đối chiếu với số công bố của hãng** | Đang tạm hoãn vì nguồn tải dữ liệu chưa phản hồi |
 | **MathVista chỉ dùng nội bộ** | Cần model chấm phụ nên không so với số công bố |
 | **Video-MME chỉ chạy khi phát hành** | Bộ lớn, tốn nhiều giờ GPU trên máy dùng chung |
 
 ## Máy
 
 - Chỉ hỗ trợ **một máy** NVIDIA DGX Spark (GB10). Chưa hỗ trợ nhiều GPU hay nhiều máy.
-- Mỗi lúc chỉ một tác vụ nặng chạy; tác vụ khác phải chờ.
