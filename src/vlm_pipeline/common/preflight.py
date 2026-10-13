@@ -286,6 +286,15 @@ class MemoryWaitTimeoutError(VlmPipelineError):
     code: ClassVar[str] = "SYS-002"
 
 
+def _vram_shortfall(gpus: list[GpuInfo], est_vram_gb: float, thresholds: MemThresholds) -> tuple[float, float] | None:
+    """(need, free) GB of VRAM when a discrete GPU cannot take the job now; None when it can (or there is no VRAM)."""
+    if memory_model(gpus) != "discrete":
+        return None
+    free = max(g.free_gb or 0.0 for g in gpus)  # the freest GPU, as check_gpu
+    need = vram_required_gb(est_vram_gb, thresholds.max_free_frac)
+    return None if free >= need else (need, free)
+
+
 def wait_for_memory(
     est_peak_gb: float,
     *,
@@ -297,6 +306,8 @@ def wait_for_memory(
     read: Callable[[], MemSnapshot] = read_meminfo,
     read_cgroup: Callable[[], float | None] = read_cgroup_available_gb,
     clock: Callable[[], float] = time.monotonic,
+    est_vram_gb: float | None = None,
+    gpus: Callable[[], list[GpuInfo]] = query_gpus,
 ) -> bool:
     """Block until a job of ``est_peak_gb`` fits the memory budget (PM 2026-10-13: queue, do not fail).
 
@@ -304,14 +315,23 @@ def wait_for_memory(
     ``on_wait({need_gb, avail_gb, waited_s})`` is called on every poll that does not fit (the UI shows "waiting
     for free memory"). Past ``timeout_s`` raises ``MemoryWaitTimeoutError`` (SYS-002, params ``minutes``). No lock
     is taken here: callers wait BEFORE acquiring the GPU lock.
+
+    Discrete GPU (D-4): free VRAM is a second budget, re-read on every poll (``est_vram_gb``, default
+    ``est_peak_gb``, at most ``max_free_frac`` of the free VRAM); while VRAM is what blocks, ``on_wait`` also gets
+    ``vram_need_gb`` / ``vram_avail_gb``. UMA (GB10) and CPU-only hosts: the host budget only, as before.
     """
     stop = cancel if cancel is not None else threading.Event()
     start = clock()
     need = thresholds.required_available_gb(est_peak_gb)
+    vram_est = est_peak_gb if est_vram_gb is None else est_vram_gb
+    # Ask nvidia-smi once for the memory model: only a discrete GPU is re-read on every poll (UMA/GB10 never needs it).
+    discrete = memory_model(gpus()) == "discrete"
     while True:
         snapshot = read()
         cgroup = read_cgroup()
-        if not check_memory(est_peak_gb, snapshot=snapshot, cgroup_available_gb=cgroup, thresholds=thresholds):
+        host_ok = not check_memory(est_peak_gb, snapshot=snapshot, cgroup_available_gb=cgroup, thresholds=thresholds)
+        vram = _vram_shortfall(gpus(), vram_est, thresholds) if discrete else None
+        if host_ok and vram is None:
             return True
         waited = clock() - start
         if waited >= timeout_s:
@@ -321,7 +341,10 @@ def wait_for_memory(
             )
         if on_wait is not None:
             avail = snapshot.mem_available_gb if cgroup is None else min(snapshot.mem_available_gb, cgroup)
-            on_wait({"need_gb": round(need, 2), "avail_gb": round(avail, 2), "waited_s": waited})
+            info = {"need_gb": round(need, 2), "avail_gb": round(avail, 2), "waited_s": waited}
+            if vram is not None:
+                info.update(vram_need_gb=round(vram[0], 2), vram_avail_gb=round(vram[1], 2))
+            on_wait(info)
         if stop.wait(poll_s):
             return False
 

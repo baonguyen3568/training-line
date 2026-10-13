@@ -70,3 +70,46 @@ def test_timeout_raises_sys_002_with_minutes() -> None:
                         clock=clock, poll_s=60.0, timeout_s=300.0)  # fmt: skip
     assert ei.value.code == "SYS-002"
     assert ei.value.params == {"minutes": 5}
+
+
+def _gpu(free_gb_seq: list[float]):  # type: ignore[no-untyped-def]
+    from vlm_pipeline.common.gpu_mem import GpuInfo
+
+    it = iter(free_gb_seq)
+    return lambda: [GpuInfo("NVIDIA L40S", 45.0, 45.0 - (f := next(it)), f, (8, 9), "580.95.05")]
+
+
+def test_a_discrete_gpu_waits_for_free_vram_too() -> None:
+    """D-4: host RAM fits, but another process holds the VRAM -> wait (not crash), report the VRAM numbers."""
+    clock = _Clock()
+    seen: list[dict[str, float]] = []
+    fits = wait_for_memory(
+        20.0, read=_feed(200.0, 200.0, 200.0), read_cgroup=lambda: None, on_wait=seen.append, cancel=_Tick(clock),
+        clock=clock, gpus=_gpu([10.0, 10.0, 20.0, 30.0]),  # first call: the memory model
+    )  # fmt: skip
+    assert fits  # 20 / 0.8 = 25 GB of free VRAM needed: the third poll
+    assert [s["vram_avail_gb"] for s in seen] == [10.0, 20.0]
+    assert all(s["vram_need_gb"] == 25.0 for s in seen)
+
+
+def test_uma_ignores_vram_figures() -> None:
+    from vlm_pipeline.common.gpu_mem import parse_query
+
+    gb10 = parse_query("NVIDIA GB10, [N/A], [N/A], [N/A], 12.1, 580.142")
+    assert wait_for_memory(10.0, read=_feed(50.0), read_cgroup=lambda: None, gpus=lambda: gb10)
+
+
+def test_uma_asks_nvidia_smi_once_not_on_every_poll() -> None:
+    from vlm_pipeline.common.gpu_mem import parse_query
+
+    clock = _Clock()
+    calls: list[int] = []
+    gb10 = parse_query("NVIDIA GB10, [N/A], [N/A], [N/A], 12.1, 580.142")
+
+    def gpus():  # type: ignore[no-untyped-def]
+        calls.append(1)
+        return gb10
+
+    assert wait_for_memory(20.0, read=_feed(5.0, 5.0, 80.0), read_cgroup=lambda: None, cancel=_Tick(clock),
+                           clock=clock, gpus=gpus)  # fmt: skip
+    assert len(calls) == 1
