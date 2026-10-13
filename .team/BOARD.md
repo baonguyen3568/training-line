@@ -31,6 +31,20 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | P1-9 | Spike NVIDIA containers trên GB10 (AutoModel 26.08 VLM, ModelOpt, vLLM) + Proposal 008: backend runtime (host orchestrator ↔ container worker, job runner, GPU lock/memguard, RunManifest) | bao-backend | PAUSED (RESET: spike hoãn; P008 giữ hướng, chờ ghép vào P009) |
 | P1-7 | PM tổng hợp → ADR-001..00N, chốt với user | bao-pm | TODO |
 
+## 🔧 MILESTONE M1b — Mọi node chạy THẬT (2026-10-13). RealWorker hiện chỉ có model.hf_pick, data.hf_load, train.lora_vlm/sft_vlm
+Ưu tiên ngang M2 với backend/research/tester/fixcode. Node chưa có worker thật → báo lỗi LÚC VALIDATE ("bước này chưa chạy thật được"), không fail giữa chừng.
+| ID | Node | Owner | Status |
+|----|------|-------|--------|
+| B-0 | GraphRule: node chưa có worker thật / model chưa hỗ trợ (vd Parse export) → lỗi validate | bao-backend | TODO |
+| B-1 | train.merge_lora (PEFT merge_and_unload trong container) | bao-backend | TODO |
+| B-2 | export.hf_dir cho model native (ADR-012) → sau đó Parse (B3) | bao-backend | TODO |
+| B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | TODO |
+| B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | TODO |
+| B-5 | eval.benchmarks (từ CORD worker + lmms-eval, ADR-002) | bao-tester | TODO |
+| B-6 | bench.perf (latency/throughput/peak mem theo tester-perf-bench) | bao-tester | TODO |
+| B-7 | serve.vllm = node "Chạy thử" (vLLM ≥0.31, mem-util ≤0.3, prefix parity) | bao-fixcode | TODO |
+DoD: cả 3 template chạy thật end-to-end trên canvas (template 2 cần user accept Cosmos trên HF).
+
 ## 🎨 MILESTONE M2 — SaaS site + Dashboard kiểu Unreal (user yêu cầu 2026-10-13)
 Dùng skill `impeccable` (~/.claude/skills/impeccable/SKILL.md). Session nào chưa thấy skill thì Read trực tiếp SKILL.md + reference/ và chạy
 `~/.claude/skills/impeccable/scripts/impeccable context`. Mode: landing/PR = Persuade; docs/giới thiệu/chính sách = Read; dashboard = Operate.
@@ -49,12 +63,12 @@ RÀNG BUỘC CỨNG (PM):
 - Không đổi dist 7870 khi user đang thử app; build dashboard mới ở nhánh/route riêng tới khi user duyệt.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | TODO |
+| G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | TODO (API sẵn 10-13: GET /api/storage/plan, POST /api/storage/apply; frontend làm sau khung site M2-3) |
 | G-2 | GAP: retention chạy theo lịch trong app (hiện chỉ CLI) | bao-cleanup + bao-backend | TODO |
 | G-3 | GAP: nút "Sửa nhanh" theo error_catalog actions trên UI | bao-frontend + bao-fixcode | TODO |
 | M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | TODO |
 | M2-2 | Sitemap 20–30 trang + IA + copy tiếng Việt (nguồn sự thật: ADR, P001/P002, benchmarks) | bao-design (copy) + bao-research (nội dung kỹ thuật docs) + bao-cleanup (docs vận hành/lưu trữ) | TODO |
-| M2-3 | Chọn stack site tĩnh (đề xuất: Astro + MDX, docs Starlight; MIT) trong `site/`, chung design tokens với app | bao-frontend + bao-cleancode | IN PROGRESS (stack chốt 10-13: Astro 7.3 + Starlight 0.42, MDX; frontend dựng khung; cleancode: gate check.sh + check `sources`) |
+| M2-3 | Chọn stack site tĩnh (đề xuất: Astro + MDX, docs Starlight; MIT) trong `site/`, chung design tokens với app | bao-frontend + bao-cleancode | DONE (b61617c khung, b7a402e gate check.sh) |
 | M2-4 | Build landing + trang marketing + animation (prefers-reduced-motion) | bao-frontend (+ bao-fixcode hỗ trợ dựng trang) | TODO |
 | M2-5 | Build docs + chính sách + trang phụ | bao-cleancode (dựng) + bao-design (review) | IN PROGRESS: 5 trang chính sách import từ docs/legal (chờ security review); tiếp: docs + trang phụ |
 | M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | TODO |
