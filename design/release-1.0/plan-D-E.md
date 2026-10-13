@@ -19,7 +19,7 @@ Mỗi trang đạt DoD khi:
 ## Luồng D — Dashboard
 | # | Việc | Làm | Design giao | Điều kiện xong |
 |---|---|---|---|---|
-| D1 | D4 thành mặc định; giao diện cũ chỉ còn qua `?ui=legacy` tới khi F (QA) xanh rồi xoá | frontend | review ảnh 3 màn: canvas, gallery, cài đặt | E2E mọi template trên D4 |
+| D1 | D4 thành mặc định; giao diện cũ chỉ còn qua `?ui=classic` (alias `legacy`) tới khi F (QA) xanh rồi xoá | frontend | review ảnh 3 màn: canvas, gallery, cài đặt | E2E mọi template trên D4 |
 | D2 | Subgraph bung/gập, lỗi bên trong group | frontend (chờ P016 của cleancode) | spec P4-4 + key `canvas.group.*` | design APPROVE ảnh chụp |
 | D3 | G-3 "Sửa nhanh" trên thẻ lỗi | frontend + fixcode | nhãn action đã đủ 52/52 trong i18n; review vị trí nút | tester: mỗi action có test |
 | D4 | G-4 "Đặt lại bước" | cleanup (API) + frontend | copy dialog dry-run + PERMANENT_LOSS khi có API | design APPROVE copy |
