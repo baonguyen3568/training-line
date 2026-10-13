@@ -157,3 +157,59 @@ def test_a_model_without_safetensors_is_refused(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(vllm_runner, "run_job", lambda *a, **k: pytest.fail("must not run"))
     with pytest.raises(BatchRequestError, match="safetensors"):
         run_vllm_batch(root, model, [{"id": "x"}], who="t", memory=(121.7, 110.0))
+
+
+def test_job_written_results_are_never_read_through_a_link(tmp_path: Path) -> None:
+    """The run dir is the job's: out.jsonl / engine.json swapped for links to host files are refused (B1 class)."""
+    from vlm_pipeline.serve.vllm_runner import BatchResult
+
+    secret = tmp_path / "secret.json"
+    secret.write_text('{"id": "x", "text": "CANARY"}\n')
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "out.jsonl").symlink_to(secret)
+    (run / "engine.json").symlink_to(secret)
+    res = BatchResult(run_dir=run, status=RunStatus.COMPLETED, error_code=None, container_digest=None)
+    with pytest.raises(OSError, match="symbolic links"):  # ELOOP from O_NOFOLLOW
+        res.rows()
+    with pytest.raises(OSError, match="symbolic links"):
+        res.engine()
+
+
+def test_sampling_is_checked_and_carried(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    items, _ = build_items(root, [{"id": "a", "sampling": {"temperature": 0.7, "top_p": 0.9}}])
+    assert items[0].sampling == {"temperature": 0.7, "top_p": 0.9}
+    with pytest.raises(BatchRequestError, match="sampling"):
+        build_items(root, [{"id": "a", "sampling": {"logits_processors": 1}}])
+
+
+@pytest.mark.parametrize(
+    "sampling",
+    [
+        {"temperature": float("nan")},
+        {"temperature": float("inf")},
+        {"temperature": -0.1},
+        {"top_p": 0.0},
+        {"top_k": 0},
+        {"top_k": 2.5},
+        {"repetition_penalty": 3.0},
+        {"temperature": True},
+        {"temperature": "0.7"},
+    ],
+)
+def test_bad_sampling_is_refused_on_the_host(tmp_path: Path, sampling: dict[str, Any]) -> None:
+    """bao-security: never discovered in the container after the GPU lock and a model load."""
+    with pytest.raises(BatchRequestError, match="sampling"):
+        build_items(_project(tmp_path), [{"id": "a", "sampling": sampling}])
+
+
+def test_top_logprobs_are_listed_by_rank() -> None:
+    from types import SimpleNamespace
+
+    from vlm_pipeline.serve.vllm_batch import _top_logprobs
+
+    lp = SimpleNamespace
+    gen = SimpleNamespace(logprobs=[{7: lp(logprob=-0.1, rank=1), 9: lp(logprob=-2.5, rank=2)}], token_ids=[7])
+    assert _top_logprobs(gen) == [[[7, -0.1], [9, -2.5]]]
+    assert _top_logprobs(SimpleNamespace(logprobs=None)) is None

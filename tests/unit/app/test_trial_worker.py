@@ -204,7 +204,7 @@ def test_temperature_turns_on_sampling_with_top_p() -> None:
     from vlm_pipeline.serve.trial import TrialRequest, decoding_overrides
 
     req = TrialRequest("m", "g", "p", "chat", "i.png", "q", max_new_tokens=256, temperature=0.0, top_p=0.9)
-    assert decoding_overrides(req) == {"max_new_tokens": 256}  # greedy: the base config's sampling stays off
+    assert decoding_overrides(req) == {"max_new_tokens": 256, "do_sample": False}  # greedy beats a sampling base
     hot = TrialRequest("m", "g", "p", "chat", "i.png", "q", max_new_tokens=256, temperature=0.7, top_p=0.9)
     assert decoding_overrides(hot) == {"max_new_tokens": 256, "do_sample": True, "temperature": 0.7, "top_p": 0.9}
 
@@ -252,3 +252,87 @@ def test_a_job_made_link_is_never_read_as_the_answer_nor_its_log(
         run_trial(w, _job({"image": UID}, run_dir, ref))
     assert "CANARY" not in ei.value.log_tail
     assert secret.read_text() == '{"text": "CANARY"}'  # never written through the link either
+
+
+# ------------------------------------------------------------------------------------------- engine=vllm (B7-3)
+
+
+def test_vllm_falls_back_to_hf_and_says_why_until_parity_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    w = RealWorker(_root(tmp_path))
+    _, ref = _base_ref(w, "cosmos-reason2-2b")
+    monkeypatch.setattr(trial_worker, "run_job", _fake_job({"text": "hf answer", "engine_used": "hf"}))
+    out = run_trial(w, _job({"image": UID, "engine": "vllm"}, w.root / "outputs" / "graph" / "runs" / "t", ref))
+    result = json.loads(Path(out.outputs["endpoint"].path).read_text())
+    assert (result["engine_used"], result["engine_fallback"]) == ("hf", "parity_pending")
+
+
+def _fake_batch(row: dict[str, Any], seen: dict[str, Any]) -> Any:
+    from vlm_pipeline.serve.vllm_runner import BatchResult
+
+    def fake(root: Path, model: Path, items: list[dict[str, Any]], **kw: Any) -> Any:
+        seen.update(model=model, items=items, kw=kw)
+        run_dir = kw["run_dir"]
+        (run_dir / "out.jsonl").write_text(json.dumps({"id": "trial", **row}) + "\n")
+        (run_dir / "engine.json").write_text(json.dumps({"vllm": "0.31.0", "quantization": None}))
+        return BatchResult(run_dir=run_dir, status=RunStatus.COMPLETED, error_code=None, container_digest="sha256:b")
+
+    return fake
+
+
+def test_vllm_answers_through_the_batch_job_once_parity_passed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.serve import vllm_runner
+
+    w = RealWorker(_root(tmp_path))
+    entry, ref = _base_ref(w, "cosmos-reason2-2b")
+    monkeypatch.setattr(trial_worker, "VLLM_PARITY_MODELS", frozenset({entry.id}))
+    monkeypatch.setattr(trial_worker, "run_job", lambda *a, **k: pytest.fail("the HF job must not run"))
+    seen: dict[str, Any] = {}
+    row = {"text": " 42.000đ ", "finish_reason": "length", "prompt_tokens": 300, "gen_tokens": 1024,
+           "prompt_ids_sha": "abc", "decoding": {"temperature": 0.0}}  # fmt: skip
+    monkeypatch.setattr(vllm_runner, "run_vllm_batch", _fake_batch(row, seen))
+    run_dir = w.root / "outputs" / "graph" / "runs" / "t"
+    secret = tmp_path / "host-file"
+    secret.write_text("keep")
+    run_dir.mkdir(parents=True)
+    (run_dir / "result.json").symlink_to(secret)  # planted by an earlier job: replaced, never written through
+    out = run_trial(w, _job({"image": UID, "engine": "vllm", "prompt": "Total?"}, run_dir, ref))
+    result = json.loads((run_dir / "result.json").read_text())
+    assert (result["engine_used"], result["text"], result["truncated"]) == ("vllm", "42.000đ", True)
+    assert result["engine"]["container_digest"] == "sha256:b"
+    assert secret.read_text() == "keep"
+    assert out.outputs["endpoint"].hash.startswith("sha256:")
+    [item] = seen["items"]
+    assert (item["prompt"], item["sampling"]) == ("Total?", {})  # greedy by default
+    assert seen["kw"]["run_dir"] == run_dir
+
+
+def test_vllm_sampling_follows_the_hf_decoding_order(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    from vlm_pipeline.app.trial_worker import vllm_sampling, vllm_unavailable
+
+    w = RealWorker(_root(tmp_path))
+    entry, ref = _base_ref(w, "cosmos-reason2-2b")
+    req, _ = build_request(w, _job({"image": UID}, w.root / "run", ref), w.root / "uploads" / f"{UID}.png")
+    assert vllm_sampling(w, req)[0] == {}
+    hot = replace(req, temperature=0.7, top_p=0.9, decode_overrides={"repetition_penalty": 1.05})
+    assert vllm_sampling(w, hot)[0] == {"temperature": 0.7, "top_p": 0.9, "repetition_penalty": 1.05}
+    assert vllm_unavailable(entry, replace(req, adapter_dir="/workspace/x")) == "lora_adapter"
+    assert vllm_unavailable(entry, replace(req, family="nemotron_parse")) == "family"
+
+
+def test_temperature_zero_stays_greedy_over_a_sampling_base(tmp_path: Path) -> None:
+    """tester: a base generation_config.json with do_sample=true + temperature 0.7 : "temperature 0" stays greedy."""
+    from vlm_pipeline.app.trial_worker import vllm_sampling
+
+    w = RealWorker(_root(tmp_path))
+    entry, ref = _base_ref(w, "cosmos-reason2-2b")
+    snap = w.root / ".cache" / "hf" / "hub" / f"models--{entry.repo.replace('/', '--')}" / "snapshots" / entry.revision
+    (snap / "generation_config.json").write_text(json.dumps({"do_sample": True, "temperature": 0.7, "top_p": 0.8,
+                                                              "top_k": 20}))  # fmt: skip
+    req, _ = build_request(w, _job({"image": UID}, w.root / "run", ref), w.root / "uploads" / f"{UID}.png")
+    sampling, record = vllm_sampling(w, req)
+    assert sampling == {}  # vLLM: temperature 0 (greedy)
+    assert record["do_sample"] is False  # HF gets the same explicit override

@@ -14,7 +14,10 @@ plus a minimal KV cache need: then the job waits in the queue for memory instead
 from __future__ import annotations
 
 import json
+import math
+import os
 import secrets
+import stat
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping
@@ -27,14 +30,22 @@ from vlm_pipeline.common.host_paths import hub_repo_dir
 from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job
 from vlm_pipeline.common.launcher import JobLauncher
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemThresholds, read_meminfo
-from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
-from vlm_pipeline.serve.vllm_batch import CONTAINER_ENV, ENGINE_NAME, OUT_NAME, BatchItem, BatchRequest
+from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_small_json, write_manifest
+from vlm_pipeline.serve.vllm_batch import (
+    CONTAINER_ENV,
+    ENGINE_NAME,
+    OUT_NAME,
+    SAMPLING_KEYS,
+    BatchItem,
+    BatchRequest,
+)
 
 VLLM_IMAGE = "vlm-vllm:0.31.0"  # docker/IMAGES.lock, bao-security APPROVED 2026-10-13
 DEFAULT_MEM_FRAC = 0.3
 CPU_SIDE_GB = 4.0  # engine process + tokenizer/processor + image decode on the CPU side (UMA: same pool)
 MIN_KV_GB = 2.0  # below this the engine starts but cannot hold one 8k request with an image
 MAX_TOKENS_LIMIT = 8192
+MAX_LOGPROBS = 5
 # bao-security S2: images are mounted one file at a time (no sibling files exposed); only a big batch from one dir
 # outside uploads/ mounts that dir (docker has no cheap way to bind 500 files).
 DIR_MOUNT_MIN = 200
@@ -60,7 +71,7 @@ class BatchResult:
 
     @property
     def ok(self) -> bool:
-        return self.status == RunStatus.COMPLETED and (self.run_dir / OUT_NAME).is_file()
+        return self.status == RunStatus.COMPLETED and (self.run_dir / OUT_NAME).exists()
 
     @property
     def out_path(self) -> Path:
@@ -72,13 +83,26 @@ class BatchResult:
         {id, text, finish_reason, prompt_tokens, gen_tokens, prompt_sha, prompt_ids_sha}, or {id, error: {code, reason}}
         for a refused image.
         """
-        with self.out_path.open(encoding="utf-8") as f:
-            return [json.loads(line) for line in f]
+        return [json.loads(line) for line in _read_job_text(self.out_path).splitlines() if line.strip()]
 
     def engine(self) -> dict[str, Any]:
         """engine.json + the image id that really ran (run.json container_digest)."""
-        engine: dict[str, Any] = json.loads((self.run_dir / ENGINE_NAME).read_text(encoding="utf-8"))
+        raw = read_small_json(self.run_dir / ENGINE_NAME)  # the job wrote it: no link, no FIFO, bounded
+        engine: dict[str, Any] = raw if isinstance(raw, dict) else {}
         return {**engine, "image": VLLM_IMAGE, "container_digest": self.container_digest}
+
+
+OUT_MAX_BYTES = 64 * 1024 * 1024  # 500 answers x 4096 tokens fit with a wide margin
+
+
+def _read_job_text(path: Path, max_bytes: int = OUT_MAX_BYTES) -> str:
+    """Text of a file the job wrote in its run dir: never through a link, never a FIFO, bounded (bao-security B1)."""
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with os.fdopen(fd, "rb") as f:
+        st = os.fstat(f.fileno())
+        if not stat.S_ISREG(st.st_mode) or st.st_size > max_bytes:
+            raise ValueError(f"{path.name}: not a regular file of at most {max_bytes} bytes")
+        return f.read(max_bytes + 1).decode("utf-8")
 
 
 def weights_gb(model_dir: Path) -> float:
@@ -140,6 +164,31 @@ def _image_mounts(root: Path, images: list[Path]) -> list[Path]:
     return mounts
 
 
+# Accepted ranges, checked on the host before any job (bao-security): NaN / inf / out of range never reach the GPU.
+SAMPLING_RANGES: dict[str, tuple[float, float]] = {
+    "temperature": (0.0, 2.0),
+    "top_p": (1e-6, 1.0),
+    "top_k": (-1, 1000),  # -1 = off; an integer
+    "repetition_penalty": (0.5, 2.0),
+}
+
+
+def _checked_sampling(rid: str, raw: object) -> dict[str, float]:
+    if not isinstance(raw, Mapping):
+        raise BatchRequestError(f"request {rid}: sampling must be a mapping")
+    out: dict[str, float] = {}
+    for key, value in raw.items():
+        if key not in SAMPLING_KEYS:
+            raise BatchRequestError(f"request {rid}: unknown sampling key {key!r}")
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+            raise BatchRequestError(f"request {rid}: sampling {key} must be a finite number")
+        low, high = SAMPLING_RANGES[key]
+        if not low <= value <= high or (key == "top_k" and (value != int(value) or value == 0)):
+            raise BatchRequestError(f"request {rid}: sampling {key}={value} out of range")
+        out[key] = float(value)
+    return out
+
+
 def build_items(root: Path, requests: Iterable[Mapping[str, Any]]) -> tuple[list[BatchItem], list[Path]]:
     """Checked items (container paths) + the image files (or, for a big batch, dirs) to mount.
 
@@ -168,7 +217,10 @@ def build_items(root: Path, requests: Iterable[Mapping[str, Any]]) -> tuple[list
                 raise BatchRequestError(f"request {rid}: image is outside the project")
             images.append(path)
             image = _container_path(root, path)
-        items.append(BatchItem(id=rid, image=image, prompt=str(raw.get("prompt", "")), max_tokens=max_tokens))
+        sampling = _checked_sampling(rid, raw.get("sampling") or {})
+        items.append(
+            BatchItem(id=rid, image=image, prompt=str(raw.get("prompt", "")), max_tokens=max_tokens, sampling=sampling)
+        )
     if not items:
         raise BatchRequestError("empty batch")
     return items, _image_mounts(root, images)
@@ -192,22 +244,29 @@ def run_vllm_batch(
     min_pixels: int = 0,
     max_pixels: int = 0,
     enable_thinking: bool = False,
+    logprobs: int = 0,
     extra: Mapping[str, Any] | None = None,
     cancel: threading.Event | None = None,
     on_wait: Callable[[dict[str, float]], None] | None = None,
     thresholds: MemThresholds = DEFAULT_THRESHOLDS,
     memory: tuple[float, float] | None = None,
     launcher: JobLauncher | None = None,
+    run_dir: Path | None = None,
+    manifest: RunManifest | None = None,
 ) -> BatchResult:
     """Answer ``requests`` (jsonl path or dicts: id, image, prompt, max_tokens) greedily with vLLM on ``model_dir``.
 
     Everything is checked before a run dir exists (a refused batch leaves nothing behind). ``memory`` = (total,
-    available) GB for tests; by default read now (``host_memory``).
+    available) GB for tests; by default read now (``host_memory``). A graph node passes its own ``run_dir`` (the
+    executor's attempt dir, already claimed) and ``manifest`` (name, stage, base model); a CLI/QA caller gets a fresh
+    ``outputs/runs/<id>``.
     """
     root = root.resolve()
     model = model_dir.resolve()
     if not model.is_relative_to(root) or not (model / "config.json").is_file():
         raise BatchRequestError("model_dir must be an HF model dir inside the project")
+    if not 0 <= logprobs <= MAX_LOGPROBS:
+        raise BatchRequestError(f"logprobs must be in [0, {MAX_LOGPROBS}]")
     if bool(min_pixels) != bool(max_pixels) or min_pixels > max_pixels:
         raise BatchRequestError("min_pixels / max_pixels go together, min <= max")
     if weights_gb(model) == 0:
@@ -217,9 +276,14 @@ def run_vllm_batch(
     budget = engine_budget(weights_gb(model), total_gb=total, available_gb=available, mem_frac=mem_frac,
                            thresholds=thresholds)  # fmt: skip
 
-    run_id = f"{time.strftime('%Y%m%d-%H%M')}-{tag}-{secrets.token_hex(2)}"
-    run_dir = root / "outputs" / "runs" / run_id
-    (run_dir / "logs").mkdir(parents=True)
+    if run_dir is None:
+        run_id = f"{time.strftime('%Y%m%d-%H%M')}-{tag}-{secrets.token_hex(2)}"
+        run_dir = root / "outputs" / "runs" / run_id
+    run_dir = run_dir.resolve()
+    if not run_dir.is_relative_to(root / "outputs"):
+        raise BatchRequestError("run_dir must be under outputs/")
+    run_id = manifest.run_id if manifest is not None else run_dir.name[:120]
+    (run_dir / "logs").mkdir(parents=True, exist_ok=True)
     request = BatchRequest(
         model_dir=_container_path(root, model),
         items=items,
@@ -229,12 +293,15 @@ def run_vllm_batch(
         min_pixels=min_pixels,
         max_pixels=max_pixels,
         enable_thinking=enable_thinking,
+        logprobs=logprobs,
         extra={**(extra or {}), "engine_gb": budget.engine_gb, "est_peak_gb": budget.est_peak_gb},
     )
     request_path = run_dir / "batch.json"
     request_path.write_text(request.to_json(), encoding="utf-8")
-    manifest = RunManifest(run_id=run_id, name=f"vllm batch {model.name}", stage="eval", task="vllm_batch",
-                           container_image=VLLM_IMAGE, seed=0)  # fmt: skip
+    if manifest is None:
+        manifest = RunManifest(run_id=run_id, name=f"vllm batch {model.name}", stage="eval", task="vllm_batch",
+                               container_image=VLLM_IMAGE, seed=0)  # fmt: skip
+    manifest = manifest.model_copy(update={"container_image": VLLM_IMAGE})
     write_manifest(run_dir, manifest)
     job = ContainerJob(
         name=run_id,

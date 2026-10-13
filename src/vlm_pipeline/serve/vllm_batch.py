@@ -34,6 +34,7 @@ CONTAINER_ENV = {
     "TRANSFORMERS_OFFLINE": "1",
 }
 SEED = 0
+SAMPLING_KEYS = frozenset({"temperature", "top_p", "top_k", "repetition_penalty"})
 OUT_NAME = "out.jsonl"
 PARTIAL_NAME = "partial.jsonl"  # rows appended per chunk: a run stopped at 450/500 (memguard, cancel) keeps 449 answers
 CHUNK = 64  # requests per llm.chat call; recorded, so two runs to compare use the same batch composition
@@ -46,6 +47,9 @@ class BatchItem:
     image: str  # container path; "" = text only
     prompt: str
     max_tokens: int
+    # Decoding beyond greedy (trial node): temperature / top_p / top_k / repetition_penalty, already resolved by the
+    # host (base generation_config -> template overrides -> node params). Empty = greedy (eval gates).
+    sampling: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,7 @@ class BatchRequest:
     min_pixels: int = 0  # 0 = the processor's default
     max_pixels: int = 0
     enable_thinking: bool = False
+    logprobs: int = 0  # >0: per generated token, the top-N (token id, logprob) for near-tie analysis (tester parity)
     enforce_eager: bool = True  # no torch.compile / CUDA graphs: faster start, no compile cache to persist
     extra: dict[str, Any] = field(default_factory=dict)  # recorded as is (e.g. who asked, gate id)
 
@@ -65,6 +70,9 @@ class BatchRequest:
     def from_json(cls, text: str) -> BatchRequest:
         raw = json.loads(text)
         raw["items"] = [BatchItem(**i) for i in raw["items"]]
+        for item in raw["items"]:
+            if unknown := set(item.sampling) - SAMPLING_KEYS:
+                raise ValueError(f"unknown sampling keys {sorted(unknown)}")
         return cls(**raw)
 
     def to_json(self) -> str:
@@ -82,9 +90,22 @@ def _conversation(item: BatchItem, image: Any) -> list[dict[str, Any]]:
     return [{"role": "user", "content": content}]
 
 
+def _top_logprobs(gen: Any) -> list[list[list[float]]] | None:
+    """Per generated token: [[token_id, logprob], ...] by rank (vLLM may add the sampled token if it is not top-N)."""
+    if not gen.logprobs:
+        return None
+    return [
+        [[int(tid), round(float(lp.logprob), 5)] for tid, lp in sorted(step.items(), key=lambda kv: kv[1].rank or 0)]
+        for step in gen.logprobs
+    ]
+
+
 def _row(item: BatchItem, out: Any) -> dict[str, Any]:
     gen = out.outputs[0]
     ids = list(out.prompt_token_ids or [])
+    extra: dict[str, Any] = {}
+    if (top := _top_logprobs(gen)) is not None:
+        extra = {"token_ids": [int(t) for t in gen.token_ids], "top_logprobs": top}
     return {
         "id": item.id,
         "text": gen.text,
@@ -93,6 +114,8 @@ def _row(item: BatchItem, out: Any) -> dict[str, Any]:
         "gen_tokens": len(gen.token_ids),
         "prompt_sha": _sha(out.prompt) if out.prompt else None,  # the chat-templated text (image placeholders as is)
         "prompt_ids_sha": _sha(json.dumps(ids)),
+        "decoding": {"temperature": 0.0, **item.sampling, "max_tokens": item.max_tokens},
+        **extra,
     }
 
 
@@ -141,7 +164,8 @@ def run(request_path: Path) -> dict[str, Any]:
         partial.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     rows: dict[str, dict[str, Any]] = {}
-    todo: dict[int, list[tuple[BatchItem, Any]]] = {}  # max_tokens -> requests (one SamplingParams per call)
+    # (max_tokens, sampling) -> requests: one SamplingParams per llm.chat call
+    todo: dict[tuple[int, tuple[tuple[str, float], ...]], list[tuple[BatchItem, Any]]] = {}
     for item in req.items:
         image = None
         if item.image:
@@ -150,10 +174,15 @@ def run(request_path: Path) -> dict[str, Any]:
             except ImageRuleError as exc:
                 emit({"id": item.id, "error": {"code": "IMAGE", "reason": exc.reason}})
                 continue
-        todo.setdefault(item.max_tokens, []).append((item, image))
+        key = (item.max_tokens, tuple(sorted(item.sampling.items())))
+        todo.setdefault(key, []).append((item, image))
     t0 = time.time()
-    for max_tokens, group in sorted(todo.items()):
-        params = SamplingParams(temperature=0.0, n=1, max_tokens=max_tokens, seed=SEED)
+    for (max_tokens, sampling), group in sorted(todo.items()):
+        decoding: dict[str, Any] = {"temperature": 0.0, **dict(sampling)}  # greedy unless resolved otherwise
+        if "top_k" in decoding:
+            decoding["top_k"] = int(decoding["top_k"])  # vLLM wants an int
+        logprobs = req.logprobs or None
+        params = SamplingParams(n=1, max_tokens=max_tokens, seed=SEED, logprobs=logprobs, **decoding)
         for start in range(0, len(group), CHUNK):
             chunk = group[start : start + CHUNK]
             outs = llm.chat(
@@ -183,8 +212,12 @@ def run(request_path: Path) -> dict[str, Any]:
         "seed": SEED,
         # Batch composition changes kernels/shapes (tester): a bf16-vs-FP8 comparison needs these equal on both runs.
         "chunk": CHUNK,
+        "logprobs": req.logprobs,
         **_scheduler(llm),
-        "sampling": {"temperature": 0.0, "n": 1, "max_tokens": "per request"},
+        "sampling": {
+            "default": {"temperature": 0.0, "n": 1},
+            "per_request": sorted({k for i in req.items for k in i.sampling}),
+        },
         "chat_template_kwargs": {"enable_thinking": req.enable_thinking},
         "mm_processor_kwargs": mm_kwargs,
         "image_decoder": "common.image_rules.open_image",

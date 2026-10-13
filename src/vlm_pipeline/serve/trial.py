@@ -60,10 +60,16 @@ class TrialRequest:
 
 
 def decoding_overrides(req: TrialRequest) -> dict[str, Any]:
-    """Generation-config keys set from the node (greedy unless the user raised the temperature)."""
+    """Generation-config keys set from the node (greedy unless the user raised the temperature).
+
+    Temperature 0 sets ``do_sample=False`` EXPLICITLY: a base generation_config.json may ship ``do_sample: true`` +
+    temperature 0.7 (many chat models), and "temperature 0" must still mean greedy and repeatable (tester).
+    """
     out: dict[str, Any] = {"max_new_tokens": req.max_new_tokens}
     if req.temperature > 0:
         out.update(do_sample=True, temperature=req.temperature, top_p=req.top_p)
+    else:
+        out["do_sample"] = False
     return out
 
 
