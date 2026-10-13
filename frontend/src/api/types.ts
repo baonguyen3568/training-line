@@ -67,6 +67,8 @@ export interface OptionMeta {
   gated?: boolean;
   license?: string;
   vendor?: string;
+  /** The publisher as people write it ("NVIDIA", "Qwen (Alibaba)"); `vendor` is a slug and is never shown. */
+  vendor_name?: string;
   /** The model always does one task (Nemotron-Parse): the "Chạy thử" question is ignored, so the UI hides it. */
   task_prompt_fixed?: boolean;
 }
@@ -415,6 +417,41 @@ export interface AdvancedOption {
   max?: number | null;
   templates: string[];
 }
+
+/** G-5 (P018): POST /api/downloads. The server resolves repo/revision from the catalog; a client never sends one. */
+export interface DownloadRequest {
+  kind: "model" | "dataset";
+  catalog_id: string;
+  confirm?: boolean;
+  check?: boolean;
+}
+export interface DownloadStart {
+  download_id: string | null;
+  status?: "queued" | "completed";
+  /** completed: false = in the cache but not checked by the app yet ("Kiểm tra" re-sends with check). */
+  verified?: boolean;
+  /** Over the size threshold: re-send with confirm. */
+  needs_confirm?: boolean;
+  name?: string;
+  size_gb?: number;
+  threshold_gb?: number;
+  license?: string;
+  gated?: boolean;
+}
+export type DownloadEvent =
+  | {
+      type: "progress";
+      files_done: number;
+      files_total: number;
+      bytes_done: number;
+      bytes_total: number;
+    }
+  | {
+      type: "status";
+      status: "downloading" | "verifying" | "completed" | "failed";
+      error?: EventError;
+    }
+  | { type: "download_not_found" | "connection_lost" };
 
 export interface NodeResetResult {
   deleted: string[];

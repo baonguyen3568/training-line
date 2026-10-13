@@ -15,6 +15,18 @@ function lazyMock(): Api {
     bugReport: (runId, q, locale) => load().then((m) => m.bugReport(runId, q, locale)),
     nodeResetPlan: (node, locale) => load().then((m) => m.nodeResetPlan(node, locale)),
     advancedOptions: (typeId, model) => load().then((m) => m.advancedOptions(typeId, model)),
+    startDownload: (body) => load().then((m) => m.startDownload(body)),
+    watchDownload: (id, onEvent) => {
+      let stop = () => {};
+      let stopped = false;
+      void load().then((m) => {
+        if (!stopped) stop = m.watchDownload(id, onEvent);
+      });
+      return () => {
+        stopped = true;
+        stop();
+      };
+    },
     nodeReset: (body, locale) => load().then((m) => m.nodeReset(body, locale)),
     upload: (file, locale) => load().then((m) => m.upload(file, locale)),
     nodeResult: (runId, nodeId) => load().then((m) => m.nodeResult(runId, nodeId)),

@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
 import type { NodeSpec, OptionMeta, ParamSchema, PortType, Range, Workflow } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
+import { downloadTargetOf } from "../lib/downloadTarget";
 import {
   durationRunCount,
   formatEstimate,
@@ -8,7 +9,7 @@ import {
   workflowDurationText,
 } from "../lib/format";
 import { withCode } from "../lib/machineText";
-import { nodeDesc, nodeTitle, SEVERITY_GLYPH, workflowTitle } from "../lib/nodeText";
+import { nodeDesc, nodeTitle, workflowTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
 import { runErrorText } from "../lib/runWarning";
@@ -536,6 +537,7 @@ export function Inspector() {
               {t("error_card.why")}: {runErrorTexts.why}
             </p>
           )}
+          <DownloadButton issue={runError} specs={specs} />
           {runError.already_optimized && (
             <p className="small">{t("error_card.already_optimized")}</p>
           )}
@@ -565,10 +567,10 @@ export function Inspector() {
               <ErrorIcon
                 tone={e.severity === "error" ? "critical" : e.severity === "info" ? "info" : "warn"}
               />
-              <strong>
-                {SEVERITY_GLYPH[e.severity]} {e.title}
-              </strong>
+              {/* the icon carries the severity: no second glyph before the title (design G-5 #2) */}
+              <strong>{e.title}</strong>
               <p>{withCode(e.what, e.params)}</p>
+              <DownloadButton issue={e} specs={specs} />
               <QuickFixes issue={e} nodeId={node.id} />
               {e.why && (
                 <p className="muted small">
@@ -691,5 +693,28 @@ export function Inspector() {
         />
       )}
     </aside>
+  );
+}
+
+/** G-5: "Tải về máy" on a NET-002 card (pre-flight or run error); nothing for other codes. */
+function DownloadButton({
+  issue,
+  specs,
+}: {
+  issue: { code: string; params?: Record<string, unknown> | undefined };
+  specs: Map<string, NodeSpec>;
+}) {
+  const target = downloadTargetOf(issue, specs);
+  if (!target) return null;
+  return (
+    <p>
+      <button
+        type="button"
+        className="primary"
+        onClick={() => useUi.getState().setDownloadTarget(target)}
+      >
+        <Icon name="download" size={14} /> {t("action.download")}
+      </button>
+    </p>
   );
 }

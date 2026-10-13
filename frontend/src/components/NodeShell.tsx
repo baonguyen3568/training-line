@@ -2,14 +2,17 @@ import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { type CSSProperties, memo } from "react";
 import type { NodeSpec, PortType, ValidationIssue } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
+import { downloadTargetOf } from "../lib/downloadTarget";
 import { minutesText } from "../lib/format";
 import { nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible, portShape, tokenVar } from "../lib/ports";
 import { runWarningText } from "../lib/runWarning";
 import { identifierView, untrustedText } from "../lib/safeText";
+import { downloadKey, downloadPercent, useDownloads } from "../store/downloads";
 import { useUi } from "../store/ui";
 import type { NodeRunState } from "../store/workflow";
+import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
 
 export interface ShellData extends Record<string, unknown> {
@@ -149,6 +152,16 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
   const { spec, ports, issues, typeId, step, params, runState } = data;
   const mode = useUi((s) => s.mode);
   const wireDrag = useUi((s) => s.wireDrag);
+  // G-5: a step whose model/dataset is not on this machine says so on its face, with "Tải về máy"
+  const specs = useWorkflow((s) => s.specs);
+  // (today the server reports it when the step runs; a validation issue is shown the same way)
+  const runErr = runState?.status === "failed" ? runState.error : undefined;
+  const missing0 =
+    issues.find((i) => i.code === "NET-002") ?? (runErr?.code === "NET-002" ? runErr : undefined);
+  const target = missing0 ? downloadTargetOf(missing0, specs) : undefined;
+  const dl = useDownloads((s) =>
+    target ? s.entries[downloadKey(target.kind, target.catalogId)] : undefined,
+  );
   // While a wire is dragged, ports it cannot reach fade (same side, own node, incompatible type): opacity only,
   // never layout, so handle positions stay where React Flow measured them.
   const unreachable = (side: "source" | "target", type: string): boolean => {
@@ -173,8 +186,14 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
     .map((v) =>
       spec?.origin.kind === "third_party" ? untrustedText(v, 40) : (v.split("/").pop() ?? v),
     );
-  const errors = issues.filter((i) => i.severity === "error");
-  const warns = issues.filter((i) => i.severity === "warn");
+  // "not on this machine yet" is not the user's mistake (design G-5 #1): it shows as not_downloaded + the button
+  // only, never in the error count, the red edge or a failed run badge.
+  const isDownload = (i: { code: string; params?: Record<string, unknown> }) =>
+    !!target && i.code === "NET-002" && !!downloadTargetOf(i, specs);
+  const userIssues = issues.filter((i) => !isDownload(i));
+  const errors = userIssues.filter((i) => i.severity === "error");
+  const warns = userIssues.filter((i) => i.severity === "warn");
+  const runNeedsDownload = !!runErr && isDownload(runErr);
   const thirdParty = spec?.origin.kind === "third_party";
   const classes = [
     "vlm-node",
@@ -202,7 +221,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
   const outputs = Object.entries(spec.outputs);
   return (
     <div
-      className={`${classes}${runState ? ` run-${runState.status}` : ""}`}
+      className={`${classes}${runState && !runNeedsDownload ? ` run-${runState.status}` : ""}`}
       data-testid={`node-${typeId}`}
       data-status={runState?.status ?? "idle"}
     >
@@ -299,15 +318,41 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
             </span>
           );
         })}
-        {runState ? (
-          <RunBadge state={runState} />
-        ) : (
-          issues.length === 0 && (
-            <span className="state ready">
-              <StateGlyph icon="circle-dot" tone="muted" /> {t("node_state.ready")}
+        {target &&
+          (dl && ["starting", "queued", "downloading", "verifying"].includes(dl.status) ? (
+            <span className="state downloading">
+              <StateGlyph icon="download" tone="muted" />{" "}
+              {t("node_state.downloading", { percent: downloadPercent(dl) ?? 0 })}
             </span>
-          )
-        )}
+          ) : (
+            <>
+              <span
+                className="state warn"
+                title={t("node_state.not_downloaded_tooltip", { name: target.name })}
+              >
+                <StateGlyph icon="download" tone="warn" /> {t("node_state.not_downloaded")}
+              </span>
+              <button
+                type="button"
+                className="node-download nodrag"
+                // pointerdown would start a node drag / selection first
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  useUi.getState().setDownloadTarget(target);
+                }}
+              >
+                <Icon name="download" size={12} /> {t("action.download")}
+              </button>
+            </>
+          ))}
+        {runState
+          ? !runNeedsDownload && <RunBadge state={runState} />
+          : issues.length === 0 && (
+              <span className="state ready">
+                <StateGlyph icon="circle-dot" tone="muted" /> {t("node_state.ready")}
+              </span>
+            )}
       </div>
     </div>
   );

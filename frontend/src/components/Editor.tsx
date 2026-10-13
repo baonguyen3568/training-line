@@ -32,6 +32,7 @@ import { useUi } from "../store/ui";
 import { graphKey, useWorkflow } from "../store/workflow";
 import { BugReportDialog } from "./BugReportDialog";
 import { CheckBar } from "./CheckBar";
+import { DownloadDialog } from "./DownloadDialog";
 import { Icon } from "./Icon";
 import { Inspector } from "./Inspector";
 import { DRAG_MIME, NodeLibrary } from "./NodeLibrary";
@@ -152,6 +153,7 @@ function EditorInner() {
   const [menu, setMenu] = useState<{ x: number; y: number; base: string } | null>(null);
   const resetNode = useUi((st) => st.resetNode);
   const bugReport = useUi((st) => st.bugReport);
+  const downloadTarget = useUi((st) => st.downloadTarget);
   useEffect(() => {
     const onToast = (e: Event) => setToast((e as CustomEvent<string>).detail);
     window.addEventListener("vlm:toast", onToast);
@@ -611,6 +613,12 @@ function EditorInner() {
               <Icon name="rotate-ccw" size={14} /> {t("storage.reset_step.menu")}
             </button>
           </div>
+        )}
+        {downloadTarget && (
+          <DownloadDialog
+            target={downloadTarget}
+            onClose={() => useUi.getState().setDownloadTarget(null)}
+          />
         )}
         {bugReport && (
           <BugReportDialog

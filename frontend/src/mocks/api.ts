@@ -5,6 +5,7 @@ import type { Api } from "../api/client";
 import type {
   AdvancedOption,
   BugReport,
+  DownloadStart,
   NodeResetPlan,
   NodeResetResult,
   NodeSpec,
@@ -541,6 +542,37 @@ export const mockApi: Api = {
       gpu: "NVIDIA GB10 (DGX Spark)",
       ...(runId ? { ref_code: "a1b2c3d4e5f6" } : {}), // the server derives it; the mock only pretends
     }),
+  // G-5: a fake download, events in the server's order (progress… → verifying → completed)
+  startDownload: (body) =>
+    delay<DownloadStart>({
+      download_id: `dl-${body.kind}-${body.catalog_id}`,
+      status: "queued",
+      name: body.catalog_id,
+      size_gb: 1.6,
+    }),
+  watchDownload: (_id, onEvent) => {
+    const total = 1_600_000_000;
+    const timers = [1, 2, 3].map((i) =>
+      setTimeout(
+        () =>
+          onEvent({
+            type: "progress",
+            files_done: i,
+            files_total: 3,
+            bytes_done: (total * i) / 3,
+            bytes_total: total,
+          }),
+        i * FAKE_STEP_MS,
+      ),
+    );
+    timers.push(
+      setTimeout(() => onEvent({ type: "status", status: "verifying" }), 4 * FAKE_STEP_MS),
+      setTimeout(() => onEvent({ type: "status", status: "completed" }), 5 * FAKE_STEP_MS),
+    );
+    return () => {
+      for (const x of timers) clearTimeout(x);
+    };
+  },
   // P016 §3: 8 real keys of configs/engine/automodel-26.08-6.json; filtered by template like the server
   advancedOptions: (_typeId, model) =>
     delay({

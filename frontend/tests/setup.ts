@@ -15,7 +15,14 @@ afterEach(async () => {
     import("../src/store/workflow"),
   ]);
   initialWorkflow ??= useWorkflow.getInitialState();
-  useUi.setState({ mode: "simple", skin: "d4", resetNode: null, wireDrag: null, bugReport: null }); // the 1.0 default, whatever a test pinned
+  useUi.setState({
+    mode: "simple",
+    skin: "d4",
+    resetNode: null,
+    wireDrag: null,
+    bugReport: null,
+    downloadTarget: null,
+  }); // the 1.0 default, whatever a test pinned
   useWorkflow.setState(initialWorkflow as ReturnType<typeof useWorkflow.getState>, true);
 });
 

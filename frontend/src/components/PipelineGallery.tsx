@@ -12,6 +12,7 @@ import type { Range } from "../api/types";
 import data from "../generated/reference-pipelines.json";
 import { getLocale, t, tpOptional } from "../i18n";
 import { formatMinutesRange } from "../lib/format";
+import { licenseName } from "../lib/licenses";
 import { portShape, tokenVar } from "../lib/ports";
 import { fold } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
@@ -45,15 +46,7 @@ const pipelines = (data as { pipelines: Pipeline[] }).pipelines;
 type Filter = "all" | Pipeline["kind"];
 const FILTERS: Filter[] = ["all", "app_template", "external", "candidate"];
 
-// SPDX-ish ids from the data file → display names (unknown ids are shown as written, never invented).
-const LICENSE_NAME: Record<string, string> = {
-  "apache-2.0": "Apache-2.0",
-  mit: "MIT",
-  "cc-by-4.0": "CC-BY-4.0",
-  "nvidia-open-model-license": "NVIDIA Open Model License",
-  "openmdw-1.1": "OpenMDW-1.1",
-};
-const lic = (id: string | null) => (id ? (LICENSE_NAME[id] ?? id) : t("pipelines.see_source"));
+const lic = (id: string | null) => (id ? licenseName(id) : t("pipelines.see_source"));
 const loc = (x: Text) => (getLocale() === "en" ? x.en : x.vi);
 const host = (url: string) => {
   try {

@@ -42,6 +42,9 @@ interface UiState {
   /** The wire being dragged (port it started from), so ports it cannot reach are dimmed (design). */
   wireDrag: WireDrag | null;
   setWireDrag(drag: WireDrag | null): void;
+  /** G-5 "Tải về máy" dialog for one catalog model/dataset. */
+  downloadTarget: import("../components/DownloadDialog").DownloadTarget | null;
+  setDownloadTarget(t: import("../components/DownloadDialog").DownloadTarget | null): void;
   /** "Gửi báo cáo lỗi" dialog for one failed step of a run. */
   bugReport: { runId: string | null; nodeId?: string; code?: string } | null;
   setBugReport(r: UiState["bugReport"]): void;
@@ -70,6 +73,10 @@ export const useUi = create<UiState>((set) => ({
   wireDrag: null,
   setWireDrag(wireDrag) {
     set({ wireDrag });
+  },
+  downloadTarget: null,
+  setDownloadTarget(downloadTarget) {
+    set({ downloadTarget });
   },
   bugReport: null,
   setBugReport(bugReport) {

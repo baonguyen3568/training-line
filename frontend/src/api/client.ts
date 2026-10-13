@@ -6,6 +6,9 @@ import { getLocale } from "../i18n";
 import type {
   AdvancedOption,
   BugReport,
+  DownloadEvent,
+  DownloadRequest,
+  DownloadStart,
   MetricsPage,
   MetricsQuery,
   NodeResetPlan,
@@ -46,6 +49,34 @@ export function appPrefix(): string {
   return location.pathname.replace(/\/[^/]*$/, "");
 }
 const at = (path: string) => `${appPrefix()}${path}`;
+
+/**
+ * An authenticated event socket (P003 D13: cookie + Origin at handshake, CSRF token as first message).
+ * `onFrame` returns true on the stream's last frame; a socket that closes before it reports `onLost`.
+ */
+function socket(path: string, onFrame: (ev: unknown) => boolean, onLost: () => void): () => void {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(`${proto}//${location.host}${at(path)}`);
+  let closed = false;
+  let finished = false;
+  ws.onopen = () => {
+    void csrfToken().then((token) => ws.send(JSON.stringify({ type: "auth", csrf_token: token })));
+  };
+  ws.onmessage = (m) => {
+    try {
+      if (onFrame(JSON.parse(String(m.data)))) finished = true;
+    } catch {
+      /* ignore malformed frames */
+    }
+  };
+  ws.onclose = () => {
+    if (!closed && !finished) onLost();
+  };
+  return () => {
+    if (!closed) ws.close();
+    closed = true;
+  };
+}
 
 let csrf: Promise<string> | null = null;
 
@@ -134,6 +165,10 @@ export interface Api {
     q: { nodeId?: string; code?: string },
     locale: string,
   ): Promise<BugReport>;
+  /** G-5: start (or check) a catalog download. 409/404 {detail: {code, params}}: NET-004, DISK-001, SYS-002, CFG-004. */
+  startDownload(body: DownloadRequest): Promise<DownloadStart>;
+  /** G-5 progress; the socket closes after completed/failed. Returns an unsubscribe function. */
+  watchDownload(id: string, onEvent: (ev: DownloadEvent) => void): () => void;
   /** P016 §3: engine options of a train node, filtered to the model's template when `model` is given. */
   advancedOptions(typeId: string, model: string | null): Promise<{ options: AdvancedOption[] }>;
   /** G-4. 422 on a malformed node. */
@@ -214,6 +249,18 @@ export const httpApi: Api = {
     request(
       "GET",
       `/api/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/result`,
+    ),
+  startDownload: (body) => request("POST", "/api/downloads", body),
+  watchDownload: (id, onEvent) =>
+    // same handshake as run events (D13): cookie + Origin, then the CSRF token as the first message
+    socket(
+      `/api/downloads/${encodeURIComponent(id)}/events`,
+      (raw) => {
+        const ev = raw as DownloadEvent;
+        onEvent(ev);
+        return ev.type === "status" && (ev.status === "completed" || ev.status === "failed");
+      },
+      () => onEvent({ type: "connection_lost" }),
     ),
   watchRun: (id, onEvent) => {
     // Browsers cannot set headers on WebSocket: auth = Origin + session cookie at handshake, then the
