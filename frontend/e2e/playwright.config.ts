@@ -7,6 +7,10 @@ import { defineConfig } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT ?? 7879);
 const TIER = process.env.E2E_TIER ?? "mock";
 const DIST = `../.cache/e2e-dist-${TIER}`; // never frontend/dist (served by the developer app)
+// One results folder per run (path is relative to this file), so a later run cannot overwrite the screenshot/trace of a failure (tester 2026-10-13).
+// Workers re-load this file: keep the main process's stamp (inherited env) so all artifacts land together.
+process.env.E2E_STAMP ??= new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, "");
+const STAMP = process.env.E2E_STAMP;
 const build = `npx vite build --outDir ${DIST} --emptyOutDir --logLevel warn`;
 const server =
   TIER === "app"
@@ -22,6 +26,7 @@ export default defineConfig({
   forbidOnly: true,
   timeout: 60_000,
   reporter: [["list"]],
+  outputDir: `../../.cache/e2e-results/${TIER}-${STAMP}`,
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     browserName: "chromium",
@@ -30,7 +35,7 @@ export default defineConfig({
     // (P003, 2026-10-12) with request allowlist + scrubbed env (see fixtures.ts and scripts/qa/e2e.sh).
     launchOptions: { chromiumSandbox: false },
     serviceWorkers: "block", // a service worker could fetch around context.route
-    trace: "off",
+    trace: "retain-on-failure", // only failed tests keep one; app-tier token is a per-run test token (e2e.sh)
     video: "off",
     screenshot: "only-on-failure",
   },

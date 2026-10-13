@@ -94,9 +94,12 @@ async function buildGraph(page: Page): Promise<void> {
   const target = page.locator(
     `[data-id="${train}"] .react-flow__handle.target[data-handleid="base_model"]`,
   );
+  await waitUntilStill(source); // the first node dropped is the likeliest to still be moving (narrow fitView)
   await waitUntilStill(target);
   await waitUntilSettled(page.getByTestId("check-bar")); // validation re-render must not land mid-drag
   await dragHandle(page, source, target);
+  // Assert the drag itself, so a miss (or a refused connection) fails here, not at the inspector wire below.
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
   // Wire 2 through the inspector ("Nhận từ — <port>"), the keyboard-accessible path.
   await node(page, NODES[2]).click();
   await page.locator("#recv-train_data").selectOption(`${data}:dataset`);

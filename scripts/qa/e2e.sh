@@ -8,6 +8,12 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 (cd "$root" && uv run --quiet python scripts/qa/e2e_preflight.py) || exit $?
+# Each run writes .cache/e2e-results/<tier>-<stamp> (playwright.config.ts): keep the 20 newest, inside that dir only.
+results="$root/.cache/e2e-results"
+if [ -d "$results" ]; then
+  find "$results" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | tail -n +21 | cut -d' ' -f2- |
+    xargs -r -d '\n' rm -rf --
+fi
 cd "$root/frontend"
 exec env -i \
   PATH="$PATH" HOME="$HOME" LANG="${LANG:-C.UTF-8}" \
