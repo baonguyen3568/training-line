@@ -369,3 +369,9 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - token acc teacher-forced (10 ảnh val);
   - greedy F1 + truncated_rate (20 ảnh val).
   - Ngưỡng tham khảo để đi tiếp lên 300 step: token acc ≥ 97% **và** truncated ≤ 10% trên val. Đây là ước lượng, sẽ ghi công khai nếu sai.
+- **P-3b-A PASS (train)** (run 20261013-0808-p3b-parse-fp32master-067c):
+  - val_loss@99 = **0.084**, so với P-3 bf16: 0.560 @99 và 0.195 @299. Loss train step 50 = 0.16.
+  - decoder.layers moved **63.8%** (P-3: 5.3%). RADIO moved 0.
+  - Peak RAM 19.8 GB (≤ catalog 20). Optim ckpt ~2.7 GB (trước ~1.1 GB).
+  - ⇒ Cùng ngân sách 1 epoch, fp32 master tốt hơn rõ 3 epoch bf16. Lỗi bf16 là nguyên nhân chính.
+  - Còn chờ: resume smoke (A/B1/B2) + gate per-ckpt của tester (token acc, greedy F1/truncated trên val) trước khi chuyển template Parse v1.1 sang FusedAdam.
