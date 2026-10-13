@@ -9,6 +9,7 @@ sources:
   - configs/catalog/models.yaml
   - .team/bugs/BUG-001-parse-native-generate-ignores-kv-cache.md
   - .team/proposals/P4-1-reference-pipelines.md
+  - src/vlm_pipeline/train/merge_lora.py
 ---
 import Hint from '~/components/Hint.astro';
 
@@ -33,6 +34,7 @@ Parse chạy bằng mã gốc của NVIDIA, sinh từng token một. Một hoá 
 
 | Giới hạn | Trạng thái |
 |---|---|
+| **Qwen3.5 sau khi gộp LoRA: phần đoán trước nhiều chữ giữ như model gốc** | Phần học thêm không áp lên phần này. Câu trả lời không đổi; khi chạy thử nhanh, tốc độ có thể thấp hơn một chút |
 | **Cosmos Reason2 2B/8B cần chấp nhận điều khoản** | Bạn phải đăng nhập Hugging Face và đồng ý điều khoản của NVIDIA trên trang model trước; app không tải hộ |
 | **Cosmos Reason2 chỉ ở mức ứng viên** | Chưa có mẫu. Hướng dẫn của NVIDIA cho DGX Spark chỉ có phần chạy thử, chưa có phần train. Dòng Cosmos Reason2 đang ở chế độ bảo trì hạn chế |
 | **Gemma 4 không nén FP8** | App ẩn lựa chọn FP8 cho Gemma 4 |
