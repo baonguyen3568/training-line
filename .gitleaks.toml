@@ -17,4 +17,5 @@ paths = [
 # Known false positives (match = the reported "Secret" value, exact).
 regexes = [
   '''^missing/unexpected$''',  # prose "missing/unexpected keys" in .claude/skills/fixcode-ckpt-convert
+  '''^0123456789abcdef$''',  # fake 16-hex cache key in tests/unit/artifacts (test_retention, test_node_reset)
 ]
