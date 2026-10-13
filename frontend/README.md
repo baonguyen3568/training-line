@@ -1,4 +1,4 @@
-# frontend — VLM Studio (node-graph editor)
+# frontend — NTC Training (node-graph editor)
 
 React 19 + Vite 8 + `@xyflow/react` 12 + zustand (ADR-009). TypeScript strict, Biome, Vitest.
 Design: P009 + `009-annex-frontend-canvas.md`, P010 (UX), P003 D13/D16 (security), P004 §8.2 (tooling).
