@@ -27,14 +27,14 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
+from vlm_pipeline.common.run_claims import RUN_ID  # one definition: the claim and the request agree on run ids
+
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_ARGV = 128
 MAX_ARG_CHARS = 4096
 MAX_INPUTS = 32
 MEMORY_CAP_GB = 96
 APP_ROOT = PurePosixPath("/app")
-# A CLI/train run (``20261013-1015-p3b-full-parse-c4f6``) or a graph node run dir (``<node id>-<16 hex>``, executor).
-RUN_ID = re.compile(r"^(?:[0-9]{8}-[0-9]{4}-[a-z0-9-]{1,48}|[A-Za-z0-9][A-Za-z0-9_-]{0,63}-[0-9a-f]{16})$")
 UPLOAD_NAME = re.compile(r"^[0-9a-f]{32}\.png$")
 IMAGE_TAG = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,127}:[A-Za-z0-9._-]{1,64}$")
 LOCK_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
