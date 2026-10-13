@@ -60,8 +60,8 @@ docker buildx imagetools inspect --raw nvcr.io/nvidia/<image>:<tag> | python3 -I
 - Registry must be `nvcr.io/nvidia/*` (or other approved official). No `:latest`.
 - Append to `docker/IMAGES.lock`: `<name> <tag> <arm64 digest> <date> <reviewer> <ngc page url>`.
 - Reference in Dockerfile/compose as `image@sha256:<digest>` (tag kept as comment).
-- Scan (report, not hard gate): `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock:ro aquasec/trivy@sha256:<pinned> image --severity CRITICAL,HIGH --ignore-unfixed <ref>`
-  (the trivy container is the ONLY one allowed the docker socket, read-only, and only for scanning).
+- Scan (report, not hard gate), no docker socket (`:ro` on a socket does not limit the API): `docker save <ref> -o <scratch>/img.tar`
+  then `docker run --rm -v <scratch>:/scan:ro aquasec/trivy@sha256:<pinned> image --input /scan/img.tar --severity CRITICAL,HIGH --ignore-unfixed`.
 - Host check: `nvidia-ctk --version` — must be ≥ 1.19.1 (CVE-2026-24260). If lower: only pinned official images with `--gpus`.
 
 ## C. Dataset
@@ -73,3 +73,18 @@ docker buildx imagetools inspect --raw nvcr.io/nvidia/<image>:<tag> | python3 -I
 ## Verdict format (reply to requester + log line)
 `VET <id>@<sha|digest>: APPROVED | APPROVED-WITH-CONDITIONS (<list>) | REJECTED (<reason>)`
 Append to `.team/log/YYYY-MM-DD.md`: `HH:MM [bao-security → <who>] VET ...`.
+
+## D. Python packages: network at import ("phone home")
+Some packages call the network when imported (update checks, telemetry). Real case: albumentations 2.0.8
+`__init__.py` -> `check_for_updates()` fetches pypi.org at import (gate: `NO_ALBUMENTATIONS_UPDATE=1`).
+Check every new package:
+```bash
+docker run --rm --network none --read-only --cap-drop ALL --user 1000:1000 --entrypoint bash <image> -c \
+  '/opt/venv/bin/python -X importtime -c "import <pkg>" 2>&1 | grep -iE "urlopen|fetch|resolution|update|telemetry"'
+grep -rnE "urlopen|requests\.(get|post)|http.client|socket\.|getaddrinfo" <site-packages>/<pkg>/__init__.py <site-packages>/<pkg>/*version*.py
+```
+Baseline env for every image/worker: `NO_ALBUMENTATIONS_UPDATE=1 HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 WANDB_MODE=offline`.
+Probe tip (bao-tester): count `socket.getaddrinfo` + `connect` in a fresh interpreter, with a CONTROL run without the env var
+(must show >= 1 lookup) — counting only connect gives 0 under `--network none` because DNS fails first.
+Limit: libraries with a native network process (wandb >= 0.2x uses the Go `wandb-core`) are invisible to Python socket probes;
+for those rely on `--network none` + `WANDB_MODE=offline|disabled`, never on the probe.
