@@ -1401,3 +1401,18 @@ reference_pipeline:
     summary: Lọc ảnh kém và bỏ ảnh trùng bằng model. Bản này dùng bước lọc chạy bằng CPU của app.
   cosmos-reason2-lora:
     summary: Dạy nhẹ Cosmos Reason2 2B trên dữ liệu của bạn. Cần tài khoản Hugging Face.
+bug_report:
+  title: Gửi báo cáo lỗi
+  intro: App sẽ chép nội dung dưới đây rồi mở trang báo lỗi của dự án trên GitHub. Bạn dán vào ô mô tả và kể thêm bạn đang làm gì. App không tự gửi gì.
+  preview_label: Nội dung sẽ được chép
+  field:
+    code: Mã lỗi
+    error_title: Lỗi
+    app_version: Phiên bản app
+    gpu: GPU
+    run_id: Lần chạy
+  not_included: Không chép nhật ký, đường dẫn thư mục, token hay dữ liệu của bạn.
+  needs_account: Cần tài khoản GitHub để mở báo lỗi.
+  copy_open: Chép và mở GitHub
+  copied: Đã chép. Dán vào ô mô tả trên trang GitHub vừa mở.
+  copy_failed: App không chép tự động được. Hãy bôi đen nội dung ở trên rồi tự chép.

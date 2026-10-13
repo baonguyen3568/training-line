@@ -1401,3 +1401,18 @@ reference_pipeline:
     summary: Filter weak images and drop duplicates with models. 1.0 uses the app's CPU filter steps.
   cosmos-reason2-lora:
     summary: LoRA-tune Cosmos Reason2 2B on your data. Needs a Hugging Face account.
+bug_report:
+  title: Send a bug report
+  intro: The app copies the details below and opens the project's issue page on GitHub. Paste them into the description and add what you were doing. The app sends nothing by itself.
+  preview_label: What will be copied
+  field:
+    code: Error code
+    error_title: Error
+    app_version: App version
+    gpu: GPU
+    run_id: Run
+  not_included: Logs, folder paths, tokens and your data are not copied.
+  needs_account: You need a GitHub account to open an issue.
+  copy_open: Copy and open GitHub
+  copied: Copied. Paste it into the description on the GitHub page that just opened.
+  copy_failed: The app could not copy automatically. Select the text above and copy it yourself.
