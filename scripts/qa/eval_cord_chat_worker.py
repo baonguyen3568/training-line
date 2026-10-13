@@ -44,6 +44,33 @@ def _positive_float(text: str) -> float:
     return value
 
 
+def folder_items(folder: Path) -> list[dict[str, Any]]:
+    """Rows of an image folder (research's data/reference/cord-v2-*: labels.jsonl {image, target, prompt} + PNGs)."""
+    lines = (folder / "labels.jsonl").read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines]
+
+
+def load_item(i: int, ds: Any, folder: Path | None, rows: list[dict[str, Any]]) -> tuple[Any, Any, str | None]:
+    """(RGB image, gt_parse, image file sha256) of row ``i``.
+
+    The HF dataset row, or the folder PNG decoded like vLLM does it (common.image_rules.open_image), so a parity run
+    reads the same pixels on both engines.
+    """
+    if folder is None:
+        item = ds[i]
+        return item["image"].convert("RGB"), gt_parse_of(item), None
+    from vlm_pipeline.common.image_rules import open_image
+    from vlm_pipeline.common.local_records import image_name_ok
+
+    if i >= len(rows):
+        raise SystemExit(f"--ids {i}: the folder has {len(rows)} rows")
+    name = rows[i]["image"]
+    if not isinstance(name, str) or not image_name_ok(name):  # rule R1: a label never points outside the folder
+        raise SystemExit(f"row {i}: image name not allowed")
+    path = folder / name
+    return open_image(path), rows[i]["target"], hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def gt_parse_of(item: dict[str, Any]) -> Any:
     """CORD-v2 rows store the answer as a JSON string under ``ground_truth`` (``{"gt_parse": ...}``)."""
     return json.loads(item["ground_truth"])["gt_parse"]
@@ -69,11 +96,7 @@ def _generation_config(model: Any, args: Any) -> tuple[Any, dict[str, Any]]:
     return config, decoding
 
 
-def main() -> int:
-    import torch
-    from datasets import load_dataset
-    from transformers import AutoModelForImageTextToText, AutoProcessor
-
+def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
     ap.add_argument("--adapter", default=None, help="PEFT adapter dir (LoRA output) applied on --model")
@@ -88,8 +111,17 @@ def main() -> int:
     ap.add_argument("--max-new-tokens", type=int, default=1024)
     ap.add_argument("--repetition-penalty", type=_positive_float, default=None)
     ap.add_argument("--attn", default="sdpa")
+    ap.add_argument("--images-dir", default=None, help="read images/ground truth from this folder (labels.jsonl)")
     ap.add_argument("--out", required=True)
-    args = ap.parse_args()
+    return ap
+
+
+def main() -> int:
+    import torch
+    from datasets import load_dataset
+    from transformers import AutoModelForImageTextToText, AutoProcessor
+
+    args = _parser().parse_args()
 
     model_dir, data_dir = _local_dir(args.model, "model"), _local_dir(args.data, "data")
     processor_dir = _local_dir(args.processor, "processor")
@@ -111,32 +143,39 @@ def main() -> int:
     prompt_sha = hashlib.sha256(text.encode()).hexdigest()[:16]
     print("decoding", json.dumps(decoding), "prompt_sha", prompt_sha, flush=True)
 
-    ds = load_dataset(str(data_dir), split=args.split)
+    folder = _local_dir(args.images_dir, "images-dir") if args.images_dir else None
+    rows = folder_items(folder) if folder else []
+    ds = None if folder else load_dataset(str(data_dir), split=args.split)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as fh:
         for i in (int(x) for x in args.ids.split(",") if x):
-            item = ds[i]
-            inputs = processor(text=[text], images=[item["image"].convert("RGB")], return_tensors="pt").to("cuda")
+            image, gt, image_sha = load_item(i, ds, folder, rows)
+            inputs = processor(text=[text], images=[image], return_tensors="pt").to("cuda")
             with torch.no_grad():
                 gen = model.generate(**inputs, generation_config=config)
-            new = [int(t) for t in gen[0].tolist()][inputs["input_ids"].shape[1] :]
+            prompt_ids = [int(t) for t in inputs["input_ids"][0].tolist()]
+            new = [int(t) for t in gen[0].tolist()][len(prompt_ids) :]
             finished = bool(new) and new[-1] in eos
             record = {
                 "index": i,
                 "answer_format": "json",
                 "sequence": processor.tokenizer.decode(new, skip_special_tokens=True).strip(),
-                "gt_parse": gt_parse_of(item),
+                "gt_parse": gt,
+                "image_sha256": image_sha,
+                "token_ids": new,
                 "split": args.split,
                 "batch_size": 1,
                 "n_new_tokens": len(new),
                 "truncated": not finished and len(new) >= args.max_new_tokens,
                 "prompt": args.prompt,
                 "prompt_sha": prompt_sha,
+                # same formula as serve.vllm_batch (sha256 of json.dumps(ids), image tokens expanded): HF<->vLLM parity
+                "prompt_ids_sha": hashlib.sha256(json.dumps(prompt_ids).encode("utf-8")).hexdigest(),
                 "pixels": pixels,
                 "model_dir": str(model_dir),
                 "adapter_dir": args.adapter,
-                "data_dir": str(data_dir),
+                "data_dir": str(folder or data_dir),
                 "decoding": decoding,
                 "worker_sha256": WORKER_SHA256,
             }
@@ -147,4 +186,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # GB10: create the CUDA context before the checkpoint is loaded on the CPU (fixcode 2026-10-13, common.cuda_init)
+    from vlm_pipeline.common.cuda_init import ensure_cuda_context
+
+    ensure_cuda_context()
     raise SystemExit(main())
