@@ -1358,22 +1358,22 @@ settings_error:
   settings_key_unusable: The key file has the wrong permissions; an admin must fix it.
 reference_pipeline:
   invoice-to-json:
-    summary: Teach a model to read receipt images and return JSON with the store, items and total. Runs right away on the CORD-v2 sample receipts.
+    summary: Teach a model to read receipt images into JSON. Runs right away on the CORD-v2 samples.
   image-video-understanding:
-    summary: Teach a small model to answer questions about images from your data, using LoRA. This version supports images only, not video.
+    summary: Teach a small model to answer questions about your images with LoRA. No video yet.
   quantize-fp8-benchmark:
-    summary: Quantize a model to FP8 so it is smaller and faster, then re-score it on the same test set to see how much quality drops.
+    summary: Quantize a model to FP8, then re-score it to see how much quality drops.
   gemma4-e4b-lora:
-    summary: LoRA-tune Gemma 4 E4B on the CORD-v2 receipts, then score each field on the same test set as the receipt template, so models can be compared.
+    summary: LoRA-tune Gemma 4 E4B on CORD-v2 receipts, scored on the receipt template's test set.
   qwen35-4b-lora:
-    summary: LoRA-tune Qwen3.5-4B on your own data. A bigger model than the "Image understanding" template, so it needs more memory.
+    summary: LoRA-tune Qwen3.5-4B on your data. Bigger than Image understanding; needs more memory.
   grpo-geometry:
-    summary: Teach a model to solve geometry problems by scoring each answer (GRPO). Reference only; the app has no GRPO step yet.
+    summary: Teach a model geometry by scoring each answer (GRPO). The app has no GRPO step yet.
   dgx-spark-vlm-playbook:
-    summary: NVIDIA's official guide to fine-tuning an image model on DGX Spark, with a before/after comparison. Reference only; not rebuilt in the app yet.
+    summary: NVIDIA's guide to fine-tuning an image model on DGX Spark, with before/after results.
   donut-cord:
-    summary: The Donut model reading CORD receipts, used as a baseline for the receipt template. It runs on a different tool, not in the app.
+    summary: Donut reading CORD receipts, as a baseline. It runs on another tool, not in the app.
   curator-image-curation:
-    summary: Filter out low-quality images and remove duplicates with models before training. Reference only; this version uses the app's CPU filter and dedup steps.
+    summary: Filter weak images and drop duplicates with models. 1.0 uses the app's CPU filter steps.
   cosmos-reason2-lora:
-    summary: LoRA-tune Cosmos Reason2 2B on your own data. Reference only; downloading the model needs a Hugging Face account.
+    summary: LoRA-tune Cosmos Reason2 2B on your data. Needs a Hugging Face account.
