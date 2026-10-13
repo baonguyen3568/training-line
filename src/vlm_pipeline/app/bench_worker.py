@@ -193,7 +193,7 @@ def run_bench(worker: RealWorker, job: NodeJob) -> NodeResult:
     ref = job.inputs["model"]
     entry, base = base_of(worker, ref)
     check_support(job.node_id, params, entry, {})  # backstop of validate (same function)
-    model_dir = worker.host_path(ref.path)
+    model_dir = worker.model_dir(ref)
     results = {"model": _measure(worker, job, entry, _trial(worker, model_dir, base, entry, params), "model")}
     is_base = ref.hash == f"{entry.repo}@{entry.revision}"
     if params.compare_with == "base" and not is_base:

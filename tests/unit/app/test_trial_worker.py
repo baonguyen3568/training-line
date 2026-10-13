@@ -47,10 +47,16 @@ def _snap(root: Path, repo: str, rev: str) -> Path:
 
 
 def _base_ref(w: RealWorker, model_id: str) -> tuple[Any, ArtifactRef]:
+    """The artifact exactly as the real ``model.hf_pick`` hands it over (a model.json descriptor, tester 2026-10-13)."""
     entry = w.catalog.get(model_id)
     assert entry is not None
-    path = _snap(w.root, entry.repo, entry.revision)
-    return entry, ArtifactRef("Model", str(path.resolve()), f"{entry.repo}@{entry.revision}")
+    _snap(w.root, entry.repo, entry.revision)
+    spec = REGISTRY.get("model.hf_pick")
+    assert spec is not None
+    pick = NodeJob(
+        "m", spec, spec.validate_params({"model": model_id}), {}, w.root / "outputs" / "graph" / "runs" / "m"
+    )
+    return entry, w.run(pick).outputs["model"]
 
 
 @pytest.mark.parametrize(("raw", "reason"), [("", "missing"), (OTHER, "missing"), ("dir", "not_a_file")])
@@ -95,6 +101,9 @@ def test_base_chat_model_uses_its_training_pixels_and_the_prompt(tmp_path: Path)
     assert (req.min_pixels, req.max_pixels) == (200704, 1003520)  # the cosmos training template's processor
     assert req.prompt == "Tổng tiền?"
     assert req.model_dir == req.processor_dir == req.generation_config_dir
+    snap = w.model_dir(ref)
+    assert req.processor_dir == w.container_path(snap)  # the snapshot folder, never the model.json descriptor
+    assert (snap / "config.json").is_file()
     assert req.adapter_dir is None
     assert req.image == f"/workspace/uploads/{UID}.png"
 
@@ -121,7 +130,7 @@ def test_lora_output_is_loaded_on_its_base_with_the_run_pixels(tmp_path: Path) -
     )
     job = _job({"image": UID}, w.root / "run", ArtifactRef("Model", str(adapter), "ft-1:abc"))
     req, _ = build_request(w, job, w.root / "uploads" / f"{UID}.png")
-    assert req.model_dir == w.container_path(Path(base.path))
+    assert req.model_dir == w.container_path(w.model_dir(base))
     assert req.adapter_dir == w.container_path(adapter)
     assert (req.min_pixels, req.max_pixels) == (100, 400)
     assert req.prompt == "Describe this image."

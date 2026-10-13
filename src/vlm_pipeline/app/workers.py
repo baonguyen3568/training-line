@@ -30,6 +30,7 @@ from vlm_pipeline.common.jobrun import (
     MemoryPreemptedBeforeStartError,
     run_job,
 )
+from vlm_pipeline.common.model_ref import PickedModel, is_model_ref, resolve_model_ref, write_model_ref
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, ArtifactRef, NodeJob, NodeResult, SupportQuery
@@ -192,9 +193,19 @@ class RealWorker:
         entry = self.catalog.get(model_id)
         if entry is None:
             raise UnknownModelError("unknown catalog model", params={"model": model_id})
-        path = self._catalog_model_path(entry)
-        ref = ArtifactRef(type="Model", path=str(path.resolve()), hash=f"{entry.repo}@{entry.revision}")
+        path = self._catalog_model_path(entry).resolve()
+        # Outputs live in the run dir (executor check_output_paths): a descriptor, the weights stay in the cache.
+        picked = PickedModel(repo=entry.repo, revision=entry.revision, path=path.relative_to(self.root).as_posix())
+        descriptor = write_model_ref(job.run_dir.resolve(), picked)
+        ref = ArtifactRef(type="Model", path=str(descriptor), hash=f"{entry.repo}@{entry.revision}")
         return NodeResult(outputs={"model": ref})
+
+    def model_dir(self, ref: ArtifactRef) -> Path:
+        """Host folder of a Model artifact: a picked catalog model's cache folder, or a trained model's run folder."""
+        path = self.host_path(ref.path)
+        # A plain folder is a trained model, or a pick cached before model.json existed (legacy, read-only: a cache
+        # hit reuses the entry without check_output_paths, which runs only on fresh results).
+        return resolve_model_ref(path, self.root) if is_model_ref(path) else path
 
     def _catalog_model_path(self, entry: CatalogEntry) -> Path:
         """Host dir of a catalog model: the pinned prepared copy (remote code) or the hub snapshot."""
@@ -208,7 +219,7 @@ class RealWorker:
 
     def base_of(self, model: ArtifactRef) -> CatalogEntry:
         """Catalog model a Model/Checkpoint artifact comes from: itself, or the base recorded in its run.json."""
-        if "@" in model.hash.split(":", 1)[0]:
+        if "@" in model.hash.split(":", 1)[0]:  # a picked catalog model (model.json): never reaches the run.json walk
             return self._entry_for(model)
         path = self.host_path(model.path).resolve()
         outputs = self.root / "outputs"
@@ -229,7 +240,7 @@ class RealWorker:
         base_path = self._catalog_model_path(entry)
         request = EvalRequest(
             root=self.root, node_id=job.node_id, params=job.params,  # type: ignore[arg-type]
-            model=ModelRef(self.host_path(model.path), model.hash),
+            model=ModelRef(self.model_dir(model), model.hash),
             base=ModelRef(base_path.resolve(), f"{entry.repo}@{entry.revision}"),
             entry=entry, run_dir=job.run_dir.resolve(), image=self.image, who=self.who,
             cancel=job.cancel, on_wait=job.on_wait,
@@ -338,7 +349,7 @@ class RealWorker:
         if entry.loss == "nemotron_parse":
             from vlm_pipeline.train.recipe_checks import resolve_parse_class_token_start_idx
 
-            class_token = resolve_parse_class_token_start_idx(self.host_path(base.path))
+            class_token = resolve_parse_class_token_start_idx(self.model_dir(base))
         run_dir = job.run_dir.resolve()
         if entry.id in RESUME_UNSUPPORTED:
             _set_aside_checkpoints(run_dir, entry.id)
@@ -356,7 +367,7 @@ class RealWorker:
         recipe = build_recipe(
             template,
             params,
-            model_dir=self.container_path(self.host_path(base.path)),
+            model_dir=self.container_path(self.model_dir(base)),
             dataset_dir=train.path,
             train_limit=train.limit or None,
             train_split=train.split,
@@ -422,7 +433,7 @@ class RealWorker:
             from vlm_pipeline.train.ckpt_complete import complete_from_base
 
             # BUG-002: consolidation drops buffers (RADIO input conditioner) -> restore them from the base model.
-            complete_from_base(self.host_path(base.path), out)
+            complete_from_base(self.model_dir(base), out)
         ref = ArtifactRef(type=out_type.type, path=str(out), hash=f"{run_id}:{config_hash}")
         return NodeResult(outputs={port: ref})
 
@@ -469,7 +480,7 @@ class RealWorker:
                 "-m",
                 "vlm_pipeline.train.merge_lora",
                 "--base",
-                self.container_path(self.host_path(base.path)),
+                self.container_path(self.model_dir(base)),
                 "--adapter",
                 self.container_path(self.host_path(adapter.path)),
                 "--out",
@@ -497,7 +508,7 @@ class RealWorker:
         from vlm_pipeline.train.ckpt_complete import complete_from_base
 
         # Keys the HF class does not build (e.g. Qwen3.5 MTP head) are dropped on save: restore them from the base.
-        complete_from_base(self.host_path(base.path), out)
+        complete_from_base(self.model_dir(base), out)
         return NodeResult(
             outputs={"model": ArtifactRef(type="Checkpoint", path=str(out), hash=f"{run_id}:{adapter.hash}")}
         )

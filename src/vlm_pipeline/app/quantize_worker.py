@@ -51,7 +51,7 @@ def run_quantize(worker: RealWorker, job: NodeJob) -> NodeResult:
         name=run_id,
         image=worker.image,
         argv=ptq_argv(
-            model=worker.container_path(worker.host_path(model.path)),
+            model=worker.container_path(worker.model_dir(model)),
             data=data.path,
             out=worker.container_path(out),
             fmt=params.format,

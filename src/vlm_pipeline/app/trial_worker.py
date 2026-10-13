@@ -81,7 +81,7 @@ def base_of(worker: RealWorker, ref: ArtifactRef) -> tuple[CatalogEntry, Path]:
     """
     entry = worker.base_of(ref)
     if "@" in ref.hash.split(":", 1)[0]:  # a catalog model: the artifact is the base snapshot
-        return entry, worker.host_path(ref.path)
+        return entry, worker.model_dir(ref)
     return entry, worker._catalog_model_path(entry).resolve()
 
 
@@ -89,7 +89,7 @@ def _pixels(worker: RealWorker, entry: CatalogEntry, ref: ArtifactRef) -> tuple[
     """Processor min/max pixels exactly as the model was (or would be) trained."""
     import yaml
 
-    model_path = worker.host_path(ref.path)
+    model_path = worker.model_dir(ref)
     run_cfg = next(
         (p / "config.yaml" for p in _parents_in(worker.root, model_path) if (p / "config.yaml").is_file()), None
     )
@@ -123,7 +123,7 @@ def build_request(worker: RealWorker, job: NodeJob, image: Path) -> tuple[TrialR
     assert isinstance(params, InferenceParams)  # noqa: S101 - registry guarantees the params model
     ref = job.inputs["model"]
     entry, base = base_of(worker, ref)
-    model_path = worker.host_path(ref.path)
+    model_path = worker.model_dir(ref)
     adapter = model_path if (model_path / "adapter_config.json").is_file() else None
     min_px, max_px = _pixels(worker, entry, ref)
     family = "nemotron_parse" if entry.loss == "nemotron_parse" else "chat"

@@ -83,7 +83,7 @@ def _destination(worker: RealWorker, job: NodeJob, raw: str) -> Path:
 def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
     model = job.inputs["model"]
     entry = worker.base_of(model)
-    src = worker.host_path(model.path)
+    src = worker.model_dir(model)
     unsupported = {"node": job.node_id, "model": entry.display_name}
     if entry.remote_code != "none" or portable.remote_code_findings(src):
         raise ExportUnsupportedError("model runs its own code", params=unsupported)

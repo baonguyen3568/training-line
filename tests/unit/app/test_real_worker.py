@@ -51,8 +51,41 @@ def test_model_pick_requires_cached_snapshot(tmp_path: Path) -> None:
     snap = _snap(root, "models", entry.repo, entry.revision)
     out = w.run(_job("model.hf_pick", {"model": "cosmos-reason2-2b"}, root / "r")).outputs["model"]
     assert out.type == "Model"
-    assert out.path == str(snap.resolve())  # host path: executor/retention verify it on the host
+    assert out.path == str((root / "r" / "model.json").resolve())  # inside the run dir (executor rule)
+    assert w.model_dir(out) == snap.resolve()  # consumers get the cached folder
     assert out.hash == f"{entry.repo}@{entry.revision}"
+
+
+def test_model_pick_passes_the_executor_output_rule(tmp_path: Path) -> None:
+    """E2E smoke 2026-10-13 failed at n1: the pick returned the cache folder, outside its run dir (tester)."""
+    from vlm_pipeline.artifacts.index import ArtifactIndex
+    from vlm_pipeline.graph.executor import Executor
+
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    entry = w.catalog.get("cosmos-reason2-2b")
+    assert entry is not None
+    snap = _snap(root, "models", entry.repo, entry.revision)
+    node = {"id": "m", "type": "model.hf_pick", "version": "1.0.0", "params": {"model": entry.id}}
+    wf = {"format": "vlm-workflow", "schema_version": 1, "name": "pick", "edges": [], "nodes": [node]}
+    executor = Executor(REGISTRY, w, root / "outputs" / "graph", index=ArtifactIndex(tmp_path / "i.db"), workspace=root)
+    run = executor.run(wf)
+    assert run.errors == {}
+    assert w.model_dir(run.outputs["m"]["model"]) == snap.resolve()
+
+
+@pytest.mark.parametrize("bad", ["/etc", "../outside", "outputs/runs/x", ".cache/../src"])
+def test_a_model_descriptor_cannot_point_outside_the_cache(tmp_path: Path, bad: str) -> None:
+    root = _root(tmp_path)
+    (root / "outputs" / "runs" / "x").mkdir(parents=True)
+    (root / "src").mkdir()
+    (tmp_path / "outside").mkdir()
+    desc = root / "outputs" / "graph" / "runs" / "m-0123456789abcdef" / "model.json"
+    desc.parent.mkdir(parents=True)
+    desc.write_text(json.dumps({"format": "vlm-model-ref", "schema_version": 1, "repo": "a/b", "revision": "r",
+                                "path": bad}))  # fmt: skip
+    with pytest.raises(ValueError, match=r"under \.cache"):
+        RealWorker(root).model_dir(ArtifactRef("Model", str(desc), "a/b@r"))
 
 
 def test_hub_dataset_pinned(tmp_path: Path) -> None:
