@@ -96,6 +96,9 @@ scripts/tools/gitleaks.sh git --redact --no-banner -c .gitleaks.toml
 step "credential-shaped strings in tracked files (hf_/nvapi-/W&B; PM 2026-10-13)"
 uv run --quiet python scripts/security/scan_tokens.py tracked
 
+step "docker build contexts: allowlist .dockerignore, never .env*/outputs/.cache (ADR-015)"
+uv run --quiet python scripts/qa/check_build_context.py
+
 if [[ -f frontend/package.json ]]; then
   step "frontend (biome, tsc, vitest)"
   # `npm run check` = build generated tokens/i18n -> biome ci -> tsc --noEmit -> vitest run (owner: bao-frontend)

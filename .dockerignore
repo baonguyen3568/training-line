@@ -1,0 +1,6 @@
+# Default build context for any Dockerfile without its own <name>.dockerignore (ADR-015).
+# Allowlist: nothing enters the context unless a "!" line below adds it. Keep the .env denies LAST
+# (last match wins). Gate: scripts/qa/check_build_context.py (check.sh).
+*
+.env*
+**/.env*
