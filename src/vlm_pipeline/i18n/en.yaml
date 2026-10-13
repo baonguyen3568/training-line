@@ -166,7 +166,7 @@ error:
     what: The export of "{node}" has a string that looks like an access key (token) in {files}, so the app stopped and has written nothing out. Remove the key from those files and export again; if unsure, send a report.
   EXP-004:
     title: The export is missing model files
-    what: 'The export folder of "{node}" is missing {files}, so nothing was written out. This is not your fault; please send a report so the team can check.'
+    what: 'The export from "{node}" is missing {files}, so the app stopped and did not mark it as finished. This is an app problem, not yours; please send a report so the team can check.'
   MEM-001:
     title: Not enough memory for this step
     what: This step needs about {need_gb} GB but only {avail_gb} GB is free, because the machine is shared with other apps.
