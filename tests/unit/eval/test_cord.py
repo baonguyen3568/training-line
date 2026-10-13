@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from vlm_pipeline.eval import cord
 from vlm_pipeline.eval.cord import (
     TEXT_SEQUENCE_KEY,
     field_f1,
@@ -127,3 +128,56 @@ def test_tree_edit_distance_matches_the_zss_golden_set() -> None:
     assert len(golden["pairs"]) >= 30
     for pair in golden["pairs"]:
         assert tree_edit_distance(_tree(pair["a"]), _tree(pair["b"])) == pair["distance"], pair
+
+
+# --------------------------------------------------------------------- chat models (JSON answers, R2 / luồng C)
+GT = {"menu": {"nm": "TEA", "price": "10.000"}, "total": {"total_price": "10.000"}}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"menu": {"nm": "TEA", "price": "10.000"}, "total": {"total_price": "10.000"}}',
+        '```json\n{"menu": {"nm": "TEA", "price": "10.000"}, "total": {"total_price": "10.000"}}\n```',
+        'Here are the fields:\n{"menu": {"nm": "TEA", "price": "10.000"}, "total": {"total_price": "10.000"}} Done.',
+    ],
+)
+def test_json_answer_reads_the_object_around_chatter_and_fences(text: str) -> None:
+    assert cord.json_answer(text) == GT
+    assert cord.score_json_texts([text], [GT]).field_f1 == 100
+
+
+TRUNCATED = '{"menu": [{"nm": "TEA", "price": "10.000"}, {"nm": "CO'  # an inner item closes, the answer does not
+
+
+@pytest.mark.parametrize("text", ["", "no json here", "[1, 2]", '"just a string"', '{"menu": {"nm": "TEA"', TRUNCATED])
+def test_non_object_or_broken_json_is_a_parse_failure(text: str) -> None:
+    assert cord.json_answer(text) is None
+    scores = cord.score_json_texts([text], [GT])
+    assert scores.parse_fail_rate == 100
+    assert scores.field_f1 == 0  # counted as an empty prediction, never skipped
+
+
+def test_json_and_token_scoring_agree_on_the_same_prediction() -> None:
+    """A chat model and Parse that predict the same dict get the same numbers (R2 compares with R0 directly)."""
+    import json
+
+    pred = {"menu": {"nm": "TEA", "price": "9.000"}, "total": {"total_price": "10.000"}}
+    tokens = (
+        "<s_menu><s_nm>TEA</s_nm><s_price>9.000</s_price></s_menu>"
+        "<s_total><s_total_price>10.000</s_total_price></s_total>"
+    )
+    assert cord.score_json_texts([json.dumps(pred)], [GT]) == cord.score_sequences([tokens], [GT])
+
+
+def test_score_rows_reads_each_format_and_refuses_a_mix() -> None:
+    import json
+
+    chat = {"answer_format": "json", "sequence": json.dumps(GT), "gt_parse": GT}
+    parse = {"sequence": "<s_total><s_total_price>10.000</s_total_price></s_total>", "gt_parse": GT}  # donut default
+    assert cord.score_rows([chat]).field_f1 == 100
+    assert 0 < cord.score_rows([parse]).field_f1 < 100
+    with pytest.raises(ValueError, match="mix answer formats"):
+        cord.score_rows([chat, parse])
+    with pytest.raises(ValueError, match="unknown answer_format"):
+        cord.prediction_of({"answer_format": "yaml", "sequence": "", "gt_parse": GT})

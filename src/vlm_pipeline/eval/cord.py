@@ -10,11 +10,15 @@ Metrics (P001a §7.2, ADR-002 registry):
 - ``nted_accuracy``: mean of ``max(0, 1 - nTED)`` per sample (Donut's "accuracy").
 - ``parse_fail_rate``: % of outputs that ``token2json`` cannot turn into a dict (lower is better).
 
+Chat models (Qwen, Gemma… trained to answer the ``gt_parse`` JSON itself) are scored by the SAME metrics on the dict
+``json_answer`` reads from their text (``score_json_texts``), so their numbers compare with Nemotron-Parse's.
+
 Scale: the metric functions return 0-1 (like ``scoring.anls``); ``CordScores`` is the report record, in percent.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -323,13 +327,69 @@ def score_sequences(
     if len(sequences) != len(answers):
         raise ValueError(f"length mismatch: {len(sequences)} sequences vs {len(answers)} answers")
     parsed = [token2json(s, categorical=categorical) for s in sequences]
-    failures = [is_parse_failure(p) for p in parsed]
-    preds = [{} if fail else p for p, fail in zip(parsed, failures, strict=True)]
-    n = len(sequences)
+    return _score([None if is_parse_failure(p) else p for p in parsed], answers)
+
+
+_FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+
+
+def json_answer(text: str) -> Json | None:
+    """The JSON object a chat model answered, or None (parse failure).
+
+    Reads a fenced block (```json ... ```) if there is one, else the text; text before the first ``{`` (a sentence)
+    and after the object is ignored. Only the OUTERMOST object (the first ``{``) counts: a truncated answer must be a
+    parse failure, never an inner item that happens to close (research review 2026-10-13). A top-level list or scalar
+    is a failure too: the target is an object.
+    """
+    fenced = _FENCE.search(text)
+    candidate = fenced.group(1) if fenced else text
+    start = candidate.find("{")
+    if start < 0:
+        return None
+    try:
+        value, _ = json.JSONDecoder().raw_decode(candidate, start)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def score_json_texts(texts: Sequence[str], answers: Sequence[Any]) -> CordScores:
+    """Score chat-model answers (JSON text) against ``gt_parse`` dicts with the metrics of ``score_sequences``."""
+    if len(texts) != len(answers):
+        raise ValueError(f"length mismatch: {len(texts)} texts vs {len(answers)} answers")
+    return _score([json_answer(t) for t in texts], answers)
+
+
+ANSWER_FORMATS = ("donut", "json")  # Donut-style <s_key> tokens (Nemotron-Parse) | JSON text (chat models)
+
+
+def prediction_of(row: dict[str, Any]) -> Json | None:
+    """The predicted dict of one prediction record (``sequence`` + ``answer_format``, default donut); None = failure."""
+    fmt = row.get("answer_format", "donut")
+    if fmt == "json":
+        return json_answer(row["sequence"])
+    if fmt == "donut":
+        parsed = token2json(row["sequence"])
+        return None if is_parse_failure(parsed) else parsed
+    raise ValueError(f"unknown answer_format {fmt!r} (expected one of {ANSWER_FORMATS})")
+
+
+def score_rows(rows: Sequence[dict[str, Any]]) -> CordScores:
+    """Score prediction records of ONE format (a run never mixes a Parse and a chat model's answers)."""
+    formats = {r.get("answer_format", "donut") for r in rows}
+    if len(formats) > 1:
+        raise ValueError(f"records mix answer formats {sorted(formats)}")
+    return _score([prediction_of(r) for r in rows], [r["gt_parse"] for r in rows])
+
+
+def _score(parsed: Sequence[Json | None], answers: Sequence[Any]) -> CordScores:
+    """A parse failure (None) counts as an empty prediction for F1/exact/nTED: penalised, not skipped."""
+    preds = [{} if p is None else p for p in parsed]
+    n = len(parsed)
     return CordScores(
         field_f1=100 * field_f1(preds, answers),
         json_exact=100 * json_exact(preds, answers),
         nted_accuracy=100 * nted_accuracy(preds, answers),
-        parse_fail_rate=100 * (sum(failures) / n if n else 0.0),
+        parse_fail_rate=100 * (sum(p is None for p in parsed) / n if n else 0.0),
         n_samples=n,
     )

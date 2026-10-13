@@ -31,6 +31,7 @@ import yaml
 from vlm_pipeline.common.catalog import CatalogEntry, load_dataset_catalog
 from vlm_pipeline.common.decoding import decode_overrides_of
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
+from vlm_pipeline.common.host_paths import hub_repo_dir
 from vlm_pipeline.common.jobrun import (
     CONTAINER_ROOT,
     ContainerJob,
@@ -228,7 +229,16 @@ def _generate(request: EvalRequest, model: ModelRef, ids: Sequence[int], run_dir
     )
     try:
         final = run_job(
-            ContainerJob(name=manifest.run_id, image=request.image, argv=argv),
+            ContainerJob(
+                name=manifest.run_id,
+                image=request.image,
+                argv=argv,
+                # P017 step 6: only its own dir writable; model, base, CORD and the worker script read-only.
+                narrow=True,
+                rw_dirs=(run_dir,),
+                code_files=(CORD_WORKER,),
+                ro_inputs=tuple(hub_repo_dir(root, p) for p in (model.path, request.base.path, data_dir)),
+            ),
             manifest,
             run_dir,
             project_root=root,
@@ -287,12 +297,12 @@ def _load(pred: Path) -> dict[int, dict[str, Any]]:
 
 
 def _parsed(row: dict[str, Any]) -> Any:
-    parsed = cord.token2json(row["sequence"])
-    return {} if cord.is_parse_failure(parsed) else parsed
+    parsed = cord.prediction_of(row)
+    return {} if parsed is None else parsed
 
 
 def metrics(rows: Sequence[dict[str, Any]]) -> dict[str, float]:
-    scores = cord.score_sequences([r["sequence"] for r in rows], [r["gt_parse"] for r in rows])
+    scores = cord.score_rows(rows)
     return {
         "field_f1": round(scores.field_f1, 2),
         "json_exact": round(scores.json_exact, 2),

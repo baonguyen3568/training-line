@@ -60,7 +60,7 @@ def run_settings(rows: list[dict[str, Any]], label: str) -> dict[str, Any]:
 
 
 def metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
-    scores = cord.score_sequences([r["sequence"] for r in records], [r["gt_parse"] for r in records])
+    scores = cord.score_rows(records)  # Donut tokens (Parse) or JSON text (chat models), per answer_format
     return {
         "field_f1": round(scores.field_f1, 2),
         "json_exact": round(scores.json_exact, 2),
@@ -88,7 +88,7 @@ def common_images(
 
 
 def _f1(run: dict[int, dict[str, Any]], ids: list[int]) -> float:
-    return cord.score_sequences([run[i]["sequence"] for i in ids], [run[i]["gt_parse"] for i in ids]).field_f1
+    return cord.score_rows([run[i] for i in ids]).field_f1
 
 
 def paired_bootstrap(
