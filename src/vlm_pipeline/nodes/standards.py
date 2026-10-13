@@ -304,8 +304,12 @@ class StandardsError(ValueError):
     """A standards file that does not match the schema, the node registry or the repo (fails loading)."""
 
 
-def load_standards(root: Path, specs: Iterable[NodeSpec]) -> tuple[Rule, ...]:
-    """All rules of ``configs/standards/*.yaml``, checked against the node specs and the repo; raises StandardsError."""
+def load_standards(root: Path, specs: Iterable[NodeSpec], *, check_sources: bool = True) -> tuple[Rule, ...]:
+    """All rules of ``configs/standards/*.yaml``, checked against the node specs and the repo; raises StandardsError.
+
+    ``check_sources=False`` skips "every cited repo path exists": the app image ships configs, not docs/.team (the
+    repo test keeps that check).
+    """
     by_type = {s.type_id: s for s in specs}
     rules: list[Rule] = []
     for path in sorted((root / STANDARDS_DIR).glob("*.yaml")):
@@ -315,14 +319,16 @@ def load_standards(root: Path, specs: Iterable[NodeSpec]) -> tuple[Rule, ...]:
             raise StandardsError(f"{path.name}: {exc}") from exc
         rules += loaded.rules
         for rule in loaded.rules:
-            _check_against_repo(rule, by_type, root, path.name)
+            _check_against_repo(rule, by_type, root, path.name, check_sources=check_sources)
     duplicates = sorted({r.id for r in rules if [x.id for x in rules].count(r.id) > 1})
     if duplicates:
         raise StandardsError(f"duplicate rule ids: {duplicates}")
     return tuple(rules)
 
 
-def _check_against_repo(rule: Rule, by_type: Mapping[str, NodeSpec], root: Path, file: str) -> None:
+def _check_against_repo(
+    rule: Rule, by_type: Mapping[str, NodeSpec], root: Path, file: str, *, check_sources: bool
+) -> None:
     where = f"{file} {rule.id}"
     for type_id in rule.applies_to.node:
         spec = by_type.get(type_id)
@@ -340,7 +346,7 @@ def _check_against_repo(rule: Rule, by_type: Mapping[str, NodeSpec], root: Path,
     target = getattr(rule.check, "target", None)
     if target is not None and target not in by_type:
         raise StandardsError(f"{where}: unknown target node {target!r}")
-    for ref in _REPO_PATH.findall(rule.source):
+    for ref in _REPO_PATH.findall(rule.source) if check_sources else ():
         if not (root / ref).exists():
             raise StandardsError(f"{where}: source path {ref!r} does not exist")
 

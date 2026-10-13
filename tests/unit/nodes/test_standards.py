@@ -377,3 +377,11 @@ def test_dead_rule_checker_catches_the_two_real_cases(tmp_path: Path) -> None:
     live = _rule(id="TEST-LIVE", check={"kind": "range", "min": 16, "max": 64})  # lora_dim offers 4..64
     loaded = {r.id: r for r in load_standards(_write(tmp_path, calib, epochs, live), SPECS)}
     assert [_can_fire(loaded[i]) for i in ("TEST-CALIB", "TEST-EPOCHS", "TEST-LIVE")] == [False, False, True]
+
+
+def test_missing_source_path_is_skipped_when_sources_are_not_checked(tmp_path: Path) -> None:
+    """The app image ships configs/ but not docs/ or .team/: the registry loads without the repo-path check."""
+    root = _write(tmp_path, _rule(source="docs/adr/ADR-missing.md §2"))
+    with pytest.raises(StandardsError, match="does not exist"):
+        load_standards(root, SPECS)
+    assert len(load_standards(root, SPECS, check_sources=False)) == 1
