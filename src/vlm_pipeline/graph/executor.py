@@ -9,6 +9,7 @@ run dir is derived from its cache key.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 import uuid
@@ -25,7 +26,15 @@ from vlm_pipeline.common.runinfo import RunManifest, RunStatus, Stage, read_mani
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
 from vlm_pipeline.graph.validation import Issue, validate
-from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, Worker, read_checkpoint_step, worker_identity
+from vlm_pipeline.graph.worker import (
+    CHECKPOINT_MARKER,
+    NOT_RESUMABLE_MARKER,
+    ArtifactRef,
+    NodeJob,
+    Worker,
+    read_checkpoint_step,
+    worker_identity,
+)
 from vlm_pipeline.nodes.spec import NodeSpec, Registry
 
 logger = logging.getLogger(__name__)
@@ -297,6 +306,13 @@ class Executor:
 
         run_dir = self.state_dir / "runs" / f"{nid}-{key.split('-', 1)[1][:16]}"
         run_dir.mkdir(parents=True, exist_ok=True)
+        if (run_dir / NOT_RESUMABLE_MARKER).exists() and os.path.lexists(run_dir / CHECKPOINT_MARKER):
+            # The worker will start over: tell the user instead of silently redoing the steps (CACHE-001 text:
+            # "the saved result cannot be read, this step runs again").
+            saved_at = os.lstat(run_dir / CHECKPOINT_MARKER).st_mtime  # epoch seconds, like the cache index
+            warning = UserError("CACHE-001", {"node": nid, "saved_at": saved_at, "est_minutes": None})
+            run.warnings.setdefault(nid, []).append(warning)
+            self._emit(run.graph_run_id, {"type": "warning", "node_id": nid, "error": _error_dict(warning)})
         job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, read_checkpoint_step(run_dir))
         self._set(run, nid, "running", cache_key=key, resume_from_step=job.resume_from_step)
         started = time.time()

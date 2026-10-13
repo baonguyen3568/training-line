@@ -19,6 +19,10 @@ from pydantic import BaseModel
 from vlm_pipeline.nodes.spec import NodeSpec
 
 CHECKPOINT_MARKER = Path("checkpoints") / "LATEST"
+# Written by a worker whose checkpoints cannot be resumed (e.g. a model whose saved state misses keys): its checkpoints
+# never count as resumable, and the worker starts such a run dir over. Permanent for that run dir: fixing the model
+# later does not make checkpoints saved before the fix resumable.
+NOT_RESUMABLE_MARKER = ".not-resumable"
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,8 @@ def read_checkpoint_step(run_dir: Path) -> int | None:
     ``checkpoints/LATEST`` is either a text file holding the step (FakeWorker / simple workers) or, as NeMo AutoModel
     writes it, a symlink to ``epoch_<E>_step_<S>``; a checkpoint dir that still has ``.incomplete`` does not count.
     """
+    if (run_dir / NOT_RESUMABLE_MARKER).exists():
+        return None
     marker = run_dir / CHECKPOINT_MARKER
     try:
         if marker.is_dir():  # follows the AutoModel symlink
@@ -92,6 +98,7 @@ def read_checkpoint_step(run_dir: Path) -> int | None:
 
 __all__ = [
     "CHECKPOINT_MARKER",
+    "NOT_RESUMABLE_MARKER",
     "ArtifactRef",
     "NodeJob",
     "NodeResult",

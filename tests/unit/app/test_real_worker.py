@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import threading
 from pathlib import Path
@@ -210,3 +211,45 @@ def test_full_finetune_output_is_completed_from_base(tmp_path: Path, monkeypatch
     out = w.run(_job("train.sft_vlm", {"epochs": 1}, run_dir, _train_inputs(w))).outputs["model"]
     assert out.path.endswith("checkpoints/LATEST/model/consolidated")
     assert calls == [(w.root / "m", Path(out.path))]
+
+
+def test_lora_on_full_finetune_only_model_is_refused_before_the_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    entry = w.catalog.get("nemotron-parse-v1.1")
+    assert entry is not None
+    assert entry.train_node == "train.sft_vlm"
+    monkeypatch.setattr(workers, "run_job", lambda *a, **kw: pytest.fail("job must not start"))
+    inputs = {**_train_inputs(w), "base_model": ArtifactRef("Model", str(root / "m"), f"{entry.repo}@{entry.revision}")}
+    with pytest.raises(workers.NodeNotRunnableError) as ei:
+        w.run(_job("train.lora_vlm", {}, root / "outputs" / "graph" / "g" / "n", inputs))
+    assert ei.value.params == {"node_type": "train.lora_vlm", "model": entry.id, "supported": "train.sft_vlm"}
+
+
+def test_resume_of_unresumable_model_starts_over(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    entry = w.catalog.get("nemotron-parse-v1.1")
+    assert entry is not None
+    assert entry.id in workers.RESUME_UNSUPPORTED
+    monkeypatch.setattr("vlm_pipeline.train.recipe_checks.resolve_parse_class_token_start_idx", lambda _path: 50000)
+    run_dir = root / "outputs" / "graph" / "g" / "n"
+    (run_dir / "checkpoints" / "epoch_0_step_1").mkdir(parents=True)
+    (run_dir / "metrics.jsonl").write_text("{}\n")
+    seen: dict[str, bool] = {}
+
+    def fake_run_job(job: Any, manifest: RunManifest, d: Path, **kw: Any) -> RunManifest:
+        seen["fresh"] = not (d / "checkpoints").exists() and not (d / "metrics.jsonl").exists()
+        return manifest.model_copy(update={"status": RunStatus.FAILED, "exit_code": 1})
+
+    monkeypatch.setattr(workers, "run_job", fake_run_job)
+    inputs = {**_train_inputs(w), "base_model": ArtifactRef("Model", str(root / "m"), f"{entry.repo}@{entry.revision}")}
+    job = dataclasses.replace(_job("train.sft_vlm", {}, run_dir, inputs), resume_from_step=1)
+    with pytest.raises(ContainerExit):
+        w.run(job)
+    assert seen == {"fresh": True}
+    kept = sorted(p.name.split(".not-resumable-")[0] for p in run_dir.glob("*.not-resumable-*"))
+    assert kept == ["checkpoints", "metrics.jsonl"]
+    assert (run_dir / workers.NOT_RESUMABLE_MARKER).exists()  # executor: never offer "resume" for this run dir

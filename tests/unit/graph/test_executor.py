@@ -9,7 +9,7 @@ from typing import Any
 from vlm_pipeline.graph.errors import InterruptedByMemguard
 from vlm_pipeline.graph.executor import Executor
 from vlm_pipeline.graph.testing import FakeWorker, make_test_registry
-from vlm_pipeline.graph.worker import NodeJob, NodeResult
+from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, NodeJob, NodeResult
 
 
 def _wf() -> dict[str, Any]:
@@ -99,6 +99,32 @@ def test_resume_passes_checkpoint_step_to_worker(tmp_path: Path) -> None:
     run = Executor(make_test_registry(), Recorder(), tmp_path).run(_wf())
     assert run.status["t"] == "completed"
     assert seen == [1]
+
+
+def test_not_resumable_run_dir_is_not_resumable_and_warns(tmp_path: Path) -> None:
+    class NotResumable(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            if job.node_id == "t":
+                (job.run_dir / NOT_RESUMABLE_MARKER).touch()
+            return super().run(job)
+
+    first = Executor(
+        make_test_registry(), NotResumable(fail={"t": InterruptedByMemguard()}, checkpoints={"t"}), tmp_path
+    ).run(_wf())
+    assert first.errors["t"].resumable is False  # a checkpoint exists, but the worker said it cannot be resumed
+    assert "t" not in first.warnings
+    seen: list[int | None] = []
+
+    class Recorder(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            if job.node_id == "t":
+                seen.append(job.resume_from_step)
+            return super().run(job)
+
+    run = Executor(make_test_registry(), Recorder(), tmp_path).run(_wf())
+    assert seen == [None]
+    assert [w.code for w in run.warnings["t"]] == ["CACHE-001"]  # "this step runs again"
+    assert run.status["t"] == "completed"
 
 
 def test_missing_output_file_is_cache_warning_and_rerun(tmp_path: Path) -> None:

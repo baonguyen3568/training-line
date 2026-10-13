@@ -11,6 +11,7 @@ import functools
 import hashlib
 import json
 import logging
+import time
 from pathlib import Path
 from typing import ClassVar
 
@@ -25,13 +26,17 @@ from vlm_pipeline.common.jobrun import (
 )
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics
 from vlm_pipeline.graph.errors import ContainerExit
-from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
+from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, ArtifactRef, NodeJob, NodeResult
 from vlm_pipeline.nodes.spec import NodeSpec
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
 
 logger = logging.getLogger(__name__)
 PREPARED_DIRS = {"nemotron-parse-v1.1": "nemotron-parse-v1.1_fd1e3c6b"}  # train.prepare outputs (hash-verified)
+# Models whose AutoModel checkpoints cannot be resumed yet. Parse: RADIO drops its input_conditioner buffers at the
+# first forward, so the saved model shard lacks keys that a freshly built model expects ("Missing key in checkpoint
+# state_dict", resume smoke 2026-10-13). A resume of these starts over instead of failing on every retry.
+RESUME_UNSUPPORTED = frozenset({"nemotron-parse-v1.1"})
 
 
 class NotCachedError(VlmPipelineError):
@@ -155,12 +160,22 @@ class RealWorker:
             raise NodeNotRunnableError("unexpected params model", params={"node_type": job.spec.type_id})
         base, data = job.inputs["base_model"], job.inputs["train_data"]
         entry = self._entry_for(base)
+        # Full-fine-tune-only models (Parse: FusedAdam fp32-master recipe, no LoRA target modules) were never run with
+        # LoRA: fail before the GPU lock. TODO(bao-fixcode): own code CFG-010 + the same rule in graph validate.
+        if entry.train_node == "train.sft_vlm" and job.spec.type_id == "train.lora_vlm":
+            raise NodeNotRunnableError(
+                "train mode not supported for this model",
+                params={"node_type": job.spec.type_id, "model": entry.id, "supported": entry.train_node},
+            )
         class_token = None
         if entry.loss == "nemotron_parse":
             from vlm_pipeline.train.recipe_checks import resolve_parse_class_token_start_idx
 
             class_token = resolve_parse_class_token_start_idx(self._host_path(base.path))
         run_dir = job.run_dir.resolve()
+        if entry.id in RESUME_UNSUPPORTED:
+            _set_aside_checkpoints(run_dir, entry.id)
+            (run_dir / NOT_RESUMABLE_MARKER).touch()  # executor: no "resume" offer, warn on the next run
         (run_dir / "logs").mkdir(parents=True, exist_ok=True)
         dataset_dir, limit = self._dataset_input(data)
         recipe = build_recipe(
@@ -248,6 +263,22 @@ def _trainable_env(entry: CatalogEntry, params: LoraParams | FullFinetuneParams)
         logger.warning("no sft_trainable_pct in the catalog for %s: freeze guard disabled", entry.id)
         return {}
     return {"VLM_EXPECTED_TRAINABLE_PCT": f"{expected[0]}:{expected[1]}"}
+
+
+def _set_aside_checkpoints(run_dir: Path, model_id: str) -> None:
+    """Start a model that cannot resume over: move its checkpoints and metrics aside (kept, never deleted).
+
+    The run dir is stable per cache key and AutoModel resumes from any checkpoint in it, so a failing resume would
+    repeat on every retry.
+    """
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    moved = False
+    for name in ("checkpoints", "metrics.jsonl"):
+        if (run_dir / name).exists():
+            (run_dir / name).rename(run_dir / f"{name}.not-resumable-{stamp}")
+            moved = True
+    if moved:
+        logger.warning("%s cannot resume from a checkpoint yet: training starts over in %s", model_id, run_dir)
 
 
 def _tail(path: Path, n: int = 30) -> str:
