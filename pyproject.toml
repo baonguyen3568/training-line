@@ -45,7 +45,7 @@ default-groups = ["dev"]
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["third_party", "frontend", "plugins", ".team", ".claude", "docs", "design"]  # ruff>=0.16 also formats Markdown code blocks
+extend-exclude = ["third_party", "frontend", "site", "plugins", ".team", ".claude", "docs", "design"]  # ruff>=0.16 also formats Markdown code blocks
 cache-dir = ".cache/ruff"
 src = ["src", "tests"]
 

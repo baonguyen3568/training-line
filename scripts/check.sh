@@ -16,8 +16,7 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 if [[ "${1:-}" == "--clean" ]]; then
   # Gates on a pristine checkout of HEAD: catches code that depends on uncommitted files (ADR-004 A4).
-  # Frontend checks run only when HEAD touches frontend/ or schemas/ (or CLEAN_FRONTEND=1), so Python-only
-  # commits stay ~30 s.
+  # Frontend / site checks run only when HEAD touches them (or CLEAN_FRONTEND=1), so Python-only commits stay ~30 s.
   # Remove clean worktrees left by runs that died (name carries the owner PID; never touch a live run's tree).
   for stale in "$ROOT"/.cache/check-clean.*; do
     [[ -d "$stale" ]] || continue
@@ -47,6 +46,12 @@ if [[ "${1:-}" == "--clean" ]]; then
      || ! git diff --quiet HEAD~1 HEAD -- frontend schemas 2>/dev/null; then
     step "clean checkout: frontend (npm ci + npm run check)"
     (cd "$WORKTREE/frontend" && npm ci --ignore-scripts --silent && npm run check)
+  fi
+  if [[ -f "$WORKTREE/site/package.json" ]] && { [[ "${CLEAN_FRONTEND:-0}" == "1" ]] \
+     || ! git diff --quiet HEAD~1 HEAD -- site docs/legal design/tokens frontend/scripts/build-tokens.mjs 2>/dev/null; }; then
+    step "clean checkout: site (npm ci + npm run check)"
+    (cd "$WORKTREE/site" && npm ci --ignore-scripts --silent && npm run check)
+    (cd "$WORKTREE" && uv run --quiet python scripts/qa/check_site_numbers.py --strict >/dev/null)
   fi
   printf '\n\033[32mClean-checkout gates passed.\033[0m\n'
   exit 0
@@ -90,6 +95,15 @@ if [[ -f frontend/package.json ]]; then
   step "frontend (biome, tsc, vitest)"
   # `npm run check` = build generated tokens/i18n -> biome ci -> tsc --noEmit -> vitest run (owner: bao-frontend)
   (cd frontend && npm ci --ignore-scripts --silent && npm run check)
+fi
+
+if [[ -f site/package.json ]]; then
+  step "site (build, internal links, security gate scripts/security/site_check.py)"
+  # Public site (M2-3, owner: bao-frontend); `npm run check` also runs the security gate (placeholders only warn).
+  (cd site && npm ci --ignore-scripts --silent && npm run check)
+  step "site: every number on a page comes from its listed sources (no made-up numbers, P011 G1)"
+  uv run python scripts/qa/check_site_numbers.py --strict >/dev/null \
+    || { uv run python scripts/qa/check_site_numbers.py; exit 1; }  # quiet when clean, full report when not
 fi
 
 step "pip-audit (informational, does not fail the run)"
