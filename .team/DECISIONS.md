@@ -75,3 +75,4 @@
 - 2026-10-13 G-5 tải về: model chỉ catalog (1.0); dataset HF tuỳ ý (chỉ file dữ liệu, SHA resolve trước, license từ card + nhãn chưa duyệt, unknown → chặn export); egress chỉ HF qua proxy; reserve disk shared 50GB/10%, personal 20GB; gõ xác nhận >20GB. Model tuỳ ý → roadmap.
 - 2026-10-13 USER: dựng nginx mở ra LAN; server của dự án chạy ở dải 4000–4050 (chỉ server dự án). → D-8: nginx :4000 HTTPS trên LAN, backend 127.0.0.1:4001–4050.
 - 2026-10-13 ADR-019 LAN qua nginx ACCEPTED (192.168.2.178:4000 TLS, allow /24, đăng nhập bằng fragment).
+- 2026-10-13 USER: GIỮ Nemotron-Parse (NVIDIA) làm model mặc định template Đọc hoá đơn, dù Qwen3.5-2B LoRA đạt CORD test F1 86.4 vs Parse 71.0 (+15.5, CI [10.4, 20.6]). Gallery ghi rõ Qwen điểm cao hơn; Qwen hoá đơn thành pipeline tham chiếu.
