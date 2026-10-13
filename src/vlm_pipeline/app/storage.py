@@ -15,6 +15,7 @@ There is no endpoint that deletes an arbitrary path. Text for the user is render
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import shlex
@@ -39,6 +40,7 @@ from vlm_pipeline.common.gpu_lock import PATH_ENV as GPU_LOCK_PATH_ENV
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.common.runinfo import read_small_json
 
+logger = logging.getLogger(__name__)
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 ApprovalPolicy = Literal["none", "threshold"]
 Source = Literal["node_cache", "checkpoint", "set_aside"]
@@ -67,27 +69,51 @@ class StorageSettings:
 
     @classmethod
     def from_env(cls, root: Path, policy_file: Path | None = None) -> StorageSettings:
-        """Profile default (``personal`` -> none, else threshold 20 GB); env may only make it stricter.
+        """Admin policy first, else the profile default (``personal`` -> none, else threshold 20 GB); env only tightens.
 
         The profile is ``effective_profile``: the admin policy file is the base and ``VLM_PROFILE`` may only tighten
-        it. Fails closed (P013 N3): no profile anywhere counts as a shared host. ``policy_file`` defaults to the admin
+        it. Fails closed (P013 N3): no profile anywhere counts as a shared host. ``[storage] approval_policy`` and
+        ``approval_threshold_gb`` in the admin file (shown read-only on the Settings page) replace the profile default;
+        an unusable value is ignored (logged) and the shared-host default stays. ``policy_file`` defaults to the admin
         file (``app_config.policy_path()``).
         """
-        profile = effective_profile(os.environ.get(PROFILE_ENV), read_policy(policy_file))
+        data = read_policy(policy_file)
+        profile = effective_profile(os.environ.get(PROFILE_ENV), data)
         policy: ApprovalPolicy = "none" if profile == "personal" else "threshold"
+        threshold = 20.0
+        admin = data.get("storage") if data is not None else None
+        if isinstance(admin, dict):
+            policy, threshold = _admin_approval(admin, policy, threshold)
+            if policy == "none" and profile != "personal":  # allowed (admin's file), never silent (security)
+                logger.warning("admin policy turned deletion approval off on a shared host (storage.approval_policy)")
         env_policy = os.environ.get(POLICY_ENV)
         if env_policy is not None:
             if env_policy not in ("none", "threshold"):
                 raise ValueError(f"{POLICY_ENV} must be none|threshold, got {env_policy!r}")
-            if env_policy == "threshold":  # tighten only; "none" never relaxes a shared_dev host
+            if env_policy == "threshold":  # tighten only; "none" never relaxes the admin/profile choice
                 policy = "threshold"
-        threshold = 20.0
         env_threshold = os.environ.get(THRESHOLD_ENV)
         if env_threshold is not None:
             threshold = min(threshold, float(env_threshold))  # lower only
         cap_env = os.environ.get(CAP_ENV)
         cap = float(cap_env) if cap_env else min(cache_retention.DEFAULT_CAP_GB, 0.1 * read_disk(root).free_gb)
         return cls(approval_policy=policy, approval_threshold_gb=threshold, node_cache_max_gb=cap)
+
+
+def _admin_approval(admin: dict[str, Any], policy: ApprovalPolicy, threshold: float) -> tuple[ApprovalPolicy, float]:
+    """``[storage] approval_policy`` / ``approval_threshold_gb`` of the admin file over the profile default."""
+    value = admin.get("approval_policy")
+    if value in ("none", "threshold"):
+        policy = value
+    elif value is not None:  # unreadable: keep the stricter shared-host rule
+        logger.warning("storage.approval_policy must be none|threshold, got %r: ignored", value)
+        policy = "threshold"
+    gb = admin.get("approval_threshold_gb")
+    if isinstance(gb, int | float) and not isinstance(gb, bool) and 0 < gb <= 100_000:
+        threshold = float(gb)
+    elif gb is not None:
+        logger.warning("storage.approval_threshold_gb must be a positive number of GB, got %r: ignored", gb)
+    return policy, threshold
 
 
 @dataclass

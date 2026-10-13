@@ -151,6 +151,37 @@ def test_settings_follow_profile_and_env_only_tightens(tmp_path: Path, monkeypat
         StorageSettings.from_env(tmp_path, absent)
 
 
+def test_admin_approval_settings_replace_the_profile_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """What the Settings page shows as set by the admin is what storage enforces; env may still only tighten."""
+    for var in ("VLM_STORAGE_APPROVAL_POLICY", "VLM_STORAGE_APPROVAL_THRESHOLD_GB"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("VLM_NODE_CACHE_MAX_GB", "50")
+    monkeypatch.setenv("VLM_PROFILE", "shared_dev")
+    roomy = _policy(tmp_path, '[storage]\napproval_policy = "threshold"\napproval_threshold_gb = 50\n')
+    assert StorageSettings.from_env(tmp_path, roomy).approval_threshold_gb == 50.0
+    monkeypatch.setenv("VLM_STORAGE_APPROVAL_THRESHOLD_GB", "500")  # env cannot raise it
+    assert StorageSettings.from_env(tmp_path, roomy).approval_threshold_gb == 50.0
+    monkeypatch.delenv("VLM_STORAGE_APPROVAL_THRESHOLD_GB")
+    trusted = _policy(tmp_path, '[storage]\napproval_policy = "none"\n')  # the admin's call on its own host
+    with caplog.at_level("WARNING", logger="vlm_pipeline.app.storage"):
+        assert StorageSettings.from_env(tmp_path, trusted).approval_policy == "none"
+    assert "approval off on a shared host" in caplog.text  # allowed, never silent (security)
+    monkeypatch.setenv("VLM_STORAGE_APPROVAL_POLICY", "threshold")  # env may tighten it again
+    assert StorageSettings.from_env(tmp_path, trusted).approval_policy == "threshold"
+    monkeypatch.delenv("VLM_STORAGE_APPROVAL_POLICY")
+    monkeypatch.setenv("VLM_PROFILE", "personal")
+    odd = _policy(tmp_path, '[storage]\napproval_policy = "yes"\napproval_threshold_gb = -1\n')
+    assert (
+        StorageSettings.from_env(tmp_path, odd).approval_policy,
+        StorageSettings.from_env(tmp_path, odd).approval_threshold_gb,
+    ) == (
+        "threshold",
+        20.0,
+    )  # unusable admin values: the stricter shared-host rule
+
+
 def test_admin_profile_cannot_be_loosened_by_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     for var in ("VLM_STORAGE_APPROVAL_POLICY", "VLM_STORAGE_APPROVAL_THRESHOLD_GB", "VLM_RETENTION_SCHEDULE"):
         monkeypatch.delenv(var, raising=False)
