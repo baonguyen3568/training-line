@@ -1,0 +1,68 @@
+{
+ "purpose": "Checklist 4.1: HF bench of R0 (Nemotron-Parse v1.1 full SFT, step 299) vs its base, same protocol; memory is publishable, speed is not (BUG-001)",
+ "models": {
+  "r0": "outputs/runs/20261013-1015-p3b-full-parse-c4f6/checkpoints/epoch_2_step_299/model/consolidated",
+  "base": "nvidia/NVIDIA-Nemotron-Parse-v1.1 (.cache/prepared/nemotron-parse-v1.1_fd1e3c6b)"
+ },
+ "protocol": {
+  "engine": "vlm_pipeline.serve.bench (HF, bf16, batch 1, eager attention)",
+  "image": "vlm-automodel:26.08-6",
+  "images": "cord-v2 test[0:10]",
+  "warmup": 3,
+  "num_requests": 30,
+  "max_new_tokens": 1024,
+  "greedy": true,
+  "repetition_penalty": 1.0,
+  "host": "GB10 shared with other services"
+ },
+ "runs": {
+  "r0": "20261013-2301-bench-r0-model-38f8",
+  "base": "20261013-2304-bench-r0-base-afed"
+ },
+ "results": {
+  "r0": {
+   "e2e_ms_p50": 5411.1,
+   "e2e_ms_p90": 6636.7,
+   "e2e_ms_p99": 6829.6,
+   "tokens_per_s": 41.89,
+   "requests_per_s": 0.182,
+   "output_tokens_mean": 224.3,
+   "load_s": 11.85,
+   "torch_max_alloc_gb": 2.17,
+   "memory_startup_peak_gb": 5.55,
+   "memory_steady_gb": 3.87,
+   "memory_peak_load_gb": 6.1
+  },
+  "base": {
+   "e2e_ms_p50": 3016.7,
+   "e2e_ms_p90": 4130.1,
+   "e2e_ms_p99": 8319.1,
+   "tokens_per_s": 58.73,
+   "requests_per_s": 0.286,
+   "output_tokens_mean": 200.5,
+   "load_s": 27.24,
+   "torch_max_alloc_gb": 2.17,
+   "memory_startup_peak_gb": 5.13,
+   "memory_steady_gb": 3.58,
+   "memory_peak_load_gb": 4.98
+  }
+ },
+ "generate_time_fit": {
+  "r0": {
+   "fixed_s": 1.48,
+   "ms_per_token": 17.3
+  },
+  "base": {
+   "fixed_s": 2.25,
+   "ms_per_token": 5.8
+  }
+ },
+ "verdict": {
+  "memory": "publishable: fine-tuning adds ~0.3 GB steady (3.87 vs 3.58 GB)",
+  "speed": "NOT publishable: the R0 export decodes at ~3x the per-token cost of the base. Both runs load the HF remote-code class (hf_nemotron_parse_modeling), which supports the KV cache (the base is linear to 1024 tokens), but the export writes use_cache=false (ckpt_complete.EXPORT_OWNED_GENERATION_KEYS, the BUG-001 workaround needed only by the native AutoModel class). Re-measure with this protocol once the export stops forcing it for the HF class"
+ },
+ "caveats": [
+  "the base is not trained for CORD: 2/30 requests emit 1 token and 3/30 hit 1024 tokens, so its tok/s mixes very different lengths",
+  "one run each, shared GPU host"
+ ]
+}
