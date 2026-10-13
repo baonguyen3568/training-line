@@ -347,3 +347,27 @@ def test_every_patch_param_exists_on_a_node_or_is_explicitly_pending() -> None:
             for op in action.patch or ():
                 assert op.param in node_params or op.param in PENDING_PATCH_PARAMS, (code, action.id, op.param)
     assert not set(PENDING_PATCH_PARAMS) & node_params, "a pending param now exists: drop it from the list"
+
+
+def test_resolved_actions_carry_the_final_value_for_the_ui() -> None:
+    """G-3 (bao-frontend): the client applies the server's value, never recomputes scale/bounds."""
+    from vlm_pipeline.common.error_catalog import resolved_actions
+
+    err = SimpleNamespace(code="MEM-003", params={})
+    node = NodeContext(params={"local_batch_size": 8}, ranges={"local_batch_size": Range(1)})
+    actions = {a["id"]: a for a in resolved_actions(err, node, node_id="n3")}
+    assert set(actions) == set(available_actions(err, node))  # one filter for ids and buttons
+    batch = actions["reduce_batch"]
+    assert (batch["kind"], batch["node_id"]) == ("patch", "n3")
+    assert batch["patch"] == [{"param": "local_batch_size", "from": 8, "value": 4}]  # from: stale check on the client
+
+
+def test_resolved_actions_without_a_node_never_ship_a_param_patch() -> None:
+    from vlm_pipeline.common.error_catalog import resolved_actions
+
+    ids = {a["id"] for a in resolved_actions(SimpleNamespace(code="MEM-003", params={}))}
+    assert "reduce_batch" not in ids  # no final value without the node's params
+    assert "queue_until_memory" in ids  # navigate actions still offered
+    err = SimpleNamespace(code="QNT-001", params={"reason": "top1"})
+    graph_op = next(a for a in resolved_actions(err, NodeContext(params={})) if a["id"] == "remove_step")
+    assert (graph_op["kind"], graph_op["patch"]) == ("patch", None)  # a graph operation, known by its id

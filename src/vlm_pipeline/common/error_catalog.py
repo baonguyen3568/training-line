@@ -293,6 +293,34 @@ def available_actions(error: _ErrorLike, node: NodeContext | None = None) -> lis
     return [a.id for a in _offered(error, node)[1]]
 
 
+def resolved_actions(
+    error: _ErrorLike, node: NodeContext | None = None, node_id: str | None = None
+) -> list[dict[str, Any]]:
+    """The offered actions, ready for the UI's quick-fix buttons (G-3, bao-frontend): no catalog logic on the client.
+
+    Same filter as ``available_actions``. A param patch carries, per param, ``from`` (the value the server saw) and
+    ``value`` (the FINAL value from ``apply_patch``: scaled, floored, inside the NodeSpec bounds). The client applies
+    ``value`` only while the param still equals ``from``; otherwise the suggestion is stale (the user edited the node)
+    and is hidden until the next validation. A patch action without ops (``remove_step``, ``auto_rename_ids``...) is
+    a graph operation identified by its id: ``patch`` is None. Without ``node`` a param patch has no final value, so
+    it is left out (the client must never compute one).
+    """
+    out: list[dict[str, Any]] = []
+    for a in _offered(error, node)[1]:
+        item: dict[str, Any] = {"id": a.id, "kind": a.kind, "confirm": a.confirm, "target": a.target, "patch": None}
+        if node_id is not None:
+            item["node_id"] = node_id
+        if a.kind == "patch" and a.patch:
+            if node is None:
+                continue
+            item["patch"] = [
+                {"param": op.param, "from": node.params[op.param], "value": apply_patch(op, node.params[op.param])}
+                for op in a.patch
+            ]
+        out.append(item)
+    return out
+
+
 def already_optimized(error: _ErrorLike, node: NodeContext | None) -> bool:
     """True when the code has memory-reducing actions but none applies to this node (UI: error_card.already_optimized).
 
@@ -383,5 +411,6 @@ __all__ = [
     "available_actions",
     "display_params",
     "load_catalog",
+    "resolved_actions",
     "variant_key",
 ]
