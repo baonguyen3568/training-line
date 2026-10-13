@@ -68,3 +68,20 @@
 1. backend: does `expand()` belong in `graph/` (my proposal) or in the app before `validate()`? (frontend: `graph/`, so CLI and app share it.)
 2. ~~design: is `inner_path` enough?~~ Yes (array + inner port/param); display spec goes to P4-4 (design).
 3. ~~security: user group param defaults?~~ Yes, validated after expansion; rules folded into §2/§3 above.
+
+## 5. §3 implementation (2026-10-13, Release 1.0)
+- Done (cleancode, pending security review): `nodes/advanced_denylist.py`; `scripts/probe/engine_schema.py` (in the
+  pinned image, offline) + `engine_schema_write.py` → `configs/engine/automodel-<tag>.json`; test over the committed
+  file. First run, AutoModel 0.5.0 in `vlm-automodel:26.08-6`: 189 keys found, **42 offered**. The rest are denied
+  by reason: runs code 18, set by the node/app 63, not a scalar type 55, denied word 11 (6 exception candidates sent
+  to security). Each key lists the templates it applies to, because the optimizers differ per model.
+- Node param (cleancode): train nodes gain `advanced: dict[str, bool|int|float|str|list]` (`x-ui.advanced=true`,
+  `widget: "advanced"`). The validator checks that every key is in the engine file, that the value matches the
+  key's type and enum, and refuses `${` / `oc.` in any string. A key that does not apply to the wired model's template
+  is refused by the train support check (backend), because only then is the model known.
+- Recipe (backend/research): `build_recipe` sets each advanced key by dotted path AFTER the template and BEFORE the
+  node-controlled fields. Node-controlled keys can never appear here, because the denylist removes them.
+- API (backend): `GET /api/node-types/{type_id}/advanced` returns `{key, type, default, choices, templates, group}`,
+  where `group` is the key prefix. It is lazy, so `/api/node-types` stays small.
+- UI (frontend + design): tree by prefix, search, "changed only", reset per key; the label is the dotted key and
+  the help text is the engine default.
