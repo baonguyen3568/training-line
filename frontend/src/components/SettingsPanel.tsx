@@ -204,7 +204,14 @@ function SessionSection() {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    api.session().then(setInfo, () => setInfo(null));
+    let live = true; // no state update after the panel is gone (a slow answer, a closed test)
+    api.session().then(
+      (i) => live && setInfo(i),
+      () => live && setInfo(null),
+    );
+    return () => {
+      live = false;
+    };
   }, []);
   if (!info) return null;
 
