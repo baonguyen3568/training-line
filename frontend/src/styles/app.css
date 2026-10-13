@@ -1000,3 +1000,25 @@ textarea {
 .error-card.info {
   border-left-color: var(--color-axis);
 }
+/* library item: the step's main output (shape + colour, Never-Colour-Alone: the title says what it is) */
+.out-port {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+.out-port.shape-Dataset {
+  border-radius: 1.5px;
+}
+.out-port.shape-Model,
+.out-port.shape-Checkpoint,
+.out-port.shape-QuantizedModel,
+.out-port.shape-Adapter {
+  border-radius: 50%;
+}
+.out-port.shape-EvalReport,
+.out-port.shape-BenchReport {
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.85);
+}

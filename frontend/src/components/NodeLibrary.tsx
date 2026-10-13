@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import type { NodeSpec } from "../api/types";
-import { t } from "../i18n";
+import { t, tp } from "../i18n";
 import { LANES, type Lane, laneOf } from "../lib/lanes";
 import { nodeDesc, nodeTitle } from "../lib/nodeText";
+import { tokenVar } from "../lib/ports";
 import { expandQuery, matches } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
 
@@ -21,6 +22,15 @@ export function NodeLibrary({
   disabled: boolean;
 }) {
   const specs = useWorkflow((s) => s.specs);
+  const ports = useWorkflow((s) => s.ports);
+  const portColor = (type: string) => {
+    const pt = ports.find((p) => p.id === type);
+    return pt ? tokenVar(pt.color_token) : "var(--color-port-value)";
+  };
+  const portName = (type: string) => {
+    const pt = ports.find((p) => p.id === type);
+    return pt ? tp(pt.label_key.split(".")) : type;
+  };
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -89,6 +99,7 @@ export function NodeLibrary({
           <ul>
             {items.map((spec) => {
               const blocked = !!spec.policy_block || disabled;
+              const out = Object.values(spec.outputs)[0];
               return (
                 <li key={spec.type_id}>
                   <button
@@ -116,6 +127,15 @@ export function NodeLibrary({
                     }}
                   >
                     <span className="library-title">
+                      {out && (
+                        // what this step produces: port shape + colour (+ the name in the tooltip/label)
+                        <span
+                          className={`out-port shape-${out.type}`}
+                          style={{ background: portColor(out.type) }}
+                          title={portName(out.type)}
+                          aria-hidden="true"
+                        />
+                      )}
                       {spec.origin.kind === "third_party" && "🧩 "}
                       {nodeTitle(spec, spec.type_id)}
                     </span>
