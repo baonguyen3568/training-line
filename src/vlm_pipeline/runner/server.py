@@ -76,6 +76,9 @@ class RunnerConfig:
     job_uid: int | None = None  # default: the owner of the data root
     job_gid: int | None = None
     allowed_peer_uids: frozenset[int] = frozenset()  # who may talk to the socket (N2); empty: this process's uid
+    # Download tokens (security download-egress §2): a host path the runner sees at the same path and the app never
+    # mounts, so the docker daemon can bind ONE file into the download job. None: no token can be handed over.
+    secrets_dir: Path | None = None
 
 
 class Runner:
@@ -89,6 +92,7 @@ class Runner:
         self.paths = HostPaths(cfg.app_root, PurePosixPath(cfg.host_project), PurePosixPath(cfg.data_root))
         self._docker = docker
         self._popen = popen
+        self._sweep_secrets()
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------------------------------ requests
@@ -129,18 +133,60 @@ class Runner:
             return {"ok": False, "error": "entrypoint_mismatch"}  # not an NGC image: its wrapper is not there
         if sub.gpu:
             gpu_lock.verify_token(self.cfg.lock_path, sub.lock_token or "")
-        job = ContainerJob(
-            name=sub.run_id, image=image_id or sub.image_tag, argv=command, entrypoint=entrypoint, gpu=sub.gpu,
-            memory_gb=sub.memory_gb,
-            narrow=True, rw_dirs=(run_dir,), ro_inputs=inputs, code_root=self.cfg.host_project,
-            code_files=(EVAL_WORKER,) if sub.job_kind == "eval" else (), uid=self.job_uid, gid=self.job_gid,
-        )  # fmt: skip
-        argv = docker_args(job, self.cfg.data_root, lock_token=sub.lock_token)  # validates every mount source
-        fd = open_run_log(run_dir, write=True)  # before the marker: a planted logs/ link refuses the job
-        self._mark_started(sub.run_id, run_dir)  # one job per run id, at the trust boundary
+        download = sub.job_kind == "download"  # the ONLY kind with a network (HF-only proxy) and a token
+        if download and sub.gpu:
+            return {"ok": False, "error": "download_without_gpu"}
+        secret = self._write_secret(sub.run_id, sub.hf_token) if sub.hf_token is not None else None
+        try:
+            job = ContainerJob(
+                name=sub.run_id, image=image_id or sub.image_tag, argv=command, entrypoint=entrypoint, gpu=sub.gpu,
+                memory_gb=sub.memory_gb,
+                narrow=True, rw_dirs=(run_dir,), ro_inputs=inputs, code_root=self.cfg.host_project,
+                code_files=(EVAL_WORKER,) if sub.job_kind == "eval" else (), uid=self.job_uid, gid=self.job_gid,
+                egress=download, secret_file=secret,
+            )  # fmt: skip
+            argv = docker_args(job, self.cfg.data_root, lock_token=sub.lock_token)  # validates every mount source
+            fd = open_run_log(run_dir, write=True)  # before the marker: a planted logs/ link refuses the job
+            self._mark_started(sub.run_id, run_dir)  # one job per run id, at the trust boundary
+        except BaseException:
+            self._drop_secret(sub.run_id)
+            raise
         with os.fdopen(fd, "ab") as out:
-            self._popen(argv, stdout=out, stderr=subprocess.STDOUT)
+            proc = self._popen(argv, stdout=out, stderr=subprocess.STDOUT)
+        if secret is not None and callable(getattr(proc, "wait", None)):  # security S2: the token lives as long as
+            threading.Thread(target=self._drop_after, args=(proc, sub.run_id), daemon=True).start()  # the job
         return {"ok": True, "container": f"vlm-{sub.run_id}", "image_id": image_id}
+
+    def _drop_after(self, proc: Any, run_id: str) -> None:
+        try:
+            proc.wait()  # the attached `docker run` returns when the container exits
+        finally:
+            self._drop_secret(run_id)
+
+    def _write_secret(self, run_id: str, token: str) -> Path:
+        """The token as ONE file for ONE job: 0400, created exclusively, never through a link; removed with the job."""
+        if self.cfg.secrets_dir is None:
+            raise ProtocolError("no_secret_store")
+        root = self.cfg.secrets_dir
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path = root / run_id
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o400)
+        with os.fdopen(fd, "w", encoding="ascii") as fh:
+            fh.write(token)
+        return path
+
+    def _drop_secret(self, run_id: str) -> None:
+        if self.cfg.secrets_dir is not None:
+            (self.cfg.secrets_dir / run_id).unlink(missing_ok=True)
+
+    def _sweep_secrets(self) -> None:
+        """At start: a token file is only ever for a running job; leftovers of a crashed runner go."""
+        root = self.cfg.secrets_dir
+        if root is None or not root.is_dir() or root.is_symlink():
+            return
+        for leftover in root.iterdir():
+            if leftover.is_file() or leftover.is_symlink():
+                leftover.unlink(missing_ok=True)
 
     def _run_ref(self, ref: RunRef) -> dict[str, Any]:
         name = f"vlm-{ref.run_id}"
@@ -148,6 +194,8 @@ class Runner:
         if state is None:
             return {"ok": False, "error": "not_found"}
         if ref.command == "status":
+            if not state.get("running"):
+                self._drop_secret(ref.run_id)  # exited: the token file must not outlive the job
             return {"ok": True, **state}
         if ref.command == "stop":
             self._docker(["stop", "-t", str(STOP_GRACE_S), name])
@@ -157,6 +205,7 @@ class Runner:
             if state["running"]:
                 return {"ok": False, "error": "still_running"}
             self._docker(["rm", name])
+            self._drop_secret(ref.run_id)  # the job is gone: so is its token
         elif ref.command == "logs":
             return {"ok": True, "text": self._tail(ref.run_id, ref.tail)}
         return {"ok": True}
@@ -294,6 +343,7 @@ def config_from_env(environ: dict[str, str] | None = None) -> RunnerConfig:
         job_uid=int(env["VLM_JOB_UID"]) if env.get("VLM_JOB_UID") else None,
         job_gid=int(env["VLM_JOB_GID"]) if env.get("VLM_JOB_GID") else None,
         allowed_peer_uids=frozenset(int(u) for u in env.get("VLM_RUNNER_ALLOWED_UIDS", "").split(",") if u.strip()),
+        secrets_dir=Path(env["VLM_RUNNER_SECRETS"]) if env.get("VLM_RUNNER_SECRETS") else None,
     )
 
 

@@ -32,9 +32,10 @@ ALLOWED_ARGV: dict[str, tuple[tuple[tuple[str, ...], str], ...]] = {
         (("python", "-m", "vlm_pipeline.serve.trial"), NGC_ENTRYPOINT),
         (("python", "-m", "vlm_pipeline.serve.bench"), NGC_ENTRYPOINT),
     ),
-    # No first-party module yet (downloads are manual, D1): every argv is refused until one exists and is reviewed.
+    # No first-party module yet: every argv is refused until one exists and is reviewed.
     "probe": (),
-    "download": (),
+    # P018 / security download-egress: the one job with a network (HF-only proxy) and a token file.
+    "download": ((("python", "-m", "vlm_pipeline.download.hub"), NGC_ENTRYPOINT),),
 }
 if not all(ep in ENTRYPOINTS for rules in ALLOWED_ARGV.values() for _, ep in rules):  # survives python -O
     raise RuntimeError("ALLOWED_ARGV uses an entrypoint outside the closed set")

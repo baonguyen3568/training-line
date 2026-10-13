@@ -10,6 +10,7 @@ an env var, a container name or a free image name. Everything here is a pure che
 * ``image_tag``: a tag; the server checks IMAGES.lock + APPROVED + image id (SEC-004), not this module;
 * ``argv``: must start with one of the kind's allowed prefixes (ALLOWED_ARGV); the rest are plain strings;
 * ``gpu``, ``memory_gb`` (1..MEMORY_CAP_GB), ``lock_token`` (required with gpu);
+* ``hf_token`` (optional, ``download`` jobs ONLY): handed to the job as a mounted file, never env, never logged;
 * ``run_dir``: the job's writable dir, an app path ``/app/outputs/runs/<run_id>`` or ``/app/outputs/graph/runs/<dir>``;
 * ``inputs``: app paths mounted READ-ONLY (earlier nodes' outputs, uploads, datasets), each under INPUT_ROOTS.
 The paths are translated to host paths by ``common.host_paths`` and checked there (no symlink, owner, kind).
@@ -23,7 +24,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -39,6 +40,7 @@ APP_ROOT = PurePosixPath("/app")
 UPLOAD_NAME = re.compile(r"^[0-9a-f]{32}\.png$")
 IMAGE_TAG = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,127}:[A-Za-z0-9._-]{1,64}$")
 LOCK_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+HF_TOKEN = re.compile(r"^hf_[A-Za-z0-9]{20,100}$")  # the shape of a Hugging Face token
 COMMANDS = frozenset({"submit", "stop", "kill", "status", "logs", "remove", "image_id"})
 JOB_KINDS = frozenset({"train", "eval", "quantize", "probe", "download", "serve"})
 RUN_DIR_PARENTS = (APP_ROOT / "outputs" / "runs", APP_ROOT / "outputs" / "graph" / "runs")
@@ -71,6 +73,7 @@ class Submit:
     lock_token: str | None
     run_dir: PurePosixPath
     inputs: tuple[PurePosixPath, ...]
+    hf_token: str | None = field(default=None, repr=False)  # never in a repr, a log or an audit line
 
 
 @dataclass(frozen=True)
@@ -145,7 +148,7 @@ def _argv(value: Any, kind: str) -> tuple[str, ...]:
 
 def parse_submit(body: dict[str, Any]) -> Submit:
     fields = {"run_id", "job_kind", "image_tag", "argv", "gpu", "memory_gb", "lock_token", "run_dir", "inputs"}
-    _closed(body, fields | {"command"}, fields - {"lock_token"})
+    _closed(body, fields | {"command", "hf_token"}, fields - {"lock_token"})
     run_id = _text(body["run_id"], "bad_run_id", RUN_ID)
     kind = _text(body["job_kind"], "bad_job_kind")
     if kind not in JOB_KINDS:
@@ -160,6 +163,12 @@ def parse_submit(body: dict[str, Any]) -> Submit:
         token = _text(token, "bad_lock_token", LOCK_TOKEN)
     if gpu and token is None:
         raise ProtocolError("gpu_needs_lock_token")
+    hf_token = body.get("hf_token")
+    if hf_token is not None:
+        if kind != "download":  # security download-egress §2: only the download job ever receives the token
+            raise ProtocolError("token_not_allowed")
+        if not isinstance(hf_token, str) or not HF_TOKEN.fullmatch(hf_token):
+            raise ProtocolError("bad_hf_token")
     run_dir = _run_dir(body["run_dir"], run_id)
     return Submit(
         run_id=run_id,
@@ -171,6 +180,7 @@ def parse_submit(body: dict[str, Any]) -> Submit:
         lock_token=token,
         run_dir=run_dir,
         inputs=_inputs(body["inputs"], run_dir),
+        hf_token=hf_token,
     )
 
 

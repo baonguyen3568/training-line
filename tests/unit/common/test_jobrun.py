@@ -669,3 +669,25 @@ def test_vlm_code_root_runs_a_clean_worktrees_code_on_the_projects_data(
     monkeypatch.setenv(CODE_ROOT_ENV, str(wt))
     with pytest.raises(ValueError, match="git worktree checkout"):
         with_code_root(job, root)
+
+
+def test_network_and_token_files_are_for_narrowed_download_jobs_only(tmp_path: Path) -> None:
+    root, run, _repo, data = _narrow_project(tmp_path)
+    secret = tmp_path / "tok"
+    secret.write_text("hf_x")
+    wide = ContainerJob(name="t", image="i", argv=("true",), egress=True)
+    with pytest.raises(ValueError, match="narrowed download"):
+        docker_args(wide, root)
+    no_net = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), secret_file=secret)
+    with pytest.raises(ValueError, match="only for a download job"):
+        docker_args(no_net, root)
+    link = tmp_path / "link"
+    link.symlink_to(secret)
+    linked = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), egress=True,
+                          secret_file=link)  # fmt: skip
+    with pytest.raises(ValueError, match="regular file"):
+        docker_args(linked, root)
+    plain = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(data,))
+    argv = docker_args(plain, root)
+    assert argv[argv.index("--network") + 1] == "none"
+    assert not any(a.startswith(("HTTPS_PROXY", "HF_TOKEN_PATH")) for a in argv)

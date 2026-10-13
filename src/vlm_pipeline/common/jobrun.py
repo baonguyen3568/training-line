@@ -13,6 +13,7 @@ import math
 import os
 import re
 import signal
+import stat
 import subprocess
 import threading
 import time
@@ -66,6 +67,10 @@ class ContainerJob:
     narrow: bool = False
     ro_inputs: tuple[Path, ...] = ()
     code_files: tuple[str, ...] = ()
+    # Download jobs only (P018, security download-egress §1-2), set by vlm-runner from the job kind, never a request
+    # field: the internal egress network (whose only way out is the HF-only proxy) and the token as a mounted FILE.
+    egress: bool = False
+    secret_file: Path | None = None
 
 
 # Env every first-party job gets (P003 D2, ADR-005 D1 caches); never secrets.
@@ -301,6 +306,7 @@ def docker_args(
     """Pure: the full ``docker run`` argv for ``job`` (tested; no shell, no user-controlled flags)."""
     if job.narrow:
         return _narrow_docker_args(job, project_root, lock_token=lock_token)
+    _no_egress(job)
     env = {**BASE_ENV, **compile_cache_env(job, project_root, image_id), **job.env}  # job.env wins
     for key in env:
         if key in SECRET_ENV_ALLOWLIST:
@@ -347,17 +353,46 @@ def _check_env(env: Mapping[str, str]) -> None:
             raise ValueError(f"secret-like env var {key} must not be passed to job containers")
 
 
+EGRESS_NETWORK = "ntc-training_egress"  # compose network `egress` (internal: true); only egress-proxy leaves it
+EGRESS_PROXY = "http://egress-proxy:3128"
+SECRET_TOKEN_PATH = "/run/secrets/hf_token"  # noqa: S105 - a path: the job reads the token from this file, never env
+
+
+def _no_egress(job: ContainerJob) -> None:
+    if job.egress or job.secret_file is not None:
+        raise ValueError("network and token files are for narrowed download jobs only")
+
+
+def _egress_args(job: ContainerJob) -> tuple[list[str], dict[str, str]]:
+    """(docker args, env) of a download job's network and token; ``--network none`` for every other job."""
+    if not job.egress:
+        if job.secret_file is not None:
+            raise ValueError("a token file is only for a download job")
+        return ["--network", "none"], {}
+    env = {"HTTPS_PROXY": EGRESS_PROXY, "NO_PROXY": "", "HF_HUB_DISABLE_XET": "1", "HF_HUB_DISABLE_TELEMETRY": "1"}
+    args = ["--network", EGRESS_NETWORK]
+    if job.secret_file is not None:
+        st = os.lstat(job.secret_file)
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError("the token file must be a regular file")
+        args += ["-v", f"{job.secret_file}:{SECRET_TOKEN_PATH}:ro"]
+        env["HF_TOKEN_PATH"] = SECRET_TOKEN_PATH
+    return args, env
+
+
 def _narrow_docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None) -> list[str]:
     mounts = narrow_mounts(job, project_root)
     rw_rel = job.rw_dirs[0].resolve().relative_to(project_root.resolve()).as_posix()
+    network, egress_env = _egress_args(job)
     env = {**BASE_ENV, **_narrow_cache_env(rw_rel), **job.env}  # job.env wins
     _check_env(env)
+    env.update(egress_env)  # set here, never from job.env: HF_TOKEN_PATH names the mounted file, not a secret
     if lock_token is not None:
         env[gpu_lock.TOKEN_ENV] = lock_token
     args = [
         "docker", "run", "--name", f"vlm-{job.name}",
         "--label", "project=vlm-training", "--label", f"vlm.job={job.name}",  # the runner acts only on its own jobs
-        "--network", "none",
+        *network,
         "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
         "--user", f"{job.uid}:{job.gid}",
         "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",

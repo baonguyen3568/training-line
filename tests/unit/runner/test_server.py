@@ -335,3 +335,80 @@ def test_the_launcher_sends_a_jobs_own_entrypoint_as_argv0(tmp_path: Path, monke
         RunnerLauncher(tmp_path / "r.sock").run(job, tmp_path, lock_token=None, log_path=run_dir / "x", image_id=None)
     assert sent[0]["job_kind"] == "eval"
     assert sent[0]["argv"] == ["python3", "-m", "vlm_pipeline.serve.vllm_batch", "b.json"]
+
+
+TOKEN = "hf_" + "A1b2C3d4" * 4
+
+
+def _download(**changes: Any) -> bytes:
+    body = {"job_kind": "download", "argv": ["python", "-m", "vlm_pipeline.download.hub", "--catalog-id", "x"],
+            "hf_token": TOKEN, **changes}  # fmt: skip
+    return _submit(**body)
+
+
+def test_only_a_download_job_gets_the_egress_network_and_the_token_as_a_file(tmp_path: Path) -> None:
+    """security download-egress §1-2: network + token for kind download only; the token is a mounted file."""
+    cfg = _project(tmp_path)
+    cfg.secrets_dir = tmp_path / "secrets"
+    runner, started = _runner(cfg, FakeDocker())
+    assert runner.handle(_download())["ok"] is True
+    argv = started[0]
+    assert _after(argv, "--network") == "ntc-training_egress"
+    secret = cfg.secrets_dir / RUN
+    assert f"{secret}:/run/secrets/hf_token:ro" in argv
+    assert oct(secret.stat().st_mode & 0o777) == "0o400"
+    assert secret.read_text() == TOKEN
+    assert "HF_TOKEN_PATH=/run/secrets/hf_token" in argv
+    assert not any(TOKEN in a for a in argv)  # never in env or argv
+    assert TOKEN not in (cfg.state_dir / "runner.jsonl").read_text()  # nor in the audit
+    runner.handle(json.dumps({"command": "remove", "run_id": RUN}).encode())
+    assert not secret.exists()  # gone with the job
+
+
+def test_every_other_job_has_no_network_and_cannot_take_a_token(tmp_path: Path) -> None:
+    cfg = _project(tmp_path)
+    cfg.secrets_dir = tmp_path / "secrets"
+    runner, started = _runner(cfg, FakeDocker())
+    assert runner.handle(_submit(hf_token=TOKEN)) == {"ok": False, "error": "token_not_allowed"}
+    assert runner.handle(_submit())["ok"] is True
+    assert _after(started[0], "--network") == "none"
+    bad = "not a token"
+    assert runner.handle(_download(hf_token=bad)) == {"ok": False, "error": "bad_hf_token"}
+    assert not cfg.secrets_dir.exists() or not any(cfg.secrets_dir.iterdir())
+
+
+def test_a_runner_without_a_secret_store_refuses_the_token_and_leftovers_are_swept(tmp_path: Path) -> None:
+    cfg = _project(tmp_path)
+    runner, started = _runner(cfg, FakeDocker())
+    assert runner.handle(_download()) == {"ok": False, "error": "no_secret_store"}
+    assert started == []
+    cfg.secrets_dir = tmp_path / "secrets"
+    cfg.secrets_dir.mkdir()
+    (cfg.secrets_dir / "old-run").write_text(TOKEN)
+    _runner(cfg, FakeDocker())  # a new runner (restart) sweeps tokens of jobs it does not run
+    assert list(cfg.secrets_dir.iterdir()) == []
+
+
+def test_the_token_file_is_removed_as_soon_as_the_container_exits(tmp_path: Path) -> None:
+    """security S2: not when the app happens to ask for status: when `docker run` returns."""
+    import threading
+
+    cfg = _project(tmp_path)
+    cfg.secrets_dir = tmp_path / "secrets"
+    done = threading.Event()
+
+    class Proc:
+        def wait(self) -> int:
+            done.wait(5)
+            return 0
+
+    runner = Runner(cfg, docker=FakeDocker(), popen=lambda argv, **kw: Proc())
+    assert runner.handle(_download())["ok"] is True
+    secret = cfg.secrets_dir / RUN
+    assert secret.exists()
+    done.set()
+    for _ in range(100):
+        if not secret.exists():
+            break
+        threading.Event().wait(0.02)
+    assert not secret.exists()
