@@ -632,3 +632,15 @@ def test_train_refuses_a_record_image_that_resolves_outside_its_folder(
     with pytest.raises(workers.LocalDatasetInvalidError) as err:
         w.run(job)
     assert (err.value.params["first_reason"], err.value.params["node"]) == ("bad_image_name", job.node_id)
+
+
+def test_the_merge_estimate_fits_measured_peaks_and_lets_9b_run() -> None:
+    """research 2026-10-13 (26.08-6): 2B fp32 merge peaked 9.5 GB, 4B bf16 8.5 GB; 9B was refused at 55 GB."""
+    from vlm_pipeline.app.workers import _merge_peak_gb
+    from vlm_pipeline.common.catalog import load_catalog
+
+    models = {m.id: m for m in load_catalog().models}
+    assert _merge_peak_gb(models["qwen3.5-2b"]) >= 9.5
+    assert _merge_peak_gb(models["qwen3.5-4b"]) >= 8.5
+    assert _merge_peak_gb(models["qwen3.5-9b"]) <= 33.1  # never more than the 9B training it follows
+    assert _merge_peak_gb(models["qwen3.5-0.8b"]) == 10.0  # floor

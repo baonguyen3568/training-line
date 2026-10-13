@@ -714,9 +714,14 @@ def _merge_dtype(entry: CatalogEntry) -> str:
 
 
 def _merge_peak_gb(entry: CatalogEntry) -> float:
-    """Weights in the merge dtype + the saved copy, plus runtime: B/param x 2 + 4 GB (0.8B bf16 measured ~6 GB)."""
+    """One copy of the weights in the merge dtype (+30 %) plus 4 GB runtime, at least 10 GB.
+
+    The merge loads the model once and saves it shard by shard (never two full copies). Measured on 26.08-6
+    (research 2026-10-13): Qwen3.5-2B fp32 9.5 GB, 4B bf16 8.5 GB; the old "x 2" asked 9B for 55 GB and blocked it.
+    peak_mem_gb under-reads mmap'd weights (page cache counts as available): never go below one copy of the weights.
+    """
     per_param = 4 if _merge_dtype(entry) == "fp32" else 2
-    return round(entry.params_b * per_param * 2 + 4, 1)
+    return round(max(10.0, entry.params_b * per_param * 1.3 + 4), 1)
 
 
 def _run_id_of(artifact: ArtifactRef) -> str | None:
