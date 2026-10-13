@@ -1,0 +1,64 @@
+# What each licence asks of the USER, keyed by licence id (configs/catalog/*.yaml `license`). Owner: bao-security.
+# Source of truth for the "Download to this machine" consent dialog (G-5) and export notices (P012); never paraphrased
+# elsewhere. Each obligation cites the clause of the vendored text in configs/licenses/<id>.txt (LICENSES.lock).
+# This is a plain-language summary for the UI, not legal advice; the dialog links the full text.
+#
+# license_class: commercial_ok | conditional (commercial use allowed under extra conditions) | non_commercial |
+#                unknown (mixed or unverified: eval only, no redistribution)
+# obligations[].when: always | distribute (only when the user shares weights/outputs) | cosmos (catalog model family
+#                     cosmos only; research joins it from models.yaml)
+# i18n: storage key license.obligation.<id>.{title,body} (design writes the copy; ids are stable).
+schema_version: 1
+licences:
+  apache-2.0:
+    license_class: commercial_ok
+    obligations:
+      - {id: include_license_copy, when: distribute, clause: "§4(a)"}
+      - {id: state_changes, when: distribute, clause: "§4(b)"}
+      - {id: keep_notices, when: distribute, clause: "§4(c)-(d)"}
+      - {id: patent_litigation_termination, when: always, clause: "§3"}
+
+  mit:
+    license_class: commercial_ok
+    obligations:
+      - {id: include_license_copy, when: distribute, clause: "permission notice"}
+
+  cc-by-4.0:
+    license_class: commercial_ok
+    obligations:
+      - {id: cc_by_attribution, when: distribute, clause: "§3(a)(1)"}
+      - {id: state_changes, when: distribute, clause: "§3(a)(1)(B)"}
+      - {id: no_additional_restrictions, when: distribute, clause: "§2(a)(5)(B)"}
+
+  openmdw-1.1:
+    license_class: commercial_ok
+    obligations:
+      - {id: include_license_copy, when: distribute, clause: "distribution condition (1)"}
+      - {id: keep_notices, when: distribute, clause: "distribution condition (2)"}
+
+  nvidia-open-model-license:
+    license_class: conditional   # "Models are commercially usable" (preamble), subject to §2 and §3
+    obligations:
+      - {id: no_guardrail_bypass, when: always, clause: "§2.1"}
+      - {id: patent_litigation_termination, when: always, clause: "§2.1"}
+      - {id: prohibited_use_policy_link, when: always, clause: "§2.3",
+         url: "https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/"}
+      - {id: include_license_copy, when: distribute, clause: "§3.1"}
+      - {id: attribution_notice, when: distribute, clause: "§3.1",
+         text: "Licensed by NVIDIA Corporation under the NVIDIA Open Model License"}
+      - {id: built_on_cosmos, when: cosmos, clause: "§3.2", text: "Built on NVIDIA Cosmos"}
+
+  mixed-unverified:
+    license_class: unknown       # e.g. OCRBench: each source image keeps its own terms
+    obligations:
+      - {id: eval_only, when: always, clause: "catalog security verdict"}
+      - {id: no_redistribution, when: always, clause: "catalog security verdict"}
+      - {id: per_source_terms, when: always, clause: "dataset card"}
+
+# Any HF dataset outside the catalog (P018 / PM 2026-10-13): license read from the dataset card and shown "not
+# reviewed by the team". If its id is one of the licences above, the same obligations apply; otherwise class unknown,
+# the dialog shows the card text and the export/share block of P012 applies.
+unknown_licence:
+  license_class: unknown
+  obligations:
+    - {id: read_dataset_card, when: always, clause: "not reviewed by the team"}
