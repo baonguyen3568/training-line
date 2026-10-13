@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from string import Formatter
 
@@ -332,3 +333,93 @@ def test_checkpoint_keep_beats_incomplete_and_failed_rules(tmp_path: Path, statu
     (ckpt / "KEEP").touch()
     _age_tree(run / "checkpoints", 30)
     assert _actions(tmp_path) == {"epoch_0_step_1": ("keep", "PINNED_OR_KEEP")}
+
+
+def _set_aside(run: Path, name: str, *, age_days: float) -> Path:
+    """A ``<name>.not-resumable-<stamp>`` entry as the worker leaves it (stamp and mtimes ``age_days`` old)."""
+    ts = NOW - age_days * DAY
+    entry = run / f"{name}.not-resumable-{time.strftime('%Y%m%d-%H%M%S', time.localtime(ts))}"
+    if name == "checkpoints":
+        (entry / "epoch_0_step_99" / "optim").mkdir(parents=True)
+        (entry / "epoch_0_step_99" / "optim" / "__0_0.distcp").write_bytes(b"o" * 3000)
+    else:
+        entry.write_text('{"step": 1}\n')
+    _age_tree(entry, age_days)
+    return entry
+
+
+def _graph_node(root: Path, name: str = "n2-ft-abc") -> Path:
+    if not (root / "pyproject.toml").exists():
+        (root / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
+    node = root / "outputs" / "graph" / "runs" / name
+    (node / "checkpoints" / "epoch_0_step_9").mkdir(parents=True)
+    (node / ".not-resumable").touch()
+    (node / "run.json").write_text(json.dumps({"run_id": name, "status": "running", "stage": "train"}))
+    return node
+
+
+def test_set_aside_resume_attempts_expire_after_three_days(tmp_path: Path) -> None:
+    node = _graph_node(tmp_path)
+    old = _set_aside(node, "checkpoints", age_days=4)
+    old_metrics = _set_aside(node, "metrics.jsonl", age_days=4)
+    young = _set_aside(node, "checkpoints", age_days=1)
+    p = plan(tmp_path, now=NOW, lock_reader=no_lock)
+    got = {i.item_id: (i.action, i.rule, i.consequence_code) for r in p.runs for i in r.items}
+    assert got == {
+        f"graph:n2-ft-abc/{old.name}": ("delete", "D3.set_aside", "PERMANENT_LOSS"),  # may be the only weights
+        f"graph:n2-ft-abc/{old_metrics.name}": ("delete", "D3.set_aside", None),
+        f"graph:n2-ft-abc/{young.name}": ("keep", "D3.set_aside_wait", None),
+    }  # the node's own checkpoints/ belong to the node cache; the running status does not block set-aside data
+
+    result = apply(tmp_path, [i.item_id for i in p.actionable], by="t", now=NOW, lock_reader=no_lock)
+    assert len(result.done) == 2
+    assert (old.exists(), old_metrics.exists(), young.exists()) == (False, False, True)
+    assert (node / ".not-resumable").exists()
+    assert (node / "checkpoints" / "epoch_0_step_9").is_dir()
+    event = json.loads((node / "events.jsonl").read_text().splitlines()[0])
+    assert (event["event"], event["rule"]) == ("checkpoint_pruned", "D3.set_aside")
+
+
+def test_set_aside_in_outputs_runs_and_its_blockers(tmp_path: Path) -> None:
+    run = _run(tmp_path, "r1", status="failed", ended_days_ago=0)
+    entry = _set_aside(run, "checkpoints", age_days=5)
+    assert _actions(tmp_path)[entry.name] == ("delete", None)  # failed-run grace does not apply to abandoned data
+    p = plan(tmp_path, now=NOW, lock_reader=lambda _p: _lock(None, corrupt=True))
+    assert [(i.path, i.blocked_by) for r in p.runs for i in r.items] == [(entry.name, "GPU_LOCK_HOLDER")]
+    (run / "KEEP").touch()
+    assert _actions(tmp_path)[entry.name] == ("keep", "PINNED_OR_KEEP")
+
+
+def test_set_aside_stamp_newer_than_mtime_wins(tmp_path: Path) -> None:
+    node = _graph_node(tmp_path)
+    entry = node / f"checkpoints.not-resumable-{time.strftime('%Y%m%d-%H%M%S', time.localtime(NOW - DAY))}"
+    entry.mkdir()
+    _age_tree(entry, 30)  # rename keeps old mtimes; the stamp says it was set aside yesterday
+    assert _actions(tmp_path)[entry.name] == ("keep", None)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".not-resumable",
+        "checkpoints.not-resumable-garbage",
+        "model.not-resumable-20200101-000000",
+        "checkpoints",
+        "checkpoints.not-resumable-20200101-000000\n",  # "$" would match before a trailing newline
+        "checkpoints.not-resumable-\u0662\u0660\u0662\u0660\u0660\u0661\u0660\u0661-000000",  # Unicode digits
+    ],
+)
+def test_only_known_set_aside_names_are_candidates(tmp_path: Path, name: str) -> None:
+    node = _graph_node(tmp_path)
+    if not (node / name).exists():  # the .not-resumable marker is already there
+        (node / name).mkdir()
+    _age_tree(node / name, 30)
+    assert plan(tmp_path, now=NOW, lock_reader=no_lock).runs == ()
+
+
+def test_symlinked_set_aside_is_never_followed(tmp_path: Path) -> None:
+    node = _graph_node(tmp_path)
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (node / "checkpoints.not-resumable-20200101-000000").symlink_to(outside)
+    assert plan(tmp_path, now=NOW, lock_reader=no_lock).runs == ()

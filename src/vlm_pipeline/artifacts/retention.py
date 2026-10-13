@@ -19,6 +19,11 @@ Rules (first match wins, per checkpoint; statuses are ``common.runinfo.RunStatus
 6. target of ``LOWEST_VAL`` -> strip optimizer state
 7. any other checkpoint -> delete once older than ``other_keep_days``
 
+Set-aside resume attempts (the worker renames ``checkpoints``/``metrics.jsonl`` of a model that cannot resume to
+``<name>.not-resumable-<YYYYmmdd-HHMMSS>`` and trains again) are deleted ``set_aside_days`` after the later of the
+stamp in the name and their mtime, in run dirs under ``outputs/runs`` and ``outputs/graph/runs``. Only a run ``KEEP``
+file or an unreadable GPU lock blocks that; the ``.not-resumable`` marker itself is never a candidate.
+
 Age is the checkpoint directory mtime. Stripping sub-directories updates that mtime, so a stripped checkpoint
 starts a new window; this errs on the side of keeping data longer.
 
@@ -30,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import time
 import tomllib
@@ -47,6 +53,8 @@ Action = Literal["keep", "strip_optim", "delete"]
 
 PLAN_SCHEMA_VERSION = 1
 RUNS_REL = Path("outputs") / "runs"
+GRAPH_RUNS_REL = Path("outputs") / "graph" / "runs"  # node run dirs of the graph executor (set-aside data only)
+SET_ASIDE_RE = re.compile(r"(checkpoints|metrics\.jsonl)\.not-resumable-([0-9]{8}-[0-9]{6})", re.ASCII)  # fullmatch
 CKPT_PREFIX = "epoch_"
 ROLE_LINKS = ("LATEST", "LOWEST_VAL")
 STRIP_SUBDIRS = ("optim", "dataloader", "rng")  # resume-only state; model weights stay
@@ -65,6 +73,7 @@ class RetentionPolicy:
     other_keep_days: float = 7.0
     failed_grace_days: float = 3.0  # failed/cancelled: untouched for this long after the run ended
     failed_latest_days: float = 7.0  # failed/cancelled: LATEST deleted (not stripped) after this long
+    set_aside_days: float = 3.0  # *.not-resumable-<stamp> left by a restarted training (PM 2026-10-13)
     approval_threshold_gb: float = 20.0  # D7.4: above this the CLI needs --approved-by
     approval_window_s: float = DAY_S  # unapproved deletes are summed over this window (no splitting into batches)
 
@@ -85,10 +94,12 @@ class PlanItem:
     blocked_by: str | None = None
     consequence_code: str | None = None  # i18n key storage.consequence.<code> (CONSEQUENCE_CODES)
     consequence_params: Mapping[str, str] = field(default_factory=dict)  # fills that text's placeholders
+    runs_rel: str = RUNS_REL.as_posix()  # runs root the run dir lives in (GRAPH_RUNS_REL for node run dirs)
 
     @property
     def item_id(self) -> str:
-        return f"{self.run_id}/{self.path}"
+        prefix = "graph:" if self.runs_rel == GRAPH_RUNS_REL.as_posix() else ""
+        return f"{prefix}{self.run_id}/{self.path}"
 
     def as_dict(self) -> dict[str, object]:
         data = asdict(self)
@@ -271,6 +282,45 @@ def _plan_checkpoint(  # noqa: PLR0911, PLR0912 - flat ADR-005 D3 decision table
     return item("delete", du_bytes(ckpt), "D3.other_after_days", "not LATEST/best and older than window")
 
 
+def _set_aside_decision(
+    entry: Path, stamp_text: str, blocked: str | None, *, now: float, policy: RetentionPolicy
+) -> tuple[Action, int, str, str, str | None]:
+    """(action, reclaim_bytes, rule, reason, blocked_by) for one set-aside entry."""
+    if blocked is not None:
+        return "keep", 0, "D7.blocked", f"protected: {blocked}", blocked
+    try:
+        stamp = time.mktime(time.strptime(stamp_text, "%Y%m%d-%H%M%S"))
+    except (ValueError, OverflowError):
+        return "keep", 0, "D3.set_aside_unparsed", "unreadable time stamp in the name", None
+    if (now - max(stamp, _newest_mtime(entry))) / DAY_S < policy.set_aside_days:
+        return "keep", 0, "D3.set_aside_wait", f"set aside < {policy.set_aside_days:g} days ago", None
+    return "delete", du_bytes(entry), "D3.set_aside", "abandoned resume attempt (not resumable)", None
+
+
+def _plan_set_aside(
+    run_dir: Path, runs_rel: Path, lock: LockStatus | None, *, now: float, policy: RetentionPolicy
+) -> list[PlanItem]:
+    """Items for ``*.not-resumable-<stamp>`` entries directly in ``run_dir`` (see module docstring)."""
+    blocked = None
+    if (run_dir / "KEEP").exists():
+        blocked = "PINNED_OR_KEEP"
+    elif lock is not None and lock.corrupt:
+        blocked = "GPU_LOCK_HOLDER"
+    items: list[PlanItem] = []
+    for entry in sorted(run_dir.iterdir()):
+        match = SET_ASIDE_RE.fullmatch(entry.name)
+        if match is None or entry.is_symlink():
+            continue
+        decision = _set_aside_decision(entry, match.group(2), blocked, now=now, policy=policy)
+        code, params = None, {}
+        if decision[0] == "delete" and match.group(1) == "checkpoints":  # may hold the only weights of that node
+            code, params = "PERMANENT_LOSS", {"name": f"{run_dir.name}/{entry.name}"}
+        items.append(
+            PlanItem(run_dir.name, entry.name, "set_aside", (), *decision, code, params, runs_rel=runs_rel.as_posix())
+        )
+    return items
+
+
 def _blocked_reason(run_dir: Path, run_id: str, status: str, lock: LockStatus | None) -> str | None:
     if (run_dir / "KEEP").exists():
         return "PINNED_OR_KEEP"
@@ -328,13 +378,24 @@ def plan(
                         policy=policy,
                     )
                 )
+        items += _plan_set_aside(run_dir, RUNS_REL, lock, now=ts, policy=policy)
         runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(items)))
+    graph_dir = root / GRAPH_RUNS_REL
+    for run_dir in sorted(graph_dir.iterdir()) if graph_dir.is_dir() else []:
+        if run_dir.is_symlink() or not run_dir.is_dir() or (run_ids is not None and run_dir.name not in run_ids):
+            continue
+        set_aside = _plan_set_aside(run_dir, GRAPH_RUNS_REL, lock, now=ts, policy=policy)
+        if set_aside:  # node checkpoints themselves belong to the node cache (cache_retention), not to D3
+            status, _ = read_run_status(run_dir)
+            runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(set_aside)))
     return Plan(ts=ts, runs=tuple(runs), policy=policy, lock=lock)
 
 
-def _safe_target(root: Path, run_id: str, rel: str) -> Path:
-    runs_dir = (root / RUNS_REL).resolve()
-    target = root / RUNS_REL / run_id / rel
+def _safe_target(root: Path, item: PlanItem) -> Path:
+    if item.runs_rel not in (RUNS_REL.as_posix(), GRAPH_RUNS_REL.as_posix()):
+        raise ValueError(f"unknown runs root: {item.runs_rel}")
+    runs_dir = (root / item.runs_rel).resolve()
+    target = root / item.runs_rel / item.run_id / item.path
     if target.is_symlink():
         raise ValueError(f"refusing symlink: {target}")
     resolved = target.resolve()
@@ -413,9 +474,11 @@ def apply(
                 f"{policy.approval_window_s / 3600:g} h) > {policy.approval_threshold_gb:g} GiB needs --approved-by"
             )
     for item in selected:
-        target = _safe_target(root, item.run_id, item.path)
-        if item.action == "delete":
+        target = _safe_target(root, item)
+        if item.action == "delete" and target.is_dir():
             shutil.rmtree(target)
+        elif item.action == "delete":
+            target.unlink()
         else:  # strip_optim
             for sub in STRIP_SUBDIRS:
                 sub_path = target / sub
@@ -433,7 +496,7 @@ def apply(
             "by": by,
             "approved_by": approved_by,
         }
-        _append_jsonl(root / RUNS_REL / item.run_id / "events.jsonl", event)
+        _append_jsonl(root / item.runs_rel / item.run_id / "events.jsonl", event)
         _append_jsonl(root / CLEANUP_LOG_REL, {**event, "run_id": item.run_id})
     return result
 
