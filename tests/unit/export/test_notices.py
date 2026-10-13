@@ -112,8 +112,8 @@ def test_notice_placeholders_are_filled_and_unknown_ones_stay_visible() -> None:
     template = "Based on {repo}@{revision}. Modified: fine-tuned with {tool} on {date}. {oops}"
     c = notices.Component(role="base_model", name="Q", repo="org/q", revision="abc", license="apache-2.0",
                           notices=(template,))  # fmt: skip
-    [filled] = notices.fill_notices([c], tool="VLM Studio", date="2026-10-13")
-    expected = "Based on org/q@abc. Modified: fine-tuned with VLM Studio on 2026-10-13. {oops}"
+    [filled] = notices.fill_notices([c], tool="NTC-Training", date="2026-10-13")
+    expected = "Based on org/q@abc. Modified: fine-tuned with NTC-Training on 2026-10-13. {oops}"
     assert filled.notices == (expected,)
 
 
