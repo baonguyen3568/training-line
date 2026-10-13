@@ -148,9 +148,11 @@ class SecretStore:
 
     def set(self, field: str, value: str, *, actor: str, client: str) -> SecretStatus:
         _check_field(field)
-        if not value or len(value) > MAX_SECRET_CHARS or value != value.strip():
+        if not value or len(value) > MAX_SECRET_CHARS or value != value.strip() or not _printable_ascii(value):
             self._audit(field, "rejected", actor=actor, client=client)
-            raise ValueError(f"{field}: value must be 1..{MAX_SECRET_CHARS} characters without surrounding spaces")
+            raise ValueError(
+                f"{field}: value must be 1..{MAX_SECRET_CHARS} printable ASCII characters without surrounding spaces"
+            )
         key = self._key(create=True)
         if key is None:  # only when create_key=False (compose: the installer made the key)
             raise SecretKeyError(f"{self.key_file} is missing: run the installer to create it")
@@ -215,6 +217,11 @@ class SecretStore:
         fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
         with os.fdopen(fd, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(line, ensure_ascii=False) + "\n")
+
+
+def _printable_ascii(value: str) -> bool:
+    """Every HF/NGC/W&B token is printable ASCII; a control char would split a header or a secrets file line."""
+    return value.isascii() and value.isprintable()
 
 
 def _check_field(field: str) -> None:

@@ -121,11 +121,14 @@ def test_audit_has_a_line_per_change_and_never_a_value(tmp_path: Path) -> None:
     store.delete("HF_TOKEN", **WHO)
     with pytest.raises(ValueError, match="characters"):
         store.set("HF_TOKEN", " padded ", **WHO)
+    with pytest.raises(ValueError, match="printable"):
+        store.set("HF_TOKEN", "hf_abc\ndef", **WHO)  # defence in depth: the store refuses it too
     audit = tmp_path / "proj" / AUDIT_REL
     lines = [json.loads(line) for line in audit.read_text().splitlines()]
     assert [(r["field"], r["action"]) for r in lines] == [
         ("HF_TOKEN", "set"),
         ("HF_TOKEN", "delete"),
+        ("HF_TOKEN", "rejected"),
         ("HF_TOKEN", "rejected"),
     ]
     assert lines[0]["last4"] == token[-4:]

@@ -60,18 +60,42 @@ def test_admin_policy_keys_are_forbidden(client: TestClient, key: str) -> None:
     assert client.delete(f"/api/settings/{key}").status_code == 403
 
 
+def test_an_unknown_key_is_refused(client: TestClient) -> None:
+    r = client.put("/api/settings/VLM_PORT", json={"value": "1"})
+    assert (r.status_code, r.json()["error"]["code"]) == (422, "settings_unknown_key")
+
+
 @pytest.mark.parametrize(
-    ("key", "body", "status"),
+    ("content", "reason"),
     [
-        ("VLM_PORT", {"value": "1"}, 422),  # not a setting of this API
-        ("HF_TOKEN", {"value": SECRET, "extra": 1}, 422),  # closed schema
-        ("HF_TOKEN", {"value": ""}, 422),
-        ("HF_TOKEN", {"value": " padded-value "}, 422),
-        ("HF_TOKEN", {"value": "x" * 4097}, 422),
+        (b"not json", "not_json"),
+        (b"[]", "not_json"),
+        (json.dumps({"value": SECRET, "extra": 1}).encode(), "extra_field"),  # closed schema
+        (b'{"value": 5}', "not_text"),
+        (b"{}", "not_text"),
+        (b'{"value": ""}', "empty"),
+        (b'{"value": " padded-value "}', "whitespace"),
+        (json.dumps({"value": "x" * 4097}).encode(), "too_long"),
+        (json.dumps({"value": "hf_abc\ndef"}).encode(), "not_printable"),  # would split a header / secrets line
+        (json.dumps({"value": "hf_abc\rX-Evil: 1"}).encode(), "not_printable"),
+        (json.dumps({"value": "hf_abc\u0000def"}).encode(), "not_printable"),
+        (json.dumps({"value": "hf_abc\u202edef"}).encode(), "not_printable"),  # bidi override
+        (json.dumps({"value": "hf_abcdéf"}).encode(), "not_printable"),
     ],
 )
-def test_bad_requests_are_refused(client: TestClient, key: str, body: dict[str, object], status: int) -> None:
-    assert client.put(f"/api/settings/{key}", json=body).status_code == status
+def test_bad_bodies_say_which_rule(client: TestClient, content: bytes, reason: str) -> None:
+    r = client.put("/api/settings/HF_TOKEN", content=content)
+    assert r.status_code == 422
+    assert r.json() == {"error": {"code": "settings_invalid", "params": {"key": "HF_TOKEN", "reason": reason}}}
+
+
+def test_admin_policy_is_value_and_source(tmp_path: Path) -> None:
+    from vlm_pipeline.app.settings_api import _admin_values
+
+    shown = _admin_values({"deployment": {"profile": "shared_dev"}, "storage": "not a table"})
+    assert shown["deployment.profile"] == {"value": "shared_dev", "source": "deployment"}
+    assert shown["storage.schedule"] == {"value": None, "source": "default"}
+    assert set(shown) == set(settings_api.ADMIN_POLICY_KEYS)
 
 
 def test_body_is_capped_while_reading(client: TestClient) -> None:

@@ -21,7 +21,6 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from vlm_pipeline.app.secret_store import MAX_SECRET_CHARS, SECRET_FIELDS, SecretKeyError, SecretStore, load_key
 from vlm_pipeline.app.security import SESSION_COOKIE
@@ -37,10 +36,32 @@ ADMIN_POLICY_KEYS = (
 )
 
 
-class SecretBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+def secret_value(raw: bytes) -> tuple[str | None, str | None]:  # noqa: PLR0911 - one return per rule
+    """``(value, None)`` or ``(None, reason)``; the reason names the rule, never the input (it may be a token).
 
-    value: str = Field(min_length=1, max_length=MAX_SECRET_CHARS)
+    Closed schema ``{"value": str}``; reasons: not_json | extra_field | not_text | empty | whitespace | not_printable
+    | too_long.
+    """
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return None, "not_json"
+    if not isinstance(body, dict):
+        return None, "not_json"
+    if set(body) - {"value"}:
+        return None, "extra_field"
+    value = body.get("value")
+    if not isinstance(value, str):
+        return None, "not_text"
+    if not value:
+        return None, "empty"
+    if value != value.strip():
+        return None, "whitespace"
+    if not (value.isascii() and value.isprintable()):  # \n \r \x00 bidi...: header/line injection downstream
+        return None, "not_printable"
+    if len(value) > MAX_SECRET_CHARS:
+        return None, "too_long"
+    return value, None
 
 
 def _error(status: int, code: str, **params: Any) -> JSONResponse:
@@ -53,12 +74,18 @@ def _actor(request: Request) -> str:
     return hashlib.sha256(cookie.encode()).hexdigest()[:12] if cookie else "local"
 
 
-def _admin_values(policy: dict[str, Any] | None) -> dict[str, Any]:
-    out: dict[str, Any] = {}
+def _admin_values(policy: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """Each admin key as ``{value, source}``: ``deployment`` when policy.toml sets it, else ``default``.
+
+    A ``default`` value is null (the app's built-in default applies). No ``reason_key`` yet: policy.toml has no
+    field for one.
+    """
+    out: dict[str, dict[str, Any]] = {}
     for dotted in ADMIN_POLICY_KEYS:
         section, _, name = dotted.partition(".")
         table = (policy or {}).get(section)
-        out[dotted] = table.get(name) if isinstance(table, dict) else None
+        value = table.get(name) if isinstance(table, dict) else None
+        out[dotted] = {"value": value, "source": "deployment" if value is not None else "default"}
     return out
 
 
@@ -99,17 +126,16 @@ def register_settings_routes(
         raw = await _read_body(request)
         if raw is None:
             return _error(413, "settings_body_too_large", limit=MAX_BODY_BYTES)
-        try:
-            body = SecretBody.model_validate(json.loads(raw))
-        except (ValueError, ValidationError):  # bad JSON or a field outside the closed schema
-            return _error(422, "settings_invalid", key=key)
+        value, reason = secret_value(raw)
+        if value is None:
+            return _error(422, "settings_invalid", key=key, reason=reason)
         client = request.client.host if request.client else "?"
         try:
-            status = store.set(key, body.value, actor=_actor(request), client=client)
+            status = store.set(key, value, actor=_actor(request), client=client)
         except SecretKeyError:
             return _error(409, "settings_key_unusable")
         except ValueError:
-            return _error(422, "settings_invalid", key=key)
+            return _error(422, "settings_invalid", key=key, reason="rejected")
         return JSONResponse({**asdict(status), "scope": "unchecked"})
 
     @app.delete("/api/settings/{key}")
