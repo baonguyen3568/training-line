@@ -1410,8 +1410,10 @@ bug_report:
     error_title: Lỗi
     app_version: Phiên bản app
     gpu: GPU
-    run_id: Lần chạy
+    ref_code: Mã tham chiếu
   not_included: Không chép nhật ký, đường dẫn thư mục, token hay dữ liệu của bạn.
+  ref_code_help: Mã ngắn để đội phát triển hỏi lại về lần chạy này; tên lần chạy và tên bước của bạn không được chép.
+  reminder: Không dán log, đường dẫn hay token. Lỗ hổng bảo mật xin gửi riêng theo hướng dẫn trong SECURITY.md, đừng tạo issue công khai.
   needs_account: Cần tài khoản GitHub để mở báo lỗi.
   copy_open: Chép và mở GitHub
   copied: Đã chép. Dán vào ô mô tả trên trang GitHub vừa mở.
