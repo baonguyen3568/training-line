@@ -37,11 +37,21 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Where the app is mounted: "" at the site root, "/app" behind nginx under a prefix (D-8). Read from the page's
+ * own path at call time (the SPA has one URL), so one build works at both; every API, upload and socket URL
+ * goes through it.
+ */
+export function appPrefix(): string {
+  return location.pathname.replace(/\/[^/]*$/, "");
+}
+const at = (path: string) => `${appPrefix()}${path}`;
+
 let csrf: Promise<string> | null = null;
 
 function csrfToken(refresh = false): Promise<string> {
   if (refresh || !csrf) {
-    csrf = fetch("/api/session", {
+    csrf = fetch(at("/api/session"), {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
@@ -86,7 +96,7 @@ async function request<T>(
     if (isRaw(body)) Object.assign(headers, body.headers);
     headers["X-VLM-CSRF"] = await csrfToken(retried);
   }
-  const res = await fetch(path, {
+  const res = await fetch(at(path), {
     method,
     headers,
     credentials: "same-origin",
@@ -144,7 +154,7 @@ export interface Api {
 }
 
 /** Preview URL of an upload (served as image/png, same origin, cookie-authenticated). */
-export const uploadUrl = (id: string) => `/api/uploads/${encodeURIComponent(id)}`;
+export const uploadUrl = (id: string) => at(`/api/uploads/${encodeURIComponent(id)}`);
 
 export const httpApi: Api = {
   nodeTypes: (locale) => request("GET", `/api/node-types?locale=${encodeURIComponent(locale)}`),
@@ -210,7 +220,7 @@ export const httpApi: Api = {
     // first message carries the CSRF token (P003 D13). Server closes with 4401 if missing/invalid.
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(
-      `${proto}//${location.host}/api/runs/${encodeURIComponent(id)}/events?locale=${getLocale()}`,
+      `${proto}//${location.host}${at(`/api/runs/${encodeURIComponent(id)}/events`)}?locale=${getLocale()}`,
     );
     let closed = false;
     ws.onopen = () => {

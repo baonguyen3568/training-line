@@ -8,9 +8,9 @@
   },
   "scripts": {
     "tokens": "node ../frontend/scripts/build-tokens.mjs --out src/generated/tokens.css && uv run --quiet python scripts/third_party.py && uv run --quiet python scripts/app_copy.py && uv run --quiet python scripts/error_codes.py && uv run --quiet python scripts/changelog.py",
-    "dev": "npm run tokens && ASTRO_TELEMETRY_DISABLED=1 astro dev --host 127.0.0.1 --port 7877",
+    "dev": "npm run tokens && ASTRO_TELEMETRY_DISABLED=1 astro dev --host 127.0.0.1 --port 4011",
     "build": "npm run tokens && ASTRO_TELEMETRY_DISABLED=1 astro build",
-    "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview --host 127.0.0.1 --port 7877",
+    "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview --host 127.0.0.1 --port 4011",
     "check": "npm run build && node scripts/check-links.mjs && cd .. && uv run --quiet python scripts/security/site_check.py site/dist"
   },
   "dependencies": {

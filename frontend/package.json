@@ -9,7 +9,7 @@
   },
   "scripts": {
     "tokens": "node scripts/build-tokens.mjs && node scripts/build-i18n.mjs && node scripts/build-icons.mjs",
-    "dev": "npm run tokens && vite --host 127.0.0.1 --port 7875 --strictPort",
+    "dev": "npm run tokens && vite --host 127.0.0.1 --port 4010 --strictPort",
     "build": "npm run tokens && tsc --noEmit && vite build",
     "lint": "biome ci .",
     "format": "biome check --write .",

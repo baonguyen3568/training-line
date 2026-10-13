@@ -2,16 +2,23 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// Dev server binds localhost only (P006 §8). The FastAPI app (127.0.0.1:7870) serves the
-// production build; in dev, /api is proxied to it unless VITE_MOCK_API=1.
+// Dev server binds localhost only (P006 §8), in the project's port range 4000–4050 (D-8: 4010–4019 for
+// dev servers). The FastAPI app serves the production build; in dev, /api is proxied to the dev app
+// (VLM_DEV_APP, default 127.0.0.1:4003 per D-8) unless VITE_MOCK_API=1.
+// (process.env read directly, never loadEnv: that would read .env files, which agents must not)
+const env =
+  (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
+const DEV_APP = env.VLM_DEV_APP ?? "http://127.0.0.1:4003";
 export default defineConfig({
   plugins: [react()],
+  // Relative asset URLs: the same build works at / and behind nginx under a prefix (e.g. /app/), D-8.
+  base: "./",
   server: {
     host: "127.0.0.1",
-    port: 7875,
+    port: 4010,
     strictPort: true,
     proxy: {
-      "/api": { target: "http://127.0.0.1:7870", changeOrigin: false, ws: true },
+      "/api": { target: DEV_APP, changeOrigin: false, ws: true },
     },
   },
   build: {

@@ -6,18 +6,24 @@ description: Use when scaffolding, starting, developing, running or debugging th
 
 ## 1. Before running anything
 ```bash
-# Free ports? Project range is 7870-7879 (7860/6006/8080/11000 are taken by other services)
-ss -ltn | awk '{print $4}' | grep -E ':(787[0-9])$' || echo "7870-7879 free"
+# Free ports? Project range is 4000-4050 (D-8, user 2026-10-13): nginx :4000 (only LAN entry), 4001 app compose,
+# 4002 static site, 4003 app dev, 4010-4019 frontend/site dev servers, 4020-4049 spare (vLLM serve…)
+ss -ltn | awk '{print $4}' | grep -E ':(40[0-4][0-9]|4050)$' || echo "4000-4050 free"
 free -g | head -2                      # dashboard must stay < 500MB RSS
 cat .team/GPU_LOCK 2>/dev/null || echo "no GPU lock"
 ```
 - Dashboard NEVER takes the GPU lock and NEVER loads a model (no `import torch` in frontend code).
-- Port map (agreed with bao-backend): 7870 dashboard, 7871 vLLM serve, 7872 TRT-LLM serve, 7873 dashboard API (if split), 7874 Trackio/TensorBoard (if adopted). Update `.team/knowledge/frontend.md` if it changes.
+- Frontend ports: 4010 Vite dev (`npm run dev`, proxies /api to VLM_DEV_APP, default 127.0.0.1:4003), 4011 site
+  (astro dev/preview), 4012 a second Vite (e.g. `VITE_MOCK_API=1 npx vite --port 4012`), 4013/4014 E2E (E2E_PORT).
+  Old 787x ports are retired once the app dev moves to 4003. Update `.team/knowledge/frontend.md` if it changes.
+- Behind nginx: the build is prefix-agnostic (relative assets + `appPrefix()` for API/WS); check `/app/` with a
+  local stand-in proxy before claiming it works, and remember the app's own Host/Origin allowlist (WS 403 otherwise).
 
 ## 2. Binding & exposure rules
 - Always bind `127.0.0.1` (Gradio: `server_name="127.0.0.1"`, never `share=True`; uvicorn `--host 127.0.0.1`; Next `-H 127.0.0.1`).
-- Remote access: `ssh -L 7870:127.0.0.1:7870 <host>`. Any other exposure → ask bao-security + bao-pm first.
-- Container (if any) name prefix `vlm-`, arm64 image, `-p 127.0.0.1:7870:7870`.
+- Remote access: through nginx :4000 (HTTPS, D-8) or `ssh -L 4003:127.0.0.1:4003 <host>`. Any other exposure → ask
+  bao-security + bao-pm first.
+- Container (if any) name prefix `vlm-`, arm64 image, `-p 127.0.0.1:<port>:<port>` (only nginx publishes 0.0.0.0).
 
 - Gradio `/demo`: `analytics_enabled=False`, `share=False`, `max_file_size` set, no CDN fonts/JS; capture real headers (`curl -sI http://127.0.0.1:7870/demo/`) and send to bao-security before merge. No 'unsafe-eval' unless proven necessary.
 

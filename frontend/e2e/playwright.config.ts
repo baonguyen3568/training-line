@@ -7,7 +7,7 @@
 // URL), no web server.
 import { defineConfig } from "@playwright/test";
 
-const PORT = Number(process.env.E2E_PORT ?? 7879);
+const PORT = Number(process.env.E2E_PORT ?? 4013); // project range 4000–4050 (D-8): dev servers 4010–4019
 const TIER = process.env.E2E_TIER ?? "mock";
 const EXTERNAL = TIER === "external";
 const BASE_URL = EXTERNAL ? (process.env.E2E_BASE_URL ?? "") : `http://127.0.0.1:${PORT}`;
