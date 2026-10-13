@@ -1077,6 +1077,7 @@ standards:
   quant:
     calib_size: "Calibration size {value} is outside the recommended range ({min}–{max}). Too few makes the quantized model less accurate; too many takes longer without helping."
     calib_from_heldout: "Calibration data comes from the benchmark set. Use training data so the post-quantization score stays trustworthy."
+    eval_downstream: "The quantized model is not scored. Quantization can make it weaker than the original; add a Benchmark step after it to know for sure."
   data:
     broken_images_some: "Some images are broken or too small (short side under {min_short_side_px} px). The app will skip them."
     broken_images_many: "More than {above}% of images are broken or too small. The folder may be wrong; check it before training."

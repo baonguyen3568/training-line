@@ -19,3 +19,10 @@ rules:
     level: error
     message: standards.quant.calib_from_heldout
     source: "docs/adr/ADR-002-eval-benchmark-protocol.md; configs/catalog/datasets.yaml heldout_splits"
+
+  - id: QUANT-EVAL-DOWNSTREAM
+    applies_to: {node: quantize.modelopt_ptq}
+    check: {kind: reaches_node, target: eval.benchmarks}
+    level: warn  # PM 2026-10-13: experts may quantize and score elsewhere; every quantize template has the step
+    message: standards.quant.eval_downstream
+    source: "the in-node parity check is a sanity check on 16 images, not a score; quality gate = configs/eval/gates.yaml quant_vs_parent"

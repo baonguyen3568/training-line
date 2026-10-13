@@ -1077,6 +1077,7 @@ standards:
   quant:
     calib_size: "Số mẫu hiệu chỉnh {value} nằm ngoài khoảng khuyến nghị ({min}–{max}). Ít quá thì bản nén kém chính xác, nhiều quá thì chạy lâu mà không tốt hơn."
     calib_from_heldout: "Dữ liệu hiệu chỉnh đang lấy từ bộ chấm điểm. Hãy dùng dữ liệu học để điểm sau khi nén còn đáng tin."
+    eval_downstream: "Model sau khi nén chưa được đo điểm. Nén có thể làm model kém hơn bản gốc; hãy nối thêm bước Đo điểm phía sau để biết chắc."
   data:
     broken_images_some: "Có ảnh hỏng hoặc quá nhỏ (cạnh ngắn dưới {min_short_side_px} px). App sẽ bỏ qua các ảnh đó."
     broken_images_many: "Hơn {above}% ảnh hỏng hoặc quá nhỏ. Thư mục có thể chọn sai; hãy kiểm tra trước khi train."
