@@ -102,5 +102,7 @@ Hai chỗ cần sửa nhỏ để làm được G-1:
   - Chưa có loader thì máy chung không bao giờ tự xoá theo lịch.
 - Mỗi lúc chỉ 1 lượt xoá (`outputs/system/retention.lock`, flock, O_NOFOLLOW). Scheduler, CLI `--apply` và panel
   apply dùng chung lock này; panel trả 409 `CLEANUP_IN_PROGRESS` khi lock đang bận.
-- **Còn mở (N3)**: thiếu `VLM_PROFILE` thì mặc định là `personal`, tức fail-open trên máy chung nếu app không chạy qua
-  `scripts/dev/app.sh`. Sửa cùng policy loader (TODO trong `StorageSettings.from_env`, chủ: bao-backend + bao-cleanup).
+- **N3 (đã sửa 2026-10-13, commit e4a441b)**: trước đây thiếu `VLM_PROFILE` thì mặc
+  định là `personal`, tức fail-open. Giờ `StorageSettings.from_env` và `mode_from_env` dùng
+  `app_config.effective_profile`: profile trong policy admin là base, env chỉ được siết. Không có profile ở đâu cả thì
+  coi là máy chung (threshold + dry_run). Policy admin chuyển sang `~/.config/ntc-training/policy.toml` (ADR-015).
