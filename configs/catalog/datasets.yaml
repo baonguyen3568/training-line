@@ -47,3 +47,5 @@ datasets:
     disk_gb: 0.07
     files_sha256:
       data/test-00000-of-00001.parquet: d9cc9f488e5310143d8d89956c19d0bdfd71e7089025da5202643f73720df7f5
+    # MANIFEST.sha256 of the extracted files (eval.ocrbench_extract, bao-tester 2026-10-13, `sha256sum -c` OK).
+    extracted_manifest_sha256: e6e6f4460c621bb515ef81744f85dd854a33d75599041b3c6028f04039f29a47

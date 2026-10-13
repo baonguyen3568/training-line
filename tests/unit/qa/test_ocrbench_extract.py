@@ -3,22 +3,16 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "qa" / "ocrbench_extract.py"
-
 
 def _mod() -> Any:
-    spec = importlib.util.spec_from_file_location("ocrbench_extract", SCRIPT)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    from vlm_pipeline.eval import ocrbench_extract
+
+    return ocrbench_extract
 
 
 def test_the_pinned_parquet_sha_comes_from_the_catalog() -> None:
@@ -48,5 +42,6 @@ def test_only_allowlisted_image_formats_are_extracted() -> None:
     mod = _mod()
     assert mod.extension(b"\x89PNG\r\n\x1a\nrest") == "png"
     assert mod.extension(b"\xff\xd8\xffrest") == "jpg"
-    with pytest.raises(ValueError, match="allowlist"):
-        mod.extension(b"<svg ...")
+    for other in (b"<svg ...", b"GIF89a...", b"BM...."):  # GIF / BMP: refused, like common.image_rules
+        with pytest.raises(ValueError, match="allowlist"):
+            mod.extension(other)

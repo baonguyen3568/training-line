@@ -227,3 +227,55 @@ def test_the_slot_is_free_when_the_ui_sees_the_end(svc: Any, monkeypatch: pytest
     hold.set()
     assert _wait(service, second[0]) == "completed"
     assert not active.exists()
+
+
+def test_eval_data_is_extracted_by_a_no_network_job_then_checked(svc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """tester 2026-10-13: OCRBench is fetched, then extracted into data/eval/ (host-checked) for the eval node."""
+    from vlm_pipeline.download.extracted import MANIFEST, eval_data_dir
+
+    service, _events = svc
+    from vlm_pipeline.common.catalog import load_dataset_catalog
+
+    entry = load_dataset_catalog().get("ocrbench")
+    assert entry is not None  # the fixture stubs resolve(): build the real asset from the catalog
+    ocr = Asset("dataset", entry.id, entry.repo, entry.revision, entry.display_name, entry.disk_gb, entry.license,
+                gated=False)  # fmt: skip
+    monkeypatch.setattr(downloads, "resolve", lambda kind, cid: ocr)
+    jobs: list[Any] = []
+
+    def run_job(job: Any, manifest: Any, run_dir: Path, **kw: Any) -> Any:
+        jobs.append((job, kw))
+        if "--parquet" in job.argv:  # the extraction job: one image, the questions, their manifest
+            out = run_dir / "out"
+            (out / "images").mkdir(parents=True)
+            (out / "images" / "0000.jpg").write_bytes(b"\xff\xd8\xff a")
+            (out / "questions.jsonl").write_bytes(b"{}\n")
+            sums = [f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out).as_posix()}"
+                    for p in (out / "images" / "0000.jpg", out / "questions.jsonl")]  # fmt: skip
+            (out / MANIFEST).write_text("\n".join(sums) + "\n")
+        else:  # the download job: the parquet as planned
+            stage = run_dir / "stage" / "files" / "data"
+            stage.mkdir(parents=True)
+            (stage / "test-00000-of-00001.parquet").write_bytes(b"pq")
+            plan = [{"name": "data/test-00000-of-00001.parquet", "size": 2,
+                     "sha256": hashlib.sha256(b"pq").hexdigest(), "git_sha1": None}]  # fmt: skip
+            (run_dir / "stage" / "plan.json").write_text(json.dumps({"files": plan}))
+        return manifest.model_copy(update={"status": RunStatus.COMPLETED})
+
+    from vlm_pipeline.download import extracted
+
+    files = {"images/0000.jpg": b"\xff\xd8\xff a", "questions.jsonl": b"{}\n"}  # what the fake job writes
+    sums = "".join(f"{hashlib.sha256(data).hexdigest()}  {rel}\n" for rel, data in sorted(files.items()))
+    pinned = entry.model_copy(update={"extracted_manifest_sha256": hashlib.sha256(sums.encode()).hexdigest()})
+    monkeypatch.setattr(extracted.ExtractSpec, "entry", lambda self: pinned)
+    monkeypatch.setattr(downloads, "run_job", run_job)
+    monkeypatch.setattr(downloads, "check_source", lambda root, cid: snapshot_dir(
+        root, "dataset", ocr.repo, ocr.revision) / "data" / "test-00000-of-00001.parquet")  # fmt: skip
+    started = service.start("dataset", "ocrbench")
+    assert _wait(service, started["download_id"]) == "completed"
+    extract, kw = jobs[1]
+    assert (extract.gpu, extract.narrow, extract.egress, extract.hf_token) == (False, True, False, None)
+    assert extract.argv[:3] == ("python", "-m", "vlm_pipeline.eval.ocrbench_extract")
+    assert kw["take_gpu_lock"] is False
+    assert (eval_data_dir(service.root, "ocrbench") / "questions.jsonl").is_file()
+    assert service.start("dataset", "ocrbench")["status"] == "completed"  # installed + extracted: nothing to do

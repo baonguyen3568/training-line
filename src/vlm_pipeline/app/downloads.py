@@ -38,6 +38,7 @@ from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.common.run_claims import holder_gone, process_identity
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_small_json
+from vlm_pipeline.download.extracted import EXTRACTED, check_source, extracted_ok, install_extracted
 from vlm_pipeline.download.hub import SPEC_NAME
 from vlm_pipeline.download.install import (
     DownloadIntegrityError,
@@ -160,6 +161,8 @@ class DownloadService:
     def installed(self, asset: Asset) -> bool:
         snapshot = snapshot_dir(self.root, asset.kind, asset.repo, asset.revision).is_dir()
         prepared = BRIDGED.get(asset.catalog_id) if asset.kind == "model" else None
+        if asset.kind == "dataset" and asset.catalog_id in EXTRACTED:  # eval data: the extracted files too
+            return snapshot and extracted_ok(self.root, asset.catalog_id)
         return snapshot and (prepared is None or (self.root / ".cache" / "prepared" / prepared.out_dir).is_dir())
 
     def _parts(self, asset: Asset) -> list[Asset]:
@@ -242,11 +245,11 @@ class DownloadService:
             parts = [d.asset] if plan_only else self._parts(d.asset)
             for n, part in enumerate(parts):
                 if (
-                    n
-                    and snapshot_dir(self.root, "model", part.repo, part.revision).is_dir()
-                    and verified(self.root, "model", part.repo, part.revision)
+                    not plan_only
+                    and snapshot_dir(self.root, part.kind, part.repo, part.revision).is_dir()
+                    and verified(self.root, part.kind, part.repo, part.revision)
                 ):
-                    continue  # a bridge repo already installed and recorded
+                    continue  # already installed and recorded (a bridge repo, or eval data only to extract)
                 run_id = d.run_id if n == 0 else f"{d.run_id}-b{n}"
                 budget = planned if n == 0 or plan_only else planned_bytes(part.size_gb)
                 if not self._fetch(d, part, run_id, budget, plan_only):
@@ -255,6 +258,10 @@ class DownloadService:
             if spec is not None:  # remote code: copy the pinned .py, link the weights, rewrite the bridges (host)
                 self._set(d, "installing")
                 prepare_catalog_model(self.root, d.asset.catalog_id, d.asset.repo, d.asset.revision)
+            if not plan_only and d.asset.kind == "dataset" and d.asset.catalog_id in EXTRACTED:
+                self._set(d, "installing")
+                if not self._extract(d):
+                    return
             self._set(d, "completed")
         except (DownloadIntegrityError, VlmPipelineError) as exc:
             self._fail(d, {"code": exc.code, "params": exc.params})
@@ -295,6 +302,33 @@ class DownloadService:
         finish = verify_existing if plan_only else install
         finish(self.root, run_dir, kind=part.kind, repo=part.repo, revision=part.revision,
                catalog_id=part.catalog_id, name=part.name)  # fmt: skip
+        return True
+
+    def _extract(self, d: Download) -> bool:
+        """Eval data as plain files: a no-network job extracts the checked source, the host checks and installs it."""
+        catalog_id = d.asset.catalog_id
+        if extracted_ok(self.root, catalog_id):
+            return True
+        spec = EXTRACTED[catalog_id]
+        source = check_source(self.root, catalog_id)  # the catalog's sha256, on the host, before the job
+        run_id = f"{d.run_id}-x"
+        run_dir = self.root / "outputs" / "runs" / run_id
+        run_dir.mkdir(parents=True)
+        container_dir = f"{CONTAINER_ROOT}/outputs/runs/{run_id}"
+        container_source = f"{CONTAINER_ROOT}/{source.relative_to(self.root).as_posix()}"
+        job = ContainerJob(
+            name=run_id, image=DEFAULT_TRAIN_IMAGE, gpu=False, memory_gb=4, narrow=True, rw_dirs=(run_dir,),
+            ro_inputs=(source.parent,),
+            argv=("python", "-m", spec.module, "--parquet", container_source, "--out", f"{container_dir}/out"),
+        )  # fmt: skip
+        manifest = RunManifest(run_id=run_id, name=f"extract {d.asset.name}", stage="data", task="extract",
+                               dataset=f"{d.asset.repo}@{d.asset.revision}")  # fmt: skip
+        final = run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
+                        take_gpu_lock=False, launcher=self._launcher)  # fmt: skip
+        if final.status != RunStatus.COMPLETED:
+            self._fail(d, {"code": "NET-003", "params": {"name": d.asset.name, "reason": "mismatch"}})
+            return False
+        install_extracted(self.root, catalog_id, run_dir / "out")
         return True
 
     def _fail(self, d: Download, error: dict[str, Any]) -> None:

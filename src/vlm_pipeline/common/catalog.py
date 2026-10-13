@@ -220,6 +220,9 @@ class DatasetEntry(BaseModel):
     notices: Notices = ()
     # Files the download step must verify (snapshot-relative path -> sha256), e.g. a security condition.
     files_sha256: dict[DataFile, Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]] = Field(default_factory=dict)
+    # Eval data the app extracts into plain files (download.extracted): sha256 of the MANIFEST.sha256 a correct,
+    # deterministic extraction writes, so the installed tree is bound to a known result (security 2026-10-13).
+    extracted_manifest_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
     @model_validator(mode="after")
     def _unverified_licence_is_eval_only(self) -> Self:
