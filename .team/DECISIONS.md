@@ -40,3 +40,5 @@
 - 2026-10-12 M1a ĐẠT: E2E tạo trống → kéo → nối → chạy (FakeWorker) → lưu/mở PASS trên app thật. M1 đầy đủ còn: 1 node train chạy thật trong container từ canvas (chờ 26.08-3 + container Worker).
 - 2026-10-12 P-1b PASS (26.08-3): Parse v1.1 freeze, trainable 30.40%, peak host +17.8GB (vs +35GB lỗi), 20s/step. GPU mở lại bình thường theo checklist.
 - 2026-10-12 ✅ M1 ĐẦY ĐỦ: workflow thật model→data→train chạy E2E qua Executor + RealWorker (container), trainable 30.40%, peak +10.5GB, ~9.7'. 4 bug tìm+sửa trên đường (cache demo/thật, path container→host, tên job trùng, max_samples).
+- 2026-10-13 USER: chuyển app 7870 sang chạy thật (--worker container), ƯU TIÊN lượt của user trên GPU. Sau P-3b-A không launch job team mới tới khi PM báo user thử xong.
+- 2026-10-13 P-3 (3 epoch) điểm thấp: root cause = train 1 GPU bỏ qua mixed-precision → param+update bf16, chỉ 5.3% phần tử decoder đổi. Fix: TE FusedAdam fp32 master (P-3b-A A/B). Áp mặc định cho mọi node full-SFT. BUG-001 CLOSED (26.08-5). Thêm gate "export không mất thông tin base" (generation_config, RADIO norm).
