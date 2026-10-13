@@ -160,3 +160,29 @@ def test_the_default_template_names_its_catalog_assets() -> None:
 
     template = json.loads((project_root() / "configs" / "templates" / "invoice_to_json.json").read_text())
     assert downloads.template_assets(template) == [("model", "nemotron-parse-v1.1"), ("dataset", "cord-v2")]
+
+
+def test_a_bridged_model_fetches_its_bridge_then_is_prepared(svc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """5b: Parse (pinned_prepared) needs C-RADIOv2-H and the host preparation, in the same download."""
+    service, events = svc
+    parse = Asset("model", "nemotron-parse-v1.1", "nvidia/NVIDIA-Nemotron-Parse-v1.1", "f" * 40, "Parse", 3.8,
+                  "nvidia-open-model", gated=False)  # fmt: skip
+    monkeypatch.setattr(downloads, "resolve", lambda kind, cid: parse)
+    fetched: list[str] = []
+    seen: dict[str, Any] = {}
+    _fake_job(monkeypatch, seen)
+    real_fetch = DownloadService._fetch
+
+    def fetch(self: DownloadService, d: Any, part: Asset, run_id: str, planned: int, plan_only: bool) -> bool:
+        fetched.append(part.repo)
+        return real_fetch(self, d, part, run_id, planned, plan_only)
+
+    prepared: list[str] = []
+    monkeypatch.setattr(DownloadService, "_fetch", fetch)
+    monkeypatch.setattr(downloads, "prepare_catalog_model", lambda root, cid, repo, rev: prepared.append(cid))
+    started = service.start("model", "nemotron-parse-v1.1")
+    assert started["size_gb"] == 3.8  # the asset; the budget counted the bridge too
+    assert _wait(service, started["download_id"]) == "completed"
+    assert fetched == ["nvidia/NVIDIA-Nemotron-Parse-v1.1", "nvidia/C-RADIOv2-H"]
+    assert prepared == ["nemotron-parse-v1.1"]
+    assert "installing" in [e["status"] for _i, e in events if e.get("type") == "status"]

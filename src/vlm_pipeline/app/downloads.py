@@ -47,6 +47,7 @@ from vlm_pipeline.download.install import (
     verified,
     verify_existing,
 )
+from vlm_pipeline.train.prepare import BRIDGED, PrepareError, prepare_catalog_model
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,16 @@ class DownloadService:
         return planned
 
     def installed(self, asset: Asset) -> bool:
-        return snapshot_dir(self.root, asset.kind, asset.repo, asset.revision).is_dir()
+        snapshot = snapshot_dir(self.root, asset.kind, asset.repo, asset.revision).is_dir()
+        prepared = BRIDGED.get(asset.catalog_id) if asset.kind == "model" else None
+        return snapshot and (prepared is None or (self.root / ".cache" / "prepared" / prepared.out_dir).is_dir())
+
+    def _parts(self, asset: Asset) -> list[Asset]:
+        """What one download fetches: the asset, then the repos its remote code bridges to (5b, P003 D16)."""
+        spec = BRIDGED.get(asset.catalog_id) if asset.kind == "model" else None
+        bridges = [Asset("model", b.pin, b.repo, b.revision, f"{asset.name} ({b.repo})", b.size_gb, asset.license,
+                         asset.gated) for b in (spec.bridges if spec else ())]  # fmt: skip
+        return [asset, *bridges]
 
     # ------------------------------------------------------------------------------------------ start
     def start(self, kind: Kind, catalog_id: str, *, confirm: bool = False, check: bool = False) -> dict[str, Any]:
@@ -169,9 +179,12 @@ class DownloadService:
             if not check:  # there, but never checked by the app (a manual copy, an old cache): say so (P3)
                 return {**asset.to_api(), "status": "completed", "verified": False, "download_id": None}
             return self._launch(asset, planned_bytes(0.05), plan_only=True)
-        planned = self.check_budget(asset)
+        parts = self._parts(asset)
+        total = Asset(asset.kind, asset.catalog_id, asset.repo, asset.revision, asset.name,
+                      round(sum(a.size_gb for a in parts), 2), asset.license, asset.gated)  # fmt: skip
+        planned = self.check_budget(total)
         if planned > CONFIRM_GB * GIB and not confirm:
-            return {**asset.to_api(), "needs_confirm": True, "threshold_gb": CONFIRM_GB}
+            return {**total.to_api(), "needs_confirm": True, "threshold_gb": CONFIRM_GB}
         return self._launch(asset, planned, plan_only=False)
 
     def _launch(self, asset: Asset, planned: int, *, plan_only: bool) -> dict[str, Any]:
@@ -213,44 +226,64 @@ class DownloadService:
         self._emit(d.download_id, {"type": "status", "status": status, **extra})
 
     def _run(self, d: Download, planned: int, plan_only: bool = False) -> None:
-        run_dir = self.root / "outputs" / "runs" / d.run_id
         try:
-            run_dir.mkdir(parents=True)
-            pins = pinned_hashes(self.root, d.asset.catalog_id, d.asset.revision) if d.asset.kind == "model" else {}
-            code = sorted(n for n in pins if n.endswith(".py"))
-            spec = {"kind": d.asset.kind, "repo": d.asset.repo, "revision": d.asset.revision,
-                    "remote_code_files": code, "max_bytes": planned, "plan_only": plan_only}  # fmt: skip
-            (run_dir / SPEC_NAME).write_text(json.dumps(spec), encoding="utf-8")
-            container_dir = f"{CONTAINER_ROOT}/outputs/runs/{d.run_id}"
-            job = ContainerJob(
-                name=d.run_id, image=DEFAULT_TRAIN_IMAGE, gpu=False, memory_gb=4, narrow=True, rw_dirs=(run_dir,),
-                argv=("python", "-m", "vlm_pipeline.download.hub", "--run-dir", container_dir),
-                download_budget=planned, hf_token=self._token(),
-            )  # fmt: skip
-            manifest = RunManifest(run_id=d.run_id, name=f"download {d.asset.name}", stage="data", task="download",
-                                   dataset=f"{d.asset.repo}@{d.asset.revision}")  # fmt: skip
-            self._set(d, "downloading")
-            watcher = threading.Thread(target=self._watch_progress, args=(d, run_dir), daemon=True)
-            watcher.start()
-            final = run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
-                            take_gpu_lock=False, launcher=self._launcher)  # fmt: skip
-            if final.status != RunStatus.COMPLETED:
-                self._fail(d, {"code": "NET-001", "params": {"reason": "network"}})
-                return
-            self._set(d, "verifying")
-            finish = verify_existing if plan_only else install
-            finish(self.root, run_dir, kind=d.asset.kind, repo=d.asset.repo, revision=d.asset.revision,
-                   catalog_id=d.asset.catalog_id, name=d.asset.name)  # fmt: skip
+            parts = [d.asset] if plan_only else self._parts(d.asset)
+            for n, part in enumerate(parts):
+                if (
+                    n
+                    and snapshot_dir(self.root, "model", part.repo, part.revision).is_dir()
+                    and verified(self.root, "model", part.repo, part.revision)
+                ):
+                    continue  # a bridge repo already installed and recorded
+                run_id = d.run_id if n == 0 else f"{d.run_id}-b{n}"
+                budget = planned if n == 0 or plan_only else planned_bytes(part.size_gb)
+                if not self._fetch(d, part, run_id, budget, plan_only):
+                    return
+            spec = None if plan_only else BRIDGED.get(d.asset.catalog_id) if d.asset.kind == "model" else None
+            if spec is not None:  # remote code: copy the pinned .py, link the weights, rewrite the bridges (host)
+                self._set(d, "installing")
+                prepare_catalog_model(self.root, d.asset.catalog_id, d.asset.repo, d.asset.revision)
             self._set(d, "completed")
-        except DownloadIntegrityError as exc:
+        except (DownloadIntegrityError, VlmPipelineError) as exc:
             self._fail(d, {"code": exc.code, "params": exc.params})
-        except VlmPipelineError as exc:
-            self._fail(d, {"code": exc.code, "params": exc.params})
+        except PrepareError:
+            logger.exception("prepare %s failed", d.download_id)
+            self._fail(d, {"code": "NET-003", "params": {"name": d.asset.name, "reason": "mismatch"}})
         except Exception:  # never a traceback to the UI
             logger.exception("download %s failed", d.download_id)
             self._fail(d, {"code": "SYS-000", "params": {}})
         finally:
             (self.root / ACTIVE_REL).unlink(missing_ok=True)
+
+    def _fetch(self, d: Download, part: Asset, run_id: str, planned: int, plan_only: bool) -> bool:
+        """One repo: the job into its own run dir, then the host verifies and installs (or checks) it."""
+        run_dir = self.root / "outputs" / "runs" / run_id
+        run_dir.mkdir(parents=True)
+        pins = pinned_hashes(self.root, part.catalog_id, part.revision) if part.kind == "model" else {}
+        code = sorted(n for n in pins if n.endswith(".py"))
+        spec = {"kind": part.kind, "repo": part.repo, "revision": part.revision,
+                "remote_code_files": code, "max_bytes": planned, "plan_only": plan_only}  # fmt: skip
+        (run_dir / SPEC_NAME).write_text(json.dumps(spec), encoding="utf-8")
+        container_dir = f"{CONTAINER_ROOT}/outputs/runs/{run_id}"
+        job = ContainerJob(
+            name=run_id, image=DEFAULT_TRAIN_IMAGE, gpu=False, memory_gb=4, narrow=True, rw_dirs=(run_dir,),
+            argv=("python", "-m", "vlm_pipeline.download.hub", "--run-dir", container_dir),
+            download_budget=planned, hf_token=self._token(),
+        )  # fmt: skip
+        manifest = RunManifest(run_id=run_id, name=f"download {part.name}", stage="data", task="download",
+                               dataset=f"{part.repo}@{part.revision}")  # fmt: skip
+        self._set(d, "downloading", part=part.repo)
+        threading.Thread(target=self._watch_progress, args=(d, run_dir), daemon=True).start()
+        final = run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
+                        take_gpu_lock=False, launcher=self._launcher)  # fmt: skip
+        if final.status != RunStatus.COMPLETED:
+            self._fail(d, {"code": "NET-001", "params": {"reason": "network"}})
+            return False
+        self._set(d, "verifying", part=part.repo)
+        finish = verify_existing if plan_only else install
+        finish(self.root, run_dir, kind=part.kind, repo=part.repo, revision=part.revision,
+               catalog_id=part.catalog_id, name=part.name)  # fmt: skip
+        return True
 
     def _fail(self, d: Download, error: dict[str, Any]) -> None:
         d.error = error

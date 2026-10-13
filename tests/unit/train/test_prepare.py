@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -104,3 +105,26 @@ def test_source_changed_between_check_and_copy_fails(
     with pytest.raises(PrepareError, match="after copy"):
         prepare_bridged_model(model, [Bridge(radio, "radio_aaaa")], out, project_root=tmp_path)
     assert not out.exists()
+
+
+def test_a_catalog_model_is_prepared_from_its_table_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """5b: one table (BRIDGED) says which repos a pinned_prepared model bridges to; downloads and the CLI share it."""
+    from vlm_pipeline.train import prepare
+
+    seen: dict[str, object] = {}
+
+    def capture(model: object, bridges: object, out: object, *, project_root: object) -> None:
+        seen.update(model=model, bridges=bridges, out=out)
+
+    monkeypatch.setattr(prepare, "prepare_bridged_model", capture)
+    prepare.prepare_catalog_model(tmp_path, "nemotron-parse-v1.1", "nvidia/NVIDIA-Nemotron-Parse-v1.1", "f" * 40)
+    hub = tmp_path / ".cache" / "hf" / "hub"
+    model: Any = seen["model"]
+    assert model.snapshot_dir == hub / "models--nvidia--NVIDIA-Nemotron-Parse-v1.1" / "snapshots" / ("f" * 40)
+    assert model.sha256_file.name == "nemotron-parse-v1.1@ffffffff.sha256"
+    [bridge] = seen["bridges"]  # type: ignore[misc]
+    assert (bridge.code.repo_id, bridge.local_name) == ("nvidia/C-RADIOv2-H", "c-radiov2-h_0d8f4c18")
+    assert bridge.code.sha256_file.name == "c-radiov2-h@0d8f4c18.sha256"
+    assert seen["out"] == tmp_path / ".cache" / "prepared" / "nemotron-parse-v1.1_fd1e3c6b"
+    with pytest.raises(prepare.PrepareError):
+        prepare.prepare_catalog_model(tmp_path, "qwen3.5-0.8b", "Qwen/x", "f" * 40)

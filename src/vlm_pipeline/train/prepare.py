@@ -200,6 +200,64 @@ def prepare_bridged_model(
     return model_dir
 
 
+@dataclass(frozen=True)
+class BridgeSpec:
+    """A repo whose code a catalog model's ``auto_map`` pulls in, pinned (P003 D16)."""
+
+    repo: str
+    revision: str
+    pin: str  # configs/models/pinned/<pin>@<rev8>.sha256
+    local_name: str  # dir name inside the prepared bundle (no "--")
+    size_gb: float  # download budget of the bridge repo
+
+
+@dataclass(frozen=True)
+class PreparedSpec:
+    out_dir: str  # .cache/prepared/<out_dir>
+    bridges: tuple[BridgeSpec, ...]
+
+
+# Catalog models with remote_code: pinned_prepared, and what preparing them needs (one place: downloads + CLI).
+BRIDGED: dict[str, PreparedSpec] = {
+    "nemotron-parse-v1.1": PreparedSpec(
+        out_dir="nemotron-parse-v1.1_fd1e3c6b",
+        bridges=(
+            BridgeSpec(
+                "nvidia/C-RADIOv2-H",
+                "0d8f4c18c877166eda07ddae1386bcad256b7a6a",
+                "c-radiov2-h",
+                "c-radiov2-h_0d8f4c18",
+                2.6,
+            ),
+        ),
+    ),
+}
+
+
+def _snapshot(hub: Path, repo: str, revision: str) -> Path:
+    return hub / f"models--{repo.replace('/', '--')}" / "snapshots" / revision
+
+
+def prepare_catalog_model(root: Path, catalog_id: str, repo: str, revision: str) -> Path:
+    """Build ``.cache/prepared/<out_dir>`` for a ``pinned_prepared`` catalog model whose snapshots are installed."""
+    spec = BRIDGED.get(catalog_id)
+    if spec is None:
+        raise PrepareError(f"{catalog_id}: no preparation recipe")
+    hub = root / ".cache" / "hf" / "hub"
+    pinned = root / "configs" / "models" / "pinned"
+    model = PinnedCode(repo, revision, _snapshot(hub, repo, revision), pinned / f"{catalog_id}@{revision[:8]}.sha256")
+    bridges = [
+        Bridge(
+            PinnedCode(
+                b.repo, b.revision, _snapshot(hub, b.repo, b.revision), pinned / f"{b.pin}@{b.revision[:8]}.sha256"
+            ),
+            b.local_name,
+        )
+        for b in spec.bridges
+    ]
+    return prepare_bridged_model(model, bridges, root / ".cache" / "prepared" / spec.out_dir, project_root=root)
+
+
 def main() -> int:  # pragma: no cover - thin CLI for the P-0 template prep
     import argparse
 
@@ -208,23 +266,9 @@ def main() -> int:  # pragma: no cover - thin CLI for the P-0 template prep
     parser = argparse.ArgumentParser(description="Prepare Nemotron-Parse-v1.1 with a pinned local C-RADIOv2-H")
     parser.parse_args()
     root = project_root()
-    hub = root / ".cache" / "hf" / "hub"
-    pinned = root / "configs" / "models" / "pinned"
-    parse_rev, radio_rev = "fd1e3c6ba0b61a6dcab5a905f0ff92c5b19f14a4", "0d8f4c18c877166eda07ddae1386bcad256b7a6a"
-    model = PinnedCode(
-        "nvidia/NVIDIA-Nemotron-Parse-v1.1",
-        parse_rev,
-        hub / "models--nvidia--NVIDIA-Nemotron-Parse-v1.1" / "snapshots" / parse_rev,
-        pinned / "nemotron-parse-v1.1@fd1e3c6b.sha256",
+    model_dir = prepare_catalog_model(
+        root, "nemotron-parse-v1.1", "nvidia/NVIDIA-Nemotron-Parse-v1.1", "fd1e3c6ba0b61a6dcab5a905f0ff92c5b19f14a4"
     )
-    radio = PinnedCode(
-        "nvidia/C-RADIOv2-H",
-        radio_rev,
-        hub / "models--nvidia--C-RADIOv2-H" / "snapshots" / radio_rev,
-        pinned / "c-radiov2-h@0d8f4c18.sha256",
-    )
-    out = root / ".cache" / "prepared" / "nemotron-parse-v1.1_fd1e3c6b"
-    model_dir = prepare_bridged_model(model, [Bridge(radio, "c-radiov2-h_0d8f4c18")], out, project_root=root)
     print(json.dumps({"model_dir": str(model_dir)}))
     return 0
 
