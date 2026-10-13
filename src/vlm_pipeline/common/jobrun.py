@@ -48,6 +48,10 @@ class ContainerJob:
     # project while the code that runs is exactly the pinned commit (ADR-002 A1).
     code_root: Path | None = None
     code_dirs: tuple[str, ...] = ("src", "configs", "scripts", "docker")
+    # With ``read_only_project``: the only writable host dirs (each under <project>/outputs/), mounted at their own
+    # container path. Jobs that run untrusted input (trial inference on user images, remote model code) write their
+    # result here and nowhere else (bao-security, B-7).
+    rw_dirs: tuple[Path, ...] = ()
     uid: int = field(default_factory=os.getuid)
     gid: int = field(default_factory=os.getgid)
 
@@ -90,6 +94,17 @@ def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None
         env[gpu_lock.TOKEN_ENV] = lock_token
     mount = f"{project_root}:{CONTAINER_ROOT}" + (":ro" if job.read_only_project else "")
     overlays: list[str] = []
+    outputs = (project_root / "outputs").resolve()
+    for rw in job.rw_dirs:
+        host = rw.resolve()
+        if outputs not in host.parents or host == outputs / "system" or (outputs / "system") in host.parents:
+            raise ValueError(f"rw dir {rw} must be inside {outputs} (not outputs/system: host logs, locks)")
+        overlays += ["-v", f"{host}:{CONTAINER_ROOT}/{host.relative_to(project_root.resolve()).as_posix()}"]
+    # SEC-005: the project mount must not expose secrets files (.env holds the HF token; jobs run as the same uid).
+    # Each root-level .env* is covered by an empty read-only file. Narrower mounts (P015) are the long-term fix.
+    for secret in sorted(project_root.glob(".env*")):
+        if secret.is_file() or secret.is_symlink():
+            overlays += ["-v", f"/dev/null:{CONTAINER_ROOT}/{secret.name}:ro"]
     if job.code_root is not None:
         for d in job.code_dirs:
             overlays += ["-v", f"{job.code_root / d}:{CONTAINER_ROOT}/{d}:ro"]
@@ -329,9 +344,13 @@ def run_job(
     gate: bool = False,
     cancel: threading.Event | None = None,
     mem_thresholds: MemThresholds = DEFAULT_THRESHOLDS,
-    require_approved_image: bool = False,
+    require_approved_image: bool = True,
 ) -> RunManifest:
-    """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock."""
+    """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock.
+
+    ``require_approved_image`` is fail-closed: only a team probe passes False explicitly (``jobrun_cli
+    --allow-unapproved-image``); every other job needs a ``bao-security APPROVED`` row in docker/IMAGES.lock.
+    """
     from vlm_pipeline.common.preflight import preflight
 
     if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
@@ -348,9 +367,9 @@ def run_job(
         gaps = reproducibility_gaps(probe)
         if gaps:
             raise RuntimeError(f"gate run refused, not reproducible: missing/invalid {gaps}")
-    check_pinned_image(
-        project_root, job.image, image_digest(job.image)
-    )  # before preflight/lock: cheap, no side effects
+    check_pinned_image(  # before preflight/lock: cheap, no side effects
+        project_root, job.image, image_digest(job.image), require_approved=require_approved_image
+    )
     verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb)
     if not verdict.ok:
         raise RuntimeError(f"preflight refused: {verdict.to_json()}")

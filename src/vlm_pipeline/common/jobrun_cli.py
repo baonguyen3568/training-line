@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--abort-gb", type=float)
     p.add_argument("--no-gpu", action="store_true")
     p.add_argument("--who", default="cli")
+    p.add_argument("--allow-unapproved-image", action="store_true",
+                   help="team probes only: run on a pinned image that bao-security has not approved yet")  # fmt: skip
     p.add_argument("cmd", nargs=argparse.REMAINDER, help="-- command ...")
     a = p.parse_args(argv)
     cmd = a.cmd[1:] if a.cmd[:1] == ["--"] else a.cmd
@@ -45,7 +47,8 @@ def main(argv: list[str] | None = None) -> int:
     write_manifest(run_dir, manifest)
     job = ContainerJob(name=run_id, image=a.image, argv=argv_c, gpu=not a.no_gpu)
     final = run_job(job, manifest, run_dir, project_root=root, who=a.who, est_peak_gb=a.est_peak_gb,
-                    mem_thresholds=tightened_thresholds(a.abort_gb))  # fmt: skip
+                    mem_thresholds=tightened_thresholds(a.abort_gb),
+                    require_approved_image=not a.allow_unapproved_image)  # fmt: skip
     print(json.dumps({"run_id": run_id, "run_dir": str(run_dir), "status": final.status,
                       "error_code": final.error_code}))  # fmt: skip
     return 0 if final.status == RunStatus.COMPLETED else 1

@@ -34,6 +34,18 @@ def test_no_gpu_and_read_only_mount() -> None:
     assert "/repo:/workspace:ro" in args
 
 
+def test_rw_dirs_are_the_only_writable_mounts_and_must_be_under_outputs(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    run = root / "outputs" / "graph" / "runs" / "try-1"
+    run.mkdir(parents=True)
+    args = docker_args(_job(read_only_project=True, rw_dirs=(run,)), root)
+    assert f"{root}:/workspace:ro" in args
+    assert f"{run.resolve()}:/workspace/outputs/graph/runs/try-1" in args
+    for outside in (root / "src", root / "outputs" / ".." / "src", root, root / "outputs" / "system" / "x"):
+        with pytest.raises(ValueError, match="must be inside"):
+            docker_args(_job(read_only_project=True, rw_dirs=(outside,)), root)
+
+
 @pytest.mark.parametrize(
     "key",
     ["HF_TOKEN", "NGC_API_KEY", "WANDB_API_KEY", "OPENAI_API_KEY", "HUGGINGFACE_TOKEN", "NVIDIA_API_KEY",
@@ -153,3 +165,41 @@ def test_engine_warning_fixtures_match() -> None:
     for code in ENGINE_WARNINGS:
         assert _engine_warnings(fixtures / f"{code}.txt") == [code], code
     assert _engine_warnings(Path("/nonexistent/stdout.log")) == []
+
+
+def test_env_files_are_masked_in_the_project_mount(tmp_path: Path) -> None:
+    """SEC-005: jobs run as the project owner's uid, so .env* (HF token) must be covered, ro mount or not."""
+    for name in (".env", ".env.local", ".env.example"):
+        (tmp_path / name).write_text("HF_TOKEN=hf_x\n")
+    (tmp_path / "data").mkdir()
+    for ro in (False, True):
+        args = docker_args(_job(read_only_project=ro), tmp_path)
+        masks = [args[i + 1] for i, a in enumerate(args) if a == "-v" and args[i + 1].startswith("/dev/null:")]
+        assert masks == [f"/dev/null:/workspace/{n}:ro" for n in (".env", ".env.example", ".env.local")]
+        project = args.index(f"{tmp_path}:/workspace" + (":ro" if ro else ""))
+        assert all(args.index(m) > project for m in masks)  # later mounts shadow the project mount
+
+
+def _probe_root(tmp_path: Path, verdict: str) -> Path:
+    (tmp_path / "docker").mkdir()
+    row = f"vlm-x | vlm-x:1 (local) | - | base | sha256:{'a' * 64} | 1GB | {verdict} | 2026-10-13 | probe\n"
+    (tmp_path / "docker" / "IMAGES.lock").write_text("# header\n" + row)
+    return tmp_path
+
+
+@pytest.mark.parametrize("verdict", ["PROBE, not approved", "bao-security APPROVED-PENDING"])
+def test_run_job_refuses_unapproved_images_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, verdict: str
+) -> None:
+    """SEC-004b: the gate goes through run_job itself and is fail-closed (no preflight, no lock, no container)."""
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.images import ImageMismatchError
+    from vlm_pipeline.common.runinfo import RunManifest
+
+    root = _probe_root(tmp_path, verdict)
+    monkeypatch.setattr(jobrun, "image_digest", lambda _image: f"sha256:{'a' * 64}")
+    monkeypatch.setattr("vlm_pipeline.common.preflight.preflight", lambda *a, **k: pytest.fail("preflight ran"))
+    job = ContainerJob(name="r1", image="vlm-x:1", argv=("true",))
+    manifest = RunManifest(run_id="r1", name="r1", stage="eval", task="eval")
+    with pytest.raises(ImageMismatchError):
+        jobrun.run_job(job, manifest, tmp_path / "run", project_root=root, who="t", est_peak_gb=1)
