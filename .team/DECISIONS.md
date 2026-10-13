@@ -67,3 +67,4 @@
 - 2026-10-13 P017 (run claims + attempt dir) duyệt hướng đi; tối đa 10 attempt/node. Stale running runs tự chuyển interrupted (SYS-003) khi app khởi động + mỗi lượt scheduler. GPU_LOCK who ghi caller thật.
 - 2026-10-13 Nén: parity 2 mức (warn bàn giao model / fail khi hỏng hẳn). QUANT-EVAL-DOWNSTREAM là WARNING (giữ tự do cho user giỏi); template nén luôn có Đo điểm; thiếu Đo điểm + parity warn → badge cảnh báo + ghi NOTICE/model card khi export.
 - 2026-10-13 14:30 USER: 'hoàn thiện đi' → RELEASE 1.0, 6 luồng song song (BOARD). Agent tự quyết trong chuyên môn; PM chỉ cho mâu thuẫn/user/ADR.
+- 2026-10-13 Release 1.0: reward GRPO/DPO chỉ loại dựng sẵn (không cho dán Python) cho tới khi có sandbox; ghi vào roadmap 'reward tuỳ chỉnh có sandbox'. donut-base phải convert offline sang safetensors; geometry3k ghi nguồn, không phân phối lại.
