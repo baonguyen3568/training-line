@@ -50,8 +50,9 @@ PM = `bao-trainning-1` (điều phối, giải quyết mâu thuẫn, chốt quy�
 3. **Task board**: `.team/BOARD.md` — nhận task bằng cách ghi tên mình vào cột owner. Không làm trùng task.
 4. **Đề xuất kiến trúc / thay đổi lớn**: viết file `.team/proposals/NNN-tieu-de.md` → nhắn các bên liên quan
    + `bao-pm` để review. Quyết định cuối ghi vào `docs/adr/` (PM chốt, có thể hỏi user).
-5. **Mâu thuẫn**: 2 bên trao đổi trước; không thống nhất được → ghi `.team/CONFLICTS.md` (lập luận 2 phía) và nhắn `bao-pm`.
-6. Tôn trọng chuyên môn: review chéo là bắt buộc cho code merge (ít nhất 1 người khác ngoài tác giả).
+5. **Không dùng AskUserQuestion** trong session agent (không có người ngồi ở tmux đó, session sẽ kẹt). Câu hỏi cho user → SendMessage tới PM.
+6. **Mâu thuẫn**: 2 bên trao đổi trước; không thống nhất được → ghi `.team/CONFLICTS.md` (lập luận 2 phía) và nhắn `bao-pm`.
+7. Tôn trọng chuyên môn: review chéo là bắt buộc cho code merge (ít nhất 1 người khác ngoài tác giả).
 
 ## Quy tắc an toàn (bắt buộc với mọi agent)
 - Chỉ ghi/xoá file **bên trong** `/home/ntcai/Trainning-model` (trừ cache pip/uv/HF/docker image pull).
