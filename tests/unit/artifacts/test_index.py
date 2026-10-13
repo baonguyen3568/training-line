@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from vlm_pipeline.artifacts.index import ArtifactIndex, OutputRef
+from vlm_pipeline.artifacts.index import ArtifactIndex, LeaseOwner, OutputRef
 
 RUN_DIR = Path("/nonexistent/outputs/graph/runs/node")  # absolute; index tests never touch it
 
@@ -193,9 +193,65 @@ def test_old_leases_still_block(tmp_path: Path) -> None:
 def test_release_all_except_drops_leases_of_dead_runs(idx: ArtifactIndex, tmp_path: Path) -> None:
     for k in ("a", "b", "c"):
         idx.record(k, run_dir=RUN_DIR, run_id=k, node_type="t", outputs=_out(tmp_path, k))
-    idx.lease(["a", "b"], run_id="crashed")
-    idx.lease(["c"], run_id="alive")
+    idx.lease(["a", "b"], run_id="crashed", owner=LeaseOwner(999_999_999, "1"))  # a pid that cannot exist
+    idx.lease(["c"], run_id="alive", owner=LeaseOwner(999_999_999, "1"))
     assert idx.release_all_except(["alive"]) == 2
     assert idx.leased_by("a") == []
     assert idx.leased_by("c") == ["alive"]
     assert idx.release_all_except(["alive"]) == 0
+
+
+def test_a_restart_keeps_leases_of_graphs_another_live_process_runs(idx: ArtifactIndex, tmp_path: Path) -> None:
+    """PM: a graph run by a script (run_workflow.py) is not in the app's run list; its live owner keeps its lease."""
+    import os
+
+    from vlm_pipeline.artifacts.index import process_start
+
+    for k in ("ours", "script", "reused", "legacy"):
+        idx.record(k, run_dir=RUN_DIR, run_id=k, node_type="t", outputs=_out(tmp_path, k))
+    idx.lease(["ours"], run_id="g-dead-app", owner=LeaseOwner(999_999_999, "1"))
+    idx.lease(["script"], run_id="g-script")  # this test process: alive
+    idx.lease(
+        ["reused"], run_id="g-reused", owner=LeaseOwner(os.getpid(), "1")
+    )  # same pid, another start time: not the owner
+    with idx._tx() as db:  # a lease written before owners were recorded
+        db.execute("INSERT INTO artifact_leases (cache_key, run_id, since) VALUES ('legacy', 'g-legacy', 0)")
+    assert idx.release_all_except([]) == 3
+    assert idx.leased_by("script") == ["g-script"]
+    assert [idx.leased_by(k) for k in ("ours", "reused", "legacy")] == [[], [], []]
+    assert process_start(os.getpid()) is not None
+
+
+def test_leases_of_an_index_created_before_owners_get_the_columns(tmp_path: Path) -> None:
+    import sqlite3
+
+    db = sqlite3.connect(tmp_path / "old.db")
+    db.execute("CREATE TABLE artifact_leases (cache_key TEXT NOT NULL, run_id TEXT NOT NULL, since REAL NOT NULL,"
+               " PRIMARY KEY (cache_key, run_id))")  # fmt: skip
+    db.execute("INSERT INTO artifact_leases VALUES ('k', 'g-old', 0)")
+    db.commit()
+    db.close()
+    idx = ArtifactIndex(tmp_path / "old.db")
+    assert idx.leased_by("k") == ["g-old"]
+    assert idx.release_all_except([]) == 1
+
+
+def test_an_owner_in_another_pid_namespace_is_kept(idx: ArtifactIndex, tmp_path: Path) -> None:
+    """cleanup R1: app in compose, script on the host: the pid cannot be checked from here, so the lease stays."""
+    idx.record("k", run_dir=RUN_DIR, run_id="k", node_type="t", outputs=_out(tmp_path, "k"))
+    idx.lease(["k"], run_id="g-host-script", owner=LeaseOwner(999_999_999, "1", "pid:[1]"))
+    assert idx.release_all_except([]) == 0
+    assert idx.leased_by("k") == ["g-host-script"]
+    idx.release_run("g-host-script")
+    assert idx.leased_by("k") == []
+
+
+def test_a_live_owner_keeps_its_lease_when_a_dead_one_shared_the_run_id(idx: ArtifactIndex, tmp_path: Path) -> None:
+    """cleanup R2: rows go per owner."""
+    for k in ("a", "b"):
+        idx.record(k, run_dir=RUN_DIR, run_id=k, node_type="t", outputs=_out(tmp_path, k))
+    idx.lease(["a"], run_id="g-1", owner=LeaseOwner(999_999_999, "1"))
+    idx.lease(["b"], run_id="g-1")  # this process, alive
+    assert idx.release_all_except([]) == 1
+    assert idx.leased_by("a") == []
+    assert idx.leased_by("b") == ["g-1"]

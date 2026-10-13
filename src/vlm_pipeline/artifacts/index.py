@@ -16,6 +16,8 @@ Stdlib only (``sqlite3``), WAL mode, one connection guarded by a lock so one ins
 from __future__ import annotations
 
 import json
+import logging
+import os
 import sqlite3
 import threading
 import time
@@ -52,6 +54,9 @@ CREATE TABLE IF NOT EXISTS artifact_leases (
     cache_key TEXT NOT NULL,
     run_id TEXT NOT NULL,
     since REAL NOT NULL,
+    owner_pid INTEGER,
+    owner_start TEXT,
+    owner_ns TEXT,
     PRIMARY KEY (cache_key, run_id)
 );
 CREATE INDEX IF NOT EXISTS artifacts_lru ON artifacts (state, pinned, last_hit_at);
@@ -113,6 +118,54 @@ def _outputs_from_json(raw: str) -> dict[str, OutputRef]:
     return {p: OutputRef(str(v["type"]), str(v["path"]), str(v["hash"])) for p, v in json.loads(raw).items()}
 
 
+_log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LeaseOwner:
+    """The process holding a lease: pid, its start time (no pid reuse) and its pid namespace (compose vs host)."""
+
+    pid: int
+    start: str | None
+    ns: str | None = None
+
+
+def process_start(pid: int) -> str | None:
+    """Start time of ``pid`` in clock ticks since boot (/proc/<pid>/stat field 22), or None if it is not running."""
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+    except OSError:
+        return None
+    fields = raw.rsplit(")", 1)[-1].split()  # after "(comm)": state is field 3, starttime field 22
+    return fields[19] if len(fields) > 19 else None
+
+
+def pid_namespace() -> str | None:
+    """This process's pid namespace (``pid:[4026531836]``); None when /proc does not say."""
+    try:
+        return str(Path("/proc/self/ns/pid").readlink())
+    except OSError:
+        return None
+
+
+def current_owner() -> LeaseOwner:
+    pid = os.getpid()
+    return LeaseOwner(pid, process_start(pid), pid_namespace())
+
+
+def owner_is_alive(owner: LeaseOwner) -> bool:
+    """The lease owner still runs: same pid and start time.
+
+    An owner in another pid namespace (app in compose, script on the host) cannot be checked from here: it is kept
+    (fail closed), only release_run frees it.
+    """
+    if owner.ns is not None and owner.ns != pid_namespace():
+        _log.info("lease owner pid %s is in another pid namespace: kept", owner.pid)
+        return True
+    current = process_start(owner.pid)
+    return current is not None and (owner.start is None or current == owner.start)
+
+
 class ArtifactIndex:
     def __init__(self, db_path: Path, *, clock: Callable[[], float] = time.time) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,6 +182,10 @@ class ArtifactIndex:
                 self._db.execute("ALTER TABLE artifacts ADD COLUMN trained_model INTEGER NOT NULL DEFAULT 0")
             if "run_dir" not in columns:
                 self._db.execute("ALTER TABLE artifacts ADD COLUMN run_dir TEXT")
+            lease_columns = {r["name"] for r in self._db.execute("PRAGMA table_info(artifact_leases)")}
+            for column, kind in (("owner_pid", "INTEGER"), ("owner_start", "TEXT"), ("owner_ns", "TEXT")):
+                if column not in lease_columns:  # leases from before owners were recorded: released as before
+                    self._db.execute(f"ALTER TABLE artifact_leases ADD COLUMN {column} {kind}")
 
     def close(self) -> None:
         with self._lock:
@@ -224,13 +281,19 @@ class ArtifactIndex:
         with self._tx() as db:
             db.execute("UPDATE artifacts SET state = 'invalid' WHERE cache_key = ?", (cache_key,))
 
-    def lease(self, cache_keys: Sequence[str], run_id: str) -> None:
-        """Protect ``cache_keys`` from eviction while graph run ``run_id`` uses them (idempotent)."""
+    def lease(self, cache_keys: Sequence[str], run_id: str, *, owner: LeaseOwner | None = None) -> None:
+        """Protect ``cache_keys`` from eviction while graph run ``run_id`` uses them (idempotent).
+
+        ``owner`` = the process running that graph, this process by default: an app restart keeps the leases of
+        graphs another live process runs (scripts, CLI) and drops only dead owners'.
+        """
         now = self._clock()
+        who = owner or current_owner()
         with self._tx() as db:
             db.executemany(
-                "INSERT OR IGNORE INTO artifact_leases (cache_key, run_id, since) VALUES (?, ?, ?)",
-                [(k, run_id, now) for k in cache_keys],
+                "INSERT OR IGNORE INTO artifact_leases (cache_key, run_id, since, owner_pid, owner_start, owner_ns)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                [(k, run_id, now, who.pid, who.start, who.ns) for k in cache_keys],
             )
 
     def release_run(self, run_id: str) -> None:
@@ -238,14 +301,33 @@ class ArtifactIndex:
         with self._tx() as db:
             db.execute("DELETE FROM artifact_leases WHERE run_id = ?", (run_id,))
 
-    def release_all_except(self, active_run_ids: Sequence[str]) -> int:
-        """Drop leases of graph runs that are no longer active (call at app startup after a crash); returns count."""
+    def release_all_except(
+        self, active_run_ids: Sequence[str], *, owner_alive: Callable[[LeaseOwner], bool] | None = None
+    ) -> int:
+        """Drop leases left by dead processes (call at app startup); returns how many.
+
+        A lease is kept when its run is in ``active_run_ids`` or its owner process is alive (``owner_is_alive``: same
+        pid AND start time; an owner in another pid namespace cannot be judged and is kept). Each owner's rows go
+        on their own: a live owner never loses a lease because a dead one shared its run id. Leases without an owner
+        (older rows) follow the run list.
+        """
+        alive = owner_alive or owner_is_alive
         active = set(active_run_ids)
         with self._tx() as db:
-            holders = [r["run_id"] for r in db.execute("SELECT DISTINCT run_id FROM artifact_leases")]
-            dead = [(run_id,) for run_id in holders if run_id not in active]
+            rows = db.execute(
+                "SELECT DISTINCT run_id, owner_pid, owner_start, owner_ns FROM artifact_leases"
+            ).fetchall()
+            dead = [
+                r for r in rows
+                if r["run_id"] not in active
+                and (r["owner_pid"] is None or not alive(LeaseOwner(r["owner_pid"], r["owner_start"], r["owner_ns"])))
+            ]  # fmt: skip
             before = db.total_changes
-            db.executemany("DELETE FROM artifact_leases WHERE run_id = ?", dead)
+            db.executemany(
+                "DELETE FROM artifact_leases"
+                " WHERE run_id = ? AND owner_pid IS ? AND owner_start IS ? AND owner_ns IS ?",
+                [(r["run_id"], r["owner_pid"], r["owner_start"], r["owner_ns"]) for r in dead],
+            )
             return db.total_changes - before
 
     def leased_by(self, cache_key: str) -> list[str]:
