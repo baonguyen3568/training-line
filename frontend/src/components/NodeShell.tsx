@@ -130,7 +130,7 @@ function RunBadge({ state }: { state: NodeRunState }) {
         ? t("node_state.running", { percent: "…" })
         : t("node_state.running", { percent })
       : state.status === "cached"
-        ? t("node_state.cached", { time: "" })
+        ? t("node_state.cached_no_time") // no saved time here: never "lúc " with nothing after it
         : t(`node_state.${RUN_COPY[state.status]}`);
   return (
     <>
