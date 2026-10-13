@@ -37,7 +37,7 @@
 ## 3. Advanced params generated from the engine: everything valid, minus a denylist by rule
 - A script run inside the pinned engine image (`scripts/probe/engine_schema.py`) walks the engine's own config schema
   (recipe dataclasses / defaults of the pinned version) and dumps **every** option it finds (dotted key, type, default,
-  bounds, doc) to `configs/engine/<engine>-<image tag>.json`, committed. Coverage target (PM, user "cực sâu"): nearly the
+  bounds or enum choices, the engine's own English doc) to `configs/engine/<engine>-<image tag>.json`, committed. Coverage target (PM, user "cực sâu"): nearly the
   whole engine surface, not a hand-picked list.
 - Excluded by rule (security owns it): one denylist module `nodes/advanced_denylist.py` imported by the generator (refuses
   to emit) **and** by a test over the COMMITTED file (the gate: the file can be hand-edited). Key segments, case-insensitive:
@@ -47,6 +47,8 @@
 - Each node's `params_model` gets `advanced: AdvancedOverrides` built from that file: `extra="forbid"`, types bool/int/
   float/enum/short scalar lists, any remaining str field with a strict pattern, **any value containing `${` or `oc.` is
   refused** (OmegaConf resolvers such as `${oc.env:HF_TOKEN}` would leak secrets; tested). `x-ui.advanced=true`.
+- UI (design): label = dotted key, tree grouped by key prefix, `?` = engine doc (not translated: Advanced is for
+  technical users; Simple params keep full i18n), "changed only" filter + per-key reset from `default`.
 - A test ties the file to the image tag in `IMAGES.lock`; an image bump regenerates it and the diff shows which knobs changed.
 
 ## 4. Open questions
