@@ -1424,3 +1424,13 @@ bug_report:
   copy_open: Chép và mở GitHub
   copied: Đã chép. Dán vào ô mô tả trên trang GitHub vừa mở.
   copy_failed: App không chép tự động được. Hãy bôi đen nội dung ở trên rồi tự chép.
+advanced_panel:
+  search: Tìm tuỳ chọn…
+  changed: "{changed_count} đã đổi"
+  none: Model này không có tuỳ chọn engine nào để chỉnh.
+  no_model: Chưa nối bước Chọn model gốc nên đang hiện mọi tuỳ chọn. Một số có thể không dùng được với model bạn chọn sau.
+  no_match: 'Không có tuỳ chọn nào khớp "{query}".'
+  default: "Mặc định: {value}"
+  engine_default: do engine tự chọn
+  range: "Khoảng: {min}–{max}"
+  list_hint: Các giá trị cách nhau bằng dấu phẩy

@@ -1424,3 +1424,13 @@ bug_report:
   copy_open: Copy and open GitHub
   copied: Copied. Paste it into the description on the GitHub page that just opened.
   copy_failed: The app could not copy automatically. Select the text above and copy it yourself.
+advanced_panel:
+  search: Search options…
+  changed: "{changed_count} changed"
+  none: This model has no engine options to adjust.
+  no_model: No base model step is connected, so every option is shown. Some may not work with the model you pick later.
+  no_match: 'No options match "{query}".'
+  default: "Default: {value}"
+  engine_default: set by the engine
+  range: "Range: {min}–{max}"
+  list_hint: Separate values with commas
