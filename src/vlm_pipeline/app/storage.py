@@ -214,8 +214,20 @@ def _needs_confirm(item: retention.PlanItem) -> bool:
     return item.blocked_by == retention.CONFIRM_REASON or item.consequence_code == PERMANENT_LOSS
 
 
-# Proper names of eval suites as people know them (bao-design); no catalog field holds them yet.
-EVAL_SUITE_NAMES = {"ocrbench": "OCRBench", "cord": "CORD v2"}
+def _dataset_name(suite: str) -> str:
+    """Catalog ``display_name`` of an eval-cache entry's dataset ("OCRBench", "CORD v2"), else the raw id.
+
+    Named caches start with the dataset id (``ocrbench-<key>``); the bare-hash ones are the Parse/CORD cache.
+    """
+    from vlm_pipeline.common.catalog import load_dataset_catalog  # local: only these rows need the catalog
+    from vlm_pipeline.eval.node_worker import CORD_DATASET_ID
+
+    dataset_id = CORD_DATASET_ID if len(suite) == 24 or "." in suite else suite
+    try:
+        entry = load_dataset_catalog().get(dataset_id)
+    except (OSError, ValueError):
+        entry = None
+    return entry.display_name if entry is not None else dataset_id
 
 
 def _retention_display_key(item: retention.PlanItem) -> str:
@@ -230,12 +242,11 @@ def _retention_display_key(item: retention.PlanItem) -> str:
 def _eval_display(item: retention.PlanItem) -> dict[str, str]:
     """``{dataset, stamp}`` of ``.<dataset>.invalid-<YYYYmmdd-HHMMSS>-<hex>`` / ``.<dataset>.<hex8>.tmp``.
 
-    For an eval-cache leftover ``dataset`` is its suite's display name (``EVAL_SUITE_NAMES``, else the suite id).
+    For an eval-cache leftover ``dataset`` is its dataset's catalog display name (``_dataset_name``).
     """
     if item.kind == "eval_cache":
         suite = item.run_id.lstrip(".").split("-", 1)[0]
-        suite = "cord" if len(suite) == 24 or "." in suite else suite  # the bare-hash cache is the Parse/CORD one
-        return {"dataset": EVAL_SUITE_NAMES.get(suite, suite), "stamp": ""}
+        return {"dataset": _dataset_name(suite), "stamp": ""}
     invalid = retention.EVAL_INVALID_RE.fullmatch(item.run_id)
     if invalid is not None:
         stamp = invalid.group(2)
