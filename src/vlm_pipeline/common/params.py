@@ -21,6 +21,9 @@ def ui(**hints: object) -> dict[str, Any]:
     disabled_options, recommended (the value the UI marks "khuyên dùng"; separate from the default on purpose).
     ``disabled_options={"fp8": "i18n.key.of.reason" | None}`` greys out values the worker cannot run yet (key = the
     value as a string: ``"fp8"``, ``"true"``, ``"512"``; None = generic "not supported yet").
+    ``visible_when={"strategy": ["interleave_under", "interleave_over"]}`` shows the field only while those params of
+    the SAME node hold one of the listed values (AND across keys, OR within a list); a hidden field keeps its value and
+    still shows its validation errors (frontend contract).
     """
     return {"x-ui": hints}
 

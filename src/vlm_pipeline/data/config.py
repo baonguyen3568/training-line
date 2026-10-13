@@ -26,6 +26,11 @@ class HubDatasetParams(Params):
     seed: int = Field(DEFAULT_SEED, json_schema_extra=ui(advanced=True))
 
 
+# Label file formats data.local_folder normalises at load (research 2026-10-13: LLaVA-Instruct JSON, ShareGPT as in
+# LLaMA-Factory dataset_info, HF chat messages with {"type": "image"}); auto = detected from the first records.
+InputFormat = Literal["auto", "llava", "sharegpt", "hf_messages"]
+
+
 class LocalFolderParams(Params):
     path: LocalPath = Field(
         "data/sample-invoices",
@@ -34,6 +39,7 @@ class LocalFolderParams(Params):
     )
     max_samples: SampleLimit = Field(0, json_schema_extra=ui(order=1, option_keys="sample_limit"))
     max_image_side_px: int = Field(4096, ge=512, le=8192, json_schema_extra=ui(advanced=True))
+    input_format: InputFormat = Field("auto", json_schema_extra=ui(advanced=True, option_keys="input_format"))
     seed: int = Field(DEFAULT_SEED, json_schema_extra=ui(advanced=True))
 
 
@@ -65,27 +71,23 @@ class FilterParams(Params):
 DedupeMethod = Literal["sha256", "dhash"]
 
 
+_DHASH_ONLY = {"compare": ["dhash"]}
+
+
 class DedupeParams(Params):
     compare: DedupeMethod = Field("sha256", json_schema_extra=ui(order=0, summary=True, option_keys="dedupe_method"))
     check_leak: bool = Field(True, json_schema_extra=ui(order=1))  # drop train samples whose image is in heldout
-    dhash_max_distance: int = Field(4, ge=0, le=16, json_schema_extra=ui(advanced=True))  # dhash only
-
-
-InputFormat = Literal["auto", "llava", "sharegpt", "hf_messages"]
-
-
-class FormatConvertParams(Params):
-    input_format: InputFormat = Field("auto", json_schema_extra=ui(order=0, summary=True, option_keys="input_format"))
-    system_prompt: str = Field("", max_length=2000, json_schema_extra=ui(order=1, widget="textarea"))
+    dhash_max_distance: int = Field(4, ge=0, le=16, json_schema_extra=ui(advanced=True, visible_when=_DHASH_ONLY))
 
 
 MixStrategy = Literal["concat", "interleave_under", "interleave_over"]
+_INTERLEAVE = {"strategy": ["interleave_under", "interleave_over"]}  # weights mean nothing for concat
 
 
 class MixParams(Params):
     strategy: MixStrategy = Field("concat", json_schema_extra=ui(order=0, summary=True, option_keys="mix_strategy"))
-    weight_1: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(order=1))  # interleave only: relative shares
-    weight_2: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(order=2))
-    weight_3: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(advanced=True))
-    weight_4: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(advanced=True))
+    weight_1: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(order=1, visible_when=_INTERLEAVE))  # shares
+    weight_2: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(order=2, visible_when=_INTERLEAVE))
+    weight_3: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(advanced=True, visible_when=_INTERLEAVE))
+    weight_4: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(advanced=True, visible_when=_INTERLEAVE))
     seed: int = Field(DEFAULT_SEED, json_schema_extra=ui(advanced=True))

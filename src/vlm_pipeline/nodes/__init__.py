@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from vlm_pipeline.common.paths import project_root
-from vlm_pipeline.nodes.data import DATA_DEDUPE, DATA_FILTER, DATA_FORMAT_CONVERT, DATA_MIX, DATA_SPLIT
+from vlm_pipeline.nodes.data import DATA_DEDUPE, DATA_FILTER, DATA_MIX, DATA_SPLIT
 from vlm_pipeline.nodes.evaluate import BENCH_PERF, EVAL_BENCHMARKS
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ, SERVE_VLLM, TRAIN_MERGE_LORA
 from vlm_pipeline.nodes.rules import RULES
@@ -21,7 +21,6 @@ SPECS = (
     DATA_SPLIT,
     DATA_FILTER,
     DATA_DEDUPE,
-    DATA_FORMAT_CONVERT,
     DATA_MIX,
     # Train
     TRAIN_LORA_VLM,

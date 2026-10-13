@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vlm_pipeline.data.config import DedupeParams, FilterParams, FormatConvertParams, MixParams, SplitParams
+from vlm_pipeline.data.config import DedupeParams, FilterParams, MixParams, SplitParams
 from vlm_pipeline.nodes.spec import NodeSpec, PortSpec
 
 DATA_SPLIT = NodeSpec(
@@ -40,17 +40,6 @@ DATA_DEDUPE = NodeSpec(
     runner="host",
 )
 
-DATA_FORMAT_CONVERT = NodeSpec(
-    type_id="data.format_convert",
-    version="1.0.0",
-    category="data",
-    icon="file-text",
-    inputs={"dataset": PortSpec(type="Dataset")},
-    outputs={"dataset": PortSpec(type="Dataset")},
-    params_model=FormatConvertParams,
-    runner="host",
-)
-
 DATA_MIX = NodeSpec(
     type_id="data.mix",
     version="1.0.0",
@@ -68,4 +57,4 @@ DATA_MIX = NodeSpec(
 )
 
 # Data nodes that keep one dataset's identity through their ``dataset`` input (standards follow them upstream).
-PASS_THROUGH = frozenset({DATA_FILTER.type_id, DATA_DEDUPE.type_id, DATA_FORMAT_CONVERT.type_id})
+PASS_THROUGH = frozenset({DATA_FILTER.type_id, DATA_DEDUPE.type_id})

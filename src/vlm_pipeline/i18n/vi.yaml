@@ -618,6 +618,9 @@ node:
       max_image_side_px:
         label: Cạnh ảnh tối đa (px)
         help: Ảnh lớn hơn sẽ bị bỏ qua để tránh tốn RAM (512–8192).
+      input_format:
+        label: Định dạng file nhãn
+        help: Để "Tự nhận biết" nếu không chắc. App đọc được nhãn dạng LLaVA, ShareGPT hoặc hội thoại HF và tự chuyển sang dạng dùng để train.
     port:
       dataset: Dữ liệu
   data.format_vlm_chat:
@@ -677,18 +680,6 @@ node:
     port:
       dataset: Dữ liệu
       heldout: Dữ liệu kiểm tra
-  data.format_convert:
-    title: Đổi định dạng dữ liệu
-    desc: Chuyển dữ liệu dạng LLaVA hoặc ShareGPT sang dạng hội thoại mà app dùng để train.
-    param:
-      input_format:
-        label: Định dạng gốc
-        help: Để "Tự nhận biết" nếu không chắc; app sẽ báo nếu không nhận ra.
-      system_prompt:
-        label: Lời dặn chung (system prompt)
-        help: Câu dặn chung thêm vào đầu mọi hội thoại. Để trống nếu không cần.
-    port:
-      dataset: Dữ liệu
   data.mix:
     title: Trộn dữ liệu
     desc: Gộp 2 đến 4 bộ dữ liệu thành một bộ để train.

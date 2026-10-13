@@ -618,6 +618,9 @@ node:
       max_image_side_px:
         label: Max image side (px)
         help: Larger images are skipped to avoid using too much RAM (512–8192).
+      input_format:
+        label: Label file format
+        help: Keep "Detect automatically" if unsure. The app reads LLaVA, ShareGPT or HF chat labels and converts them for training.
     port:
       dataset: Data
   data.format_vlm_chat:
@@ -677,18 +680,6 @@ node:
     port:
       dataset: Data
       heldout: Test data
-  data.format_convert:
-    title: Convert data format
-    desc: Turn LLaVA or ShareGPT style data into the chat format the app trains on.
-    param:
-      input_format:
-        label: Original format
-        help: Keep "Detect automatically" if unsure; the app tells you when it cannot recognise it.
-      system_prompt:
-        label: General instruction (system prompt)
-        help: A general instruction added at the start of every conversation. Leave empty if not needed.
-    port:
-      dataset: Data
   data.mix:
     title: Mix data
     desc: Combine 2 to 4 datasets into one for training.

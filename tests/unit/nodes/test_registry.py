@@ -43,7 +43,7 @@ def test_api_item_matches_frontend_contract(spec: NodeSpec) -> None:
         assert hints is not None, f"{spec.type_id}.{name} has no x-ui hints"
         assert set(hints) <= {
             "widget", "order", "preset", "advanced", "option_keys", "summary", "option_meta", "disabled_options",
-            "recommended",
+            "recommended", "visible_when",
         }  # fmt: skip
 
 
@@ -185,3 +185,53 @@ def test_disabled_options_checker_catches_mistakes() -> None:
     assert any(".vision: no vi/en text" in p for p in problems)
     assert any(".size: ['1024'] are not values" in p for p in problems)
     assert any(".size: the default value cannot be disabled" in p for p in problems)
+
+
+def _visible_when_problems(spec: NodeSpec) -> list[str]:
+    props = spec.params_schema().get("properties", {})
+    problems: list[str] = []
+    for name, prop in props.items():
+        rule = prop.get("x-ui", {}).get("visible_when")
+        if rule is None:
+            continue
+        where = f"{spec.type_id}.{name}"
+        if not isinstance(rule, dict) or not rule:
+            problems.append(f"{where}: visible_when must be a non-empty mapping")
+            continue
+        for other, values in rule.items():
+            if other == name or other not in props:
+                problems.append(f"{where}: visible_when names {other!r}, not another param of this node")
+            elif not isinstance(values, list) or not values:
+                problems.append(f"{where}: visible_when[{other!r}] must be a non-empty list")
+            elif unknown := sorted(
+                {str(v).lower() if isinstance(v, bool) else str(v) for v in values} - _values_as_strings(props[other])
+            ):
+                problems.append(f"{where}: {unknown} are not values of {other!r}")
+    return problems
+
+
+@pytest.mark.parametrize("spec", ALL_SPECS, ids=lambda s: s.type_id)
+def test_visible_when_names_real_params_and_values(spec: NodeSpec) -> None:
+    assert _visible_when_problems(spec) == []
+
+
+def test_visible_when_checker_catches_mistakes() -> None:
+    from typing import Literal
+
+    from pydantic import Field
+
+    from vlm_pipeline.common.params import Params, ui
+
+    class _P(Params):
+        mode: Literal["a", "b"] = "a"
+        ok: int = Field(1, json_schema_extra=ui(visible_when={"mode": ["b"]}))
+        typo: int = Field(1, json_schema_extra=ui(visible_when={"mood": ["b"]}))
+        value: int = Field(1, json_schema_extra=ui(visible_when={"mode": ["c"]}))
+        itself: bool = Field(False, json_schema_extra=ui(visible_when={"itself": [True]}))
+
+    spec = NodeSpec(type_id="test.visible", version="1.0.0", category="util", icon="x", params_model=_P, runner="host")
+    problems = _visible_when_problems(spec)
+    assert not any(".ok:" in p for p in problems)
+    assert any(".typo: visible_when names 'mood'" in p for p in problems)
+    assert any(".value: ['c'] are not values of 'mode'" in p for p in problems)
+    assert any(".itself: visible_when names 'itself'" in p for p in problems)

@@ -241,6 +241,21 @@
       "params_schema": {
         "additionalProperties": false,
         "properties": {
+          "input_format": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "llava",
+              "sharegpt",
+              "hf_messages"
+            ],
+            "title": "Input Format",
+            "type": "string",
+            "x-ui": {
+              "advanced": true,
+              "option_keys": "input_format"
+            }
+          },
           "max_image_side_px": {
             "default": 4096,
             "maximum": 8192,
@@ -504,7 +519,12 @@
             "title": "Dhash Max Distance",
             "type": "integer",
             "x-ui": {
-              "advanced": true
+              "advanced": true,
+              "visible_when": {
+                "compare": [
+                  "dhash"
+                ]
+              }
             }
           }
         },
@@ -515,66 +535,6 @@
       "policy_block": null,
       "runner": "host",
       "type_id": "data.dedupe",
-      "version": "1.0.0"
-    },
-    {
-      "cacheable": true,
-      "category": "data",
-      "icon": "file-text",
-      "inputs": {
-        "dataset": {
-          "many": false,
-          "optional": false,
-          "type": "Dataset"
-        }
-      },
-      "origin": {
-        "kind": "first_party"
-      },
-      "outputs": {
-        "dataset": {
-          "many": false,
-          "optional": false,
-          "type": "Dataset"
-        }
-      },
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "input_format": {
-            "default": "auto",
-            "enum": [
-              "auto",
-              "llava",
-              "sharegpt",
-              "hf_messages"
-            ],
-            "title": "Input Format",
-            "type": "string",
-            "x-ui": {
-              "option_keys": "input_format",
-              "order": 0,
-              "summary": true
-            }
-          },
-          "system_prompt": {
-            "default": "",
-            "maxLength": 2000,
-            "title": "System Prompt",
-            "type": "string",
-            "x-ui": {
-              "order": 1,
-              "widget": "textarea"
-            }
-          }
-        },
-        "title": "FormatConvertParams",
-        "type": "object"
-      },
-      "permissions": [],
-      "policy_block": null,
-      "runner": "host",
-      "type_id": "data.format_convert",
       "version": "1.0.0"
     },
     {
@@ -646,7 +606,13 @@
             "title": "Weight 1",
             "type": "number",
             "x-ui": {
-              "order": 1
+              "order": 1,
+              "visible_when": {
+                "strategy": [
+                  "interleave_under",
+                  "interleave_over"
+                ]
+              }
             }
           },
           "weight_2": {
@@ -656,7 +622,13 @@
             "title": "Weight 2",
             "type": "number",
             "x-ui": {
-              "order": 2
+              "order": 2,
+              "visible_when": {
+                "strategy": [
+                  "interleave_under",
+                  "interleave_over"
+                ]
+              }
             }
           },
           "weight_3": {
@@ -666,7 +638,13 @@
             "title": "Weight 3",
             "type": "number",
             "x-ui": {
-              "advanced": true
+              "advanced": true,
+              "visible_when": {
+                "strategy": [
+                  "interleave_under",
+                  "interleave_over"
+                ]
+              }
             }
           },
           "weight_4": {
@@ -676,7 +654,13 @@
             "title": "Weight 4",
             "type": "number",
             "x-ui": {
-              "advanced": true
+              "advanced": true,
+              "visible_when": {
+                "strategy": [
+                  "interleave_under",
+                  "interleave_over"
+                ]
+              }
             }
           }
         },
