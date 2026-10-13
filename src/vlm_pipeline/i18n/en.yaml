@@ -887,6 +887,7 @@ run:
   view_results: View results
   connection_lost: Lost connection to the app, reconnecting… The run keeps going on the machine.
 workflow:
+  untitled: Untitled workflow
   save: Save workflow
   open: Open workflow
   unsaved: Unsaved changes
@@ -990,6 +991,19 @@ engine_warning:
   bf16_adam_params:
     title: The model may have learned less than expected
     what: Weights were trained in bf16 without an fp32 copy, so very small updates were rounded away. The model may have learned much less than the number of steps suggests. Compare its score with the base model before using it.
+trial:
+  image_too_large: The image is larger than 20 MB. Use a smaller one.
+  upload_failed: Could not upload the image. Try again.
+  uploading: Uploading the image…
+  image_alt: Image for the trial run
+  image_selected: Image selected
+  image_remove: Remove image
+  result_title: Trial run result
+  result_not_ready: No result yet.
+  result_too_large: The result is too long to show here.
+  truncated: The answer was cut off at the length limit
+  meta: "Engine {engine} · {token_count} tokens"
+  details: Technical details
 error_group:
   CACHE: Saved step results
   CFG: Workflow setup (wires, settings)
@@ -1003,3 +1017,19 @@ error_group:
   NET: Network
   SEC: Safety and licenses
   SYS: System and running processes
+d4:
+  est_time: Time
+  step_count: "{step_count} steps"
+  issue_count: "{error_count} errors · {warning_count} warnings"
+  tools: Tools
+  library: Step library
+  close: Close
+  fit_view: Fit to screen
+  zoom_in: Zoom in
+  zoom_out: Zoom out
+  mode_to_advanced: Turn on Advanced mode
+  mode_to_simple: Back to Simple mode
+  dock: Bottom panel
+  dock_expand: Open panel
+  dock_collapse: Collapse panel
+  explain: Explanation

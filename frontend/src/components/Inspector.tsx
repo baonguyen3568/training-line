@@ -1,13 +1,17 @@
 import { useState } from "react";
-import type { NodeSpec, ParamSchema, PortType, Workflow } from "../api/types";
+import type { NodeSpec, OptionMeta, ParamSchema, PortType, Workflow } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
-import { nodeDesc, nodeTitle } from "../lib/nodeText";
+import { formatEstimate } from "../lib/format";
+import { nodeDesc, nodeTitle, workflowTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
 import { selfAndDownstream } from "../lib/topo";
 import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
+import { Icon } from "./Icon";
+import { ImageUpload } from "./ImageUpload";
+import { TrialResult } from "./TrialResult";
 
 interface SourceOption {
   value: string; // "nodeId:port"
@@ -95,6 +99,24 @@ function ParamField({
   const mode = useUi((s) => s.mode);
   const availGb = useSystem((s) => s.status?.mem_available_gb);
   const current = value ?? schema.default;
+  const widget = schema["x-ui"]?.widget;
+  if (widget === "image_upload") {
+    return <ImageUpload id={id} label={label} value={String(current ?? "")} onChange={onChange} />;
+  }
+  if (widget === "textarea") {
+    return (
+      <div className="field">
+        <label htmlFor={id}>{label}</label>
+        <textarea
+          id={id}
+          rows={3}
+          maxLength={schema.maxLength}
+          value={String(current ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    );
+  }
   if (schema.type === "array" && schema.enum) {
     const selected = new Set(Array.isArray(current) ? current : []);
     return (
@@ -182,34 +204,160 @@ function ParamField({
 
 type FieldProps = Parameters<typeof ParamField>[0];
 
-/** Field + its plain-language help line (node.<type>.param.<name>.help). */
-function ParamRow(props: FieldProps) {
+/**
+ * Field + its plain-language help (node.<type>.param.<name>.help). Classic: a help line under the field.
+ * D4: the help sits behind a "?" popover (no stray text), while this field's own errors stay right under it.
+ */
+function ParamRow(props: FieldProps & { errors?: string[] }) {
+  const { errors = [], ...field } = props;
   const help = tpOptional(["node", props.nodeType, "param", props.name, "help"]);
+  const d4 = useUi((s) => s.skin) === "d4";
+  const popId = `help-${props.name}`;
   return (
     <div className="param-row">
-      <ParamField {...props} />
-      {help && <p className="help">{help}</p>}
+      <ParamField {...field} />
+      {help && !d4 && <p className="help">{help}</p>}
+      {help && d4 && (
+        <>
+          <button
+            type="button"
+            className="help-btn"
+            popoverTarget={popId}
+            aria-label={t("d4.explain")}
+          >
+            <Icon name="circle-question-mark" size={14} />
+          </button>
+          <div id={popId} popover="auto" className="pop">
+            {help}
+          </div>
+        </>
+      )}
+      {d4 &&
+        errors.map((e) => (
+          <p key={e} className="field-error" role="alert">
+            {e}
+          </p>
+        ))}
     </div>
   );
 }
 
+/** Catalog entry of the model feeding this node: follow model-typed inputs upstream to a model picker. */
+function upstreamModelMeta(
+  workflow: Workflow,
+  specs: Map<string, NodeSpec>,
+  nodeId: string,
+  seen = new Set<string>(),
+): OptionMeta | undefined {
+  if (seen.has(nodeId)) return undefined;
+  seen.add(nodeId);
+  const node = workflow.nodes.find((n) => n.id === nodeId);
+  const spec = node && specs.get(node.type);
+  if (!node || !spec) return undefined;
+  const picked = spec.params_schema.properties.model?.["x-ui"]?.option_meta;
+  if (picked && typeof node.params.model === "string") return picked[node.params.model];
+  for (const [port, ps] of Object.entries(spec.inputs)) {
+    if (ps.type !== "Model" && ps.type !== "Checkpoint") continue;
+    const edge = workflow.edges.find((e) => e.to[0] === nodeId && e.to[1] === port);
+    const found = edge && upstreamModelMeta(workflow, specs, edge.from[0], seen);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * D4: with nothing selected the right column still helps (design r1 #3): step count, pre-flight state and the
+ * estimate with its source; unknown numbers read "chưa có số đo", never a guess.
+ */
+function WorkflowSummary() {
+  const { workflow, validation } = useWorkflow();
+  if (!workflow) return null;
+  const errors = validation?.errors.filter((e) => e.severity === "error").length ?? 0;
+  const warnings = validation?.errors.filter((e) => e.severity === "warn").length ?? 0;
+  const est = validation?.estimate;
+  const unknown = !est || est.source === "unknown";
+  const rows: [string, string, string][] = [
+    [
+      "timer",
+      t("d4.est_time"),
+      unknown
+        ? t("estimate.source.unknown")
+        : formatEstimate(est.duration_min, "minutes", est.source),
+    ],
+    [
+      "memory-stick",
+      "RAM",
+      unknown
+        ? t("estimate.source.unknown")
+        : formatEstimate(est.ram_gb_peak, "ram_gb", est.source),
+    ],
+    [
+      "hard-drive",
+      t("header.disk"),
+      unknown ? t("estimate.source.unknown") : formatEstimate(est.disk_gb, "disk_gb", est.source),
+    ],
+  ];
+  return (
+    <aside className="inspector wf-summary" aria-label={workflowTitle(workflow.name)}>
+      <h2>{workflowTitle(workflow.name)}</h2>
+      <p>{t("d4.step_count", { step_count: workflow.nodes.length })}</p>
+      <p>
+        {errors === 0 && warnings === 0 ? (
+          <>
+            <span className="si si-completed">
+              <Icon name="circle-check-big" size={14} />
+            </span>{" "}
+            {t("preflight.summary_ok")}
+          </>
+        ) : (
+          <>
+            <span className={`si ${errors ? "si-bad" : "si-warn"}`}>
+              <Icon name={errors ? "circle-x" : "triangle-alert"} size={14} />
+            </span>{" "}
+            {t("d4.issue_count", { error_count: errors, warning_count: warnings })}
+          </>
+        )}
+      </p>
+      <dl className="est">
+        {rows.map(([icon, label, value]) => (
+          <div key={label}>
+            <dt>
+              <Icon name={icon} size={14} /> {label}
+            </dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </aside>
+  );
+}
+
 export function Inspector() {
-  const { workflow, specs, ports, selectedId, validation } = useWorkflow();
+  const { workflow, specs, ports, selectedId, validation, run } = useWorkflow();
+  const skin = useUi((st) => st.skin);
   const { setParam, connect, disconnect } = useWorkflow.getState();
   const mode = useUi((s) => s.mode);
   const [expanded, setExpanded] = useState(false);
   const node = workflow?.nodes.find((n) => n.id === selectedId);
   if (!workflow || !node) {
+    if (skin === "d4" && workflow) return <WorkflowSummary />;
     return <aside className="inspector muted">{t("inspector.empty_hint")}</aside>;
   }
   const spec = specs.get(node.type);
   if (!spec) return <aside className="inspector">{t("error.CFG-004.title")}</aside>;
   const issues = validation?.errors.filter((e) => e.node_id === node.id) ?? [];
+  const fieldErrors = (param: string) => issues.filter((e) => e.param === param).map((e) => e.what);
 
   const params = Object.entries(spec.params_schema.properties).sort(
     ([, a], [, b]) => (a["x-ui"]?.order ?? 99) - (b["x-ui"]?.order ?? 99),
   );
-  const simple = params.filter(([, s]) => !s["x-ui"]?.advanced);
+  // "Chạy thử": a model with a fixed task (Nemotron-Parse) ignores the question, so do not ask it (B-7).
+  const fixedPrompt = upstreamModelMeta(workflow, specs, node.id)?.task_prompt_fixed === true;
+  const simple = params.filter(
+    ([name, s]) =>
+      !s["x-ui"]?.advanced &&
+      !(fixedPrompt && s["x-ui"]?.widget === "textarea" && name === "prompt"),
+  );
   const advanced = params.filter(([, s]) => s["x-ui"]?.advanced);
   // Advanced mode: everything visible + technical id. Simple: advanced params behind a per-node toggle,
   // but changes made there stay visible as a badge (P010 §10 — no hidden changes).
@@ -300,6 +448,7 @@ export function Inspector() {
 
       {simple.map(([name, schema]) => (
         <ParamRow
+          errors={fieldErrors(name)}
           key={name}
           nodeType={node.type}
           name={name}
@@ -321,6 +470,7 @@ export function Inspector() {
       {showAdvanced &&
         advanced.map(([name, schema]) => (
           <ParamRow
+            errors={fieldErrors(name)}
             key={name}
             nodeType={node.type}
             name={name}
@@ -329,6 +479,13 @@ export function Inspector() {
             onChange={(v) => setParam(node.id, name, v)}
           />
         ))}
+      {node.type.startsWith("serve.") && run?.nodes[node.id]?.status === "completed" && (
+        <TrialResult
+          runId={run.id}
+          nodeId={node.id}
+          imageId={typeof node.params.image === "string" ? node.params.image : undefined}
+        />
+      )}
     </aside>
   );
 }

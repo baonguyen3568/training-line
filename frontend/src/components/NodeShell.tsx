@@ -9,6 +9,7 @@ import { runWarningText } from "../lib/runWarning";
 import { identifierView, untrustedText } from "../lib/safeText";
 import { useUi } from "../store/ui";
 import type { NodeRunState } from "../store/workflow";
+import { Icon } from "./Icon";
 
 export interface ShellData extends Record<string, unknown> {
   typeId: string;
@@ -66,8 +67,28 @@ const RUN_COPY: Record<NodeRunState["status"], string> = {
   interrupted: "interrupted",
 };
 
+// D4 (design 2026-10-13): Lucide glyph per state; only the glyph carries status ink, the label stays text ink.
+const RUN_LUCIDE: Record<NodeRunState["status"], string> = {
+  pending: "clock",
+  cached: "rotate-ccw-clock",
+  running: "loader-circle",
+  completed: "circle-check-big",
+  failed: "circle-x",
+  skipped: "circle-minus",
+  interrupted: "circle-pause",
+};
+
+function StateGlyph({ icon, tone }: { icon: string; tone: "bad" | "warn" | "muted" }) {
+  return (
+    <span className={`si si-${tone}`}>
+      <Icon name={icon} size={14} />
+    </span>
+  );
+}
+
 /** Run state on the node face: icon + text (never color alone) and a 3px progress bar while running. */
 function RunBadge({ state }: { state: NodeRunState }) {
+  const d4 = useUi((s) => s.skin) === "d4";
   const percent = state.progress === undefined ? undefined : Math.round(state.progress * 100);
   const text =
     state.status === "running"
@@ -80,7 +101,14 @@ function RunBadge({ state }: { state: NodeRunState }) {
   return (
     <>
       <span className={`state run ${state.status}`}>
-        {RUN_ICON[state.status]} {text}
+        {d4 ? (
+          <span className={`si si-${state.status}`}>
+            <Icon name={RUN_LUCIDE[state.status]} size={14} />
+          </span>
+        ) : (
+          RUN_ICON[state.status]
+        )}{" "}
+        {text}
       </span>
       {state.status === "running" && (
         <span
@@ -99,13 +127,16 @@ function RunBadge({ state }: { state: NodeRunState }) {
 function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
   const { spec, ports, issues, typeId, step, params, runState } = data;
   const mode = useUi((s) => s.mode);
+  const d4 = useUi((s) => s.skin) === "d4";
   const customized = mode === "simple" ? customizedAdvanced(spec, params) : [];
   // Key choices on the node face (x-ui.summary), e.g. the chosen model/dataset; repo ids shortened to the name.
   const summary = Object.entries(spec?.params_schema.properties ?? {})
     .filter(([, s]) => s["x-ui"]?.summary)
     .map(([name, s]) => {
       const v = String(params[name] ?? s.default ?? "");
-      return s["x-ui"]?.option_meta?.[v]?.label ?? v; // catalog id → display name
+      const keys = s["x-ui"]?.option_keys;
+      // catalog id → display name; enum value → its option copy ("3" → "3 lượt", design D4 r1 B4)
+      return s["x-ui"]?.option_meta?.[v]?.label ?? (keys ? tpOptional([keys, v]) : undefined) ?? v;
     })
     .filter(Boolean)
     .map((v) =>
@@ -209,25 +240,32 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
         )}
         {errors.length > 0 && (
           <span className="state failed">
-            ✕ {t("node_state.failed")} ({errors.length})
+            {d4 ? <StateGlyph icon="circle-dashed" tone="bad" /> : "✕"}{" "}
+            {d4 ? t("node_state.not_ready") : t("node_state.failed")} ({errors.length})
           </span>
         )}
         {errors.length === 0 && warns.length > 0 && (
-          <span className="state warn">⚠ {warns.length}</span>
+          <span className="state warn">
+            {d4 ? <StateGlyph icon="triangle-alert" tone="warn" /> : "⚠"} {warns.length}
+          </span>
         )}
         {runState?.warnings?.map((w, i) => {
           const text = runWarningText(w, () => nodeTitle(spec, typeId));
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: warnings are append-only for one run
             <span key={i} className="state warn run-warning" title={text.what}>
-              ⚠ {text.title}
+              {d4 ? <StateGlyph icon="triangle-alert" tone="warn" /> : "⚠"} {text.title}
             </span>
           );
         })}
         {runState ? (
           <RunBadge state={runState} />
         ) : (
-          issues.length === 0 && <span className="state ready">○ {t("node_state.ready")}</span>
+          issues.length === 0 && (
+            <span className="state ready">
+              {d4 ? <StateGlyph icon="circle-dot" tone="muted" /> : "○"} {t("node_state.ready")}
+            </span>
+          )
         )}
       </div>
     </div>

@@ -31,7 +31,15 @@ export interface PortSpec {
 
 /** UI hints carried on each JSON Schema property (`x-ui`, P004 §8.2). */
 export interface UiHint {
-  widget?: "slider" | "select" | "segmented" | "text" | "number" | "toggle";
+  widget?:
+    | "slider"
+    | "select"
+    | "segmented"
+    | "text"
+    | "number"
+    | "toggle"
+    | "textarea"
+    | "image_upload";
   order?: number;
   preset?: boolean;
   advanced?: boolean;
@@ -51,11 +59,15 @@ export interface OptionMeta {
   gated?: boolean;
   license?: string;
   vendor?: string;
+  /** The model always does one task (Nemotron-Parse): the "Chạy thử" question is ignored, so the UI hides it. */
+  task_prompt_fixed?: boolean;
 }
 
 export interface ParamSchema {
   type: "string" | "number" | "integer" | "boolean" | "array";
   enum?: (string | number)[];
+  maxLength?: number;
+  pattern?: string;
   default?: unknown;
   minimum?: number;
   maximum?: number;
@@ -332,4 +344,24 @@ export interface StorageApplyResult {
   pruned: unknown[];
   skipped: { item_id: string; reason: string }[];
   freed_gb: number;
+}
+
+/** B-7 (backend app/uploads.py): POST /api/uploads response. `label` is the client's file name: untrusted. */
+export interface UploadInfo {
+  upload_id: string;
+  label: string;
+  width: number;
+  height: number;
+  size_bytes: number;
+}
+/** GET /api/runs/{id}/nodes/{node}/result for serve.* ("Chạy thử"). Written by a container: untrusted text. */
+export interface TrialResult {
+  engine_used: string;
+  engine_requested?: string;
+  text: string;
+  n_tokens: number;
+  truncated: boolean;
+  decoding: Record<string, unknown>;
+  overrides: Record<string, unknown>;
+  model_class?: string;
 }

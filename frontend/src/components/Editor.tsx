@@ -12,16 +12,30 @@ import {
 } from "@xyflow/react";
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t, tp } from "../i18n";
-import { LANE_WIDTH, LANES, laneOf, ROW_HEIGHT } from "../lib/lanes";
+import {
+  LANE_WIDTH,
+  LANES,
+  type Lane,
+  type LaneBox,
+  laneBoxes,
+  laneOf,
+  occupiedLanes,
+  ROW_HEIGHT,
+  toDisplayX,
+  toModelX,
+} from "../lib/lanes";
 import { nodeTitle } from "../lib/nodeText";
 import { isCompatible, tokenVar } from "../lib/ports";
 import { selfAndDownstream, stepNumbers } from "../lib/topo";
+import { useUi } from "../store/ui";
 import { graphKey, useWorkflow } from "../store/workflow";
 import { CheckBar } from "./CheckBar";
 import { Inspector } from "./Inspector";
 import { DRAG_MIME, NodeLibrary } from "./NodeLibrary";
 import { NodeShell, type ShellNode } from "./NodeShell";
+import { Dock, IconStrip, LibraryFlyout } from "./ShellD4";
 import { Toolbar } from "./Toolbar";
+import { ToolbarD4 } from "./ToolbarD4";
 
 const nodeTypes = { vlm: NodeShell };
 const NARROW = "(max-width: 1279px)";
@@ -42,36 +56,68 @@ const VALIDATE_DEBOUNCE_MS = 500;
 const LANE_TOP = -4000;
 const LANE_HEIGHT = 12000;
 
-function Lanes() {
+function Lanes({ boxes }: { boxes: readonly LaneBox[] }) {
   // Labels stick to the top edge of the visible canvas and stay ≥12px on screen at any zoom (design review #2).
   const { y, zoom } = useViewport();
   const labelTop = (-y + 48) / zoom - LANE_TOP; // below the canvas toolbar
   return (
     <ViewportPortal>
-      {LANES.map((lane, i) => (
-        <div
-          key={lane}
-          className="lane"
-          style={{
-            transform: `translate(${i * LANE_WIDTH}px, ${LANE_TOP}px)`,
-            width: LANE_WIDTH,
-            height: LANE_HEIGHT,
-          }}
-        >
-          <span
-            className="lane-label"
-            style={{ top: labelTop, fontSize: `${12 / Math.min(zoom, 1)}px` }}
+      {boxes.map((box) => {
+        const name = t(`canvas.lane.${box.lane}`);
+        return (
+          <div
+            key={box.lane}
+            className={box.compact ? "lane compact" : "lane"}
+            style={{
+              transform: `translate(${box.x}px, ${LANE_TOP}px)`,
+              width: box.width,
+              height: LANE_HEIGHT,
+            }}
+            title={box.compact ? name : undefined}
           >
-            {t(`canvas.lane.${lane}`)}
-          </span>
-        </div>
-      ))}
+            <span
+              className="lane-label"
+              style={{ top: labelTop, fontSize: `${12 / Math.min(zoom, 1)}px` }}
+            >
+              {/* compact: only the circled number ①…⑦, full name in the tooltip */}
+              {box.compact ? Array.from(name)[0] : name}
+            </span>
+          </div>
+        );
+      })}
     </ViewportPortal>
   );
 }
 
 function EditorInner() {
   const { workflow, specs, ports, validation, selectedId, run } = useWorkflow();
+  const skin = useUi((st) => st.skin);
+  // D4 compact lanes: geometry from occupied lanes; frozen while a node is dragged (a lane only shrinks after
+  // the drop), and the target lane of a library drag opens under the cursor.
+  const [dragLane, setDragLane] = useState<Lane | null>(null);
+  const [nodeDragging, setNodeDragging] = useState(false);
+  const frozen = useRef<LaneBox[] | null>(null);
+  const liveBoxes = useMemo(
+    () =>
+      laneBoxes(
+        occupiedLanes((workflow?.nodes ?? []).map((n) => n.ui?.x ?? 0)),
+        dragLane,
+        skin === "d4",
+      ),
+    [workflow, dragLane, skin],
+  );
+  if (!nodeDragging) frozen.current = null;
+  else if (!frozen.current) frozen.current = liveBoxes;
+  const boxes = frozen.current ?? liveBoxes;
+  useEffect(() => {
+    const onDrag = (e: Event) => {
+      const typeId = (e as CustomEvent<string | null>).detail;
+      const cat = typeId ? specs.get(typeId)?.category : undefined;
+      setDragLane(cat ? laneOf(cat) : null);
+    };
+    window.addEventListener("vlm:library-drag", onDrag);
+    return () => window.removeEventListener("vlm:library-drag", onDrag);
+  }, [specs]);
   const {
     move,
     commitMove,
@@ -141,9 +187,11 @@ function EditorInner() {
       const typeId = e.dataTransfer.getData(DRAG_MIME);
       if (!typeId || locked) return;
       e.preventDefault();
-      placeInLane(typeId, screenToFlowPosition({ x: e.clientX, y: e.clientY }));
+      const at = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      placeInLane(typeId, { x: toModelX(at.x, boxes), y: at.y });
+      setDragLane(null);
     },
-    [placeInLane, screenToFlowPosition, locked],
+    [placeInLane, screenToFlowPosition, locked, boxes],
   );
 
   // Keyboard: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z or Ctrl+Y redo, Ctrl/Cmd+D duplicate selection.
@@ -170,7 +218,7 @@ function EditorInner() {
     return workflow.nodes.map((n) => ({
       id: n.id,
       type: "vlm",
-      position: n.ui ?? { x: 0, y: 0 },
+      position: { x: toDisplayX(n.ui?.x ?? 0, boxes), y: n.ui?.y ?? 0 },
       selected: n.id === selectedId,
       className: n.id === flashId ? "flash" : undefined,
       draggable: !locked,
@@ -185,7 +233,7 @@ function EditorInner() {
         runState: run?.nodes[n.id],
       },
     }));
-  }, [workflow, specs, ports, validation, selectedId, run, locked, flashId]);
+  }, [workflow, specs, ports, validation, selectedId, run, locked, flashId, boxes]);
 
   const edges: Edge[] = useMemo(() => {
     if (!workflow) return [];
@@ -286,12 +334,17 @@ function EditorInner() {
   const onNodesChange = useCallback(
     (changes: NodeChange<ShellNode>[]) => {
       for (const ch of changes) {
-        if (ch.type === "position" && ch.position) move(ch.id, ch.position.x, ch.position.y);
-        if (ch.type === "position" && ch.dragging === false) commitMove();
+        if (ch.type === "position" && ch.position)
+          move(ch.id, toModelX(ch.position.x, boxes), ch.position.y);
+        if (ch.type === "position" && ch.dragging === true) setNodeDragging(true);
+        if (ch.type === "position" && ch.dragging === false) {
+          commitMove();
+          setNodeDragging(false);
+        }
         if (ch.type === "select" && ch.selected) select(ch.id);
       }
     },
-    [move, commitMove, select],
+    [move, commitMove, select, boxes],
   );
 
   const onNodesDelete = useCallback(
@@ -323,7 +376,13 @@ function EditorInner() {
       // canvas — panning on every add pushed earlier nodes out of view. Always select + flash it.
       const vp = getViewport();
       const rect = canvasRef.current?.getBoundingClientRect();
-      const left = pos.x * vp.zoom + vp.x;
+      // the node's lane opens after the add: measure against the new lane geometry
+      const after = laneBoxes(
+        occupiedLanes((useWorkflow.getState().workflow?.nodes ?? []).map((n) => n.ui?.x ?? 0)),
+        null,
+        skin === "d4",
+      );
+      const left = toDisplayX(pos.x, after) * vp.zoom + vp.x;
       const top = pos.y * vp.zoom + vp.y;
       const visible =
         !!rect &&
@@ -344,13 +403,25 @@ function EditorInner() {
       setFlashId(id);
       setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1200);
     },
-    [placeInLane, fitView, getViewport, getInternalNode],
+    [placeInLane, fitView, getViewport, getInternalNode, skin],
   );
 
   if (!workflow) return null;
+  const d4 = skin === "d4";
+  const errorCount = validation?.errors.filter((e) => e.severity === "error").length ?? 0;
   return (
-    <div className="editor">
-      <NodeLibrary onAdd={addFromLibrary} disabled={locked} />
+    <div className={d4 ? "editor d4" : "editor"}>
+      {d4 ? (
+        <>
+          <ToolbarD4 locked={locked} />
+          <IconStrip />
+          <LibraryFlyout>
+            <NodeLibrary onAdd={addFromLibrary} disabled={locked} />
+          </LibraryFlyout>
+        </>
+      ) : (
+        <NodeLibrary onAdd={addFromLibrary} disabled={locked} />
+      )}
       <section
         className="canvas"
         aria-label={workflow.name}
@@ -363,7 +434,7 @@ function EditorInner() {
         }}
         onDrop={onDrop}
       >
-        <Toolbar locked={locked} running={runLocked} />
+        {!d4 && <Toolbar locked={locked} running={runLocked} />}
         {narrow && (
           <p className="readonly-note" role="note">
             {t("app.read_only_small_screen")}
@@ -383,10 +454,13 @@ function EditorInner() {
           nodesConnectable={!locked}
           deleteKeyCode={locked ? null : ["Delete", "Backspace"]}
           defaultViewport={{ x: 16, y: 40, zoom: 1 }}
+          // D4 "one screen": empty lanes are compact, so the whole chain fits at ≥75% (design r1 B3).
+          fitView={d4 && workflow.nodes.length > 0}
+          fitViewOptions={{ minZoom: 0.75, maxZoom: 1, padding: 0.06 }}
           minZoom={0.3}
           proOptions={{ hideAttribution: false }}
         >
-          <Lanes />
+          <Lanes boxes={boxes} />
           <Background gap={24} color="var(--color-canvas-grid-dot)" />
           <Controls />
         </ReactFlow>
@@ -404,7 +478,13 @@ function EditorInner() {
         )}
       </section>
       <Inspector />
-      <CheckBar />
+      {d4 ? (
+        <Dock errorCount={errorCount}>
+          <CheckBar />
+        </Dock>
+      ) : (
+        <CheckBar />
+      )}
     </div>
   );
 }

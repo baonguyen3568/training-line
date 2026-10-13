@@ -887,6 +887,7 @@ run:
   view_results: Xem kết quả
   connection_lost: Mất kết nối với app, đang thử nối lại… Lần chạy vẫn tiếp tục trên máy.
 workflow:
+  untitled: Workflow chưa đặt tên
   save: Lưu workflow
   open: Mở workflow
   unsaved: Có thay đổi chưa lưu
@@ -990,6 +991,19 @@ engine_warning:
   bf16_adam_params:
     title: Model có thể học được ít hơn mong đợi
     what: Trọng số được train ở bf16 mà không giữ bản fp32, nên các bước cập nhật quá nhỏ bị làm tròn mất. Model có thể học được ít hơn nhiều so với số bước đã chạy. Hãy so điểm với model gốc trước khi dùng.
+trial:
+  image_too_large: Ảnh lớn hơn 20 MB. Hãy dùng ảnh nhỏ hơn.
+  upload_failed: Không tải ảnh lên được. Thử lại.
+  uploading: Đang tải ảnh lên…
+  image_alt: Ảnh để chạy thử
+  image_selected: Đã chọn ảnh
+  image_remove: Bỏ ảnh
+  result_title: Kết quả chạy thử
+  result_not_ready: Chưa có kết quả.
+  result_too_large: Kết quả quá dài nên không hiển thị được ở đây.
+  truncated: Câu trả lời bị cắt vì chạm giới hạn độ dài
+  meta: "Engine {engine} · {token_count} token"
+  details: Chi tiết kỹ thuật
 error_group:
   CACHE: Kết quả đã lưu của các bước
   CFG: Cách ghép workflow (nối dây, thiết lập)
@@ -1003,3 +1017,19 @@ error_group:
   NET: Kết nối mạng
   SEC: An toàn và giấy phép
   SYS: Hệ thống và tiến trình chạy
+d4:
+  est_time: Thời gian
+  step_count: "{step_count} bước"
+  issue_count: "{error_count} lỗi · {warning_count} cảnh báo"
+  tools: Công cụ
+  library: Thư viện bước
+  close: Đóng
+  fit_view: Vừa khung
+  zoom_in: Phóng to
+  zoom_out: Thu nhỏ
+  mode_to_advanced: Bật chế độ Nâng cao
+  mode_to_simple: Về chế độ Đơn giản
+  dock: Bảng dưới
+  dock_expand: Mở bảng
+  dock_collapse: Thu gọn bảng
+  explain: Giải thích

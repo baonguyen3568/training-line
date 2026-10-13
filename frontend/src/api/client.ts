@@ -14,6 +14,8 @@ import type {
   SystemStatus,
   Template,
   TemplateMeta,
+  TrialResult,
+  UploadInfo,
   ValidationResult,
   Workflow,
 } from "./types";
@@ -56,6 +58,14 @@ const isCsrfRejection = (status: number, data: unknown) =>
   data !== null &&
   (data as { code?: unknown }).code === "csrf_invalid";
 
+/** A non-JSON request body (POST /api/uploads takes the raw file, no multipart parser on the server). */
+export interface RawBody {
+  raw: Blob;
+  contentType: string;
+  headers?: Record<string, string>;
+}
+const isRaw = (b: unknown): b is RawBody => typeof b === "object" && b !== null && "raw" in b;
+
 async function request<T>(
   method: "GET" | "POST",
   path: string,
@@ -64,14 +74,15 @@ async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (method !== "GET") {
-    headers["Content-Type"] = "application/json";
+    headers["Content-Type"] = isRaw(body) ? body.contentType : "application/json";
+    if (isRaw(body)) Object.assign(headers, body.headers);
     headers["X-VLM-CSRF"] = await csrfToken(retried);
   }
   const res = await fetch(path, {
     method,
     headers,
     credentials: "same-origin",
-    body: body === undefined ? null : JSON.stringify(body),
+    body: body === undefined ? null : isRaw(body) ? body.raw : JSON.stringify(body),
   });
   const data: unknown = res.headers.get("content-type")?.includes("json") ? await res.json() : null;
   if (!res.ok) {
@@ -98,7 +109,14 @@ export interface Api {
   storagePlan(locale: string): Promise<StoragePlan>;
   /** Rejects with ApiError: 409 {code: PLAN_EXPIRED|CLEANUP_IN_PROGRESS}, 403 {error: DISK-002 + admin_command}. */
   storageApply(body: StorageApplyRequest, locale: string): Promise<StorageApplyResult>;
+  /** B-7. Rejects with ApiError {error: DATA-005 rendered (title/what)} on 400/413/415/507. */
+  upload(file: File, locale: string): Promise<UploadInfo>;
+  /** 404 {error: {code: RESULT_NOT_READY}}, 502 {error: {code: RESULT_TOO_LARGE}}. */
+  nodeResult(runId: string, nodeId: string): Promise<TrialResult>;
 }
+
+/** Preview URL of an upload (served as image/png, same origin, cookie-authenticated). */
+export const uploadUrl = (id: string) => `/api/uploads/${encodeURIComponent(id)}`;
 
 export const httpApi: Api = {
   nodeTypes: (locale) => request("GET", `/api/node-types?locale=${encodeURIComponent(locale)}`),
@@ -123,6 +141,17 @@ export const httpApi: Api = {
   storagePlan: (locale) => request("GET", `/api/storage/plan?locale=${encodeURIComponent(locale)}`),
   storageApply: (body, locale) =>
     request("POST", `/api/storage/apply?locale=${encodeURIComponent(locale)}`, body),
+  upload: (file, locale) =>
+    request("POST", `/api/uploads?locale=${encodeURIComponent(locale)}`, {
+      raw: file,
+      contentType: file.type || "application/octet-stream", // a hint only: the server sniffs the bytes
+      headers: { "X-Upload-Label": encodeURIComponent(file.name) },
+    } satisfies RawBody),
+  nodeResult: (runId, nodeId) =>
+    request(
+      "GET",
+      `/api/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/result`,
+    ),
   watchRun: (id, onEvent) => {
     // Browsers cannot set headers on WebSocket: auth = Origin + session cookie at handshake, then the
     // first message carries the CSRF token (P003 D13). Server closes with 4401 if missing/invalid.

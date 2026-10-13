@@ -6,6 +6,7 @@ import { t } from "./i18n";
 import { clearDraft, type Draft, loadDraft, saveDraft } from "./lib/draft";
 import { formatDateTime } from "./lib/format";
 import { useSystem } from "./store/system";
+import { useUi } from "./store/ui";
 import { useWorkflow } from "./store/workflow";
 
 // Run panels (and uPlot) load on demand to keep the editor bundle small.
@@ -25,12 +26,24 @@ export function App() {
   const [catalogError, setCatalogError] = useState(false);
   const [view, setView] = useState<View>({ kind: "home" });
   const worker = useSystem((s) => s.status?.worker);
+  const skin = useUi((s) => s.skin);
+  // D4 is dark-first regardless of the OS (design M2-6 r1 B1); light comes from Settings later. Classic follows the OS.
+  useEffect(() => {
+    if (skin === "d4") document.documentElement.dataset.theme = "dark";
+    else delete document.documentElement.dataset.theme;
+  }, [skin]);
   const [draft, setDraft] = useState<Draft | null>(() => loadDraft());
 
   // "Xem kết quả" in the check bar asks for the runs view.
   useEffect(() => {
     const go = (e: Event) => {
-      if ((e as CustomEvent).detail === "runs") setView({ kind: "runs" });
+      const to = (e as CustomEvent).detail;
+      if (to === "runs" || to === "storage") setView({ kind: to });
+      // D4 toolbar mark = back to the gallery (the classic header is not shown in the D4 editor)
+      if (to === "home") {
+        useWorkflow.getState().closeWorkflow();
+        setView({ kind: "home" });
+      }
     };
     window.addEventListener("vlm:navigate", go);
     return () => window.removeEventListener("vlm:navigate", go);
@@ -55,17 +68,22 @@ export function App() {
   }, [loadCatalog]);
   useEffect(load, [load]);
 
+  // M2-6: the D4 editor owns the whole screen (its toolbar replaces the header); other views keep the header.
+  const d4Editor = skin === "d4" && view.kind === "home" && !!workflow;
+
   const navigate = (to: Nav) => {
     if (to === "home") closeWorkflow();
     setView({ kind: to });
   };
 
   return (
-    <div className="app">
-      <Header
-        onNavigate={navigate}
-        active={view.kind === "home" ? "home" : view.kind === "storage" ? "storage" : "runs"}
-      />
+    <div className={d4Editor ? "app d4" : "app"}>
+      {!d4Editor && (
+        <Header
+          onNavigate={navigate}
+          active={view.kind === "home" ? "home" : view.kind === "storage" ? "storage" : "runs"}
+        />
+      )}
       {(import.meta.env.VITE_MOCK_API === "1" || worker === "fake") && (
         // Mock API: make it impossible to mistake the FakeWorker for real training (PM request).
         <p className="demo-banner" role="note">

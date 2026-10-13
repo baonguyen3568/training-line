@@ -8,3 +8,4 @@ test-results/
 playwright-report/
 test-results/
 playwright-report/
+src/generated/icons.ts

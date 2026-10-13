@@ -3,16 +3,15 @@ import { t } from "../i18n";
 import { parseWorkflowFile, serializeWorkflow } from "../lib/workflowFile";
 import { useWorkflow } from "../store/workflow";
 
-/** Canvas toolbar: new / open / save (.json) / undo / redo / duplicate / delete (M1-4). */
-export function Toolbar({ locked, running }: { locked: boolean; running: boolean }) {
-  const { workflow, selectedId, past, future } = useWorkflow();
-  const { newWorkflow, openWorkflow, undo, redo, duplicateNode, removeNodes } =
-    useWorkflow.getState();
+/** Save (.json download) and open (file picker) shared by the classic and the D4 toolbars. */
+export function useWorkflowFile() {
+  const workflow = useWorkflow((st) => st.workflow);
+  const { openWorkflow } = useWorkflow.getState();
   const fileInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  if (!workflow) return null;
 
   const save = () => {
+    if (!workflow) return;
     // Plain download (no File System Access API) so it works everywhere and in headless E2E.
     const blob = new Blob([serializeWorkflow(workflow)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -34,26 +33,39 @@ export function Toolbar({ locked, running }: { locked: boolean; running: boolean
     openWorkflow(res.workflow);
   };
 
+  const input = (
+    <input
+      ref={fileInput}
+      type="file"
+      accept=".json,application/json"
+      hidden
+      data-testid="workflow-file-input"
+      onChange={(e) => {
+        void open(e.target.files?.[0]);
+        e.target.value = "";
+      }}
+    />
+  );
+  return { save, pick: () => fileInput.current?.click(), input, error };
+}
+
+/** Canvas toolbar: new / open / save (.json) / undo / redo / duplicate / delete (M1-4). */
+export function Toolbar({ locked, running }: { locked: boolean; running: boolean }) {
+  const { workflow, selectedId, past, future } = useWorkflow();
+  const { newWorkflow, undo, redo, duplicateNode, removeNodes } = useWorkflow.getState();
+  const file = useWorkflowFile();
+  if (!workflow) return null;
+
   return (
     <div className="toolbar" role="toolbar" aria-label={t("app.name")}>
       <button type="button" onClick={newWorkflow} disabled={locked}>
         ＋ {t("gallery.blank_workflow")}
       </button>
-      <button type="button" onClick={() => fileInput.current?.click()} disabled={locked}>
+      <button type="button" onClick={file.pick} disabled={locked}>
         📂 {t("workflow.open")}
       </button>
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        hidden
-        data-testid="workflow-file-input"
-        onChange={(e) => {
-          void open(e.target.files?.[0]);
-          e.target.value = "";
-        }}
-      />
-      <button type="button" onClick={save}>
+      {file.input}
+      <button type="button" onClick={file.save}>
         💾 {t("workflow.save")}
       </button>
       <span className="sep" />
@@ -91,9 +103,9 @@ export function Toolbar({ locked, running }: { locked: boolean; running: boolean
         🗑 {t("workflow.delete")}
       </button>
       {running && <span className="muted small">🔒 {t("run.locked_while_running")}</span>}
-      {error && (
+      {file.error && (
         <span role="alert" className="toolbar-error">
-          {error}
+          {file.error}
         </span>
       )}
     </div>

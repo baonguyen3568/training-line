@@ -18,10 +18,9 @@ function shortTime(iso: string | undefined): string {
 
 export type Nav = "home" | "runs" | "storage";
 
-export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; active: Nav }) {
+/** Poll GET /api/system every 10 s into the system store (header chips, RAM-fit badges). */
+export function useSystemPoll(): SystemStatus | null {
   const [sys, setSys] = useState<SystemStatus | null>(null);
-  const { mode, setMode } = useUi();
-
   useEffect(() => {
     let alive = true;
     const load = () =>
@@ -40,9 +39,15 @@ export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; 
       clearInterval(timer);
     };
   }, []);
+  return sys;
+}
 
-  const lock = sys?.gpu_lock;
-  const gpuText = !lock
+/** GPU chip copy + state, shared by the classic header and the D4 toolbar. */
+export function gpuChip(lock: SystemStatus["gpu_lock"] | undefined): {
+  text: string;
+  state: string;
+} {
+  const text = !lock
     ? "GPU · …"
     : lock.stale
       ? t("header.gpu_stale")
@@ -53,7 +58,14 @@ export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; 
             since: shortTime(lock.since),
           })
         : t("header.gpu_free");
-  const gpuState = !lock ? "unknown" : lock.stale ? "critical" : lock.held ? "busy" : "free";
+  const state = !lock ? "unknown" : lock.stale ? "critical" : lock.held ? "busy" : "free";
+  return { text, state };
+}
+
+export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; active: Nav }) {
+  const sys = useSystemPoll();
+  const { mode, setMode } = useUi();
+  const { text: gpuText, state: gpuState } = gpuChip(sys?.gpu_lock);
 
   return (
     <header className="app-header">

@@ -8,6 +8,10 @@ import { useWorkflow } from "../store/workflow";
 
 export const DRAG_MIME = "application/vlm-node-type";
 
+/** Type being dragged from the library: dataTransfer data is unreadable during dragover, the canvas needs it to
+ * open the right (compact) lane under the cursor (design M2-6 r1 B3). */
+export const libraryDrag: { typeId: string | null } = { typeId: null };
+
 /** Left sidebar (M1-4, design spec M1-5): grouped by lane, accent-insensitive search, drag or double-click/Enter. */
 export function NodeLibrary({
   onAdd,
@@ -97,6 +101,14 @@ export function NodeLibrary({
                     onDragStart={(e) => {
                       e.dataTransfer.setData(DRAG_MIME, spec.type_id);
                       e.dataTransfer.effectAllowed = "copy";
+                      libraryDrag.typeId = spec.type_id;
+                      window.dispatchEvent(
+                        new CustomEvent("vlm:library-drag", { detail: spec.type_id }),
+                      );
+                    }}
+                    onDragEnd={() => {
+                      libraryDrag.typeId = null;
+                      window.dispatchEvent(new CustomEvent("vlm:library-drag", { detail: null }));
                     }}
                     onDoubleClick={() => onAdd(spec.type_id)}
                     onKeyDown={(e) => {
