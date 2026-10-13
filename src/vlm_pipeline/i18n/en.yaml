@@ -1195,6 +1195,8 @@ param_unsupported:
   worker_v1: This option is still being built and the app cannot run it yet. Choose another value.
 settings:
   no_password_manager: If the browser offers to save a password, choose "Never". The token should only be stored in the app.
+  policy_warning:
+    APPROVAL_OFF_SHARED: "This machine is shared, but large deletes need no approval: anyone using the app here can delete a lot of data without an admin's OK."
   policy_default: App default
   locked_default: The app uses its built-in default. Only an admin can change it when installing the app.
   policy_value:

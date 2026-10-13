@@ -98,6 +98,28 @@ def test_admin_policy_is_value_and_source(tmp_path: Path) -> None:
     assert set(shown) == set(settings_api.ADMIN_POLICY_KEYS)
 
 
+@pytest.mark.parametrize(
+    ("profile_env", "admin_profile", "warned"),
+    [(None, "shared_dev", True), ("personal", None, False), (None, None, True), ("lab", None, True)],
+)
+def test_approval_off_on_a_shared_host_is_flagged(
+    monkeypatch: pytest.MonkeyPatch, profile_env: str | None, admin_profile: str | None, warned: bool
+) -> None:
+    """Security: an admin may turn deletion approval off on a shared host, but the Settings page says so."""
+    from vlm_pipeline.app.settings_api import _admin_values
+
+    if profile_env is None:
+        monkeypatch.delenv("VLM_PROFILE", raising=False)
+    else:
+        monkeypatch.setenv("VLM_PROFILE", profile_env)
+    policy: dict[str, object] = {"storage": {"approval_policy": "none"}}
+    if admin_profile:
+        policy["deployment"] = {"profile": admin_profile}
+    row = _admin_values(policy)["storage.approval_policy"]
+    assert (row.get("warning") == "APPROVAL_OFF_SHARED") is warned
+    assert "warning" not in _admin_values({"storage": {"approval_policy": "threshold"}})["storage.approval_policy"]
+
+
 def test_body_is_capped_while_reading(client: TestClient) -> None:
     big = b'{"value": "' + b"x" * (settings_api.MAX_BODY_BYTES + 10) + b'"}'
     r = client.put("/api/settings/HF_TOKEN", content=iter([big[:1000], big[1000:]]))  # no Content-Length to trust

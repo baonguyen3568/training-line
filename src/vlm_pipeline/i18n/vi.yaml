@@ -1195,6 +1195,8 @@ param_unsupported:
   worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.
 settings:
   no_password_manager: Nếu trình duyệt hỏi có lưu mật khẩu không, hãy chọn "Không bao giờ". Token chỉ nên lưu trong app.
+  policy_warning:
+    APPROVAL_OFF_SHARED: "Máy này dùng chung nhưng không cần duyệt khi xoá nhiều: ai dùng app trên máy cũng xoá được lượng lớn dữ liệu mà không cần quản trị viên đồng ý."
   policy_default: Mặc định của app
   locked_default: App đang dùng giá trị mặc định có sẵn. Chỉ quản trị viên đổi được khi cài app.
   policy_value:

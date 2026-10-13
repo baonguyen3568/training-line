@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections.abc import Callable
 from dataclasses import asdict
 from typing import Any
@@ -24,9 +25,10 @@ from fastapi.responses import JSONResponse
 
 from vlm_pipeline.app.secret_store import MAX_SECRET_CHARS, SECRET_FIELDS, SecretKeyError, SecretStore, load_key
 from vlm_pipeline.app.security import SESSION_COOKIE
-from vlm_pipeline.common.app_config import read_policy
+from vlm_pipeline.common.app_config import effective_profile, read_policy
 
 MAX_BODY_BYTES = 16 * 1024
+PROFILE_ENV = "VLM_PROFILE"
 ADMIN_POLICY_KEYS = (
     "deployment.profile",
     "storage.schedule",
@@ -86,7 +88,17 @@ def _admin_values(policy: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
         table = (policy or {}).get(section)
         value = table.get(name) if isinstance(table, dict) else None
         out[dotted] = {"value": value, "source": "deployment" if value is not None else "default"}
+    if out["storage.approval_policy"]["value"] == "none" and _shared_host(policy):
+        out["storage.approval_policy"]["warning"] = "APPROVAL_OFF_SHARED"  # allowed, never silent (security)
     return out
+
+
+def _shared_host(policy: dict[str, Any] | None) -> bool:
+    """Not an effective ``personal`` install (same rule as storage: no profile anywhere counts as shared)."""
+    try:
+        return effective_profile(os.environ.get(PROFILE_ENV), policy) != "personal"
+    except ValueError:  # an unknown VLM_PROFILE: treat as shared (fail closed)
+        return True
 
 
 async def _read_body(request: Request) -> bytes | None:
