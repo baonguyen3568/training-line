@@ -9,8 +9,10 @@ receives the typed job and builds the argv itself, never an argv from the app.
 from __future__ import annotations
 
 import json
+import os
 import signal
 import subprocess
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -43,6 +45,8 @@ class JobLauncher(Protocol):
 
 class LocalDockerLauncher:
     """The docker CLI on the host (dev mode; the behaviour run_job always had)."""
+
+    checks_images = True  # run_job resolves and gates the image itself before the lock
 
     def image_id(self, image: str) -> str | None:
         try:
@@ -94,4 +98,112 @@ class LocalDockerLauncher:
         subprocess.run(["docker", "rm", name], capture_output=True, check=False)  # noqa: S603,S607
 
 
-__all__ = ["JobLauncher", "LocalDockerLauncher"]
+class RunnerError(RuntimeError):
+    """vlm-runner refused or failed a request; ``reason`` is its rule name (never a traceback)."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"runner: {reason}")
+        self.reason = reason
+
+
+class RunnerLauncher:
+    """The compose path (ADR-015): typed requests to ``vlm-runner`` over a unix socket; no docker CLI in the app.
+
+    The runner checks the image (IMAGES.lock + APPROVED, runs it by id), the GPU token, the mounts and "one job per
+    run id" itself, at the trust boundary; ``checks_images`` tells ``run_job`` not to try (no docker here).
+    """
+
+    checks_images = False
+    POLL_S = 2.0
+
+    def __init__(self, socket_path: Path) -> None:
+        self.socket_path = socket_path
+        self.last_image_id: str | None = None
+
+    def _call(self, body: dict[str, object]) -> dict[str, object]:
+        import socket
+
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+            conn.connect(str(self.socket_path))
+            conn.sendall(json.dumps(body).encode("utf-8"))
+            conn.shutdown(socket.SHUT_WR)
+            reply = json.loads(conn.makefile("rb").read() or b"{}")
+        if not isinstance(reply, dict):
+            raise RunnerError("bad_reply")
+        return reply
+
+    def image_id(self, image: str) -> str | None:
+        return None  # the runner resolves and pins it; the manifest gets the id the runner reports
+
+    def run(
+        self, job: ContainerJob, project_root: Path, *, lock_token: str | None, log_path: Path, image_id: str | None
+    ) -> int:
+        from vlm_pipeline.common.job_kinds import job_kind
+
+        if not job.narrow or len(job.rw_dirs) != 1:
+            raise RunnerError("not_a_narrowed_job")
+        kind = job_kind(tuple(job.argv))
+        if kind is None:
+            raise RunnerError("argv_not_allowed")
+        reply = self._call({
+            "command": "submit", "run_id": job.name, "job_kind": kind, "image_tag": job.image, "argv": list(job.argv),
+            "gpu": job.gpu, "memory_gb": job.memory_gb, "lock_token": lock_token,
+            "run_dir": _app_path(job.rw_dirs[0], project_root),
+            "inputs": [_app_path(p, project_root) for p in job.ro_inputs],
+        })  # fmt: skip
+        if reply.get("ok") is not True:
+            raise RunnerError(str(reply.get("error", "refused")))
+        self.last_image_id = str(reply.get("image_id") or "") or None
+        while True:  # the runner owns the container; we only watch it
+            running, info = self._status(f"vlm-{job.name}")
+            if not running:
+                return info.exit_code
+            time.sleep(self.POLL_S)
+
+    def _ref(self, command: str, name: str) -> dict[str, object]:
+        return self._call({"command": command, "run_id": name.removeprefix("vlm-")})
+
+    def stop(self, name: str, grace_s: int) -> None:
+        self._ref("stop", name)  # the runner applies its own grace period
+
+    def kill(self, name: str) -> None:
+        self._ref("kill", name)
+
+    def _status(self, name: str) -> tuple[bool, ExitInfo]:
+        from vlm_pipeline.common.jobrun import ExitInfo
+
+        reply = self._ref("status", name)
+        if reply.get("ok") is not True:
+            raise RunnerError(str(reply.get("error", "status")))
+        code = reply.get("exit_code", -1)
+        info = ExitInfo(exit_code=code if isinstance(code, int) else -1, oom_killed=bool(reply.get("oom_killed")))
+        return bool(reply.get("running")), info
+
+    def state(self, name: str) -> ExitInfo:
+        return self._status(name)[1]
+
+    def remove(self, name: str) -> None:
+        self._ref("remove", name)
+
+
+def _app_path(path: Path, project_root: Path) -> str:
+    """``path`` in the runner protocol's namespace (``/app/<relative to the app's project root>``)."""
+    rel = Path(os.path.normpath(path.absolute())).relative_to(Path(os.path.normpath(project_root.absolute())))
+    return f"/app/{rel.as_posix()}"
+
+
+def default_launcher() -> JobLauncher:
+    """The runner when ``VLM_RUNNER_SOCKET`` is set (compose), else the local docker CLI (dev on the host).
+
+    An app inside the compose stack (``VLM_IN_COMPOSE=1``) without a socket fails here: it must never fall back to a
+    docker CLI or socket (bao-security 7.2 condition 1).
+    """
+    socket_path = os.environ.get("VLM_RUNNER_SOCKET")
+    if socket_path:
+        return RunnerLauncher(Path(socket_path))
+    if os.environ.get("VLM_IN_COMPOSE") == "1":
+        raise RunnerError("no_runner_socket")
+    return LocalDockerLauncher()
+
+
+__all__ = ["JobLauncher", "LocalDockerLauncher", "RunnerError", "RunnerLauncher", "default_launcher"]

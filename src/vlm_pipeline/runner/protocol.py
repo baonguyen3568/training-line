@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
+from vlm_pipeline.common.job_kinds import ALLOWED_ARGV
 from vlm_pipeline.common.run_claims import RUN_ID  # one definition: the claim and the request agree on run ids
 
 MAX_REQUEST_BYTES = 64 * 1024
@@ -49,16 +50,6 @@ INPUT_ROOTS = (
     APP_ROOT / ".cache" / "prepared",
     APP_ROOT / "uploads",  # one file each, named <32 hex>.png (checked below)
 )
-# The first argv items a kind may run; the job's own arguments follow. One place to read what jobs exist.
-ALLOWED_ARGV: dict[str, tuple[tuple[str, ...], ...]] = {
-    "train": (("automodel",), ("python", "-m", "vlm_pipeline.train.merge_lora")),
-    "eval": (("python", "/workspace/scripts/qa/eval_cord_worker.py"),),
-    "quantize": (("python", "-m", "vlm_pipeline.quantize.ptq"),),
-    "serve": (("python", "-m", "vlm_pipeline.serve.trial"), ("python", "-m", "vlm_pipeline.serve.bench")),
-    # No first-party module yet (downloads are manual, D1): every argv is refused until one exists and is reviewed.
-    "probe": (),
-    "download": (),
-}
 
 
 class ProtocolError(ValueError):

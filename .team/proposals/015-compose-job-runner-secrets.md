@@ -46,6 +46,14 @@ version. C biến bài toán thành allowlist trên schema của chính ta.
 Không có lệnh nào nhận path TỰ DO, mount, cờ docker, tên image tự do, biến env tự do, hay tên container tuỳ ý. Ngoại lệ có luật đóng (review 2026-10-13): `run_dir` (tên == run_id; app có thể ghi input trước, runner CLAIM bằng file `outputs/system/runner_claims/<run_id>` O_EXCL|O_NOFOLLOW nằm ngoài mọi mount của job, claim không bao giờ xoá; đã có claim → từ chối; resume = run_id mới + ckpt cũ là input ro; LocalDockerLauncher dùng cùng hàm claim) và `inputs` (≤ 32, dưới INPUT_ROOTS, không là cha/con của run_dir hay của nhau, qua HostPaths + check_mount_source, mount ro).
 **Không** có `exec`, `pull`, `build`, `image rm`, `volume`, `network`. Pull image chỉ làm tay (PM/user) theo D1.
 
+### 3.1b Threat model: hàng rào thật là sandbox của job (security review A2, 2026-10-13)
+Argv allowlist theo `job_kind` KHÔNG phải hàng rào chính. Ví dụ `automodel <config>`: config YAML do app ghi có thể chứa
+`_target_`, tức là import và gọi callable tuỳ ý BÊN TRONG job. Ranh giới thật là sandbox job: `--network none`, mount
+thu hẹp (P017 bước 6), `cap_drop ALL`, `no-new-privileges`, user không phải root, image đã duyệt chạy bằng id. Runner
+bảo vệ HOST và các job khác, không bảo vệ job khỏi code nó được giao chạy.
+Known limitation v1: runner chạy `docker run` attached; runner restart thì container vẫn chạy (status/stop qua label)
+nhưng log ngừng ghi. Bản sau dùng `-d` + `docker logs -f`.
+
 ### 3.2 Mount do runner tính (thu hẹp so với hiện tại)
 Hiện `docker_args` mount **cả project root** vào job (rw khi `read_only_project=False`). Với compose, như vậy job (kể cả
 plugin chưa duyệt) đọc được `.env.local` nếu file nằm trong project root, và ghi được vào code của app. Đề xuất:

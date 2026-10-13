@@ -25,7 +25,7 @@ from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 from vlm_pipeline.common.host_paths import check_mount_source, link_units, secret_file_problem, tree_problem
 from vlm_pipeline.common.images import check_pinned_image
-from vlm_pipeline.common.launcher import JobLauncher, LocalDockerLauncher
+from vlm_pipeline.common.launcher import JobLauncher, LocalDockerLauncher, default_launcher
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
 from vlm_pipeline.common.run_claims import RunDirClaimedError, claim_run, is_claimed
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
@@ -322,7 +322,7 @@ def _narrow_docker_args(job: ContainerJob, project_root: Path, *, lock_token: st
         env[gpu_lock.TOKEN_ENV] = lock_token
     args = [
         "docker", "run", "--name", f"vlm-{job.name}",
-        "--label", "project=vlm-training",
+        "--label", "project=vlm-training", "--label", f"vlm.job={job.name}",  # the runner acts only on its own jobs
         "--network", "none",
         "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
         "--user", f"{job.uid}:{job.gid}",
@@ -654,7 +654,13 @@ def _relative(run_dir: Path, project_root: Path) -> str | None:
 
 
 def _checks_before_queueing(
-    job: ContainerJob, manifest: RunManifest, project_root: Path, *, gate: bool, require_approved: bool
+    job: ContainerJob,
+    manifest: RunManifest,
+    project_root: Path,
+    *,
+    gate: bool,
+    require_approved: bool,
+    checks_images: bool = True,
 ) -> str | None:
     """Cheap refusals with no side effect, before the memory wait: returns the pinned image id."""
     # P017 B1 (bao-security): a run id that already had its job is refused before ANYTHING is written to its run dir
@@ -663,6 +669,8 @@ def _checks_before_queueing(
         raise RunDirClaimedError(manifest.run_id)
     if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
         _check_gate(job, manifest, project_root)
+    if not checks_images:  # vlm-runner gates and pins the image itself (compose: no docker CLI in the app)
+        return None
     pinned_id = image_digest(job.image)  # the id the gate approves is the id that runs (no retag window)
     check_pinned_image(project_root, job.image, pinned_id, require_approved=require_approved)
     return pinned_id
@@ -696,8 +704,11 @@ def run_job(
     reporting ``on_wait({need_gb, avail_gb, waited_s, since})`` on every poll; cancel while waiting -> CANCELLED
     without starting a container; still no memory after ``memory_wait_s`` -> FAILED with SYS-002 (raised).
     """
-    launcher = launcher or LocalDockerLauncher()
-    pinned_id = _checks_before_queueing(job, manifest, project_root, gate=gate, require_approved=require_approved_image)
+    launcher = launcher or default_launcher()
+    pinned_id = _checks_before_queueing(
+        job, manifest, project_root, gate=gate, require_approved=require_approved_image,
+        checks_images=getattr(launcher, "checks_images", True),
+    )  # fmt: skip
     waited = _wait_for_memory(
         manifest,
         run_dir,
@@ -765,6 +776,7 @@ def run_job(
         )
         done.set()
         state = launcher.state(container)
+        runner_id = getattr(launcher, "last_image_id", None)  # vlm-runner reports the id it ran
         info = dataclasses.replace(
             state, preempted_by_memguard=guard.should_stop.is_set(), cancelled_by_executor=cancelled.is_set()
         )
@@ -774,6 +786,7 @@ def run_job(
             status, code = RunStatus.INTERRUPTED, None
         manifest = manifest.model_copy(
             update={
+                "container_digest": runner_id or manifest.container_digest,
                 "status": status,
                 "error_code": code,
                 "exit_code": info.exit_code,
