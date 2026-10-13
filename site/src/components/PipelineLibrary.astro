@@ -1,0 +1,14 @@
+---
+// /template: every reference pipeline (research's data, in file order), each card anchored at #<id> so the score
+// comparison and other pages can link it. Not-yet-available ones say their status; nothing is invented.
+import PipelineCard from "~/components/PipelineCard.astro";
+import { allPipes, pl } from "~/lib/pipelines";
+import "~/styles/landing.css";
+---
+
+<section class="tpl tpl-library" aria-labelledby="lib-h">
+  <h2 id="lib-h">{pl.title}</h2>
+  <ul class="tpl-grid">
+    {allPipes.map((p) => <PipelineCard p={p} compareHref={(id) => `#${id}`} anchor />)}
+  </ul>
+</section>

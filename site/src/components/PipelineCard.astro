@@ -1,0 +1,91 @@
+---
+// One reference pipeline (the app's data): step chips, title, licence and level, the measured line with its
+// source/CI/config and the score comparison behind "?". Used by the landing (available ones) and /template (all).
+import Icon from "~/components/Icon.astro";
+import { compareOf, compareParts, fill, licenseOf, METRIC, measuredLine, type Pipe, pl } from "~/lib/pipelines";
+
+interface Props {
+  p: Pipe;
+  /** URL of another pipeline's card (the score comparison links its title). */
+  compareHref: (id: string) => string;
+  /** Give the card id={p.id} so /template/#<id> lands on it. */
+  anchor?: boolean;
+}
+const { p, compareHref, anchor = false } = Astro.props;
+const other = compareOf(p);
+---
+
+<li class="tpl-card" id={anchor ? p.id : undefined}>
+  <ol class="mini" aria-hidden="true">
+    {(p.steps.length > 5 ? p.steps.slice(0, 4) : p.steps).map((st) => (
+      <li class={st.node ? undefined : "no-node"}>{st.label.vi}</li>
+    ))}
+    {p.steps.length > 5 && <li class="more">{fill(pl.more_steps, { step_count: p.steps.length - 4 })}</li>}
+  </ol>
+  <h3>{p.title.vi}</h3>
+  {p.status !== "available" && <p class="tpl-status">{pl.status?.[p.status] ?? p.status}</p>}
+  <p class="tpl-meta">
+    <span class="badge">{licenseOf(p)}</span>
+    <span>{p.difficulty ? pl.level[p.difficulty] : pl.not_assessed}</span>
+  </p>
+  {p.measured ? (
+    <p class="tpl-measured">
+      {measuredLine(p.measured)}
+      <button class="help" popovertarget={`pop-m-${p.id}`} aria-label="Về số đo này">
+        <Icon name="circle-question-mark" size={14} />
+      </button>
+    </p>
+  ) : (
+    <p class="tpl-measured muted">Chưa có số đo</p>
+  )}
+  {p.measured && (
+    <div id={`pop-m-${p.id}`} popover>
+      Đo trên một máy DGX Spark.
+      {p.measured.score && (
+        <>
+          {" "}
+          {METRIC[p.measured.score.metric] ?? p.measured.score.metric} {p.measured.score.value.toFixed(2)} trên{" "}
+          {p.measured.score.n} mẫu {p.measured.score.benchmark}
+          {p.measured.score.ci95 && (
+            <>
+              , khoảng tin cậy 95%: {p.measured.score.ci95[0].toFixed(2)}–{p.measured.score.ci95[1].toFixed(2)}
+            </>
+          )}
+          .
+        </>
+      )}
+      {other?.measured?.score && (
+        <>
+          {" "}
+          {compareParts(other)[0]}
+          <a class="link" href={compareHref(other.id)}>{other.title.vi}</a>
+          {compareParts(other)[1]}
+        </>
+      )}
+      {p.measured.score && (
+        <>
+          {" "}
+          {pl.score_single_run}
+        </>
+      )}
+      {p.measured.config && (
+        <>
+          {" "}
+          Cấu hình: <span lang="en">{p.measured.config}</span>.
+        </>
+      )}
+      {p.measured.sources && (
+        <>
+          {" "}
+          Nguồn: {p.measured.sources.map((src, i) => (
+            <>
+              {i ? ", " : ""}
+              <code>{src}</code>
+            </>
+          ))}
+          .
+        </>
+      )}
+    </div>
+  )}
+</li>

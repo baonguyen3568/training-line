@@ -75,13 +75,27 @@ function timeText(p: Pipeline, estimate: Range | null | undefined): string {
   return m?.peak_ram_gb ? `${time} · ${t("pipelines.ram_peak", { gb: m.peak_ram_gb })}` : time;
 }
 
-/** 'Trên cùng bộ kiểm tra, pipeline "X" đạt N.' for a pipeline research compared on the same benchmark. */
-function scoreCompare(p: Pipeline): string | undefined {
+/**
+ * 'Trên cùng bộ kiểm tra, pipeline "X" đạt N.' for a pipeline research compared on the same benchmark; X is a
+ * button that scrolls to that card (design: the reader must find it).
+ */
+function ScoreCompare({ p, onShow }: { p: Pipeline; onShow: (id: string) => void }) {
   const other = pipelines.find((x) => x.id === p.measured?.score?.compare_with);
   const value = other?.measured?.score?.value;
-  return other && value !== undefined
-    ? t("pipelines.score_compare", { other: loc(other.title), other_value: value.toFixed(2) })
-    : undefined;
+  if (!other || value === undefined) return null;
+  const [before, after = ""] = t("pipelines.score_compare", {
+    other: "\u0000",
+    other_value: value.toFixed(2),
+  }).split("\u0000");
+  return (
+    <p>
+      {before}
+      <button type="button" className="link" onClick={() => onShow(other.id)}>
+        {loc(other.title)}
+      </button>
+      {after}
+    </p>
+  );
 }
 
 /** "?" + native popover (DESIGN.md "?" Popover): secondary detail never sits on the card itself. */
@@ -172,6 +186,16 @@ export function PipelineGallery() {
   const { openTemplate, newWorkflow } = useWorkflow.getState();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  /** Show one card even if the tab or search hides it, then bring it into view (score comparison link). */
+  const showCard = (id: string) => {
+    setFilter("all");
+    setQuery("");
+    requestAnimationFrame(() => {
+      const card = document.getElementById(`rp-${id}`);
+      card?.scrollIntoView({ block: "center" });
+      card?.focus({ preventScroll: true });
+    });
+  };
   // App templates carry the server's measured time (estimate.minutes); never a number from the data file.
   const [minutes, setMinutes] = useState<Map<string, Range | null>>(new Map());
   useEffect(() => {
@@ -235,7 +259,12 @@ export function PipelineGallery() {
         {shown.map((p) => {
           const open = p.status === "available" && p.template_id;
           return (
-            <li key={p.id} className={`rp-card ${p.kind}${p.status !== "available" ? " dim" : ""}`}>
+            <li
+              key={p.id}
+              id={`rp-${p.id}`}
+              tabIndex={-1}
+              className={`rp-card ${p.kind}${p.status !== "available" ? " dim" : ""}`}
+            >
               <MiniDiagram steps={p.steps} />
               <h2>{loc(p.title)}</h2>
               {p.summary_key && (
@@ -305,7 +334,7 @@ export function PipelineGallery() {
                             p.measured.score.metric
                           }
                         >
-                          {scoreCompare(p) && <p>{scoreCompare(p)}</p>}
+                          <ScoreCompare p={p} onShow={showCard} />
                           <p>{t("pipelines.score_single_run")}</p>
                         </Help>
                       </>

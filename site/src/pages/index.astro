@@ -3,6 +3,8 @@
 // (design/m2/directions/chuan); error-card text is the app's own MEM-001 copy; demo numbers are labelled "minh hoạ".
 import EditorPreview from "~/components/EditorPreview.astro";
 import NodeCard from "~/components/NodeCard.astro";
+import PipelineCard from "~/components/PipelineCard.astro";
+import { allPipes } from "~/lib/pipelines";
 import Icon from "~/components/Icon.astro";
 import copy from "~/generated/app-copy.json";
 import Marketing from "~/layouts/Marketing.astro";
@@ -16,57 +18,7 @@ const [memBefore, memAfter] = memWhat.split(/(?=máy chỉ còn)/);
 
 // Landing 1.0 sections (design/release-1.0/landing-copy.md): reference pipelines straight from the app's data
 // (bao-research configs/reference_pipelines.yaml), measured numbers with their source, never invented.
-type Pipe = {
-  id: string;
-  status: string;
-  difficulty: "basic" | "advanced" | null;
-  title: { vi: string };
-  license: { code: string | null; model: string | null; data: string | null };
-  steps: { node: string | null; label: { vi: string } }[];
-  measured?: {
-    train_minutes?: number;
-    peak_ram_gb?: number;
-    score?: {
-      benchmark: string;
-      metric: string;
-      value: number;
-      ci95?: [number, number];
-      n?: number;
-      compare_with?: string;
-    };
-    config?: string;
-    sources?: string[];
-  } | null;
-};
-const pipes = (copy.pipelines_data as Pipe[]).filter((p) => p.status === "available");
-const est = copy.estimate as Record<string, string>;
-const fill = (tpl: string, v: Record<string, string | number>) =>
-  tpl.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? `{${k}}`));
-const minutes = (m: number) => {
-  const total = Math.round(m);
-  const h = Math.floor(total / 60);
-  const r = total % 60;
-  return h === 0 ? fill(est.dur_m, { m: r }) : r ? fill(est.dur_hm, { h, m: r }) : fill(est.dur_h, { h });
-};
-const pl = copy.pipelines as Record<string, any>;
-const LICENSE: Record<string, string> = {
-  "apache-2.0": "Apache-2.0",
-  mit: "MIT",
-  "cc-by-4.0": "CC-BY-4.0",
-  "nvidia-open-model-license": "NVIDIA Open Model License",
-  "openmdw-1.1": "OpenMDW-1.1",
-};
-const METRIC = (pl.metric ?? {}) as Record<string, string>; // pipelines.metric.<id> (design copy)
-const licenseOf = (p: Pipe) =>
-  [...new Set([p.license.code, p.license.model].filter(Boolean).map((x) => LICENSE[x as string] ?? x))].join(" · ");
-const measuredLine = (m: NonNullable<Pipe["measured"]>) =>
-  [
-    m.train_minutes ? `Dạy model: ~${minutes(m.train_minutes)}` : null,
-    m.peak_ram_gb ? fill(pl.ram_peak, { gb: m.peak_ram_gb }) : null,
-    m.score ? `${METRIC[m.score.metric] ?? m.score.metric} ${m.score.value.toFixed(2)}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+const pipes = allPipes.filter((p) => p.status === "available");
 // "only what changed runs again" figure: the invoice template's own nodes; the first three reuse their results
 const ns = copy.node_state as Record<string, string>;
 const cachedLabel = ns.cached_no_time;
@@ -202,81 +154,7 @@ const invoiceMeasured = pipes.find((p) => p.id === "invoice-to-json")?.measured;
     <ul class="tpl-grid">
       {
         pipes.map((p) => (
-          <li class="tpl-card">
-            <ol class="mini" aria-hidden="true">
-              {(p.steps.length > 5 ? p.steps.slice(0, 4) : p.steps).map((st) => (
-                <li class={st.node ? undefined : "no-node"}>{st.label.vi}</li>
-              ))}
-              {p.steps.length > 5 && <li class="more">{fill(pl.more_steps, { step_count: p.steps.length - 4 })}</li>}
-            </ol>
-            <h3>{p.title.vi}</h3>
-            <p class="tpl-meta">
-              <span class="badge">{licenseOf(p)}</span>
-              <span>{p.difficulty ? pl.level[p.difficulty] : pl.not_assessed}</span>
-            </p>
-            {p.measured ? (
-              <p class="tpl-measured">
-                {measuredLine(p.measured)}
-                <button class="help" popovertarget={`pop-m-${p.id}`} aria-label="Về số đo này">
-                  <Icon name="circle-question-mark" size={14} />
-                </button>
-              </p>
-            ) : (
-              <p class="tpl-measured muted">Chưa có số đo</p>
-            )}
-            {p.measured && (
-              <div id={`pop-m-${p.id}`} popover>
-                Đo trên một máy DGX Spark.
-                {p.measured.score && (
-                  <>
-                    {" "}
-                    {METRIC[p.measured.score.metric] ?? p.measured.score.metric} {p.measured.score.value.toFixed(2)} trên{" "}
-                    {p.measured.score.n} mẫu {p.measured.score.benchmark}
-                    {p.measured.score.ci95 && (
-                      <>
-                        , khoảng tin cậy 95%: {p.measured.score.ci95[0].toFixed(2)}–{p.measured.score.ci95[1].toFixed(2)}
-                      </>
-                    )}
-                    .
-                  </>
-                )}
-                {p.measured.score?.compare_with && (() => {
-                  const other = pipes.find((x) => x.id === p.measured?.score?.compare_with)
-                    ?? (copy.pipelines_data as Pipe[]).find((x) => x.id === p.measured?.score?.compare_with);
-                  return other?.measured?.score ? (
-                    <>
-                      {" "}
-                      {fill(pl.score_compare, { other: other.title.vi, other_value: other.measured.score.value.toFixed(2) })}
-                    </>
-                  ) : null;
-                })()}
-                {p.measured.score && (
-                  <>
-                    {" "}
-                    {pl.score_single_run}
-                  </>
-                )}
-                {p.measured.config && (
-                  <>
-                    {" "}
-                    Cấu hình: <span lang="en">{p.measured.config}</span>.
-                  </>
-                )}
-                {p.measured.sources && (
-                  <>
-                    {" "}
-                    Nguồn: {p.measured.sources.map((src, i) => (
-                      <>
-                        {i ? ", " : ""}
-                        <code>{src}</code>
-                      </>
-                    ))}
-                    .
-                  </>
-                )}
-              </div>
-            )}
-          </li>
+          <PipelineCard p={p} compareHref={(id) => `/template/#${id}`} />
         ))
       }
       <li class="tpl-card tpl-more">

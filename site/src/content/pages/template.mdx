@@ -11,6 +11,7 @@ sources:
 numbers_without_source: ["2", "3.5", "2B", "1.1", "2.0"]
 ---
 import Hint from '~/components/Hint.astro';
+import PipelineLibrary from '~/components/PipelineLibrary.astro';
 
 Mỗi mẫu là một workflow dựng sẵn bằng chính các khối trong app. Bạn mở mẫu, bấm Chạy để xem nó chạy, rồi thay dữ liệu hay đổi bước tuỳ ý. Mẫu không có gì đặc biệt: mọi thứ trong mẫu bạn đều tự ghép lại được.
 
@@ -36,3 +37,5 @@ Nén model cho nhỏ và nhanh hơn, rồi đo điểm trong cùng điều kiệ
 ## Thời gian và bộ nhớ
 
 Trang này không ghi thời gian chạy hay bộ nhớ cần dùng. Các con số đó phụ thuộc vào máy và dữ liệu của bạn. App hiển thị ước lượng ngay trên mẫu khi bạn mở nó, kèm nguồn của số; chỗ nào chưa đo thì ghi "chưa có số đo".
+
+<PipelineLibrary />

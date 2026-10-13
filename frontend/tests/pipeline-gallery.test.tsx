@@ -68,4 +68,19 @@ describe("PipelineGallery", () => {
     await waitFor(() => expect(document.body.textContent).toContain("~1 giờ 56 phút"));
     expect(document.body.textContent).not.toContain("5 giờ");
   });
+
+  it("the compared pipeline's name brings its card into view, even from another tab", async () => {
+    const { PipelineGallery } = await import("../src/components/PipelineGallery");
+    render(<PipelineGallery />);
+    fireEvent.click(screen.getByRole("tab", { name: /Mẫu của app/ })); // the Qwen LoRA card is a candidate
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const link = screen
+      .getAllByRole("button", { hidden: true }) // inside a closed "?" popover
+      .find((b) => b.closest("p")?.textContent?.includes("Trên cùng bộ kiểm tra"));
+    if (!link) throw new Error("no compare link");
+    fireEvent.click(link);
+    await waitFor(() => expect(document.getElementById("rp-invoice-qwen35-2b-lora")).toBeTruthy());
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+  });
 });

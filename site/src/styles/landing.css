@@ -376,3 +376,24 @@
     grid-template-columns: 1fr;
   }
 }
+.tpl-status {
+  margin: 0;
+  color: var(--tx3);
+  font-size: 13px;
+}
+.tpl-library {
+  padding-top: 48px;
+}
+.tpl-card:target {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+/* inside a 760px prose page (/template) three cards are too narrow: two columns */
+.prose .tpl-library .tpl-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  .prose .tpl-library .tpl-grid {
+    grid-template-columns: 1fr;
+  }
+}
