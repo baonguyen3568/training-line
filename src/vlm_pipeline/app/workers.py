@@ -45,6 +45,12 @@ class NotCachedError(VlmPipelineError):
     code: ClassVar[str] = "NET-001"
 
 
+class TrainModeUnsupportedError(VlmPipelineError):
+    """The fine-tune node is not the one the catalog vetted for this model (raised before the GPU lock)."""
+
+    code: ClassVar[str] = "CFG-010"
+
+
 class NodeNotRunnableError(VlmPipelineError):
     """This worker has no implementation for the node type yet."""
 
@@ -160,12 +166,10 @@ class RealWorker:
             raise NodeNotRunnableError("unexpected params model", params={"node_type": job.spec.type_id})
         base, data = job.inputs["base_model"], job.inputs["train_data"]
         entry = self._entry_for(base)
-        # Full-fine-tune-only models (Parse: FusedAdam fp32-master recipe, no LoRA target modules) were never run with
-        # LoRA: fail before the GPU lock. TODO(bao-fixcode): own code CFG-010 + the same rule in graph validate.
-        if entry.train_node == "train.sft_vlm" and job.spec.type_id == "train.lora_vlm":
-            raise NodeNotRunnableError(
-                "train mode not supported for this model",
-                params={"node_type": job.spec.type_id, "model": entry.id, "supported": entry.train_node},
+        if not entry.supports_train_node(job.spec.type_id):  # graph validate blocks it first; this is the backstop
+            raise TrainModeUnsupportedError(
+                "train node not vetted for this model",
+                params={"node": job.node_id, "model": entry.display_name, "supported": entry.train_node},
             )
         class_token = None
         if entry.loss == "nemotron_parse":
@@ -175,8 +179,9 @@ class RealWorker:
         run_dir = job.run_dir.resolve()
         if entry.id in RESUME_UNSUPPORTED:
             _set_aside_checkpoints(run_dir, entry.id)
-            (run_dir / NOT_RESUMABLE_MARKER).touch()  # executor: no "resume" offer, warn on the next run
         (run_dir / "logs").mkdir(parents=True, exist_ok=True)
+        if entry.id in RESUME_UNSUPPORTED:
+            (run_dir / NOT_RESUMABLE_MARKER).touch()  # executor: no "resume" offer, warn on the next run
         dataset_dir, limit = self._dataset_input(data)
         recipe = build_recipe(
             load_template(template_path(self.root, entry)),
@@ -288,4 +293,4 @@ def _tail(path: Path, n: int = 30) -> str:
         return ""
 
 
-__all__ = ["DEFAULT_TRAIN_IMAGE", "NodeNotRunnableError", "NotCachedError", "RealWorker"]
+__all__ = ["DEFAULT_TRAIN_IMAGE", "NodeNotRunnableError", "NotCachedError", "RealWorker", "TrainModeUnsupportedError"]

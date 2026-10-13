@@ -208,7 +208,11 @@ def test_full_finetune_output_is_completed_from_base(tmp_path: Path, monkeypatch
 
     monkeypatch.setattr(workers, "run_job", fake_run_job)
     run_dir = root / "outputs" / "graph" / "runs" / "t-x"
-    out = w.run(_job("train.sft_vlm", {"epochs": 1}, run_dir, _train_inputs(w))).outputs["model"]
+    monkeypatch.setattr("vlm_pipeline.train.recipe_checks.resolve_parse_class_token_start_idx", lambda _path: 50000)
+    parse = w.catalog.get("nemotron-parse-v1.1")
+    assert parse is not None
+    inputs = {**_train_inputs(w), "base_model": ArtifactRef("Model", str(root / "m"), f"{parse.repo}@{parse.revision}")}
+    out = w.run(_job("train.sft_vlm", {"epochs": 1}, run_dir, inputs)).outputs["model"]
     assert out.path.endswith("checkpoints/LATEST/model/consolidated")
     assert calls == [(w.root / "m", Path(out.path))]
 
@@ -223,9 +227,20 @@ def test_lora_on_full_finetune_only_model_is_refused_before_the_job(
     assert entry.train_node == "train.sft_vlm"
     monkeypatch.setattr(workers, "run_job", lambda *a, **kw: pytest.fail("job must not start"))
     inputs = {**_train_inputs(w), "base_model": ArtifactRef("Model", str(root / "m"), f"{entry.repo}@{entry.revision}")}
-    with pytest.raises(workers.NodeNotRunnableError) as ei:
+    with pytest.raises(workers.TrainModeUnsupportedError) as ei:
         w.run(_job("train.lora_vlm", {}, root / "outputs" / "graph" / "g" / "n", inputs))
-    assert ei.value.params == {"node_type": "train.lora_vlm", "model": entry.id, "supported": "train.sft_vlm"}
+    assert ei.value.code == "CFG-010"
+    assert ei.value.params == {"node": "n", "model": entry.display_name, "supported": "train.sft_vlm"}
+
+
+def test_full_finetune_on_lora_only_model_is_refused_before_the_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    w = RealWorker(_root(tmp_path))
+    monkeypatch.setattr(workers, "run_job", lambda *a, **kw: pytest.fail("job must not start"))
+    with pytest.raises(workers.TrainModeUnsupportedError) as ei:  # cosmos-reason2-2b: catalog train_node lora_vlm
+        w.run(_job("train.sft_vlm", {}, w.root / "outputs" / "graph" / "g" / "n", _train_inputs(w)))
+    assert ei.value.params["supported"] == "train.lora_vlm"
 
 
 def test_resume_of_unresumable_model_starts_over(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
