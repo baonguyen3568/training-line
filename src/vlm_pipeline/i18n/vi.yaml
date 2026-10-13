@@ -1335,6 +1335,9 @@ pipelines:
   more_steps: "+{step_count} bước"
   metric:
     field_f1: F1 theo trường
+    accuracy_delta_fp8_minus_bf16: Điểm chênh so với bản gốc BF16
+  metric_help:
+    accuracy_delta_fp8_minus_bf16: Hiệu điểm giữa bản nén FP8 và bản gốc BF16 trên cùng {n} câu kiểm tra. Số âm nghĩa là bản nén kém hơn chừng đó điểm, thường chỉ một chút; đây không phải điểm tuyệt đối nên không so với số trên trang model.
   score_compare: Trên cùng bộ kiểm tra, pipeline "{other}" đạt {other_value}.
   score_single_run: Mỗi điểm là kết quả của một lần chạy (một seed), nên còn có thể dao động.
   title: Pipeline tham chiếu

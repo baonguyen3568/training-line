@@ -1335,6 +1335,9 @@ pipelines:
   more_steps: "+{step_count} steps"
   metric:
     field_f1: Field F1
+    accuracy_delta_fp8_minus_bf16: Score change vs the BF16 original
+  metric_help:
+    accuracy_delta_fp8_minus_bf16: The score difference between the FP8 quantized model and the BF16 original on the same {n} test questions. A negative number means the quantized model scores that much lower, usually only slightly; it is not an absolute score, so don't compare it with model card numbers.
   score_compare: On the same test set, the "{other}" pipeline scores {other_value}.
   score_single_run: Each score comes from a single run (one seed), so it may still vary.
   title: Reference pipelines
