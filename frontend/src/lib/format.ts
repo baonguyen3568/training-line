@@ -26,11 +26,15 @@ function minutesText(min: number): string {
   return m ? t("estimate.dur_hm", { h, m }) : t("estimate.dur_h", { h });
 }
 
-/** Minute range for people: "~20–35 phút" under an hour, else "~1 giờ 37 phút – 1 giờ 52 phút". */
+/**
+ * Minute range for people: "~20–35 phút" under an hour, else "~1 giờ 37 phút – 1 giờ 52 phút". A narrow range
+ * (< 5 min or < 5 % of hi) reads as one number, "~1 giờ 55 phút": a 1-minute spread is false precision (design).
+ */
 export function formatMinutesRange(r: Range | null): string {
   if (!r) return t("estimate.source.unknown");
   const lo = Math.round(r.lo);
   const hi = Math.round(r.hi);
+  if (r.hi - r.lo < 5 || r.hi - r.lo < 0.05 * r.hi) return `~${minutesText(hi)}`;
   if (hi < 60) return t("estimate.range_minutes", { lo, hi });
   return t("estimate.range_duration", { lo: minutesText(lo), hi: minutesText(hi) });
 }

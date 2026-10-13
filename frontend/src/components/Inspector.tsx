@@ -1,7 +1,12 @@
 import { type ReactNode, useState } from "react";
-import type { NodeSpec, OptionMeta, ParamSchema, PortType, Workflow } from "../api/types";
+import type { NodeSpec, OptionMeta, ParamSchema, PortType, Range, Workflow } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
-import { durationRunCount, formatEstimate, workflowDurationText } from "../lib/format";
+import {
+  durationRunCount,
+  formatEstimate,
+  formatMinutesRange,
+  workflowDurationText,
+} from "../lib/format";
 import { nodeDesc, nodeTitle, SEVERITY_GLYPH, workflowTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
@@ -96,12 +101,15 @@ function ParamField({
   schema,
   value,
   onChange,
+  optionMinutes,
 }: {
   nodeType: string;
   name: string;
   schema: ParamSchema;
   value: unknown;
   onChange: (v: unknown) => void;
+  /** Measured time per option (estimate per_node.by_epochs), shown next to each option. */
+  optionMinutes?: Record<string, Range | null>;
 }) {
   const label = tp(["node", nodeType, "param", name, "label"]);
   const id = `param-${name}`;
@@ -164,6 +172,7 @@ function ParamField({
           {visibleOptions(schema, mode, current).map((opt) => {
             const off = disabledReason(schema, opt);
             const rec = schema["x-ui"]?.recommended;
+            const minutes = optionMinutes?.[String(opt)];
             return (
               // a dimmed option is still announced: its text carries "· chưa hỗ trợ"
               <option
@@ -172,6 +181,7 @@ function ParamField({
                 disabled={off !== undefined && opt !== current}
               >
                 {optionLabel(schema, opt, availGb)}
+                {minutes ? ` · ${formatMinutesRange(minutes)}` : ""}
                 {rec !== undefined && String(opt) === String(rec)
                   ? ` · ${t("inspector.recommended")}`
                   : ""}
@@ -429,6 +439,8 @@ export function Inspector() {
   // but changes made there stay visible as a badge (P010 §10 — no hidden changes).
   const showAdvanced = mode === "advanced" || expanded;
   const customized = customizedAdvanced(spec, node.params);
+  // Measured time of this train step (estimate.duration.per_node): "~1 giờ 37 phút – 1 giờ 52 phút · 300 step".
+  const nodeEst = validation?.estimate.duration?.per_node[node.id];
 
   return (
     <aside className="inspector" aria-label={nodeTitle(spec, node.type)}>
@@ -452,6 +464,15 @@ export function Inspector() {
           <h2>{nodeTitle(spec, node.type)}</h2>
           <p className="muted">{nodeDesc(spec, node.type)}</p>
         </>
+      )}
+      {nodeEst && (
+        <p className="node-est" data-testid="node-estimate">
+          <Icon name="timer" size={14} /> {formatMinutesRange(nodeEst.minutes)}
+          {/* Simple mode: time only; a raw step count is nothing a beginner can act on (design) */}
+          {mode === "advanced" && nodeEst.steps != null
+            ? ` · ${t("inspector.steps", { step_count: nodeEst.steps })}`
+            : ""}
+        </p>
       )}
       {mode === "advanced" && (
         <p className="small">
@@ -540,6 +561,7 @@ export function Inspector() {
           schema={schema}
           value={node.params[name]}
           onChange={(v) => setParam(node.id, name, v)}
+          optionMinutes={name === "epochs" ? nodeEst?.by_epochs : undefined}
         />
       ))}
       {advanced.length > 0 && mode === "simple" && (
@@ -562,6 +584,7 @@ export function Inspector() {
             schema={schema}
             value={node.params[name]}
             onChange={(v) => setParam(node.id, name, v)}
+            optionMinutes={name === "epochs" ? nodeEst?.by_epochs : undefined}
           />
         ))}
       {node.type.startsWith("serve.") && run?.nodes[node.id]?.status === "completed" && (

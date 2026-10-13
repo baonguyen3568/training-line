@@ -19,6 +19,13 @@ describe("measured duration", () => {
     expect(formatMinutesRange(null)).toBe("chưa có số đo");
   });
 
+  it("a narrow range reads as one number (< 5 min or < 5 % of hi)", () => {
+    expect(formatMinutesRange({ lo: 114, hi: 115 })).toBe("~1 giờ 55 phút");
+    expect(formatMinutesRange({ lo: 38.5, hi: 39.4 })).toBe("~39 phút");
+    expect(formatMinutesRange({ lo: 189, hi: 191 })).toBe("~3 giờ 11 phút");
+    expect(formatMinutesRange({ lo: 32, hi: 37 })).toBe("~32–37 phút");
+  });
+
   it("shows measured time even when RAM/disk source is unknown", () => {
     const est: Est = {
       ...base,

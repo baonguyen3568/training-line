@@ -1095,3 +1095,12 @@ textarea {
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
 }
+
+/* Measured time of the selected train step (estimate.duration.per_node). */
+.inspector .node-est {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-8);
+  color: var(--color-text-secondary);
+}

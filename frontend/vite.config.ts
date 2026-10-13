@@ -25,5 +25,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./tests/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
+    // Shared host: a GPU job next door can push jsdom component tests past 5 s (13:34, load 8); 15 s is still
+    // far below a real hang.
+    testTimeout: 15_000,
   },
 });

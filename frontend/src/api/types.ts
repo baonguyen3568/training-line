@@ -211,7 +211,16 @@ export interface ValidationResult {
 export interface DurationEstimate {
   /** Train nodes only; null as soon as one train node has no measurement. */
   duration_min: Range | null;
-  per_node: Record<string, { steps: number | null; minutes: Range | null; based_on: string[] }>;
+  per_node: Record<
+    string,
+    {
+      steps: number | null;
+      minutes: Range | null;
+      based_on: string[];
+      /** Same measurement per `epochs` option ("1" | "2" | "3" | "5"), for the epochs picker. */
+      by_epochs?: Record<string, Range | null>;
+    }
+  >;
   /** Heavy non-train nodes (eval/quantize/bench/serve/merge) whose time is not counted yet. */
   unmeasured: string[];
 }
