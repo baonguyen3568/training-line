@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from vlm_pipeline.app.bench_worker import run_bench
+from vlm_pipeline.app.export_worker import run_export
 from vlm_pipeline.app.quantize_worker import run_quantize
 from vlm_pipeline.app.trial_worker import run_trial
 from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
@@ -138,6 +139,7 @@ class RealWorker:
             "train.merge_lora": self._merge_lora,
             "eval.benchmarks": self._eval,
             "bench.perf": functools.partial(run_bench, self),  # B-6 (app/bench_worker.py, bao-tester)
+            "export.hf_dir": functools.partial(run_export, self),  # B-2: native models (ADR-012)
             "quantize.modelopt_ptq": functools.partial(run_quantize, self),  # B-4 (app/quantize_worker.py, research)
             "serve.vllm": functools.partial(run_trial, self),  # B-7 "Chạy thử" (app/trial_worker.py)
         }
