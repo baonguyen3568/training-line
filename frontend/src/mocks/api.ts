@@ -537,7 +537,7 @@ export const mockApi: Api = {
       ...(q.code ? { code: q.code } : {}),
       app_version: "1.0.0-dev",
       gpu: "NVIDIA GB10 (DGX Spark)",
-      ref_code: `r-${runId.length.toString(16).padStart(8, "0")}`, // the server hashes; the mock only pretends
+      ...(runId ? { ref_code: "a1b2c3d4e5f6" } : {}), // the server derives it; the mock only pretends
     }),
   // G-4 (storage_reset.py shape): one finished attempt with a checkpoint; typed confirmation with the node title.
   nodeResetPlan: (node) => {

@@ -115,9 +115,8 @@ function navigation(
   if (target === "memory_panel" || target === "cleanup_dry_run") return () => navigate("storage");
   if (target === "queue_until_memory") return () => void s.startRun(); // the run waits for memory by itself
   if (target === "bug_report") {
-    // the report is about one run: without a run there is nothing to report on
-    const runId = s.run?.id;
-    if (!runId) return undefined;
+    // with a run the report carries its reference code; validate/preflight errors report without one (design)
+    const runId = s.run?.id ?? null;
     return () => useUi.getState().setBugReport({ runId, nodeId, code: issue.code });
   }
   return undefined;

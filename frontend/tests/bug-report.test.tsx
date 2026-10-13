@@ -56,4 +56,21 @@ describe("bug report", () => {
     await screen.findByText(/không chép tự động được/);
     expect(win).not.toHaveBeenCalled();
   });
+
+  it("the reminder links SECURITY.md in the preview and keeps the URL as text in the copy", async () => {
+    await open({ code: "MEM-003", ref_code: "a1b2c3d4" });
+    const link = screen.getByRole("link", { name: /SECURITY\.md/ });
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(document.body.textContent).not.toContain("{security_url}");
+  });
+
+  it("an error outside a run reports without a reference code", async () => {
+    const { api } = await import("../src/api");
+    const spy = vi.spyOn(api, "bugReport");
+    const { BugReportDialog } = await import("../src/components/BugReportDialog");
+    render(<BugReportDialog runId={null} code="EXP-001" onClose={() => {}} />);
+    await screen.findByText(/Mã lỗi: EXP-001/);
+    expect(spy).toHaveBeenCalledWith(null, { nodeId: undefined, code: "EXP-001" }, "vi");
+    expect(document.body.textContent).not.toContain("Mã tham chiếu:");
+  });
 });

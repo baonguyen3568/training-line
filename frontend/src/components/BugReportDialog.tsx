@@ -7,6 +7,9 @@ import { toast } from "./QuickFixes";
 
 /** The project's public issue tracker (PM 2026-10-13). Nothing is prefilled in the URL: the text goes by clipboard. */
 export const ISSUES_URL = "https://github.com/baonguyen3568/training-line/issues/new";
+/** Where security issues go instead of a public issue (security, via bug_report.reminder {security_url}). */
+export const SECURITY_URL = "https://github.com/baonguyen3568/training-line/blob/main/SECURITY.md";
+const reminder = () => t("bug_report.reminder", { security_url: SECURITY_URL });
 
 const FIELDS = ["code", "error_title", "app_version", "gpu", "ref_code"] as const;
 
@@ -18,7 +21,7 @@ export function reportText(r: BugReport): string {
   return [
     ...FIELDS.filter((f) => r[f]).map((f) => `${t(`bug_report.field.${f}`)}: ${r[f]}`),
     "",
-    t("bug_report.reminder"),
+    reminder(),
   ].join("\n");
 }
 
@@ -32,7 +35,8 @@ export function BugReportDialog({
   code,
   onClose,
 }: {
-  runId: string;
+  /** null for errors outside a run (validate, preflight): no reference code then. */
+  runId: string | null;
   nodeId?: string;
   code?: string;
   onClose: () => void;
@@ -115,7 +119,11 @@ export function BugReportDialog({
               )}
             </p>
             <pre className="bug-report-preview" ref={pre}>
-              {text}
+              {text.slice(0, text.lastIndexOf(SECURITY_URL))}
+              <a href={SECURITY_URL} target="_blank" rel="noopener noreferrer">
+                {SECURITY_URL}
+              </a>
+              {text.slice(text.lastIndexOf(SECURITY_URL) + SECURITY_URL.length)}
             </pre>
             <p className="muted small">{t("bug_report.not_included")}</p>
             <p className="muted small">{t("bug_report.needs_account")}</p>

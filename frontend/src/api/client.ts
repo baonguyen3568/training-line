@@ -116,8 +116,9 @@ export interface Api {
   /** Rejects with ApiError: 409 {code: PLAN_EXPIRED|CLEANUP_IN_PROGRESS}, 403 {error: DISK-002 + admin_command}. */
   storageApply(body: StorageApplyRequest, locale: string): Promise<StorageApplyResult>;
   /** The 5 safe fields of a bug report for one failed step (server-built, filtered). */
+  /** With a run: /api/runs/{id}/bug-report (adds ref_code); without (validate/preflight errors): /api/bug-report. */
   bugReport(
-    runId: string,
+    runId: string | null,
     q: { nodeId?: string; code?: string },
     locale: string,
   ): Promise<BugReport>;
@@ -168,7 +169,10 @@ export const httpApi: Api = {
     const qs = new URLSearchParams({ locale });
     if (q.nodeId) qs.set("node_id", q.nodeId);
     if (q.code) qs.set("code", q.code);
-    return request("GET", `/api/runs/${encodeURIComponent(runId)}/bug-report?${qs}`);
+    return request(
+      "GET",
+      runId ? `/api/runs/${encodeURIComponent(runId)}/bug-report?${qs}` : `/api/bug-report?${qs}`,
+    );
   },
   nodeResetPlan: (node, locale) =>
     request(

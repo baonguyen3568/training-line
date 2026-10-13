@@ -963,3 +963,6 @@
   white-space: pre-wrap;
   user-select: all;
 }
+.bug-report-preview a {
+  color: var(--color-action-link);
+}

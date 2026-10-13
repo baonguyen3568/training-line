@@ -43,7 +43,7 @@ interface UiState {
   wireDrag: WireDrag | null;
   setWireDrag(drag: WireDrag | null): void;
   /** "Gửi báo cáo lỗi" dialog for one failed step of a run. */
-  bugReport: { runId: string; nodeId?: string; code?: string; title?: string } | null;
+  bugReport: { runId: string | null; nodeId?: string; code?: string } | null;
   setBugReport(r: UiState["bugReport"]): void;
   /** G-4: node base ("<nid>-<key16>") whose "Đặt lại bước" dialog is open. */
   resetNode: string | null;
