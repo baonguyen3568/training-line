@@ -165,3 +165,26 @@ EOF
 - Megatron-LM Llama/Mistral (untie embeddings): https://docs.nvidia.com/megatron-core/developer-guide/nightly/llama_mistral.html
 - HF forum — Image features and image tokens do not match: https://discuss.huggingface.co/t/valueerror-image-features-and-image-tokens-do-not-match/150302
 - transformers issue #43334 (Qwen3-VL on 5.0.dev): https://github.com/huggingface/transformers/issues/43334
+
+## 2.2b CUDA OOM lúc nạp model khi host còn nhiều RAM (GB10, quan sát 2026-10-13, CHƯA rõ cơ chế)
+- Triệu chứng: `torch.AcceleratorError: CUDA error: out of memory` ở `model.to("cuda")` hoặc ngay lúc tạo CUDA context,
+  với MemFree 25–35 GB và MemAvailable 45–50 GB. Peak của job chỉ 2.4 GB. Từng lặp 3/3 lần trong khoảng 90 s, rồi tự hết.
+  Runs: `20261013-2002-bench-r0-*`, `20261013-2011/2012-e1val-e1-s599-*`.
+- Đã đo được: `cudaMemGetInfo().free` ≈ **MemFree**, không phải MemAvailable, vì page cache không được tính là trống
+  cho CUDA. Ví dụ: free 12.9 GiB, MemFree 13.7, MemAvailable 34.
+- Đã LOẠI bằng thí nghiệm có kiểm soát (2026-10-13 20:25–20:30, 25/25 lần OK):
+  - checkpoint khác nhau: hai checkpoint giống hệt;
+  - container cgroup `--memory`: CUDA KHÔNG bị tính vào cgroup, 6 GiB qua được với `--memory 4g`;
+  - driver chậm trả bộ nhớ sau khi container 20–30 GiB thoát: MemFree hồi ngay;
+  - page cache sạch từ việc đọc checkpoint 3.7 GB chặn cudaMalloc;
+  - dirty/writeback: job trước là eval, không ghi checkpoint.
+- Đang có: 2 VLLM::EngineCore ngoài dự án (khoảng 58 GB) và stack vss-* chạy song song (đã báo PM để hỏi user).
+- Biện pháp hiện tại:
+  - log CUDA OOM → MEM-003 (d83e0db);
+  - executor retry 1 lần sau 120 s nếu OOM lúc khởi tạo: không có step, peak < 50% est, ≤ 300 s, không bị oom_killed
+    (backend, `retried_after: gpu_alloc_transient`).
+- Lần sau gặp thì ghi lại:
+  - giờ chính xác lúc chết;
+  - `docker ps -a` của container trước, xem nó đã thật sự biến mất chưa;
+  - `nvidia-smi --query-compute-apps`;
+  - đối chiếu với sampler 2 s ở `outputs/debug/cuda-oom-20261013/gpu_mem_2s.log`.
