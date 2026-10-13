@@ -68,6 +68,7 @@ def test_secrets_never_reach_containers(key: str) -> None:
         (ExitInfo(139, False), (RunStatus.FAILED, "SYS-003")),
         (ExitInfo(137, True, cancelled_by_executor=True), (RunStatus.CANCELLED, None)),
         (ExitInfo(143, False, cancelled_by_executor=True), (RunStatus.CANCELLED, None)),
+        (ExitInfo(1, False, cuda_oom_in_log=True), (RunStatus.FAILED, "MEM-003")),  # evidence in the log
     ],
 )
 def test_classify_exit(info: ExitInfo, expected: tuple[RunStatus, str | None]) -> None:
@@ -754,3 +755,27 @@ def test_network_and_token_files_are_for_narrowed_download_jobs_only(tmp_path: P
     argv = docker_args(plain, root)
     assert argv[argv.index("--network") + 1] == "none"
     assert not any(a.startswith(("HTTPS_PROXY", "HF_TOKEN_PATH")) for a in argv)
+
+
+def test_a_cuda_allocation_failure_in_the_log_is_mem003_not_sys003(tmp_path: Path) -> None:
+    """tester 2026-10-13 (run ...-2002-bench-r0-model-1f93): a CUDA OOM while loading showed 'stopped unexpectedly'."""
+    from vlm_pipeline.common.jobrun import _cuda_oom_in_log
+
+    (tmp_path / "logs").mkdir()
+    log = tmp_path / "logs" / "stdout.log"
+    log.write_text("    return t.to(\ntorch.AcceleratorError: CUDA error: out of memory\n")
+    assert _cuda_oom_in_log(tmp_path)
+    log.write_text("ValueError: bad config\n")
+    assert not _cuda_oom_in_log(tmp_path)
+
+
+def test_graph_classifies_a_cuda_oom_log_tail_as_mem003() -> None:
+    from vlm_pipeline.graph.errors import ContainerExit, classify
+
+    tail = 'File "torch/nn/modules/module.py", line 1369, in convert\ntorch.AcceleratorError: CUDA error: out of memory'
+    out = classify(ContainerExit(1, log_tail=tail), cancelled=False, checkpoint_step=None)
+    assert out.error is not None
+    assert out.error.code == "MEM-003"
+    other = classify(ContainerExit(1, log_tail="KeyError: 'x'"), cancelled=False, checkpoint_step=None)
+    assert other.error is not None
+    assert other.error.code == "SYS-003"

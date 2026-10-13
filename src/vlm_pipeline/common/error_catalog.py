@@ -11,6 +11,7 @@ from __future__ import annotations
 import functools
 import logging
 import math
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from importlib import resources
@@ -321,6 +322,19 @@ def resolved_actions(
     return out
 
 
+@functools.cache
+def _log_patterns(code: str) -> re.Pattern[str] | None:
+    entry = load_catalog().get(code)
+    values = [str(m["value"]) for m in (entry.match if entry else ()) if m.get("kind") == "regex"]
+    return re.compile("|".join(f"(?:{v})" for v in values)) if values else None
+
+
+def log_matches(code: str, text: str) -> bool:
+    """Whether a job log shows the evidence the catalog lists for ``code`` (its ``kind: regex`` match rules)."""
+    pattern = _log_patterns(code)
+    return pattern is not None and pattern.search(text) is not None
+
+
 def already_optimized(error: _ErrorLike, node: NodeContext | None) -> bool:
     """True when the code has memory-reducing actions but none applies to this node (UI: error_card.already_optimized).
 
@@ -411,6 +425,7 @@ __all__ = [
     "available_actions",
     "display_params",
     "load_catalog",
+    "log_matches",
     "resolved_actions",
     "variant_key",
 ]

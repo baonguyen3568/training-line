@@ -60,7 +60,9 @@ MEM-003:
   prevent_in_preflight: false
   params: [step, checkpoint_step, image_size_px, batch_size, {name: resumable, type: bool}]  # last two from job config
   match:
-    - {kind: regex, value: "torch\\.OutOfMemoryError|CUDA out of memory|NV_ERR_NO_MEMORY|cudaErrorMemoryAllocation"}
+    # "CUDA error: out of memory" is torch.AcceleratorError (allocation / context creation, e.g. while another
+    # process maps memory on GB10's shared pool), not torch.OutOfMemoryError.
+    - {kind: regex, value: "torch\\.OutOfMemoryError|CUDA out of memory|CUDA error: out of memory|NV_ERR_NO_MEMORY|cudaErrorMemoryAllocation"}
     - {kind: exit, value: "137+oom_killed"}
   actions:
     - {id: reduce_max_length, kind: patch, patch: [{param: max_seq_len, op: scale, value: 0.5}], confirm: false, effect: memory}

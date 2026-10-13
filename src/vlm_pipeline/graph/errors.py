@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar, Literal
 
-from vlm_pipeline.common.error_catalog import FALLBACK_CODE, load_catalog
+from vlm_pipeline.common.error_catalog import FALLBACK_CODE, load_catalog, log_matches
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 
 NodeOutcome = Literal["interrupted", "failed"]
@@ -133,6 +133,8 @@ def _classify_container_exit(exc: ContainerExit, cancelled: bool, checkpoint_ste
         return Classified("failed", err("MEM-003"))
     if (found := _event_error(exc.events)) is not None:
         return Classified("failed", err(*found))
+    if exc.log_tail and log_matches("MEM-003", exc.log_tail):  # e.g. "CUDA error: out of memory" at model load
+        return Classified("failed", err("MEM-003"))
     return Classified("failed", err("SYS-003", {"exit_code": exc.exit_code, "signal": _signal_name(exc.exit_code)}))
 
 

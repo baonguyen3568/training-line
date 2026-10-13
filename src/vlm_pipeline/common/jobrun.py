@@ -423,6 +423,15 @@ class ExitInfo:
     oom_killed: bool
     cancelled_by_executor: bool = False
     preempted_by_memguard: bool = False  # host watchdog stopped the job (MemAvailable < abort_gb)
+    cuda_oom_in_log: bool = False  # the job's own log shows a CUDA allocation failure (MEM-003 evidence)
+
+
+def _cuda_oom_in_log(run_dir: Path) -> bool:
+    """A CUDA allocation failure in the job log tail (read no-follow): MEM-003, not "stopped unexpectedly"."""
+    from vlm_pipeline.common.error_catalog import log_matches
+    from vlm_pipeline.common.run_log import log_tail
+
+    return log_matches("MEM-003", log_tail(run_dir, 200))
 
 
 def classify_exit(info: ExitInfo) -> tuple[RunStatus, str | None]:
@@ -435,7 +444,7 @@ def classify_exit(info: ExitInfo) -> tuple[RunStatus, str | None]:
         return RunStatus.COMPLETED, None
     if info.exit_code == ExitCode.MEM_PREEMPT:
         return RunStatus.INTERRUPTED, "MEM-002"
-    if info.oom_killed:
+    if info.oom_killed or info.cuda_oom_in_log:
         return RunStatus.FAILED, "MEM-003"
     return RunStatus.FAILED, "SYS-003"
 
@@ -947,8 +956,9 @@ def run_job(
         state = launcher.state(container)
         runner_id = getattr(launcher, "last_image_id", None)  # vlm-runner reports the id it ran
         info = dataclasses.replace(
-            state, preempted_by_memguard=guard.should_stop.is_set(), cancelled_by_executor=cancelled.is_set()
-        )
+            state, preempted_by_memguard=guard.should_stop.is_set(), cancelled_by_executor=cancelled.is_set(),
+            cuda_oom_in_log=state.exit_code != 0 and _cuda_oom_in_log(run_dir),
+        )  # fmt: skip
         status, code = classify_exit(info)
         if status == RunStatus.COMPLETED and _stopped_by_signal(run_dir / "logs" / "stdout.log"):
             # AutoModel turns SIGTERM into a graceful stop with exit 0: not a finished run (stopped from outside).
