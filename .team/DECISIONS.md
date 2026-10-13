@@ -69,3 +69,4 @@
 - 2026-10-13 14:30 USER: 'hoàn thiện đi' → RELEASE 1.0, 6 luồng song song (BOARD). Agent tự quyết trong chuyên môn; PM chỉ cho mâu thuẫn/user/ADR.
 - 2026-10-13 Release 1.0: reward GRPO/DPO chỉ loại dựng sẵn (không cho dán Python) cho tới khi có sandbox; ghi vào roadmap 'reward tuỳ chỉnh có sandbox'. donut-base phải convert offline sang safetensors; geometry3k ghi nguồn, không phân phối lại.
 - 2026-10-13 USER (pháp lý site): luật VN (Luật BVDLCN 2025 + NĐ 13/2023) + nội dung site CC BY 4.0; vận hành 'NTC', email liên hệ + báo lỗ hổng = email tài khoản của user (user chọn, sẽ public khi publish); repo chưa public (để trống); host site chưa quyết → site CHƯA publish. Ngày hiệu lực = ngày publish (điền lúc release).
+- 2026-10-13 USER: repo công khai = https://github.com/baonguyen3568/training-line (PUBLIC, nhánh main), push bằng tài khoản ambrouse qua gh. PM push lần đầu (db03e7e, 641 commit). Agent vẫn KHÔNG push; chỉ PM push khi user yêu cầu.
