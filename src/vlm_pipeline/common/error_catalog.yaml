@@ -396,6 +396,28 @@ CFG-009:
     - {id: migrate_node, kind: patch, confirm: true, when: {migratable: true}}
     - {id: open_node, kind: navigate, target: "node:self", confirm: false}
 
+CFG-010:
+  slug: MODEL_TRAIN_MODE_UNSUPPORTED
+  severity: error
+  prevent_in_preflight: true
+  # The train node does not match the only mode the model catalog has tested (catalog `train_node`): e.g. LoRA on
+  # Nemotron-Parse v1.1, whose recipe is full fine-tune only (FusedAdam fp32 master, no LoRA target modules).
+  # node = the train node's id; model = catalog display_name; supported = catalog train_node.
+  params:
+    - {name: node, ref: node}
+    - model
+    - {name: supported, type: enum, values: [train.sft_vlm, train.lora_vlm, none]}
+  variants:
+    - {when: {supported: train.sft_vlm}, key: full_finetune_only}
+    - {when: {supported: train.lora_vlm}, key: lora_only}
+    - {when: {supported: none}, key: not_trainable}
+  match:
+    - {kind: validate, value: "train node type differs from the model catalog train_node"}
+    - {kind: executor, value: "app/workers.py RealWorker._train guard, before run_job (no GPU lock taken)"}
+  actions:
+    - {id: switch_train_step, kind: patch, confirm: true, when: {supported: [train.sft_vlm, train.lora_vlm]}}
+    - {id: pick_other_asset, kind: navigate, target: "node:model", confirm: false}
+
 SEC-001:
   slug: PATH_OUTSIDE_WORKSPACE
   severity: error

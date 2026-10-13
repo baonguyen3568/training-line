@@ -73,6 +73,12 @@ error:
     what:
       migratable: '"{node_id}" was made with {node_type} {workflow_version}; this machine has {installed_version}. The app can move the settings to the new version; review the changes first.'
       not_migratable: '"{node_id}" was made with {node_type} {workflow_version}; this machine has {installed_version} and it can''t be converted automatically. Open the step to adjust its settings.'
+  CFG-010:
+    title: This model doesn't support this training mode
+    what:
+      full_finetune_only: '"{node}" uses LoRA, but {model} only supports full fine-tuning. Nothing has run yet; switch to the full fine-tune step or pick another model.'
+      lora_only: '"{node}" uses full fine-tuning, but {model} only supports LoRA. Nothing has run yet; switch to the LoRA step or pick another model.'
+      not_trainable: '"{node}" is a training step, but {model} is for trying out and evaluation only and can''t be trained. Nothing has run yet; pick another model.'
   MEM-001:
     title: Not enough memory for this step
     what: This step needs about {need_gb} GB but only {avail_gb} GB is free, because the machine is shared with other apps.
@@ -208,6 +214,7 @@ action:
   pick_input_source: Choose a source for this input
   remove_step: Remove this step
   replace_step: Choose a replacement step
+  switch_train_step: Switch to the matching training step
   reset_default: Reset to default
   remove_bad_wire: Remove the broken wire
   open_other_file: Open another file

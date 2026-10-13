@@ -73,6 +73,12 @@ error:
     what:
       migratable: Bước "{node_id}" được tạo với {node_type} bản {workflow_version}, máy này có bản {installed_version}. App có thể chuyển thiết lập sang bản mới; bạn xem thay đổi trước khi áp dụng.
       not_migratable: Bước "{node_id}" được tạo với {node_type} bản {workflow_version}, máy này có bản {installed_version} và không tự chuyển được. Mở bước để chỉnh lại thiết lập.
+  CFG-010:
+    title: Model này không train được theo cách bạn chọn
+    what:
+      full_finetune_only: Bước "{node}" dùng LoRA, nhưng {model} chỉ hỗ trợ fine-tune toàn phần. App chưa chạy gì; hãy đổi sang bước fine-tune toàn phần hoặc chọn model khác.
+      lora_only: Bước "{node}" dùng fine-tune toàn phần, nhưng {model} chỉ hỗ trợ LoRA. App chưa chạy gì; hãy đổi sang bước LoRA hoặc chọn model khác.
+      not_trainable: Bước "{node}" là bước train, nhưng {model} chỉ dùng để chạy thử và đánh giá, không train được. App chưa chạy gì; hãy chọn model khác.
   MEM-001:
     title: Không đủ bộ nhớ cho bước này
     what: Bước này cần khoảng {need_gb} GB nhưng máy chỉ còn {avail_gb} GB trống, vì máy đang dùng chung với ứng dụng khác.
@@ -208,6 +214,7 @@ action:
   pick_input_source: Chọn nguồn cho đầu vào này
   remove_step: Xoá bước này
   replace_step: Chọn bước thay thế
+  switch_train_step: Đổi sang bước train phù hợp
   reset_default: Đặt về mặc định
   remove_bad_wire: Xoá dây lỗi
   open_other_file: Mở file khác
