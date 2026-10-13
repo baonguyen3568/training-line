@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "purpose": "LoRA train + merge memory of Qwen3.5-4B/9B on one GB10 (catalog ram_gb_train, merge estimate)",
+  "hardware": "1x NVIDIA GB10 (DGX Spark), UMA, driver 580.142",
+  "workflow": "template image_video_understanding without the eval node: LoRA 1 epoch on data/reference/cord-v2-train200 (first 200 CORD v2 train images, local-folder form), pixels 200704-1003520, then train.merge_lora",
+  "peak_note": "run.json peak_mem_gb (host-wide memguard); merge peaks may under-count mmapped weights (page cache counts as available), so the merge estimate is not lowered below one BF16 copy",
+  "models": {
+    "qwen3.5-4b": {
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "code_commit": "a015390b2afe62431d73746f86864a4b3c1c3362",
+      "git_dirty": false,
+      "image": "vlm-automodel:26.08-6",
+      "train": {
+        "run_id": "n4-f9097f984a8f74ca",
+        "peak_mem_gb": 24.4,
+        "minutes": 12.5
+      },
+      "merge": {
+        "run_id": "n5-4e69723dfe35cdcd",
+        "peak_mem_gb": 8.5,
+        "minutes": 1.4
+      }
+    },
+    "qwen3.5-9b": {
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "code_commit": "a015390b2afe62431d73746f86864a4b3c1c3362",
+      "git_dirty": false,
+      "image": "vlm-automodel:26.08-6",
+      "train": {
+        "run_id": "n4-5b8db7ae779edb01",
+        "peak_mem_gb": 33.1,
+        "minutes": 16.0
+      },
+      "merge": {
+        "run_id": "n5-936dc94a094f8b6b-a2",
+        "peak_mem_gb": 14.0,
+        "minutes": 2.9
+      }
+    }
+  }
+}
