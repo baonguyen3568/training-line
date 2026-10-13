@@ -1015,6 +1015,7 @@ error_group:
   MEM: Bộ nhớ
   MODEL: Tải và dùng model
   NET: Kết nối mạng
+  STD: Khuyến nghị về thiết lập và dữ liệu
   SEC: An toàn và giấy phép
   SYS: Hệ thống và tiến trình chạy
 d4:

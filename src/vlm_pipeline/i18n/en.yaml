@@ -1015,6 +1015,7 @@ error_group:
   MEM: Memory
   MODEL: Downloading and using models
   NET: Network
+  STD: Recommended settings and data
   SEC: Safety and licenses
   SYS: System and running processes
 d4:
