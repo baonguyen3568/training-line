@@ -63,7 +63,7 @@ PM = `bao-trainning-1` (điều phối, giải quyết mâu thuẫn, chốt quy�
 7. Tôn trọng chuyên môn: review chéo là bắt buộc cho code merge (ít nhất 1 người khác ngoài tác giả).
 
 ## Quy tắc an toàn (bắt buộc với mọi agent)
-- Chỉ ghi/xoá file **bên trong** `/home/ntcai/Trainning-model` (trừ cache pip/uv/HF/docker image pull).
+- Chỉ ghi/xoá file **bên trong** `/home/ntcai/Trainning-model`, data root cấu hình trong `.env.local`, và `~/.config/ntc-training` (chỉ PM/user tạo file policy). Ngoại lệ: cache pip/uv/HF/docker image pull.
 - **KHÔNG**: `docker system prune`, xoá/stop container/image không thuộc dự án, `git push`, sửa `~/.claude/settings.json`,
   `sudo` thay đổi hệ thống, `rm -rf` ngoài project. Cần những việc đó → hỏi PM, PM hỏi user.
 - Không commit secrets (HF token, NGC key, W&B key) — dùng `.env` (đã gitignore).
@@ -87,6 +87,7 @@ data/ outputs/                                              # gitignored
 
 ## Quy tắc commit (nhiều agent cùng một working tree)
 - **Index git là của chung.** Commit bằng `git commit -m ... -- <path1> <path2>` (pathspec) để chỉ lấy file của mình, KHÔNG dựa vào những gì đang staged. Không `git reset` (kể cả --soft) sau commit.
+- File CHUNG (vd i18n yaml) mà chỉ commit 1 phần: kiểm `git diff --cached --quiet` (index sạch) → `git apply --cached <patch>` → `git commit -m ...` KHÔNG pathspec → kiểm `git show --stat HEAD`. (`git commit -- <path>` lấy NGUYÊN file trong working tree.)
 - Chỉ `git add <path cụ thể>` cho file của mình. **Cấm** `git add -A`, `git add .`, `git commit -a` (sẽ gom file người khác đang làm dở).
 - Code chỉ commit sau khi có review theo ADR-004 (security review với Docker/deps/network). Tài liệu do mình viết trong `.team/` (proposal, knowledge, security-reviews, bugs, upstream) thì tác giả tự commit. File dùng chung `.team/{BOARD,DECISIONS,ROSTER,CONFLICTS}.md`, `.team/log/`, `docs/adr/`, `CLAUDE.md` thì chỉ PM commit (ai cũng được sửa nội dung, PM gom commit).
 - **Cấm** `git stash`, `git checkout -- .`, `git reset --hard`, `git clean` trên working tree chung (sẽ cuốn file của người khác). Cần trạng thái sạch → `scripts/check.sh --clean` / git worktree.
