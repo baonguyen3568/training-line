@@ -59,6 +59,19 @@ export interface UiHint {
   visible_when?: Record<string, (string | number | boolean)[]>;
 }
 
+/** One duty of a licence (393ec98): `id` → `license.obligation.<id>`; ids without copy are not shown. */
+export interface LicenseObligation {
+  id: string;
+  licence: string;
+  clause?: string;
+  parts?: string[];
+  when?: "always" | "distribute" | "cosmos";
+  /** attribution_notice: the verbatim notice. */
+  text?: string;
+  /** prohibited_use_policy_link: the publisher's policy page. */
+  url?: string;
+}
+
 export interface OptionMeta {
   label: string;
   tier?: "default" | "template" | "catalog" | "baseline" | "rnd";
@@ -69,6 +82,9 @@ export interface OptionMeta {
   vendor?: string;
   /** The publisher as people write it ("NVIDIA", "Qwen (Alibaba)"); `vendor` is a slug and is never shown. */
   vendor_name?: string;
+  /** Licence verdict from configs/licenses/obligations.yaml (security): drives the `license.badge.*` badge. */
+  license_class?: "commercial_ok" | "conditional" | "non_commercial" | "unknown";
+  obligations?: LicenseObligation[];
   /** The model always does one task (Nemotron-Parse): the "Chạy thử" question is ignored, so the UI hides it. */
   task_prompt_fixed?: boolean;
 }

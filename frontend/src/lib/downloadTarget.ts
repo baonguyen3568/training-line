@@ -34,6 +34,8 @@ export function downloadTargetOf(
     name: meta?.label ?? str(p.name) ?? catalogId,
     ...(typeof p.size_gb === "number" ? { sizeGb: p.size_gb } : {}),
     ...(license ? { license } : {}),
+    ...(meta?.license_class ? { licenseClass: meta.license_class } : {}),
+    ...(meta?.obligations?.length ? { obligations: meta.obligations } : {}),
     ...(meta?.gated ? { gated: true } : {}),
     // a proper noun, never translated nor shown as the slug (design G-5 a): the catalog name, else the repo's org
     ...(publisher ? { publisher } : {}),

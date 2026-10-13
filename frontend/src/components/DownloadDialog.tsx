@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { LicenseObligation } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { formatDuration } from "../lib/format";
-import { licenseName } from "../lib/licenses";
 import { type DownloadKind, downloadKey, downloadPercent, useDownloads } from "../store/downloads";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
+import { LicenseTerms } from "./LicenseTerms";
 
 export interface DownloadTarget {
   kind: DownloadKind;
@@ -18,6 +19,8 @@ export interface DownloadTarget {
   publisher?: string;
   /** Minutes the server expects the download to take (NET-002 est_min). */
   estMin?: number;
+  licenseClass?: "commercial_ok" | "conditional" | "non_commercial" | "unknown";
+  obligations?: LicenseObligation[];
   /** NET-002 not_prepared: on disk, the server only runs the preparation step (no size, no estimate shown). */
   prepare?: boolean;
 }
@@ -92,9 +95,14 @@ export function DownloadDialog({
           <p className="small">{t("gated.intro", { publisher: target.publisher })}</p>
         )}
         {license && (
-          <p>
-            {t("download.license_lead")} <strong>{licenseName(license)}</strong>
-          </p>
+          <>
+            <p className="small muted">{t("download.license_lead")}</p>
+            <LicenseTerms
+              license={license}
+              licenseClass={target.licenseClass}
+              obligations={target.obligations}
+            />
+          </>
         )}
         {!busy && entry?.status !== "completed" && entry?.status !== "unverified" && (
           <label className="field check">

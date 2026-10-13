@@ -8,6 +8,7 @@ import { useWorkflow } from "../store/workflow";
 import type { DownloadTarget } from "./DownloadDialog";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
+import { LicenseTerms } from "./LicenseTerms";
 
 const BUSY = ["starting", "queued", "downloading", "verifying"];
 
@@ -45,10 +46,12 @@ export function RunMissingDialog({ onClose }: { onClose: () => void }) {
   const totalGb = targets
     .filter((x) => !done(x) && !x.prepare)
     .reduce((sum, x) => sum + (x.sizeGb ?? 0), 0);
-  const licenses = useMemo(
-    () => [...new Set(targets.map((x) => x.license).filter((l): l is string => !!l))],
-    [targets],
-  );
+  // each licence once, with its badge and duties (one "I agree" covers them all, design 9015477)
+  const licenses = useMemo(() => {
+    const byId = new Map<string, DownloadTarget>();
+    for (const x of targets) if (x.license && !byId.has(x.license)) byId.set(x.license, x);
+    return [...byId.values()];
+  }, [targets]);
   const stopped = targets.find((x) => downloadKey(x.kind, x.catalogId) === stoppedAt);
 
   const go = async () => {
@@ -147,15 +150,17 @@ export function RunMissingDialog({ onClose }: { onClose: () => void }) {
           <p className="small">{t("download.missing_total", { size_gb: totalGb.toFixed(1) })}</p>
         )}
         {licenses.length > 0 && (
-          <p>
-            {t("download.license_lead")}{" "}
-            {licenses.map((l, i) => (
-              <span key={l}>
-                {i > 0 && ", "}
-                <strong>{licenseName(l)}</strong>
-              </span>
+          <>
+            <p className="small muted">{t("download.license_lead")}</p>
+            {licenses.map((x) => (
+              <LicenseTerms
+                key={x.license}
+                license={x.license as string}
+                licenseClass={x.licenseClass}
+                obligations={x.obligations}
+              />
             ))}
-          </p>
+          </>
         )}
         {!chaining && (
           <label className="field check">

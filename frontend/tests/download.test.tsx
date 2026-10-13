@@ -279,3 +279,30 @@ describe("prepare only", () => {
     expect(screen.getByRole("checkbox")).toBeTruthy(); // the licence still needs "I agree"
   });
 });
+
+describe("licence terms", () => {
+  it("shows the verdict badge and the duties with copy, never a bare duty id", async () => {
+    const { useWorkflow } = await import("../src/store/workflow");
+    await useWorkflow.getState().loadCatalog();
+    const { downloadTargetOf } = await import("../src/lib/downloadTarget");
+    const issue = net002("not_cached");
+    const target = downloadTargetOf(
+      { ...issue, params: { ...issue.params, catalog_id: "nemotron-parse-v1.1" } },
+      useWorkflow.getState().specs,
+    );
+    if (!target) throw new Error("no target");
+    expect(target.licenseClass).toBe("conditional");
+    const { DownloadDialog } = await import("../src/components/DownloadDialog");
+    render(<DownloadDialog target={target} onClose={() => {}} />);
+    const text = screen.getByRole("dialog").textContent ?? "";
+    // copy is design's: look it up, so a wording change does not break this test
+    const { t } = await import("../src/i18n");
+    expect(text).toContain(t("license.badge.conditional"));
+    expect(text).toContain(t("license.obligation.no_guardrail_bypass"));
+    expect(text).toContain(t("license.obligations_use"));
+    expect(text).toContain(t("license.obligations_distribute"));
+    expect(text).not.toMatch(/patent_litigation_termination|include_license_copy|\{\w+\}/);
+    const link = screen.getByRole("link", { name: "Xem chính sách" });
+    expect(link.getAttribute("rel")).toContain("noopener");
+  });
+});
