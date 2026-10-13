@@ -59,13 +59,25 @@ def holder_run_dir(run_id: str, outputs: Path) -> Path | None:
     return None
 
 
+def locked_run_dir(value: object, outputs: Path) -> Path | None:
+    """Run dir named by the lock ("outputs/..." from the project root): inside ``outputs`` and with a run.json."""
+    if not isinstance(value, str) or not value.startswith("outputs/"):
+        return None
+    run_dir = (outputs.parent / value).resolve()
+    if not run_dir.is_relative_to(outputs.resolve()) or not (run_dir / "run.json").is_file():
+        return None
+    return run_dir
+
+
 def holder_abort_gb(status: dict[str, object], outputs: Path) -> tuple[float | None, str]:
     """Abort level of the lock holder's job, and who holds it ("" when free); None when the run does not record it."""
     if not status.get("held"):
         return None, ""
     who = f"{status.get('who')} ({status.get('job')})"
+    run_dir = locked_run_dir(status.get("run_dir"), outputs)  # recorded by run_job (lock schema, 2026-10-13)
     run_id = status.get("run_id")
-    run_dir = holder_run_dir(run_id, outputs) if isinstance(run_id, str) and RUN_ID.fullmatch(run_id) else None
+    if run_dir is None and isinstance(run_id, str) and RUN_ID.fullmatch(run_id):  # older locks: search
+        run_dir = holder_run_dir(run_id, outputs)
     if run_dir is None:
         return None, who
     level = getattr(read_manifest(run_dir), "memguard_abort_gb", None)

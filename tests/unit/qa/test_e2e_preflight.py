@@ -51,6 +51,25 @@ def test_graph_node_jobs_are_found_by_their_run_id(tmp_path: Path, where: str) -
     assert pre.holder_abort_gb(status, tmp_path) == (9.0, "vlm-app (j)")
 
 
+def test_the_run_dir_recorded_in_the_lock_wins(tmp_path: Path) -> None:
+    """Locks taken by run_job name the run dir: any place under outputs/, no search (research's A/B dirs)."""
+    outputs = tmp_path / "outputs"
+    write_manifest(
+        outputs / "research" / "quant_ab" / "calib32",
+        RunManifest(run_id="20261013-1356-q", name="t", stage="quantize", task="q", memguard_abort_gb=8),
+    )
+    status = {
+        "held": True,
+        "who": "r",
+        "job": "j",
+        "run_id": "20261013-1356-q",
+        "run_dir": "outputs/research/quant_ab/calib32",
+    }
+    assert _pre().holder_abort_gb(status, outputs) == (8.0, "r (j)")
+    for bad in ("outputs/../x", "/etc", "outputs/missing"):
+        assert _pre().locked_run_dir(bad, outputs) is None
+
+
 def test_a_run_id_cannot_walk_out_of_outputs(tmp_path: Path) -> None:
     write_manifest(tmp_path / "x", RunManifest(run_id="x", name="t", stage="eval", task="eval", memguard_abort_gb=1))
     status = {"held": True, "who": "w", "job": "j", "run_id": "../x"}
