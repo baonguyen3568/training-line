@@ -258,3 +258,69 @@ def test_a_lock_outside_a_lock_folder_has_no_mirror(tmp_path: Path) -> None:
     handle = _acquire(lock)
     assert sorted(p.name for p in tmp_path.rglob("*")) == ["GPU_LOCK", "vlm-lock"]
     gpu_lock.release(handle)
+
+
+def test_a_reservation_keeps_the_next_turn_for_its_name_only(tmp_path: Path) -> None:
+    """PM: maintenance reserves the GPU; others are refused until the reserver takes its turn, at most 30 min."""
+    lock = gpu_lock.lock_path_for(tmp_path)
+    res = gpu_lock.reserve(lock, who="bao-frontend", reason="restart app 7870", minutes=10)
+    assert res.until - res.created_at == 600
+    with pytest.raises(GpuLockError, match="GPU reserved") as err:
+        gpu_lock.acquire(lock, who="vlm-app", job="train", run_id="r1")
+    assert err.value.params["who"] == "bao-frontend"
+    with pytest.raises(GpuLockError, match="already reserved"):
+        gpu_lock.reserve(lock, who="someone-else", reason="x", minutes=5)
+    handle = gpu_lock.acquire(lock, who="bao-frontend", job="restart", run_id="m1")
+    assert gpu_lock.read_reservation(lock) is None  # the reserved turn is taken
+    gpu_lock.release(handle)
+    log = (lock.parent / gpu_lock.RESERVATIONS_LOG_NAME).read_text().splitlines()
+    assert [json.loads(line)["event"] for line in log] == ["reserve", "unreserve"]
+    assert json.loads(log[0])["reason"] == "restart app 7870"
+
+
+@pytest.mark.parametrize(("minutes", "reason"), [(31, "x"), (0, "x"), (5, " ")])
+def test_a_reservation_is_short_and_says_why(tmp_path: Path, minutes: float, reason: str) -> None:
+    with pytest.raises(ValueError, match=r"minutes|reason"):
+        gpu_lock.reserve(gpu_lock.lock_path_for(tmp_path), who="x", reason=reason, minutes=minutes)
+
+
+def test_an_expired_or_damaged_reservation_never_wedges_the_gpu(tmp_path: Path) -> None:
+    lock = gpu_lock.lock_path_for(tmp_path)
+    gpu_lock.reserve(lock, who="bao-frontend", reason="restart", minutes=1, now=0.0)  # long expired
+    gpu_lock.release(gpu_lock.acquire(lock, who="vlm-app", job="t", run_id="r"))
+    gpu_lock.reservation_path(lock).write_text("garbage")
+    gpu_lock.release(gpu_lock.acquire(lock, who="vlm-app", job="t", run_id="r"))
+    assert gpu_lock.unreserve(lock, who="vlm-app") is False  # never removes another name's (or junk)
+
+
+@pytest.mark.parametrize("plant", ["symlink", "fifo"])
+def test_a_planted_reservation_file_is_ignored_at_once(tmp_path: Path, plant: str) -> None:
+    """cleanup R1: read_reservation is on every acquire; a link to /dev/zero or a FIFO must not hang it."""
+    import os
+
+    lock = gpu_lock.lock_path_for(tmp_path)
+    lock.parent.mkdir(parents=True)
+    target = gpu_lock.reservation_path(lock)
+    if plant == "symlink":
+        target.symlink_to("/dev/zero")
+    else:
+        os.mkfifo(target)
+    assert gpu_lock.read_reservation(lock) is None
+    gpu_lock.release(gpu_lock.acquire(lock, who="vlm-app", job="t", run_id="r"))
+
+
+@pytest.mark.parametrize(
+    ("created", "until"),
+    [(0.0, 10 * 86400.0), (0.0, float("inf")), (float("nan"), 60.0), (86400.0 * 365, 86400.0 * 365 + 60)],
+)
+def test_a_reservation_outside_the_limit_is_ignored(tmp_path: Path, created: float, until: float) -> None:
+    """cleanup: the 30 min cap holds even for a file reserve() did not write (10 days, inf, NaN, future)."""
+    import time
+
+    lock = gpu_lock.lock_path_for(tmp_path)
+    lock.parent.mkdir(parents=True)
+    now = time.time()
+    body = {"who": "x", "reason": "r", "created_at": now + created, "until": now + until}
+    gpu_lock.reservation_path(lock).write_text(json.dumps(body))
+    assert gpu_lock.read_reservation(lock) is None
+    gpu_lock.release(gpu_lock.acquire(lock, who="vlm-app", job="t", run_id="r"))

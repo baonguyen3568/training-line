@@ -12,6 +12,8 @@ Rules (CLAUDE.md "GPU lock"):
 from __future__ import annotations
 
 import json
+import logging
+import math
 import os
 import secrets
 import time
@@ -195,6 +197,91 @@ def is_stale(info: LockInfo, *, pid_alive: Callable[[int], bool] = _pid_alive) -
     return not is_alive(info, pid_alive=pid_alive)
 
 
+RESERVED_NAME = "GPU_RESERVED"  # next to the lock: the next turn belongs to one name (PM, maintenance)
+RESERVATIONS_LOG_NAME = "GPU_RESERVATIONS.jsonl"  # who reserved, why, until when (append only)
+MAX_RESERVE_S = 30 * 60  # PM: enough for maintenance; longer would be a disguised way to hold the GPU
+
+
+@dataclass(frozen=True)
+class Reservation:
+    who: str
+    reason: str
+    created_at: float
+    until: float
+
+
+def reservation_path(lock_path: Path) -> Path:
+    return lock_path.with_name(RESERVED_NAME)
+
+
+def read_reservation(lock_path: Path, *, now: float | None = None) -> Reservation | None:
+    """The reservation in force (an expired or unreadable one counts as none: it can never wedge the GPU)."""
+    from vlm_pipeline.common.runinfo import read_small_json  # never follows a link, never blocks on a FIFO
+
+    try:
+        data = read_small_json(reservation_path(lock_path), max_bytes=4096)
+        if not isinstance(data, dict):
+            return None
+        res = Reservation(who=str(data["who"]), reason=str(data["reason"]), created_at=float(data["created_at"]),
+                          until=float(data["until"]))  # fmt: skip
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    t = time.time() if now is None else now
+    if not (math.isfinite(res.created_at) and math.isfinite(res.until)) or (
+        res.until - res.created_at > MAX_RESERVE_S + 5 or res.created_at > t + 60
+    ):  # not written by reserve(): a hand-made or job-made file never holds the GPU for one name
+        logging.getLogger(__name__).warning("GPU reservation file ignored: outside the %ss limit", MAX_RESERVE_S)
+        return None
+    return res if res.until > t else None
+
+
+def reserve(lock_path: Path, *, who: str, reason: str, minutes: float, now: float | None = None) -> Reservation:
+    """Keep the next GPU turn for ``who`` (at most 30 min); refused while another name holds a reservation."""
+    if not who.strip() or not reason.strip():
+        raise ValueError("a reservation needs who and a reason")
+    if not 0 < minutes * 60 <= MAX_RESERVE_S:
+        raise ValueError(f"a reservation lasts at most {MAX_RESERVE_S // 60} minutes")
+    t = time.time() if now is None else now
+    current = read_reservation(lock_path, now=t)
+    if current is not None and current.who != who:
+        raise GpuLockError("GPU already reserved", params={"who": current.who, "until": current.until})
+    res = Reservation(who=who, reason=reason, created_at=t, until=t + minutes * 60)
+    path = reservation_path(lock_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(4)}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o644)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps(asdict(res)) + "\n")
+    try:
+        if current is None:  # none in force: create it atomically, so of two names reserving at once one is refused
+            # An expired or unreadable one goes first; two names racing within this instant can still both pass
+            # (maintenance is rare: accepted, cleanup N1).
+            path.unlink(missing_ok=True)
+            try:
+                os.link(tmp, path)
+            except FileExistsError:
+                won = read_reservation(lock_path, now=t)
+                raise GpuLockError("GPU already reserved", params={"who": won.who if won else "?"}) from None
+        else:
+            tmp.replace(path)  # extending our own reservation
+    finally:
+        tmp.unlink(missing_ok=True)
+    with (path.parent / RESERVATIONS_LOG_NAME).open("a", encoding="utf-8") as log:
+        log.write(json.dumps({"event": "reserve", **asdict(res)}) + "\n")
+    return res
+
+
+def unreserve(lock_path: Path, *, who: str) -> bool:
+    """Drop ``who``'s reservation (another name's is never touched); True when one was removed."""
+    current = read_reservation(lock_path)
+    if current is None or current.who != who:
+        return False
+    reservation_path(lock_path).unlink(missing_ok=True)
+    with (lock_path.parent / RESERVATIONS_LOG_NAME).open("a", encoding="utf-8") as log:
+        log.write(json.dumps({"event": "unreserve", "who": who, "at": time.time()}) + "\n")
+    return True
+
+
 def acquire(
     path: Path,
     *,
@@ -211,6 +298,10 @@ def acquire(
     lock is ALSO linked there (same inode, ``O_EXCL``) so processes still running the old code see the GPU busy too.
     The old path is the shared arbiter: if an old-code job takes it between our two links, ours is rolled back.
     """
+    reserved = read_reservation(path)
+    if reserved is not None and reserved.who != who:  # maintenance: the next turn is someone else's
+        raise GpuLockError("GPU reserved", params={"who": reserved.who, "job": reserved.reason,
+                                                   "since": reserved.created_at, "state": "reserved"})  # fmt: skip
     legacy = _legacy_of(path)
     if legacy is not None:
         try:
@@ -243,6 +334,8 @@ def acquire(
         _link_legacy(tmp, path)
     finally:
         tmp.unlink(missing_ok=True)
+    if reserved is not None:
+        unreserve(path, who=who)  # the reserved turn is taken: everyone queues normally again after it
     return LockHandle(path=path, info=info)
 
 
@@ -302,8 +395,8 @@ def _release_legacy(handle: LockHandle) -> None:
 
 
 # ------------------------------------------------------------------------------------------------------- CLI
-def main(argv: list[str] | None = None) -> int:
-    """``python -m vlm_pipeline.common.gpu_lock {status|acquire|release}`` for shell scripts and skills.
+def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911 - one return per subcommand
+    """``python -m vlm_pipeline.common.gpu_lock {status|acquire|release|reserve|unreserve}`` for scripts and skills.
 
     ``acquire`` prints the lock JSON (including the token) once; keep the token to release. Never tee that output
     into run logs (``outputs/runs/*/logs``): the token must not outlive the lock on disk. ``--host-pid`` must be
@@ -324,17 +417,30 @@ def main(argv: list[str] | None = None) -> int:
     acq.add_argument("--host-pid", type=int, required=True)
     rel = sub.add_parser("release")
     rel.add_argument("--token", required=True)
+    res = sub.add_parser("reserve", help="keep the next GPU turn for --who (maintenance, max 30 min)")
+    res.add_argument("--who", required=True)
+    res.add_argument("--reason", required=True)
+    res.add_argument("--minutes", type=float, required=True)
+    unres = sub.add_parser("unreserve")
+    unres.add_argument("--who", required=True)
     args = parser.parse_args(argv)
     path: Path = args.path or default_lock_path()
 
     try:
         if args.cmd == "status":
             info = read_lock(path)
+            reserved = read_reservation(path)
             if info is None:
-                print(json.dumps({"held": False}))
+                print(json.dumps({"held": False, **({"reserved": asdict(reserved)} if reserved else {})}))
                 return int(ExitCode.OK)
             print(json.dumps({"held": True, "stale": is_stale(info), **info.public()}))
             return int(ExitCode.LOCK_BUSY)
+        if args.cmd == "reserve":
+            print(json.dumps(asdict(reserve(path, who=args.who, reason=args.reason, minutes=args.minutes))))
+            return int(ExitCode.OK)
+        if args.cmd == "unreserve":
+            print(json.dumps({"removed": unreserve(path, who=args.who)}))
+            return int(ExitCode.OK)
         if args.cmd == "acquire":
             handle = acquire(path, who=args.who, job=args.job, run_id=args.run_id, host_pid=args.host_pid)
             print(json.dumps(asdict(handle.info)))
@@ -347,6 +453,9 @@ def main(argv: list[str] | None = None) -> int:
     except GpuLockError as exc:
         print(json.dumps({"error": exc.code, "message": str(exc), "params": exc.params}))
         return int(ExitCode.LOCK_BUSY)
+    except ValueError as exc:  # reserve: missing reason, too long
+        print(json.dumps({"error": "bad_request", "message": str(exc)}))
+        return 2
 
 
 if __name__ == "__main__":
