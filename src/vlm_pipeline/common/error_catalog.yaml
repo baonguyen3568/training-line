@@ -402,6 +402,29 @@ NET-001:
     - {id: enter_token, kind: navigate, target: settings_secrets, confirm: false}
     - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
 
+NET-002:
+  slug: NOT_DOWNLOADED
+  severity: error
+  prevent_in_preflight: true
+  # app/workers.py NotCachedError: jobs run offline, so a model or dataset must already be in the project cache. Not a
+  # network or sign-in problem (that is NET-001, PM 2026-10-13). not_prepared: downloaded, but a model that needs a
+  # preparation step (prepared snapshot) has not had it; not_pinned: a dataset outside the vetted catalog (never
+  # downloaded by the app). download = G-5 (backend); until its handler exists the UI hides the button (G-3 rule).
+  # catalog_id + kind feed the download API (POST /api/downloads {kind, catalog_id}: the server resolves repo, revision
+  # and include from the catalog, a client never sends a repo); size_gb shows the download size on the card.
+  params:
+    - repo
+    - {name: reason, type: enum, values: [not_cached, not_prepared, not_pinned]}
+    - catalog_id
+    - {name: kind, type: enum, values: [model, dataset]}
+    - size_gb
+  variant_by: reason
+  match:
+    - {kind: executor, value: "app/workers.py NotCachedError"}
+  actions:
+    - {id: download, kind: navigate, target: download_asset, confirm: false, when: {reason: [not_cached, not_prepared]}}
+    - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
+
 CFG-001:
   slug: GRAPH_PORT_TYPE_MISMATCH
   severity: error

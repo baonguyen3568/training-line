@@ -48,7 +48,7 @@ def test_model_pick_requires_cached_snapshot(tmp_path: Path) -> None:
     assert entry is not None
     with pytest.raises(NotCachedError) as ei:
         w.run(_job("model.hf_pick", {"model": "cosmos-reason2-2b"}, root / "r"))
-    assert ei.value.code == "NET-001"
+    assert ei.value.code == "NET-002"
     snap = _snap(root, "models", entry.repo, entry.revision)
     out = w.run(_job("model.hf_pick", {"model": "cosmos-reason2-2b"}, root / "r")).outputs["model"]
     assert out.type == "Model"

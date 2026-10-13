@@ -389,3 +389,14 @@ def test_text_variants_follow_the_params(code: str, params: dict[str, object], v
     from vlm_pipeline.common.error_catalog import variant_key
 
     assert variant_key(code, params) == variant
+
+
+@pytest.mark.parametrize(("reason", "download"), [("not_cached", True), ("not_prepared", True), ("not_pinned", False)])
+def test_not_downloaded_offers_download_only_when_the_app_can_download(reason: str, download: bool) -> None:
+    """NET-002 (PM): "not here yet" is not a network error; a dataset outside the catalog is never fetched."""
+    from vlm_pipeline.common.error_catalog import variant_key
+
+    ids = available_actions(SimpleNamespace(code="NET-002", params={"repo": "a/b", "reason": reason}))
+    assert ("download" in ids) is download
+    assert "pick_other_asset" in ids
+    assert variant_key("NET-002", {"reason": reason}) == reason

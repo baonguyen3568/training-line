@@ -64,7 +64,7 @@ RESUME_UNSUPPORTED: frozenset[str] = frozenset()
 class NotCachedError(VlmPipelineError):
     """A model or dataset is not in the project cache; jobs run offline, so it must be downloaded first."""
 
-    code: ClassVar[str] = "NET-001"
+    code: ClassVar[str] = "NET-002"  # "not on this machine yet", not a network / sign-in failure (NET-001)
 
 
 class LocalDatasetInvalidError(VlmPipelineError):

@@ -239,6 +239,12 @@ error:
   NET-001:
     title: Couldn't download model or data
     what: Couldn't reach Hugging Face/NGC, or you're not signed in.
+  NET-002:
+    title: 'Model or data not on this machine yet'
+    what:
+      not_cached: '"{repo}" has not been downloaded to this machine. Steps run offline, so it must be here first; click "Download" and run again.'
+      not_prepared: '"{repo}" is downloaded but not prepared yet; this model needs an extra preparation step. Click "Download": the app finishes that step without downloading again.'
+      not_pinned: 'Dataset "{repo}" is not in the app''s checked catalog, so the app will not download it. Pick another dataset from the catalog.'
   CFG-001:
     title: These two steps can't connect
     what: '"{a}" outputs {type_a} but "{b}" needs {type_b}.'
@@ -331,6 +337,7 @@ action:
   retry_recommended_version: Retry with the recommended version
   view_comparison: View comparison
   use_original_model: Use the original model
+  download: 'Download'
   check_connection: Check connection
   enter_token: Enter token (Settings)
   preview_converter: Add a matching converter step (preview)
