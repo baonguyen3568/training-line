@@ -60,14 +60,17 @@ def test_divergences_report_the_first_token_and_the_near_tie() -> None:
         "first_diff_token": 1,
         "hf_choice_rank_in_vllm": "2",
         "vllm_margin_nats": 0.05,
+        "kind": "near_tie",
     }
     assert report["near_ties"] == 3
 
 
 def test_too_many_differences_fail_exact_and_f1() -> None:
     report = _mod().compare(*_pair(50, differ=10))
-    assert report["checks"]["2_exact_match_ge_90"] is False
-    assert report["checks"]["3_f1_delta_le_2_and_ci_has_0"] is False
+    assert report["original_rule"]["2_exact_match_ge_90"] is False
+    assert report["checks"]["2_exact_ge_90_or_all_near_ties"] is True  # 10 near ties: rule 2' holds...
+    assert report["checks"]["3_f1_delta_le_2_and_ci_has_0"] is False  # ...but the answers are worse
+    assert report["verdict"] == "FAIL"
 
 
 def test_images_must_be_the_same() -> None:
@@ -93,6 +96,45 @@ def test_an_hf_token_outside_vllm_top2_is_not_a_near_tie() -> None:
     report = _mod().compare(hf, vl)
     assert report["diverged"][0]["hf_choice_rank_in_vllm"] == ">2"
     assert report["near_ties"] == 0
+
+
+def test_an_exact_tie_listed_first_is_a_near_tie() -> None:
+    # First real probe (Qwen3.5-2B): vLLM lists HF's token first with the same logprob, then picks the other one.
+    hf, vl = _pair(10, differ=1)
+    vl[0]["top_logprobs"][1] = [[2, -0.69], [9, -0.69]]
+    report = _mod().compare(hf, vl)
+    assert report["diverged"][0]["hf_choice_rank_in_vllm"] == "1"
+    assert report["diverged"][0]["vllm_margin_nats"] == 0.0
+    assert report["near_ties"] == 1
+    assert report["diverged"][0]["kind"] == "near_tie"
+
+
+def test_hf_top1_with_a_margin_is_an_anomaly_and_fails() -> None:
+    # vLLM greedy did not take its own top-1: not a tie, whatever the exact-match rate.
+    hf, vl = _pair(50, differ=1)
+    vl[0]["top_logprobs"][1] = [[2, -0.4], [9, -0.7]]
+    report = _mod().compare(hf, vl)
+    assert report["diverged"][0]["kind"] == "anomaly"
+    assert report["anomalies"] == [0]
+    assert report["checks"]["2_exact_ge_90_or_all_near_ties"] is False
+    assert report["verdict"] == "FAIL"
+
+
+def test_one_real_divergence_fails_rule_2_below_90_pct_exact() -> None:
+    hf, vl = _pair(10, differ=2)
+    hf[0]["token_ids"] = [1, 8, 3, 7]  # outside vLLM's top-2
+    report = _mod().compare(hf, vl)
+    assert report["real_divergences"] == [0]
+    assert report["checks"]["2_exact_ge_90_or_all_near_ties"] is False
+
+
+def test_hf_stopping_where_vllm_goes_on_is_ranked_with_the_eos() -> None:
+    hf, vl = _pair(10, differ=1)
+    hf[0]["token_ids"] = [1, 7]  # HF ends after one token; vLLM goes on (its token 9 vs EOS 7 at position 1)
+    vl[0]["top_logprobs"][1] = [[9, -0.70], [7, -0.75]]
+    report = _mod().compare(hf, vl)
+    assert report["diverged"][0]["hf_choice_rank_in_vllm"] == "2"
+    assert report["diverged"][0]["kind"] == "near_tie"
 
 
 def test_no_predictions_is_an_error() -> None:

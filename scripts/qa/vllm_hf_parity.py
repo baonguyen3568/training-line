@@ -9,9 +9,14 @@ Same CORD-v2 test images, same training prompt and pixels, greedy. HF side: scri
 PASS needs all of (agreed with bao-fixcode, 2026-10-13):
 1. the same input on 100% of the images - blocking: image_sha256 equal (both sides read the same PNG; the HF worker
    records it) AND prompt_ids_sha equal (same tokens in, image tokens included); a vLLM image error is a failure;
-2. exact text match >= 90%; for the others the first differing token, the rank of HF's token in vLLM's top-2 and
-   vLLM's top1-top2 margin there (a near tie = HF's token is vLLM's rank 2 with margin < 0.5 nats: a kernel-level
-   difference; anything else is a real divergence);
+2. exact text match >= 90% OR (every first divergence is a near tie AND no anomaly) - changed 2026-10-13 with
+   bao-fixcode after the first Qwen3.5-2B probe: 3/3 images diverged, all at near ties (margins 0.0 / 0.125 / 0.0
+   nats). Greedy bf16 over a JSON answer hundreds of tokens long forks at the first tie, so exact match measures
+   length, not engine agreement; conditions 3 and 4 stay the quality gate. The original rule is still reported.
+   At each first differing token: the rank of HF's token in vLLM's top-2 and vLLM's top1-top2 margin. A near tie =
+   rank 2 with margin < 0.5 nats, or rank 1 with margin 0 (equal logprobs: vLLM picks among them arbitrarily). Rank 1
+   with a margin > 0 means vLLM's greedy did not take its own top-1: an anomaly, which fails the gate. Anything else
+   is a real divergence;
 3. |delta field F1| <= 2 points AND its paired 95% CI contains 0;
 4. truncated% and parse_fail% each differ by <= 2 points.
 """
@@ -34,6 +39,7 @@ PROMPT = "Read this receipt and return its fields as JSON."
 PIXELS = (200704, 1003520)
 MAX_TOKENS = 1024
 NEAR_TIE_NATS = 0.5
+EXACT_TIE_NATS = 1e-6
 RESAMPLES, SEED = 1000, 0
 
 
@@ -94,6 +100,17 @@ def hf_rank(row: dict[str, Any], index: int, hf_token: int | None) -> str | None
     return str(ranked.index(hf_token) + 1) if hf_token in ranked else ">2"
 
 
+def kind_of(rank: str | None, margin: float | None) -> str:
+    """First divergence kind: "near_tie", "anomaly" (greedy skipped its own top-1) or "divergence" (anything else)."""
+    if margin is None:
+        return "divergence"
+    if rank == "1":
+        return "near_tie" if abs(margin) < EXACT_TIE_NATS else "anomaly"
+    if rank == "2" and margin < NEAR_TIE_NATS:
+        return "near_tie"
+    return "divergence"
+
+
 def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dict[str, Any]:
     ids = sorted(hf)
     if not ids:
@@ -118,13 +135,15 @@ def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dic
             continue
         v_ids = vl[i].get("token_ids") or []
         drop = {v_ids[-1]} if v_ids and vl[i].get("finish_reason") == "stop" else set()  # EOS / pad at the end
-        h_ids, v_ids = _strip_end(hf[i].get("token_ids") or [], drop), _strip_end(v_ids, drop)
+        h_full = hf[i].get("token_ids") or []
+        h_ids, v_ids = _strip_end(h_full, drop), _strip_end(v_ids, drop)
         pos = first_difference(h_ids, v_ids)
         m = margin_at(vl[i], pos) if pos is not None else None
-        rank = hf_rank(vl[i], pos, h_ids[pos] if pos < len(h_ids) else None) if pos is not None else None
+        # HF's token there, its EOS included (HF stopping where vLLM went on is a choice like any other)
+        rank = hf_rank(vl[i], pos, h_full[pos] if pos < len(h_full) else None) if pos is not None else None
         diverged.append(
             {"id": i, "first_diff_token": pos, "hf_choice_rank_in_vllm": rank,
-             "vllm_margin_nats": None if m is None else round(m, 3)}
+             "vllm_margin_nats": None if m is None else round(m, 3), "kind": kind_of(rank, m)}
         )  # fmt: skip
     hf_rows = [{"answer_format": "json", "sequence": hf[i]["sequence"], "gt_parse": hf[i]["gt_parse"]} for i in ids]
     vl_rows = [{"answer_format": "json", "sequence": text[i], "gt_parse": hf[i]["gt_parse"]} for i in ids]
@@ -140,9 +159,13 @@ def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dic
     hf_scores, vl_scores = cord.score_rows(hf_rows), cord.score_rows(vl_rows)
     trunc_hf = 100 * sum(bool(hf[i]["truncated"]) for i in ids) / n
     trunc_vl = 100 * sum(vl[i].get("finish_reason") == "length" for i in ids) / n
+    kinds = [d["kind"] for d in diverged]
+    near = sorted(d["vllm_margin_nats"] for d in diverged if d["kind"] == "near_tie")
+    exact_ge_90 = 100 * len(exact) / n >= 90
+    rule_2 = (exact_ge_90 or all(k == "near_tie" for k in kinds)) and "anomaly" not in kinds
     checks = {
         "1_same_input": len(same_input) == n,
-        "2_exact_match_ge_90": 100 * len(exact) / n >= 90,
+        "2_exact_ge_90_or_all_near_ties": rule_2,
         "3_f1_delta_le_2_and_ci_has_0": abs(delta) <= 2 and ci[0] <= 0 <= ci[1],
         "4_trunc_and_parse_fail_le_2": abs(trunc_hf - trunc_vl) <= 2
         and abs(hf_scores.parse_fail_rate - vl_scores.parse_fail_rate) <= 2,
@@ -158,13 +181,14 @@ def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dic
         "delta_f1_vllm_minus_hf": {"delta": round(delta, 2), "ci95": [round(ci[0], 2), round(ci[1], 2)]},
         "truncated_pct": {"hf": round(trunc_hf, 1), "vllm": round(trunc_vl, 1)},
         "parse_fail_pct": {"hf": round(hf_scores.parse_fail_rate, 1), "vllm": round(vl_scores.parse_fail_rate, 1)},
-        "near_ties": sum(
-            1
-            for d in diverged
-            if d["hf_choice_rank_in_vllm"] == "2"
-            and d["vllm_margin_nats"] is not None
-            and d["vllm_margin_nats"] < NEAR_TIE_NATS
-        ),
+        "near_ties": len(near),
+        "anomalies": [d["id"] for d in diverged if d["kind"] == "anomaly"],
+        "real_divergences": [d["id"] for d in diverged if d["kind"] == "divergence"],
+        "near_tie_margin_nats": {"median": near[len(near) // 2] if near else None, "max": near[-1] if near else None},
+        "original_rule": {
+            "2_exact_match_ge_90": exact_ge_90,
+            "verdict": "PASS" if exact_ge_90 and all(v for k, v in checks.items() if k[0] != "2") else "FAIL",
+        },
         "diverged": diverged,
     }
 
