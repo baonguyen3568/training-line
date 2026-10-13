@@ -370,3 +370,28 @@ main > .prose {
     display: none;
   }
 }
+
+/* anchored popovers (scripts/popover-anchor): arrow towards the "?" that opened them */
+[popover]:not(#site-menu):popover-open {
+  overflow: visible;
+}
+[popover]:not(#site-menu)::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--arrow-x, 16px) - 6px);
+  width: 10px;
+  height: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  transform: rotate(45deg);
+}
+[popover]:not(#site-menu)[data-side="below"]::before {
+  top: -6px;
+  border-right: 0;
+  border-bottom: 0;
+}
+[popover]:not(#site-menu)[data-side="above"]::before {
+  bottom: -6px;
+  border-left: 0;
+  border-top: 0;
+}

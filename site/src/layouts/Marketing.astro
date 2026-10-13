@@ -1,6 +1,6 @@
 ---
 // Marketing + policy layout, direction D4 "Chuẩn doanh nghiệp" (.impeccable/surfaces/site-src-pages-index-astro.md).
-// No JS: the mobile menu and every "?" are native popovers.
+// The mobile menu and every "?" are native popovers; one small bundled script anchors them to their trigger.
 import "~/generated/tokens.css";
 import "~/styles/fonts.css";
 import "~/styles/site.css";
@@ -71,5 +71,8 @@ const current = (href: string) => (path.startsWith(href) ? "page" : undefined);
         }
       </div>
     </footer>
+    <script>
+      import "~/scripts/popover-anchor";
+    </script>
   </body>
 </html>

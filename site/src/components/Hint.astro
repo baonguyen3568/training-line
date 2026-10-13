@@ -1,6 +1,7 @@
 ---
 // "?" + popover for secondary explanations (DESIGN.md "?" Popover): the same native popover as the landing, so it
-// opens on click/Enter, closes on Esc or outside click, never on hover, and needs no JS (strict CSP).
+// opens on click/Enter, closes on Esc or outside click, never on hover; scripts/popover-anchor places it next to
+// its "?" (a bundled module, hashed by the CSP; deduplicated by Astro when a page has several hints).
 import Icon from "~/components/Icon.astro";
 
 interface Props {
@@ -17,3 +18,7 @@ const id = `hint-${crypto.randomUUID().slice(0, 8)}`;
   <b class="hint-title">{title}</b>
   <slot />
 </span>
+
+<script>
+  import "~/scripts/popover-anchor";
+</script>

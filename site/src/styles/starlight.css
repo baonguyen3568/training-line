@@ -61,3 +61,28 @@
 .site-title {
   color: var(--sl-color-white);
 }
+
+/* anchored popovers (scripts/popover-anchor): arrow towards the "?" that opened them */
+.hint-pop[popover]:popover-open {
+  overflow: visible;
+}
+.hint-pop[popover]::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--arrow-x, 16px) - 6px);
+  width: 10px;
+  height: 10px;
+  background: var(--color-canvas-placeholder-bg);
+  border: 1px solid var(--color-axis);
+  transform: rotate(45deg);
+}
+.hint-pop[popover][data-side="below"]::before {
+  top: -6px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.hint-pop[popover][data-side="above"]::before {
+  bottom: -6px;
+  border-left: 0;
+  border-top: 0;
+}
