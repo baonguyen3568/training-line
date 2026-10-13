@@ -1127,3 +1127,22 @@ button.hairline.sm {
   display: grid;
   gap: 2px;
 }
+
+/* D-8: the session ended and no sign-in page is served here (Vite dev): one card, nothing else */
+.app.session-ended {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-16);
+}
+.app.session-ended .error-card {
+  max-width: 34rem;
+}
+
+/* D-8 session rows: buttons side by side, left-aligned in the value column */
+.set-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+}

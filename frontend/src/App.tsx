@@ -1,4 +1,5 @@
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from "react";
+import { onSessionEnded } from "./api/client";
 import { Editor } from "./components/Editor";
 import { Gallery } from "./components/Gallery";
 import { Header, type Nav } from "./components/Header";
@@ -8,6 +9,7 @@ import { HomeBarD4 } from "./components/ShellD4";
 import { t } from "./i18n";
 import { clearDraft, type Draft, loadDraft, saveDraft } from "./lib/draft";
 import { formatDateTime } from "./lib/format";
+import { handleSessionEnded } from "./lib/session";
 import { useSystem } from "./store/system";
 import { useUi } from "./store/ui";
 import { useWorkflow } from "./store/workflow";
@@ -44,6 +46,11 @@ export function App() {
     else delete document.documentElement.dataset.theme;
   }, [skin]);
   const [draft, setDraft] = useState<Draft | null>(() => loadDraft());
+  const [sessionEnded, setSessionEnded] = useState(false);
+  useEffect(() => {
+    onSessionEnded(() => handleSessionEnded(() => setSessionEnded(true)));
+    return () => onSessionEnded(null);
+  }, []);
 
   // "Xem kết quả" in the check bar asks for the runs view.
   useEffect(() => {
@@ -98,6 +105,23 @@ export function App() {
     if (to === "home") closeWorkflow();
     setView({ kind: to });
   };
+
+  if (sessionEnded)
+    return (
+      <main className="app session-ended">
+        <div className="error-card" role="alert">
+          <Icon name="lock" size={16} />
+          <strong>{t("session.ended_title")}</strong>
+          <p>{t("session.ended_body")}</p>
+          {/* the link is often opened in another tab: coming back, one click picks the new session up */}
+          <p>
+            <button type="button" className="hairline" onClick={() => window.location.reload()}>
+              {t("session.ended_retry")}
+            </button>
+          </p>
+        </div>
+      </main>
+    );
 
   return (
     <div className={d4 ? "app d4" : "app"}>

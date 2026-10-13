@@ -576,3 +576,10 @@ export interface SettingsView {
   >;
   key_ok: boolean;
 }
+
+/** D-8 GET /api/session without its CSRF token (that stays in client.ts memory). */
+export interface SessionInfo {
+  origin_class: "local" | "lan";
+  /** Local session only: the LAN sign-in lock (too many wrong tokens); epoch seconds or null. */
+  lan_login?: { locked_until: number | null; recent_failures: number };
+}

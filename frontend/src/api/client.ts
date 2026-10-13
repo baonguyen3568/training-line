@@ -18,6 +18,7 @@ import type {
   RunInfo,
   SecretField,
   SecretState,
+  SessionInfo,
   SettingsView,
   StorageApplyRequest,
   StorageApplyResult,
@@ -51,6 +52,24 @@ export function appPrefix(): string {
 const at = (path: string) => `${appPrefix()}${path}`;
 
 /**
+ * D-8: the session ended (signed out here or everywhere, expired). An event socket closed with 4401 or an API
+ * 401 `unauthenticated` calls this once; the app reloads to the server's sign-in page, or, where none is served
+ * (Vite dev, a reload that just happened), says to open the link printed in the terminal. Never a reconnect loop.
+ */
+let sessionEndedHandler: (() => void) | null = null;
+let sessionEndedFired = false;
+export function onSessionEnded(handler: (() => void) | null): void {
+  sessionEndedHandler = handler;
+  sessionEndedFired = false;
+}
+function sessionEnded(): void {
+  if (sessionEndedFired) return;
+  sessionEndedFired = true;
+  sessionEndedHandler?.();
+}
+const WS_SESSION_ENDED = 4401;
+
+/**
  * An authenticated event socket (P003 D13: cookie + Origin at handshake, CSRF token as first message).
  * `onFrame` returns true on the stream's last frame; a socket that closes before it reports `onLost`.
  */
@@ -69,7 +88,8 @@ function socket(path: string, onFrame: (ev: unknown) => boolean, onLost: () => v
       /* ignore malformed frames */
     }
   };
-  ws.onclose = () => {
+  ws.onclose = (e) => {
+    if (e.code === WS_SESSION_ENDED) return sessionEnded(); // not "connection lost": signed out
     if (!closed && !finished) onLost();
   };
   return () => {
@@ -135,6 +155,8 @@ async function request<T>(
   });
   const data: unknown = res.headers.get("content-type")?.includes("json") ? await res.json() : null;
   if (!res.ok) {
+    if (res.status === 401 && (data as { code?: unknown } | null)?.code === "unauthenticated")
+      sessionEnded();
     if (method !== "GET" && !retried && isCsrfRejection(res.status, data))
       return request(method, path, body, true);
     throw new ApiError(res.status, data);
@@ -166,6 +188,14 @@ export interface Api {
     locale: string,
   ): Promise<BugReport>;
   /** G-5: start (or check) a catalog download. 409/404 {detail: {code, params}}: NET-004, DISK-001, SYS-002, CFG-004. */
+  /** D-8: who this browser is (local / LAN) and, on the local machine, the LAN sign-in lock. */
+  session(): Promise<SessionInfo>;
+  /** DELETE /api/session: this browser only. */
+  signOut(): Promise<void>;
+  /** Every browser signs in again with the new link the app prints (the token rotates). */
+  revokeAllSessions(): Promise<void>;
+  /** Local session only (LAN: 403 local_only). */
+  unlockLan(): Promise<SessionInfo["lan_login"]>;
   startDownload(body: DownloadRequest): Promise<DownloadStart>;
   /** G-5 progress; the socket closes after completed/failed. Returns an unsubscribe function. */
   watchDownload(id: string, onEvent: (ev: DownloadEvent) => void): () => void;
@@ -250,6 +280,23 @@ export const httpApi: Api = {
       "GET",
       `/api/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/result`,
     ),
+  session: async () => {
+    const { csrf_token, ...info } = await request<SessionInfo & { csrf_token?: string }>(
+      "GET",
+      "/api/session",
+    );
+    if (typeof csrf_token === "string") csrf = Promise.resolve(csrf_token); // same token, one request fewer
+    return info;
+  },
+  signOut: async () => {
+    await request("DELETE", "/api/session");
+  },
+  revokeAllSessions: async () => {
+    await request("POST", "/api/session/revoke-all");
+  },
+  unlockLan: async () =>
+    (await request<{ lan_login?: SessionInfo["lan_login"] }>("POST", "/api/session/unlock-lan"))
+      .lan_login,
   startDownload: (body) => request("POST", "/api/downloads", body),
   watchDownload: (id, onEvent) =>
     // same handshake as run events (D13): cookie + Origin, then the CSRF token as the first message
@@ -286,7 +333,8 @@ export const httpApi: Api = {
       }
     };
     // Never leave nodes silently "pending": a socket that drops (or never opens) before the run ends is reported.
-    ws.onclose = () => {
+    ws.onclose = (e) => {
+      if (e.code === WS_SESSION_ENDED) return sessionEnded(); // signed out: not a lost connection
       if (!closed && !finished) onEvent({ type: "connection_lost" });
     };
     return () => {

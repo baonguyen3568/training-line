@@ -14,6 +14,7 @@ import type {
   PortType,
   RunInfo,
   SecretState,
+  SessionInfo,
   SettingsView,
   StorageApplyResult,
   StorageItem,
@@ -35,6 +36,11 @@ import advancedFixture from "./fixtures/advanced-options.json";
 import s3aMetrics from "./fixtures/s3a.metrics.jsonl?raw";
 import s3aRun from "./fixtures/s3a.run.json";
 import storagePlanSample from "./fixtures/storage-plan.v3.json";
+
+const mockSession: SessionInfo = {
+  origin_class: "local",
+  lan_login: { locked_until: Math.floor(Date.now() / 1000) + 15 * 60, recent_failures: 5 },
+};
 
 const portTypes: PortType[] = [
   { id: "Dataset", parent: null, color_token: "color.port.dataset", label_key: "port.dataset" },
@@ -542,6 +548,14 @@ export const mockApi: Api = {
       gpu: "NVIDIA GB10 (DGX Spark)",
       ...(runId ? { ref_code: "a1b2c3d4e5f6" } : {}), // the server derives it; the mock only pretends
     }),
+  // D-8: the local machine, LAN sign-in locked for a few minutes after wrong tokens
+  session: () => delay<SessionInfo>({ ...mockSession }),
+  signOut: () => delay(undefined),
+  revokeAllSessions: () => delay(undefined),
+  unlockLan: () => {
+    mockSession.lan_login = { locked_until: null, recent_failures: 0 };
+    return delay(mockSession.lan_login);
+  },
   // G-5: a fake download, events in the server's order (progress… → verifying → completed)
   startDownload: (body) =>
     delay<DownloadStart>({

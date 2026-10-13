@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { ApiError } from "../api/client";
-import type { SecretField, SecretState, SettingsView } from "../api/types";
-import { t, tpOptional } from "../i18n";
+import type { SecretField, SecretState, SessionInfo, SettingsView } from "../api/types";
+import { getLocale, t, tpOptional } from "../i18n";
 import { formatDateTime } from "../lib/format";
+import { reloadForSignIn } from "../lib/session";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
 
@@ -184,6 +185,144 @@ const show = (key: string, v: unknown): { text: string; mono: boolean } => {
   return { text: String(v), mono: true };
 };
 
+const hhmm = (epochS: number) =>
+  new Intl.DateTimeFormat(getLocale() === "vi" ? "vi-VN" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: getLocale() !== "vi",
+  }).format(new Date(epochS * 1000));
+
+/**
+ * D-8 "Phiên đăng nhập" (security): where this browser signs in from, sign out here or everywhere (the token
+ * rotates; every browser opens the new link from the app's log), and, on the app's own machine only, the LAN
+ * sign-in lock with "Mở khoá". After a sign-out the page reloads into the server's sign-in page.
+ */
+function SessionSection() {
+  const [info, setInfo] = useState<SessionInfo | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api.session().then(setInfo, () => setInfo(null));
+  }, []);
+  if (!info) return null;
+
+  const act = async (fn: () => Promise<unknown>, after: () => void) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      after();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const lock = info.lan_login;
+  const locked = !!lock?.locked_until && lock.locked_until * 1000 > Date.now();
+
+  return (
+    <section aria-labelledby="set-session">
+      <h2 id="set-session">
+        <Icon name="shield-check" size={16} /> {t("session.section_title")}
+      </h2>
+      {/* the same two-column grid as Kết nối / Do quản trị viên đặt (design D-8 r1) */}
+      <div className="set-row">
+        <span className="set-label">{t("session.row_access")}</span>
+        <div className="set-control">
+          {info.origin_class === "local" ? t("session.origin_local") : t("session.origin_lan")}
+        </div>
+      </div>
+      {((locked && lock?.locked_until) || note) && (
+        <div className="set-row" data-testid={locked ? "lan-lock" : undefined}>
+          <span className="set-label">{t("session.row_lan")}</span>
+          <div className="set-control">
+            {locked && lock?.locked_until ? (
+              <>
+                <p className="set-state">
+                  <span className="si si-warn" aria-hidden="true">
+                    <Icon name="triangle-alert" size={14} />
+                  </span>{" "}
+                  {t("session.lan_locked", {
+                    time: hhmm(lock.locked_until),
+                    failure_count: lock.recent_failures,
+                  })}
+                </p>
+                <button
+                  type="button"
+                  className="hairline"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(api.unlockLan, () => {
+                      setInfo({ ...info, lan_login: { locked_until: null, recent_failures: 0 } });
+                      setNote(t("session.unlock_done"));
+                    })
+                  }
+                >
+                  {t("session.unlock_lan")}
+                </button>
+              </>
+            ) : (
+              <p className="set-state" role="status">
+                <span className="si si-completed" aria-hidden="true">
+                  <Icon name="circle-check-big" size={14} />
+                </span>{" "}
+                {note}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="set-row">
+        <span className="set-label">{t("session.row_sign_out")}</span>
+        <div className="set-control">
+          {confirmAll ? (
+            <div role="alertdialog" aria-labelledby="revoke-all-q">
+              <p id="revoke-all-q" className="set-state">
+                {t("session.revoke_all_confirm")}
+              </p>
+              <p className="set-actions">
+                <button type="button" className="hairline" onClick={() => setConfirmAll(false)}>
+                  {t("storage.dialog.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="primary danger"
+                  disabled={busy}
+                  onClick={() => void act(api.revokeAllSessions, reloadForSignIn)}
+                >
+                  {t("session.revoke_all")}
+                </button>
+              </p>
+            </div>
+          ) : (
+            <p className="set-actions">
+              <button
+                type="button"
+                className="hairline"
+                disabled={busy}
+                onClick={() => void act(api.signOut, reloadForSignIn)}
+              >
+                {t("session.sign_out")}
+              </button>
+              <button type="button" className="hairline" onClick={() => setConfirmAll(true)}>
+                {t("session.revoke_all")}
+              </button>
+            </p>
+          )}
+        </div>
+      </div>
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** Settings (D4, D-7): secrets the user may set; deployment policy shown read-only with who/why behind "?". */
 export function SettingsPanel() {
   const [view, setView] = useState<SettingsView | null>(null);
@@ -219,6 +358,7 @@ export function SettingsPanel() {
           />
         ))}
       </section>
+      <SessionSection />
       <section aria-labelledby="set-admin">
         <h2 id="set-admin">
           <Icon name="lock" size={16} /> {t("settings.section_admin")}
