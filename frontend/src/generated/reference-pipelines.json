@@ -80,6 +80,88 @@
       ]
     },
     {
+      "id": "invoice-qwen35-2b-lora",
+      "summary_key": "reference_pipeline.invoice-qwen35-2b-lora.summary",
+      "kind": "candidate",
+      "template_id": null,
+      "status": "planned",
+      "difficulty": "basic",
+      "title": {
+        "vi": "Đọc hoá đơn → JSON (Qwen3.5-2B, fine-tune nhẹ)",
+        "en": "Receipts → JSON (Qwen3.5-2B LoRA)"
+      },
+      "source_url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/qwen3_5",
+      "publisher": "NVIDIA",
+      "license": {
+        "code": "apache-2.0",
+        "model": "apache-2.0",
+        "data": "cc-by-4.0"
+      },
+      "measured": {
+        "train_minutes": 58.8,
+        "peak_ram_gb": 16.7,
+        "score": {
+          "benchmark": "CORD v2 test",
+          "metric": "field_f1",
+          "value": 86.42,
+          "ci95": [
+            81.38,
+            90.34
+          ],
+          "n": 100
+        },
+        "config": "LoRA 3 epochs on 720 CORD train images (+ merge), answer = the receipt fields as JSON; one training seed. Same 100 test images and field F1 as the Nemotron Parse pipeline, which reads its own CORD tokens instead of JSON",
+        "sources": [
+          "benchmarks/eval/r2-qwen3.5-2b-lora-cord-test-20261013.json",
+          "benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json"
+        ]
+      },
+      "steps": [
+        {
+          "node": "model.hf_pick",
+          "label": {
+            "vi": "Qwen3.5-2B",
+            "en": "Qwen3.5-2B"
+          }
+        },
+        {
+          "node": "data.local_folder",
+          "label": {
+            "vi": "CORD v2 (thư mục)",
+            "en": "CORD v2 (folder)"
+          }
+        },
+        {
+          "node": "data.split",
+          "label": {
+            "vi": "Chia dữ liệu",
+            "en": "Split data"
+          }
+        },
+        {
+          "node": "train.lora_vlm",
+          "label": {
+            "vi": "Fine-tune nhẹ (LoRA)",
+            "en": "LoRA fine-tune"
+          }
+        },
+        {
+          "node": "train.merge_lora",
+          "label": {
+            "vi": "Gộp vào model",
+            "en": "Merge"
+          }
+        },
+        {
+          "node": "eval.benchmarks",
+          "label": {
+            "vi": "Chấm CORD",
+            "en": "Score on CORD"
+          }
+        }
+      ]
+    },
+    {
       "id": "image-video-understanding",
       "summary_key": "reference_pipeline.image-video-understanding.summary",
       "kind": "app_template",
