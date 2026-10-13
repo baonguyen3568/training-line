@@ -86,6 +86,7 @@ data/ outputs/                                              # gitignored
 ```
 
 ## Quy tắc commit (nhiều agent cùng một working tree)
+- **Index git là của chung.** Commit bằng `git commit -m ... -- <path1> <path2>` (pathspec) để chỉ lấy file của mình, KHÔNG dựa vào những gì đang staged. Không `git reset` (kể cả --soft) sau commit.
 - Chỉ `git add <path cụ thể>` cho file của mình. **Cấm** `git add -A`, `git add .`, `git commit -a` (sẽ gom file người khác đang làm dở).
 - Code chỉ commit sau khi có review theo ADR-004 (security review với Docker/deps/network). Tài liệu do mình viết trong `.team/` (proposal, knowledge, security-reviews, bugs, upstream) thì tác giả tự commit. File dùng chung `.team/{BOARD,DECISIONS,ROSTER,CONFLICTS}.md`, `.team/log/`, `docs/adr/`, `CLAUDE.md` thì chỉ PM commit (ai cũng được sửa nội dung, PM gom commit).
 - **Cấm** `git stash`, `git checkout -- .`, `git reset --hard`, `git clean` trên working tree chung (sẽ cuốn file của người khác). Cần trạng thái sạch → `scripts/check.sh --clean` / git worktree.
