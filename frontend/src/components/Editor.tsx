@@ -111,9 +111,9 @@ function EditorInner() {
       laneBoxes(
         occupiedLanes((workflow?.nodes ?? []).map((n) => n.ui?.x ?? 0)),
         dragLane,
-        skin === "d4",
+        true, // both skins: empty lanes compact, so a template fits at 1280 px (tester, classic desktop-min)
       ),
-    [workflow, dragLane, skin],
+    [workflow, dragLane],
   );
   if (!nodeDragging) frozen.current = null;
   else if (!frozen.current) frozen.current = liveBoxes;
@@ -457,7 +457,7 @@ function EditorInner() {
       const after = laneBoxes(
         occupiedLanes((useWorkflow.getState().workflow?.nodes ?? []).map((n) => n.ui?.x ?? 0)),
         null,
-        skin === "d4",
+        true,
       );
       const left = toDisplayX(pos.x, after) * vp.zoom + vp.x;
       const top = pos.y * vp.zoom + vp.y;
@@ -480,7 +480,7 @@ function EditorInner() {
       setFlashId(id);
       setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1200);
     },
-    [placeInLane, fitView, getViewport, getInternalNode, skin],
+    [placeInLane, fitView, getViewport, getInternalNode],
   );
 
   if (!workflow) return null;

@@ -412,19 +412,19 @@
   color: var(--color-text-secondary);
   border-bottom: 1px solid var(--color-grid);
 }
-/* compact lanes: number only, vertical, tooltip has the name; width change animates (not under reduced motion) */
-.editor.d4 .lane {
+/* compact lanes (both skins): number only, vertical, tooltip has the name; width animates (not reduced motion) */
+.lane {
   transition:
     width 0.15s ease,
     transform 0.15s ease;
 }
-.editor.d4 .lane.compact .lane-label {
+.lane.compact .lane-label {
   left: 50%;
   transform: translateX(-50%);
   writing-mode: vertical-rl;
 }
 @media (prefers-reduced-motion: reduce) {
-  .editor.d4 .lane {
+  .lane {
     transition: none;
   }
 }
