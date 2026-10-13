@@ -27,6 +27,7 @@ from vlm_pipeline.eval.ocrbench import CITATION, load_subset, paired_accuracy, s
 
 DATA = Path("data") / "eval" / "ocrbench-92a54bd1"
 MAX_TOKENS = 256  # OCRBench answers are short; truncation is reported, not hidden
+KV_CACHE_GB = 8.0  # pinned, the SAME for both runs of a pair (KV size changes scheduling, hence numerics)
 PIXELS = (200704, 1003520)  # Qwen3.5 training templates (f95897c): the same image budget as training
 # Engine settings that must be equal for a paired comparison (quantization is what differs).
 SAME_ENGINE = (
@@ -40,6 +41,7 @@ SAME_ENGINE = (
     "max_num_batched_tokens",
     "enable_chunked_prefill",
     "chunk",
+    "kv_cache_gb",
     "chat_template_kwargs",
     "mm_processor_kwargs",
     "container_digest",
@@ -87,6 +89,7 @@ def run(args: argparse.Namespace) -> int:
         min_pixels=PIXELS[0],
         max_pixels=PIXELS[1],
         enable_thinking=False,
+        kv_cache_gb=args.kv_cache_gb,
     )
     if not res.ok:
         print(f"batch failed: {res.status} {res.error_code} {res.run_dir}", file=sys.stderr)
@@ -199,6 +202,8 @@ def compare(args: argparse.Namespace) -> int:
     report["accuracy"] = {ref["label"]: ref["accuracy"], cand["label"]: cand["accuracy"]}
     report["gen_tokens_mean"] = {r["label"]: r.get("gen_tokens_mean") for r in (ref, cand)}
     report["truncated_pct"] = {r["label"]: r.get("truncated_pct") for r in (ref, cand)}
+    # Preemption recomputes a sequence under another batch: report it; > 0 means the KV pin was too small.
+    report["num_preemptions"] = {r["label"]: r["engine"].get("num_preemptions") for r in (ref, cand)}
     print(json.dumps(report, indent=1, default=str))
     return 0
 
@@ -211,6 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--label", required=True)
     r.add_argument("--quantization", default=None)
     r.add_argument("--out", required=True)
+    r.add_argument("--kv-cache-gb", type=float, default=KV_CACHE_GB)
     c = sub.add_parser("compare")
     c.add_argument("reference")
     c.add_argument("candidate")
