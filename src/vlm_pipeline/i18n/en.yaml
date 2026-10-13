@@ -470,6 +470,8 @@ node_state:
   skipped_tooltip: A previous step failed, so this one didn't run
   cached_tooltip: Nothing changed, so it wasn't run again
   running_indeterminate: Running
+  waiting_memory: Waiting for memory
+  waiting_memory_tooltip: This step needs about {need_gb} GB but only {avail_gb} GB is free because other apps are running. It will start on its own when there is enough memory.
 preflight:
   title: Pre-run check
   summary_ok: Everything is ready
