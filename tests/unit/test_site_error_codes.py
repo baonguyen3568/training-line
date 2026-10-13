@@ -66,3 +66,12 @@ def test_a_prefix_without_group_text_fails_the_build(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(i18n, "load", lambda loc: {k: v for k, v in real(loc).items() if k != "error_group.MEM"})
     with pytest.raises(SystemExit, match=r"error_group\.MEM"):
         _module().build()
+
+
+def test_actions_no_node_can_apply_are_not_listed(data: dict[str, Any]) -> None:
+    """MEM-001 'use QLoRA' sets method=qlora: no registered node has that param/value yet -> hidden (bao-design)."""
+    codes = {c["code"]: c for g in data["groups"] for c in g["codes"]}
+    labels = [a["en"] for a in codes["MEM-001"]["actions"]]
+    assert not any("QLoRA" in label for label in labels)
+    assert codes["MEM-001"]["actions"]  # navigate actions (pick a smaller model) stay
+    assert codes["GPU-003"]["actions"]  # quantize format=fp8 is a real node param value

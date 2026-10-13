@@ -34,6 +34,26 @@ def _guide_anchors() -> set[str]:
     return set(re.findall(r'<a id="([A-Z]+-\d{3})"', GUIDE_SOURCE.read_text(encoding="utf-8")))
 
 
+def _patch_possible(action: Any, specs: list[dict[str, Any]]) -> bool:
+    """A patch action is listed only if some registered node has every param it sets and accepts the value (the app
+    filters the same way per node), so e.g. "use QLoRA" stays hidden until a node offers QLoRA (bao-design).
+    """
+    if action.kind != "patch" or not action.patch:
+        return True  # navigate / resume / generic patches (remove_step, preview) are always available
+
+    def accepts(props: dict[str, Any], op: Any) -> bool:
+        prop = props.get(op.param)
+        if prop is None:
+            return False
+        if op.op == "set" and "enum" in prop:
+            return op.value in prop["enum"]
+        if op.op == "set" and "const" in prop:
+            return bool(op.value == prop["const"])
+        return True
+
+    return any(all(accepts(props, op) for op in action.patch) for props in specs)
+
+
 def _what(code: str, texts: dict[str, str]) -> list[str]:
     """The 'what' text: one sentence, or one per variant (key order of the i18n file)."""
     bare = texts.get(f"error.{code}.what")
@@ -46,9 +66,11 @@ def _what(code: str, texts: dict[str, str]) -> list[str]:
 def build() -> dict[str, Any]:
     from vlm_pipeline.common.error_catalog import load_catalog
     from vlm_pipeline.i18n import load
+    from vlm_pipeline.nodes import REGISTRY
 
     texts = {loc: load(loc) for loc in LOCALES}
     guides = _guide_anchors()
+    specs = [spec.params_schema().get("properties") or {} for spec in REGISTRY.all()]
     groups: dict[str, dict[str, Any]] = {}
     for code, entry in sorted(load_catalog().items()):
         if entry.deprecated:
@@ -70,7 +92,11 @@ def build() -> dict[str, Any]:
                 "severity": entry.severity,
                 "title": {loc: texts[loc][f"error.{code}.title"] for loc in LOCALES},
                 "what": {loc: _what(code, texts[loc]) for loc in LOCALES},
-                "actions": [{loc: texts[loc][f"action.{a.id}"] for loc in LOCALES} for a in entry.actions],
+                "actions": [
+                    {loc: texts[loc][f"action.{a.id}"] for loc in LOCALES}
+                    for a in entry.actions
+                    if _patch_possible(a, specs)
+                ],
                 "guide": f"{GUIDE_PAGE}#{code}" if code in guides else None,
             }
         )
