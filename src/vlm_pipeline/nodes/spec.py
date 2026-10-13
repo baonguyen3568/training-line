@@ -8,7 +8,8 @@ hints under ``x-ui`` on each field, is what the editor renders (P004 §8.2).
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -121,8 +122,39 @@ class NodeSpec(_Frozen):
         }
 
 
+@dataclass(frozen=True)
+class Issue:
+    """One pre-run finding: error-catalog code + where + params (text comes from i18n at the API edge)."""
+
+    code: str
+    severity: Literal["error", "warn"] = "error"
+    node_id: str | None = None
+    port: str | None = None
+    param: str | None = None
+    params: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class GraphView:
+    """What a ``GraphRule`` sees: nodes whose type and params are valid, and the wires between them."""
+
+    specs: Mapping[str, NodeSpec]  # node id -> spec
+    params: Mapping[str, BaseModel]  # node id -> validated params (nodes with invalid params are absent)
+    sources: Mapping[tuple[str, str], tuple[str, ...]]  # (node id, input port) -> upstream node ids
+
+    def source(self, node_id: str, port: str) -> str | None:
+        """The single upstream node of ``port`` (None when unwired or fanned in)."""
+        found = self.sources.get((node_id, port), ())
+        return found[0] if len(found) == 1 else None
+
+
+# Cross-node check that needs node semantics (catalog, params) the generic graph validator must not know.
+# First-party code only: rules are executable, so a plugin manifest (data-only, P004 §8.5) can never add one.
+GraphRule = Callable[[GraphView], Iterable[Issue]]
+
+
 class Registry:
-    """Immutable set of node specs keyed by ``type_id``.
+    """Immutable set of node specs keyed by ``type_id``, plus the cross-node rules of those nodes.
 
     Checks at construction: unique ids, known port types, strict params models, and (unless ``allow_unpinned``,
     used until the worker images are wired in M1) a digest-pinned image for every container node.
@@ -133,9 +165,11 @@ class Registry:
         specs: Iterable[NodeSpec],
         port_types: Iterable[PortType] = PORT_TYPES,
         *,
+        rules: Iterable[GraphRule] = (),
         allow_unpinned: bool = False,
     ) -> None:
         self.port_types: tuple[PortType, ...] = tuple(port_types)
+        self.rules: tuple[GraphRule, ...] = tuple(rules)
         known_ports = {p.id for p in self.port_types}
         by_id: dict[str, NodeSpec] = {}
         for spec in specs:
@@ -170,6 +204,9 @@ __all__ = [
     "PORT_TYPES",
     "Category",
     "EmptyParams",
+    "GraphRule",
+    "GraphView",
+    "Issue",
     "LocalPath",
     "NodeSpec",
     "PortSpec",

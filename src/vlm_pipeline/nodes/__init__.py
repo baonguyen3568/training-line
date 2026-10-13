@@ -5,6 +5,7 @@ from __future__ import annotations
 from vlm_pipeline.nodes.data import DATA_SPLIT
 from vlm_pipeline.nodes.evaluate import BENCH_PERF, EVAL_BENCHMARKS
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ, SERVE_VLLM, TRAIN_MERGE_LORA
+from vlm_pipeline.nodes.rules import RULES
 from vlm_pipeline.nodes.source import DATA_HF_LOAD, DATA_LOCAL_FOLDER, MODEL_HF_PICK
 from vlm_pipeline.nodes.spec import Registry
 from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM
@@ -29,6 +30,7 @@ REGISTRY = Registry(
         BENCH_PERF,
         EXPORT_HF_DIR,
     ],
+    rules=RULES,
     allow_unpinned=True,
 )
 

@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
 from vlm_pipeline.app.services import BadRequestError, NotAvailableError, Services
-from vlm_pipeline.common.error_catalog import Labels, display_params
+from vlm_pipeline.common.error_catalog import Labels, display_params, variant_key
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 Workflow = Annotated[dict[str, Any], Body()]
@@ -54,8 +54,11 @@ def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None =
     params = display_params(code, raw, labels, node_id=node_id if isinstance(node_id, str) else None) if labels else raw
     out = dict(issue)  # node_id / port / param / params stay raw for the UI
     texts = i18n.load(locale)
+    variant = variant_key(code, raw)  # chosen on raw ids, never on display labels
     for part in ("title", "what", "why"):
         key = f"error.{code}.{part}"
+        if part == "what" and variant:
+            key = f"{key}.{variant}"
         if part == "why" and key not in texts:  # "why" is optional in the catalog
             out[part] = None
             continue

@@ -297,3 +297,30 @@ def test_unknown_ids_fall_back_to_raw_and_input_is_not_mutated() -> None:
     shown = display_params("CFG-003", raw, _labels(), node_id="ghost")  # type: ignore[arg-type]
     assert shown == raw
     assert raw == {"node": "ghost", "port": "x"}
+
+
+@pytest.mark.parametrize(
+    ("code", "params", "key"),
+    [
+        ("CFG-009", {"migratable": True}, "migratable"),
+        ("CFG-009", {"migratable": False}, "not_migratable"),
+        ("CFG-004", {"reason": "not_installed", "trust_level": "unverified"}, "not_installed_unknown"),
+        ("CFG-010", {"supported": "train.sft_vlm"}, "full_finetune_only"),
+        ("CFG-001", {"a": "x"}, None),
+    ],
+)
+def test_variant_key_picks_the_i18n_child(code: str, params: dict[str, object], key: str | None) -> None:
+    from vlm_pipeline.common.error_catalog import variant_key
+    from vlm_pipeline.i18n import load
+
+    assert variant_key(code, params) == key
+    if key is not None:
+        assert f"error.{code}.what.{key}" in load("vi")
+
+
+def test_variant_key_coerces_bool_strings_and_never_leaves_a_raw_key() -> None:
+    from vlm_pipeline.common.error_catalog import variant_key
+
+    assert variant_key("CFG-009", {"migratable": "true"}) == "migratable"
+    assert variant_key("CFG-009", {"migratable": "false"}) == "not_migratable"
+    assert variant_key("CFG-010", {"supported": "train.unknown"}) == "full_finetune_only"  # first variant + warning

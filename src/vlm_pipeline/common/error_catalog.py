@@ -9,6 +9,7 @@ Host-side only (pydantic + pyyaml); container workers use ``common.errors`` whic
 from __future__ import annotations
 
 import functools
+import logging
 import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -19,6 +20,8 @@ import yaml
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, model_validator
 
 from vlm_pipeline.common.errors import VlmPipelineError
+
+_log = logging.getLogger(__name__)
 
 CODE_PATTERN = r"^[A-Z]+-\d{3}$"
 FALLBACK_CODE = "SYS-000"
@@ -316,6 +319,30 @@ class Labels:
     port_type: Callable[[str], str | None]  # port type id -> label, e.g. "Dữ liệu"
 
 
+def variant_key(code: str, params: Mapping[str, object]) -> str | None:
+    """Text variant of ``error.<code>.what`` for these raw params (``variant_by`` / ``variants``), None if plain."""
+    entry = load_catalog().get(code)
+    if entry is None:
+        return None
+    if entry.variant_by:
+        name = entry.variant_by
+        value = params.get(name)
+        declared = next(p for p in entry.params if p.name == name)  # checked when the catalog loads
+        if declared.type == "bool":  # i18n keys: <name> / not_<name>; "true"/"false" may arrive via JSON from workers
+            truthy = value is True or (isinstance(value, str) and value.lower() == "true")
+            return name if truthy else f"not_{name}"
+        return None if value is None else str(value)
+    if not entry.variants:
+        return None
+    key = next((v.key for v in entry.variants if _matches(v.when, params)), None)
+    if key is None:  # a code with variants has no plain `what` text: never show a raw key
+        _log.warning(
+            "error %s: no text variant matches params %s; using %r", code, sorted(params), entry.variants[0].key
+        )
+        key = entry.variants[0].key
+    return key
+
+
 def display_params(
     code: str, params: Mapping[str, object], labels: Labels, *, node_id: str | None
 ) -> dict[str, object]:
@@ -356,4 +383,5 @@ __all__ = [
     "available_actions",
     "display_params",
     "load_catalog",
+    "variant_key",
 ]

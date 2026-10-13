@@ -2,7 +2,7 @@
 
 Returns ``Issue``s (catalog code + params only; text comes from i18n at the API edge). Order: file shape (CFG-007),
 node ids (CFG-008), node types (CFG-004), params (CFG-005 / SEC-001 / SEC-002), edges (CFG-006 / CFG-001),
-cycles (CFG-002), missing inputs (CFG-003).
+cycles (CFG-002), missing inputs (CFG-003), then the registry's cross-node rules (e.g. CFG-010).
 """
 
 from __future__ import annotations
@@ -11,15 +11,14 @@ import os
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 from urllib.parse import unquote
 
 from pydantic import ValidationError
 
 from vlm_pipeline.graph.workflow import WORKFLOW_FORMAT, WorkflowEdge, WorkflowFile, WorkflowNode, allowed_keys
-from vlm_pipeline.nodes.spec import LOCAL_PATH_FORMAT, NodeSpec, Registry, is_compatible
+from vlm_pipeline.nodes.spec import LOCAL_PATH_FORMAT, GraphView, Issue, NodeSpec, Registry, is_compatible
 
 SUPPORTED_SCHEMA_VERSIONS = frozenset({1})
 # Allowed keys come from the workflow file models (single source shared with the frontend via JSON schema).
@@ -31,16 +30,6 @@ _EDGE_KEYS = allowed_keys(WorkflowEdge)
 _TYPE_ID = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}(/[a-z0-9][a-z0-9_.-]{0,63})?$")
 _NODE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _SECRET = re.compile(r"hf_[A-Za-z0-9]{20,}|nvapi-[A-Za-z0-9_-]{20,}|(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}")
-
-
-@dataclass(frozen=True)
-class Issue:
-    code: str
-    severity: Literal["error", "warn"] = "error"
-    node_id: str | None = None
-    port: str | None = None
-    param: str | None = None
-    params: Mapping[str, object] = field(default_factory=dict)
 
 
 # ----------------------------------------------------------------------------------------------- helpers
@@ -213,8 +202,8 @@ def _validate(workflow: object, registry: Registry, workspace: Path | None) -> l
         return [*issues, Issue("CFG-007", params={"field": "nodes" if not isinstance(raw_nodes, list) else "edges"})]
     if not raw_nodes:
         issues.append(Issue("CFG-007", params={"field": "nodes"}))
-    seen, specs = _check_nodes(raw_nodes, registry, workspace, issues)
-    links, connected = _check_edges(raw_edges, seen, specs, issues)
+    seen, specs, raw_params = _check_nodes(raw_nodes, registry, workspace, issues)
+    links, connected, sources = _check_edges(raw_edges, seen, specs, issues)
     cycle = _find_cycle(seen, links)
     if cycle:
         issues.append(Issue("CFG-002", node_id=cycle[0], params={"nodes": ", ".join(cycle)}))
@@ -222,14 +211,29 @@ def _validate(workflow: object, registry: Registry, workspace: Path | None) -> l
         for name, port in spec.inputs.items():
             if not port.optional and (node_id, name) not in connected:
                 issues.append(Issue("CFG-003", node_id=node_id, port=name, params={"node": node_id, "port": name}))
+    if registry.rules:
+        view = GraphView(specs=specs, params=_valid_params(specs, raw_params), sources=sources)
+        for rule in registry.rules:
+            issues.extend(rule(view))
     return issues
+
+
+def _valid_params(specs: Mapping[str, NodeSpec], raw_params: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    valid: dict[str, Any] = {}
+    for node_id, spec in specs.items():
+        try:
+            valid[node_id] = spec.validate_params(raw_params.get(node_id, {}))
+        except ValidationError:
+            continue  # already reported as CFG-005 / SEC-001
+    return valid
 
 
 def _check_nodes(
     raw_nodes: list[object], registry: Registry, workspace: Path | None, issues: list[Issue]
-) -> tuple[set[str], dict[str, NodeSpec]]:
-    """Per-node checks; returns the node ids seen and the specs of nodes valid enough to wire."""
+) -> tuple[set[str], dict[str, NodeSpec], dict[str, Mapping[str, Any]]]:
+    """Per-node checks; returns the node ids seen, the specs of nodes valid enough to wire and their raw params."""
     specs: dict[str, NodeSpec] = {}
+    raw_params: dict[str, Mapping[str, Any]] = {}
     counts: dict[str, int] = {}
     for raw in raw_nodes:
         if not isinstance(raw, Mapping) or not isinstance(raw.get("id"), str) or not _NODE_ID.match(raw["id"]):
@@ -245,17 +249,20 @@ def _check_nodes(
         spec = None if bad_type else registry.get(str(raw.get("type")))
         if spec is not None:
             specs[node_id] = spec
+            params = raw.get("params", {})
+            raw_params[node_id] = params if isinstance(params, Mapping) else {}
     for node_id, n in counts.items():
         if n > 1:
             issues.append(Issue("CFG-008", node_id=node_id, params={"node_id": node_id, "duplicate_count": n}))
-    return set(counts), specs
+    return set(counts), specs, raw_params
 
 
 def _check_edges(
     raw_edges: list[object], seen: set[str], specs: Mapping[str, NodeSpec], issues: list[Issue]
-) -> tuple[list[tuple[str, str]], dict[tuple[str, str], int]]:
+) -> tuple[list[tuple[str, str]], dict[tuple[str, str], int], dict[tuple[str, str], tuple[str, ...]]]:
     links: list[tuple[str, str]] = []
     connected: dict[tuple[str, str], int] = {}
+    sources: dict[tuple[str, str], tuple[str, ...]] = {}
     for raw_edge in raw_edges:
         edge = _parse_edge(raw_edge)
         if edge is None:
@@ -280,7 +287,9 @@ def _check_edges(
         if too_many or not is_compatible(s_type, d_type):
             params = {"a": src, "b": dst, "type_a": s_type, "type_b": d_type}
             issues.append(Issue("CFG-001", node_id=dst, port=inp, params=params))
-    return links, connected
+            continue
+        sources[(dst, inp)] = (*sources.get((dst, inp), ()), src)  # only wires that pass, for the rules
+    return links, connected, sources
 
 
 __all__ = ["WORKFLOW_FORMAT", "Issue", "path_escapes_workspace", "validate"]

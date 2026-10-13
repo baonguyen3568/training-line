@@ -78,6 +78,13 @@ class CatalogEntry(BaseModel):
             return None
         return self.sft_trainable_pct_min, self.sft_trainable_pct_max
 
+    def supports_train_node(self, node_type: str) -> bool:
+        """Whether ``node_type`` is the fine-tune path vetted for this model (CFG-010).
+
+        Only that path has a measured RAM budget and a smoke run. Single rule for graph validation and the worker.
+        """
+        return node_type == self.train_node  # "none" matches no node
+
     @model_validator(mode="after")
     def _trainable_pct_range(self) -> Self:
         low, high = self.sft_trainable_pct_min, self.sft_trainable_pct_max
