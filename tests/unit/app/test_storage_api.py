@@ -366,6 +366,29 @@ def _scheduler(root: Path, settings: StorageSettings | None = None) -> tuple[Ret
     return RetentionScheduler(root, idx, settings, lock_path=root / ".team" / "GPU_LOCK"), idx
 
 
+def test_every_pass_reconciles_stale_runs_in_any_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from functools import partial
+
+    from vlm_pipeline.artifacts import stale_runs
+    from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest, write_manifest
+
+    monkeypatch.setattr(stale_runs, "reconcile", partial(stale_runs.reconcile, containers=set))  # no docker CLI call
+    s, _ = _scheduler(tmp_path)
+    s.mode = "off"
+    stuck = tmp_path / "outputs" / "runs" / "probe"
+    write_manifest(stuck, RunManifest(run_id="probe", name="probe", stage="eval", task="x", status=RunStatus.RUNNING))
+    old = time.time() - 3 * stale_runs.QUIET_S
+    for path in (stuck, *stuck.iterdir()):
+        os.utime(path, (old, old))
+    assert s.run_once() == {"status": "off", "reconciled": ["probe"]}
+    assert read_manifest(stuck).status == RunStatus.INTERRUPTED
+    s.mode = "dry_run"
+    assert s.run_once()["reconciled"] == []  # once
+    s.lock_path.parent.mkdir(parents=True, exist_ok=True)
+    s.lock_path.write_text("not json")  # a malformed lock: no run is judged, the pass still runs
+    assert s.run_once()["reconciled"] == []
+
+
 def test_apply_pass_does_only_safe_items(tmp_path: Path) -> None:
     s, idx = _scheduler(tmp_path)
     s.mode = "apply"

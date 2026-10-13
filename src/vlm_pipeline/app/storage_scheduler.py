@@ -15,6 +15,8 @@ Every ``interval_s`` (first run ``first_delay_s`` after start) one pass:
    (``~/.config/ntc-training/policy.toml``, ``[storage] schedule``) or else the profile default decides, and
    ``VLM_RETENTION_SCHEDULE`` may only lower it.
 
+Before that, every pass runs ``stale_runs.reconcile`` (status fix only, any mode).
+
 The pass holds ``retention.cleanup_lock`` (shared with ``scripts/cleanup/{retention,cache}.py --apply``).
 """
 
@@ -31,7 +33,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from vlm_pipeline.app.storage import APPROVAL_WINDOW_S, CLEANUP_LOG_REL, PERMANENT_LOSS, PROFILE_ENV, StorageSettings
-from vlm_pipeline.artifacts import cache_retention, retention
+from vlm_pipeline.artifacts import cache_retention, retention, stale_runs
 from vlm_pipeline.artifacts.index import ArtifactIndex
 from vlm_pipeline.common.app_config import effective_profile, read_policy
 from vlm_pipeline.common.paths import GIB
@@ -104,13 +106,26 @@ class RetentionScheduler:
     _stop: threading.Event = field(default_factory=threading.Event)
 
     def run_once(self) -> dict[str, Any]:
-        """One pass; returns (and records) its summary. Never raises for a skipped pass."""
+        """One pass; returns (and records) its summary. Never raises for a skipped pass.
+
+        Every pass first marks runs stuck at running/queued with no sign of life ``interrupted``
+        (``stale_runs.reconcile``). That only fixes a status and deletes nothing, so it runs in every mode, also while
+        the GPU lock is held (it checks the lock's run itself).
+        """
+        reconciled = self._reconcile()
         if self.mode == "off":
-            return {"status": "off"}
+            return {"status": "off", "reconciled": reconciled}
         with retention.cleanup_lock(self.root) as held:
             if not held:
-                return self._record({"status": "skipped", "reason": "PASS_IN_PROGRESS"})
-            return self._record(self._pass())
+                return self._record({"status": "skipped", "reason": "PASS_IN_PROGRESS", "reconciled": reconciled})
+            return self._record({**self._pass(), "reconciled": reconciled})
+
+    def _reconcile(self) -> list[str]:
+        try:
+            return stale_runs.reconcile(self.root, now=self.clock(), lock_path=self.lock_path)
+        except Exception:  # a status fix must never stop the cleanup pass
+            logger.exception("stale-run check failed")
+            return []
 
     def _pass(self) -> dict[str, Any]:
         if self.lock_path.exists() or self.lock_path.is_symlink():
