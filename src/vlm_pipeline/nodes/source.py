@@ -6,10 +6,30 @@ from typing import Any, Literal
 
 from pydantic import Field, create_model
 
-from vlm_pipeline.common.catalog import Catalog, load_catalog
+from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog
+from vlm_pipeline.common.obligations import ObligationsTable, load_obligations, model_obligations
 from vlm_pipeline.common.params import Params, ui
 from vlm_pipeline.data.config import HubDatasetParams, LocalFolderParams
 from vlm_pipeline.nodes.spec import NodeSpec, PortSpec
+
+
+def _option_meta(m: CatalogEntry, catalog: Catalog, obligations: ObligationsTable) -> dict[str, Any]:
+    license_class, duties = model_obligations(m, obligations)
+    return {
+        "label": m.display_name,
+        "tier": m.tier,
+        "ram_gb": m.ram_gb_train,
+        "ram_source": m.ram_source,
+        "gated": m.gated,
+        "license": m.license,
+        "vendor": m.vendor,
+        "vendor_name": catalog.vendor_name(m),  # proper noun for the download/terms dialogs (G-5), not i18n
+        # G-5 consent dialog: licence duties from bao-security's table (configs/licenses/obligations.yaml)
+        "license_class": license_class,
+        "obligations": duties,
+        # The model always runs one fixed task (Nemotron-Parse): "Chạy thử" hides its question box (B-7).
+        "task_prompt_fixed": m.task_prompt_fixed,
+    }
 
 
 def _model_pick_params(catalog: Catalog) -> type[Params]:
@@ -19,20 +39,8 @@ def _model_pick_params(catalog: Catalog) -> type[Params]:
     the descriptive tagline is the i18n key ``model_catalog.<id>.tagline``.
     """
     entries = catalog.selectable()
-    option_meta = {
-        m.id: {
-            "label": m.display_name,
-            "tier": m.tier,
-            "ram_gb": m.ram_gb_train,
-            "ram_source": m.ram_source,
-            "gated": m.gated,
-            "license": m.license,
-            "vendor": m.vendor,
-            # The model always runs one fixed task (Nemotron-Parse): "Chạy thử" hides its question box (B-7).
-            "task_prompt_fixed": m.task_prompt_fixed,
-        }
-        for m in entries
-    }
+    obligations = load_obligations()
+    option_meta = {m.id: _option_meta(m, catalog, obligations) for m in entries}
     model_id: Any = Literal.__getitem__(tuple(m.id for m in entries))
     field = Field(catalog.default.id, json_schema_extra=ui(order=0, summary=True, option_meta=option_meta))
     params: type[Params] = create_model("ModelPickParams", __base__=Params, model=(model_id, field))

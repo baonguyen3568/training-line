@@ -5,6 +5,7 @@
 #
 # Field conventions (flat on purpose, consumed by nodes as per-model defaults):
 #   display_name        proper name only, language-neutral; descriptions live in i18n model_catalog.<id>.tagline (vi/en)
+#   vendor              slug, a key of the top-level `vendors` map (publisher name shown to users, a proper noun)
 #   ("needs a free machine" is NOT stored: UI derives it from ram_gb_train vs live MemAvailable at preflight)
 #   revision            40-char commit SHA vetted by bao-security (never `main`)
 #   tier                default | template | catalog | baseline | rnd   (rnd = never shown in Simple)
@@ -26,6 +27,11 @@
 #   security            approved | approved_with_conditions | conditional | rejected
 schema_version: 1
 budget_note: "RAM budget on the shared GB10 is ~40GB; preflight = ram_gb_train + 10GB headroom vs MemAvailable."
+vendors:
+  nvidia: "NVIDIA"
+  qwen: "Qwen (Alibaba Cloud)"
+  google: "Google"
+
 models:
   - id: nemotron-parse-v1.1
     repo: nvidia/NVIDIA-Nemotron-Parse-v1.1
@@ -39,6 +45,8 @@ models:
     license: nvidia-open-model-license
     commercial: "yes"
     attribution: "NVIDIA Open Model License; tokenizer CC-BY-4.0"
+    model_parts:
+      - {name: tokenizer, license: cc-by-4.0}
     security: approved
     params_b: 0.94
     disk_gb: 3.8
@@ -410,6 +418,8 @@ models:
     license: openmdw-1.1
     commercial: "yes"
     attribution: "OpenMDW-1.1 notice; tokenizer CC-BY-4.0"
+    model_parts:
+      - {name: tokenizer, license: cc-by-4.0}
     security: approved_with_conditions
     params_b: 0.95
     disk_gb: 3.6

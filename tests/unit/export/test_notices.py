@@ -52,9 +52,10 @@ def test_trained_artifact_lists_base_model_and_training_data(tmp_path: Path) -> 
     components, mods, gaps = _lineage(tmp_path, artifact)
     assert [(c.role, c.repo, c.license) for c in components] == [
         ("base_model", PARSE.repo, PARSE.license),
+        ("model_part", PARSE.repo, "cc-by-4.0"),  # the tokenizer (catalog model_parts)
         ("training_data", CORD.repo, CORD.license),
     ]
-    assert components[1].revision == CORD.revision  # "#limit=" is not part of the revision
+    assert components[2].revision == CORD.revision  # "#limit=" is not part of the revision
     assert [m.run_id for m in mods] == ["r1"]
     assert gaps == []
 
@@ -69,14 +70,14 @@ def test_parent_runs_are_followed_and_shared_data_listed_once(tmp_path: Path) ->
     )
     child = _run(tmp_path, "r1", parent_run_id="r0", dataset=f"{CORD.repo}@{CORD.revision}")
     components, mods, gaps = _lineage(tmp_path, child)
-    assert [c.role for c in components] == ["base_model", "training_data"]
+    assert [c.role for c in components] == ["base_model", "model_part", "training_data"]  # Parse tokenizer part
     assert [m.run_id for m in mods] == ["r1", "r0"]
     assert gaps == []
 
 
 def test_untrained_catalog_model_and_unknown_data_are_reported_not_guessed(tmp_path: Path) -> None:
     components, mods, gaps = _lineage(tmp_path, tmp_path / "snapshot", base_ref=f"{PARSE.repo}@{PARSE.revision}")
-    assert [c.role for c in components] == ["base_model"]
+    assert [c.role for c in components] == ["base_model", "model_part"]  # Parse tokenizer part
     assert (mods, gaps) == ([], [])
     run = _run(tmp_path, "r2", base_model="someone/unknown", base_model_revision="0" * 40, dataset="/data/mine")
     components, _, gaps = _lineage(tmp_path, run)

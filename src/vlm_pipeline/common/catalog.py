@@ -66,7 +66,7 @@ class CatalogEntry(BaseModel):
     repo: str = Field(pattern=REPO_ID_PATTERN)
     revision: str = Field(pattern=REVISION_PATTERN)
     display_name: str = Field(min_length=1)  # proper name only; tagline in i18n model_catalog.<id>.tagline
-    vendor: str
+    vendor: str  # slug, a key of Catalog.vendors
     tier: Tier
     gated: bool
     remote_code: Literal["none", "pinned_prepared"]
@@ -153,6 +153,7 @@ class Catalog(BaseModel):
 
     schema_version: Literal[1]
     budget_note: str = ""
+    vendors: dict[str, str]  # slug -> publisher as people write it ("NVIDIA"); a proper noun, not in i18n
     models: tuple[CatalogEntry, ...]
 
     @model_validator(mode="after")
@@ -162,7 +163,13 @@ class Catalog(BaseModel):
             raise ValueError("duplicate model id in catalog")
         if [m.tier for m in self.models].count("default") != 1:
             raise ValueError("catalog needs exactly one model with tier: default")
+        if unknown := sorted({m.vendor for m in self.models} - set(self.vendors)):
+            raise ValueError(f"vendor not in catalog vendors: {unknown}")
         return self
+
+    def vendor_name(self, entry: CatalogEntry) -> str:
+        """The publisher shown to users ("NVIDIA"), from the one ``vendors`` map."""
+        return self.vendors[entry.vendor]
 
     def get(self, model_id: str) -> CatalogEntry | None:
         return next((m for m in self.models if m.id == model_id), None)

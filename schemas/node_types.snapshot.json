@@ -41,111 +41,640 @@
                   "gated": true,
                   "label": "NVIDIA Cosmos Reason2 2B",
                   "license": "nvidia-open-model-license",
+                  "license_class": "conditional",
+                  "obligations": [
+                    {
+                      "clause": "\u00a72.1",
+                      "id": "no_guardrail_bypass",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a72.1",
+                      "id": "patent_litigation_termination",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a72.3",
+                      "id": "prohibited_use_policy_link",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "url": "https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/",
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a73.1",
+                      "id": "include_license_copy",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73.1",
+                      "id": "attribution_notice",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "text": "Licensed by NVIDIA Corporation under the NVIDIA Open Model License",
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73.2",
+                      "id": "built_on_cosmos",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "text": "Built on NVIDIA Cosmos",
+                      "when": "cosmos"
+                    }
+                  ],
                   "ram_gb": 14.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": false,
                   "tier": "catalog",
-                  "vendor": "nvidia"
+                  "vendor": "nvidia",
+                  "vendor_name": "NVIDIA"
                 },
                 "cosmos-reason2-8b": {
                   "gated": true,
                   "label": "NVIDIA Cosmos Reason2 8B",
                   "license": "nvidia-open-model-license",
+                  "license_class": "conditional",
+                  "obligations": [
+                    {
+                      "clause": "\u00a72.1",
+                      "id": "no_guardrail_bypass",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a72.1",
+                      "id": "patent_litigation_termination",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a72.3",
+                      "id": "prohibited_use_policy_link",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "url": "https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/",
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a73.1",
+                      "id": "include_license_copy",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73.1",
+                      "id": "attribution_notice",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "text": "Licensed by NVIDIA Corporation under the NVIDIA Open Model License",
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73.2",
+                      "id": "built_on_cosmos",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "text": "Built on NVIDIA Cosmos",
+                      "when": "cosmos"
+                    }
+                  ],
                   "ram_gb": 32.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": false,
                   "tier": "catalog",
-                  "vendor": "nvidia"
+                  "vendor": "nvidia",
+                  "vendor_name": "NVIDIA"
                 },
                 "gemma-4-e2b-it": {
                   "gated": false,
                   "label": "Gemma 4 E2B",
                   "license": "apache-2.0",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "\u00a74(a)",
+                      "id": "include_license_copy",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(b)",
+                      "id": "state_changes",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(c)-(d)",
+                      "id": "keep_notices",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73",
+                      "id": "patent_litigation_termination",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    }
+                  ],
                   "ram_gb": 20.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": false,
                   "tier": "catalog",
-                  "vendor": "google"
+                  "vendor": "google",
+                  "vendor_name": "Google"
                 },
                 "gemma-4-e4b-it": {
                   "gated": false,
                   "label": "Gemma 4 E4B",
                   "license": "apache-2.0",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "\u00a74(a)",
+                      "id": "include_license_copy",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(b)",
+                      "id": "state_changes",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(c)-(d)",
+                      "id": "keep_notices",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73",
+                      "id": "patent_litigation_termination",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    }
+                  ],
                   "ram_gb": 28.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": false,
                   "tier": "catalog",
-                  "vendor": "google"
+                  "vendor": "google",
+                  "vendor_name": "Google"
                 },
                 "nemotron-parse-2.0": {
                   "gated": false,
                   "label": "NVIDIA Nemotron Parse 2.0",
                   "license": "openmdw-1.1",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "distribution condition (1)",
+                      "id": "include_license_copy",
+                      "licence": "openmdw-1.1",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "distribution condition (2)",
+                      "id": "keep_notices",
+                      "licence": "openmdw-1.1",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73(a)(1)",
+                      "id": "cc_by_attribution",
+                      "licence": "cc-by-4.0",
+                      "parts": [
+                        "tokenizer"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73(a)(1)(B)",
+                      "id": "state_changes",
+                      "licence": "cc-by-4.0",
+                      "parts": [
+                        "tokenizer"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a72(a)(5)(B)",
+                      "id": "no_additional_restrictions",
+                      "licence": "cc-by-4.0",
+                      "parts": [
+                        "tokenizer"
+                      ],
+                      "when": "distribute"
+                    }
+                  ],
                   "ram_gb": 14.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": true,
                   "tier": "rnd",
-                  "vendor": "nvidia"
+                  "vendor": "nvidia",
+                  "vendor_name": "NVIDIA"
                 },
                 "nemotron-parse-v1.1": {
                   "gated": false,
                   "label": "NVIDIA Nemotron Parse v1.1",
                   "license": "nvidia-open-model-license",
+                  "license_class": "conditional",
+                  "obligations": [
+                    {
+                      "clause": "\u00a72.1",
+                      "id": "no_guardrail_bypass",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a72.1",
+                      "id": "patent_litigation_termination",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a72.3",
+                      "id": "prohibited_use_policy_link",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "url": "https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/",
+                      "when": "always"
+                    },
+                    {
+                      "clause": "\u00a73.1",
+                      "id": "include_license_copy",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73.1",
+                      "id": "attribution_notice",
+                      "licence": "nvidia-open-model-license",
+                      "parts": [
+                        "model"
+                      ],
+                      "text": "Licensed by NVIDIA Corporation under the NVIDIA Open Model License",
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73(a)(1)",
+                      "id": "cc_by_attribution",
+                      "licence": "cc-by-4.0",
+                      "parts": [
+                        "tokenizer"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73(a)(1)(B)",
+                      "id": "state_changes",
+                      "licence": "cc-by-4.0",
+                      "parts": [
+                        "tokenizer"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a72(a)(5)(B)",
+                      "id": "no_additional_restrictions",
+                      "licence": "cc-by-4.0",
+                      "parts": [
+                        "tokenizer"
+                      ],
+                      "when": "distribute"
+                    }
+                  ],
                   "ram_gb": 20.0,
                   "ram_source": "measured",
                   "task_prompt_fixed": true,
                   "tier": "default",
-                  "vendor": "nvidia"
+                  "vendor": "nvidia",
+                  "vendor_name": "NVIDIA"
                 },
                 "qwen3-vl-2b-instruct": {
                   "gated": false,
                   "label": "Qwen3-VL 2B Instruct",
                   "license": "apache-2.0",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "\u00a74(a)",
+                      "id": "include_license_copy",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(b)",
+                      "id": "state_changes",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(c)-(d)",
+                      "id": "keep_notices",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73",
+                      "id": "patent_litigation_termination",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    }
+                  ],
                   "ram_gb": 14.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": false,
                   "tier": "baseline",
-                  "vendor": "qwen"
+                  "vendor": "qwen",
+                  "vendor_name": "Qwen (Alibaba Cloud)"
                 },
                 "qwen3.5-0.8b": {
                   "gated": false,
                   "label": "Qwen3.5 0.8B",
                   "license": "apache-2.0",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "\u00a74(a)",
+                      "id": "include_license_copy",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(b)",
+                      "id": "state_changes",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(c)-(d)",
+                      "id": "keep_notices",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73",
+                      "id": "patent_litigation_termination",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    }
+                  ],
                   "ram_gb": 13.0,
                   "ram_source": "measured",
                   "task_prompt_fixed": false,
                   "tier": "catalog",
-                  "vendor": "qwen"
+                  "vendor": "qwen",
+                  "vendor_name": "Qwen (Alibaba Cloud)"
                 },
                 "qwen3.5-2b": {
                   "gated": false,
                   "label": "Qwen3.5 2B",
                   "license": "apache-2.0",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "\u00a74(a)",
+                      "id": "include_license_copy",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(b)",
+                      "id": "state_changes",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(c)-(d)",
+                      "id": "keep_notices",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73",
+                      "id": "patent_litigation_termination",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    }
+                  ],
                   "ram_gb": 17.0,
                   "ram_source": "measured",
                   "task_prompt_fixed": false,
                   "tier": "template",
-                  "vendor": "qwen"
+                  "vendor": "qwen",
+                  "vendor_name": "Qwen (Alibaba Cloud)"
                 },
                 "qwen3.5-4b": {
                   "gated": false,
                   "label": "Qwen3.5 4B",
                   "license": "apache-2.0",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "\u00a74(a)",
+                      "id": "include_license_copy",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(b)",
+                      "id": "state_changes",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(c)-(d)",
+                      "id": "keep_notices",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73",
+                      "id": "patent_litigation_termination",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    }
+                  ],
                   "ram_gb": 24.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": false,
                   "tier": "catalog",
-                  "vendor": "qwen"
+                  "vendor": "qwen",
+                  "vendor_name": "Qwen (Alibaba Cloud)"
                 },
                 "qwen3.5-9b": {
                   "gated": false,
                   "label": "Qwen3.5 9B",
                   "license": "apache-2.0",
+                  "license_class": "commercial_ok",
+                  "obligations": [
+                    {
+                      "clause": "\u00a74(a)",
+                      "id": "include_license_copy",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(b)",
+                      "id": "state_changes",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a74(c)-(d)",
+                      "id": "keep_notices",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "distribute"
+                    },
+                    {
+                      "clause": "\u00a73",
+                      "id": "patent_litigation_termination",
+                      "licence": "apache-2.0",
+                      "parts": [
+                        "model"
+                      ],
+                      "when": "always"
+                    }
+                  ],
                   "ram_gb": 38.0,
                   "ram_source": "estimated",
                   "task_prompt_fixed": false,
                   "tier": "catalog",
-                  "vendor": "qwen"
+                  "vendor": "qwen",
+                  "vendor_name": "Qwen (Alibaba Cloud)"
                 }
               },
               "order": 0,
