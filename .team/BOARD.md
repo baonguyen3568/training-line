@@ -31,6 +31,21 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | P1-9 | Spike NVIDIA containers trên GB10 (AutoModel 26.08 VLM, ModelOpt, vLLM) + Proposal 008: backend runtime (host orchestrator ↔ container worker, job runner, GPU lock/memguard, RunManifest) | bao-backend | PAUSED (RESET: spike hoãn; P008 giữ hướng, chờ ghép vào P009) |
 | P1-7 | PM tổng hợp → ADR-001..00N, chốt với user | bao-pm | TODO |
 
+## 🚀 RELEASE 1.0 — HOÀN THIỆN (user yêu cầu 2026-10-13 14:30). ƯU TIÊN CAO NHẤT, chạy song song 6 luồng.
+Chế độ làm việc: mỗi người TỰ QUYẾT trong phạm vi chuyên môn, không chờ PM cho việc thường. Chỉ hỏi PM khi: mâu thuẫn giữa các bên,
+quyết định của user, hoặc thay đổi kiến trúc/ADR. Review chéo + check --clean sau commit vẫn bắt buộc. GPU tự xếp qua lock (≤80% RAM trống).
+Máy hiện trống ~106GB (voice-agent đã tắt) → tận dụng để chạy pipeline thật.
+
+| Luồng | Definition of Done | Owner chính (hỗ trợ) |
+|---|---|---|
+| A. Đóng gói | `docker compose up` chạy toàn bộ (app+UI, site, vlm-runner, vLLM khi cần) trên máy này; buildx amd64+arm64 OK; `.env.local.example` + script cài 1 lệnh; settings DB D-7 + trang Cài đặt; mount thu hẹp; README cài đặt | backend (security, tester, cleancode) |
+| B. Node sâu | P016 xong: subgraph bung/gập; node dữ liệu (lọc, bỏ trùng, resize, đổi định dạng/chat template, trộn, tạo caption bằng VLM); train QLoRA, DPO, GRPO; nén NVFP4 + AWQ (khi phần cứng hỗ trợ); Advanced đủ tham số engine; tất cả qua check_support | cleancode + backend (fixcode, research) |
+| C. Pipeline tham chiếu | ≥8 pipeline trong gallery, mỗi cái chạy thật ít nhất 1 lần trên GB10, có số đo (thời gian, RAM, điểm) ghi nguồn: R0 hoá đơn ✓, R2 Qwen LoRA ảnh/video, R3 nén FP8 + so điểm (bỏ ẩn quantize_bench), R1 Gemma LoRA, R6 Donut/CORD, R4/R5 GRPO, R7 lọc/bỏ trùng dữ liệu, Cosmos-Reason2 (gated) | research (tester, fixcode) |
+| D. Dashboard | D4 thành mặc định; subgraph UI; G-3 nút "Sửa nhanh"; G-4 "Đặt lại bước"; trạng thái chờ bộ nhớ; Chạy thử; mọi thứ icon-first + popover; E2E đủ mọi template | frontend + design (cleanup, tester) |
+| E. Site | 20–30 trang đủ nội dung thật (landing, tính năng, pipeline tham chiếu, docs đầy đủ, chính sách, FAQ, changelog, roadmap, 404), số liệu có nguồn, a11y AA, Lighthouse tốt; chỉ chờ thông tin pháp lý của user để publish | design + frontend + cleancode (research, cleanup, security) |
+| F. QA phát hành | Checklist release: E2E mọi template (mock + app thật), perf, a11y, security scan, check --clean, compose smoke; báo cáo "đã kiểm / chưa kiểm (vd amd64 GPU)" trung thực | tester (security) |
+| G. Dọn dẹp liên tục | Rác disk/repo/docker theo ADR-005, code chết, docs lỗi thời | cleanup + cleancode |
+
 ## 🧩 MILESTONE M4 — Pipeline tự do sâu + chuẩn mực + thư viện 5–10 pipeline tham chiếu (user định hướng cốt lõi 2026-10-13)
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
