@@ -7,7 +7,8 @@ vi.stubEnv("VITE_MOCK_API", "1");
 async function setup() {
   const { StoragePanel } = await import("../src/components/StoragePanel");
   const view = render(<StoragePanel />);
-  await waitFor(() => expect(screen.getByRole("heading", { name: "Dung lượng" })).toBeTruthy());
+  // first test of the file pays the cold dynamic import; 1 s (default) is too tight on the shared host
+  await screen.findByRole("heading", { name: "Dung lượng" }, { timeout: 5000 });
   return view;
 }
 const row = (container: HTMLElement, id: string) =>
