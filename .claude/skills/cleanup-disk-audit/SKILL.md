@@ -11,7 +11,7 @@ Project root: `/home/ntcai/Trainning-model`. Host is SHARED — report only, nev
 ```bash
 df -h /                                   # alert PM if Avail < 300G
 free -g; grep -E 'MemAvailable|SwapFree' /proc/meminfo   # GB10 unified memory: nvidia-smi shows N/A
-cat /home/ntcai/Trainning-model/.team/GPU_LOCK 2>/dev/null   # who is running heavy job
+uv run python -m vlm_pipeline.common.gpu_lock status   # who is running a heavy job (.team/lock/GPU_LOCK)
 ```
 Thresholds: MemAvailable < 20G → warn `trainning-model-6a` (PM); < 10G → recommend pausing *our* job. Never touch other people's processes.
 

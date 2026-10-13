@@ -19,7 +19,7 @@ Cập nhật: 2026-10-12. Phạm vi: VLM training trên DGX Spark GB10 (aarch64,
 2. **Dry-run mặc định**, xoá thật cần `--apply`; in danh sách + tổng dung lượng trước.
 3. **Không bao giờ** `docker system prune`, `docker image prune -a` không filter, `docker builder prune` toàn cục (build cache 59G là của các project khác, builder `buildx_buildkit_comfyui-publisher0` cũng không phải của ta).
 4. Xoá > 20GB hoặc bất kỳ thứ gì "best/final/released" → báo PM + bao-security trước.
-5. Không xoá thứ đang được dùng: kiểm tra `.team/GPU_LOCK`, `lsof +D`/`fuser`, tiến trình train còn sống.
+5. Không xoá thứ đang được dùng: kiểm tra GPU lock bằng `uv run python -m vlm_pipeline.common.gpu_lock status` (file ở `.team/lock/GPU_LOCK`), `lsof +D`/`fuser`, tiến trình train còn sống.
 
 ## 2. Hugging Face cache
 Nguồn: https://huggingface.co/docs/huggingface_hub/guides/manage-cache (huggingface_hub v2.x)
@@ -92,7 +92,7 @@ Nguồn: https://build.nvidia.com/spark/vlm-finetuning/troubleshooting ; https:/
 
 ## 9. Checklist trước khi xoá
 - [ ] Đường dẫn resolve nằm trong project root / object có label `project=vlm-training`
-- [ ] Không có `.team/GPU_LOCK` liên quan / process đang mở file (`fuser -v`)
+- [ ] GPU lock (`gpu_lock status`) không giữ run liên quan / process đang mở file (`fuser -v`)
 - [ ] Không có marker `KEEP`, không là target của `LATEST`/`LOWEST_VAL`/best
 - [ ] Đã chạy dry-run, có tổng dung lượng
 - [ ] > 20GB hoặc artifact "release" → PM + security đồng ý

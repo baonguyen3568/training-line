@@ -15,7 +15,7 @@ description: Use whenever deleting anything for the VLM project — old checkpoi
 1. `realpath <target>` starts with `/home/ntcai/Trainning-model/` (guards against symlinks escaping).
 2. No `KEEP` marker file in target or its run dir.
 3. Not the target of `LATEST` / `LOWEST_VAL` / `best` symlink: `readlink -f outputs/runs/<run>/checkpoints/{LATEST,LOWEST_VAL}`.
-4. Not in use: `cat .team/GPU_LOCK`; `fuser -vm <target>` / `lsof +D <target>` empty; no `*.tmp` / partial async save.
+4. Not in use: `uv run python -m vlm_pipeline.common.gpu_lock status` (lock lives at `.team/lock/GPU_LOCK`; never read/write it by hand); `fuser -vm <target>` / `lsof +D <target>` empty; no `*.tmp` / partial async save.
 5. Size known (`du -sh`), dry-run listing reviewed.
 6. Log after: `HH:MM [bao-cleanup → bao-pm] deleted <what> (<size>)` in `.team/log/YYYY-MM-DD.md`.
 
