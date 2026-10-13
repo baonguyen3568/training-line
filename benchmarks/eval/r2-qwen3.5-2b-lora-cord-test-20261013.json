@@ -62,7 +62,6 @@
    "n": 100,
    "nted_accuracy": 93.06,
    "json_exact": 38.0,
-   "pending": "the base Qwen3.5-2B delta is added later",
    "scores": "outputs/tester/r2-test-score.json (score_cord_runs)"
   }
  },
@@ -88,5 +87,19 @@
   }
  },
  "speed": "582 s for 100 images including model load (~10 images/min, HF bf16, batch 1, GB10); R0 Parse ~7 images/min",
- "ci_method": "bootstrap over images, 1000 resamples, seed 0, micro F1 from per-image (tp, errors) counts"
+ "ci_method": "bootstrap over images, 1000 resamples, seed 0, micro F1 from per-image (tp, errors) counts",
+ "vs_base": {
+  "base": "Qwen/Qwen3.5-2B@15852e8c (same prompt, pixels, decoding)",
+  "eval_run": "20261013-1950-r2test-base-q35-2b-d9d3",
+  "base_field_f1": 0.0,
+  "base_parse_fail_rate": 1.0,
+  "r2_minus_base": {
+   "delta": 86.42,
+   "ci95": [
+    81.38,
+    90.34
+   ]
+  },
+  "note": "the base answers valid JSON in its own schema (keys like ticket/items), so it scores 0 field F1 on CORD's schema: the delta measures learning the target format and values, not reading ability alone"
+ }
 }
