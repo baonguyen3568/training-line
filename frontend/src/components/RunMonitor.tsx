@@ -25,15 +25,16 @@ const STALE_S = 120;
 
 const fmt = formatNumber;
 
+// Lucide glyph per run status (design: no unicode glyphs as icons); only the glyph carries status ink
 const STATUS_ICON: Record<RunStatus, string> = {
-  queued: "⧗",
-  running: "◐",
-  completed: "✓",
-  failed: "✕",
-  cancelled: "■",
-  interrupted: "⏸",
-  evicted: "↺",
-  discarded: "–",
+  queued: "clock",
+  running: "loader-circle",
+  completed: "circle-check-big",
+  failed: "circle-x",
+  cancelled: "circle-minus",
+  interrupted: "circle-pause",
+  evicted: "rotate-ccw-clock",
+  discarded: "circle-minus",
 };
 
 /** Run monitor (P006 annex (c)): is this run healthy? Separate charts per measure, x = step, synced crosshair. */
@@ -155,7 +156,10 @@ export function RunMonitor({ runId }: { runId: string }) {
       <header className="run-head">
         <h1>{run.name ?? run.run_id}</h1>
         <span className={`chip status-${status}`}>
-          {STATUS_ICON[status]} {t(`run_monitor.status.${status}`)}
+          <span className={`si si-${status}`} aria-hidden="true">
+            <Icon name={STATUS_ICON[status]} size={14} />
+          </span>{" "}
+          {t(`run_monitor.status.${status}`)}
         </span>
         {stale && (
           <span className="state warn">

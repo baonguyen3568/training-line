@@ -642,7 +642,8 @@ export function Inspector() {
           aria-expanded={showAdvanced}
           onClick={() => setExpanded((s) => !s)}
         >
-          ▸ {t("canvas.show_advanced", { param_count: advanced.length })}
+          <Icon name={showAdvanced ? "chevron-down" : "chevron-right"} size={14} />{" "}
+          {t("canvas.show_advanced", { param_count: advanced.length })}
         </button>
       )}
       {showAdvanced &&

@@ -32,7 +32,8 @@ describe("vertical slice", () => {
     const pickers = screen.getAllByLabelText(/Nhận từ/);
     fireEvent.change(pickers[0] as HTMLElement, { target: { value: "" } });
     await waitFor(
-      () => expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", true),
+      // D4 default: Run lives in the toolbar only (no second one in the dock)
+      () => expect(screen.getByRole("button", { name: /^Chạy/ })).toHaveProperty("disabled", true),
       {
         timeout: 2000,
       },

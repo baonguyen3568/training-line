@@ -35,6 +35,9 @@ describe("severity info", () => {
         },
       },
     });
+    // the check bar's own Run button is the classic one (D4 runs from the toolbar)
+    const { useUi } = await import("../src/store/ui");
+    useUi.setState({ skin: "classic" });
     render(
       <ReactFlowProvider>
         <CheckBar />

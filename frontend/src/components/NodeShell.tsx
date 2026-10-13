@@ -48,15 +48,6 @@ function ThirdPartyBadge({ spec }: { spec: NodeSpec }) {
   );
 }
 
-const RUN_ICON: Record<NodeRunState["status"], string> = {
-  pending: "⧗",
-  cached: "↺",
-  running: "◐",
-  completed: "✓",
-  failed: "✕",
-  skipped: "–",
-  interrupted: "⏸",
-};
 // Executor statuses → existing copy keys (node_state.*).
 const RUN_COPY: Record<NodeRunState["status"], string> = {
   pending: "queued",
@@ -135,13 +126,9 @@ function RunBadge({ state }: { state: NodeRunState }) {
   return (
     <>
       <span className={`state run ${state.status}`}>
-        {d4 ? (
-          <span className={`si si-${state.status}`}>
-            <Icon name={RUN_LUCIDE[state.status]} size={14} />
-          </span>
-        ) : (
-          RUN_ICON[state.status]
-        )}{" "}
+        <span className={`si si-${state.status}`}>
+          <Icon name={RUN_LUCIDE[state.status]} size={14} />
+        </span>{" "}
         {text}
       </span>
       {state.status === "running" && (
@@ -294,13 +281,13 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
         )}
         {errors.length > 0 && (
           <span className="state failed">
-            {d4 ? <StateGlyph icon="circle-dashed" tone="bad" /> : "✕"}{" "}
+            <StateGlyph icon="circle-dashed" tone="bad" />{" "}
             {d4 ? t("node_state.not_ready") : t("node_state.failed")} ({errors.length})
           </span>
         )}
         {errors.length === 0 && warns.length > 0 && (
           <span className="state warn">
-            {d4 ? <StateGlyph icon="triangle-alert" tone="warn" /> : "⚠"} {warns.length}
+            <StateGlyph icon="triangle-alert" tone="warn" /> {warns.length}
           </span>
         )}
         {runState?.warnings?.map((w, i) => {
@@ -308,7 +295,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: warnings are append-only for one run
             <span key={i} className="state warn run-warning" title={text.what}>
-              {d4 ? <StateGlyph icon="triangle-alert" tone="warn" /> : "⚠"} {text.title}
+              <StateGlyph icon="triangle-alert" tone="warn" /> {text.title}
             </span>
           );
         })}
@@ -317,7 +304,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
         ) : (
           issues.length === 0 && (
             <span className="state ready">
-              {d4 ? <StateGlyph icon="circle-dot" tone="muted" /> : "○"} {t("node_state.ready")}
+              <StateGlyph icon="circle-dot" tone="muted" /> {t("node_state.ready")}
             </span>
           )
         )}

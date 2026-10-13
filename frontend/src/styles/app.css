@@ -844,7 +844,7 @@ button.link {
   grid-template-columns: 16px 1fr;
   column-gap: var(--space-8);
   align-items: start;
-  border: 1px solid var(--color-status-ink-critical);
+  border: 1px solid var(--color-axis); /* Hairline-First: colour lives in the icon only (design 1.0) */
   background: var(--color-page);
   padding: var(--space-8);
   border-radius: var(--radius-sm);
@@ -858,7 +858,7 @@ button.link {
   padding-top: 2px;
 }
 .error-card.warn {
-  border-color: var(--color-status-ink-warning);
+  border-color: var(--color-axis);
 }
 .error-card p {
   margin: var(--space-4) 0;

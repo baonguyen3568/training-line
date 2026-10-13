@@ -5,6 +5,7 @@ import { estimateLine, formatDuration } from "../lib/format";
 import { nodeTitle, SEVERITY_GLYPH } from "../lib/nodeText";
 import { runErrorText, runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
+import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
 
@@ -15,6 +16,7 @@ export function CheckBar() {
   const run = useWorkflow((s) => s.run);
   const { setCenter, getNode } = useReactFlow();
   const [open, setOpen] = useState(false);
+  const d4 = useUi((st) => st.skin) === "d4";
   if (!workflow) return null;
 
   const errors = validation?.errors.filter((e) => e.severity === "error") ?? [];
@@ -167,21 +169,23 @@ export function CheckBar() {
           </>
         )}
         <span className="spacer" />
-        {running ? (
-          <button type="button" className="primary" onClick={() => void cancelRun()}>
-            ■ {t("run.stop")}
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="primary"
-            disabled={!validation || errors.length > 0 || workflow.nodes.length === 0}
-            title={errors.length > 0 ? t("preflight.run_blocked") : undefined}
-            onClick={() => void startRun()}
-          >
-            ▶ {t("app.run")}
-          </button>
-        )}
+        {/* D4: Run / Stop live in the toolbar only (design: no second Run in the dock) */}
+        {!d4 &&
+          (running ? (
+            <button type="button" className="primary" onClick={() => void cancelRun()}>
+              ■ {t("run.stop")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="primary"
+              disabled={!validation || errors.length > 0 || workflow.nodes.length === 0}
+              title={errors.length > 0 ? t("preflight.run_blocked") : undefined}
+              onClick={() => void startRun()}
+            >
+              ▶ {t("app.run")}
+            </button>
+          ))}
       </div>
       {open && (
         <ul className="issues">
