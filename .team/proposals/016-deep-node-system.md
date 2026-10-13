@@ -24,13 +24,17 @@
 - The "big" beginner nodes (`train.lora_vlm`…) can become first-party groups later **without changing saved workflows**:
   the type id stays and resolves to a group.
 
-## 3. Advanced params generated from the engine, through an allowlist
-- A script run inside the pinned engine image (`scripts/probe/engine_schema.py`) dumps the recipe options we support
-  (dotted key, type, default, bounds, doc) to `configs/engine/<engine>-<image tag>.json`, committed and reviewed.
-- Each node's `params_model` gets an `advanced: AdvancedOverrides` field built from that file: **only listed keys**, typed,
-  `x-ui.advanced=true`. Never a free dict: `_target_`, paths, `trust_remote_code`, and anything callable stay out (security).
-- A test checks that the file matches the image tag in `IMAGES.lock`. Bumping the image means regenerating the file, and the
-  diff shows exactly which knobs changed.
+## 3. Advanced params generated from the engine: everything valid, minus a denylist by rule
+- A script run inside the pinned engine image (`scripts/probe/engine_schema.py`) walks the engine's own config schema
+  (recipe dataclasses / defaults of the pinned version) and dumps **every** option it finds (dotted key, type, default,
+  bounds, doc) to `configs/engine/<engine>-<image tag>.json`, committed. Coverage target (PM, user "cực sâu"): nearly the
+  whole engine surface, not a hand-picked list.
+- Excluded **by rule, in the generator, and re-checked by a test** (security owns the rules): `_target_`/class or callable
+  references, filesystem paths and URLs (the app sets those), `trust_remote_code`/code loading, distributed/env/launcher
+  settings, logging/telemetry endpoints. The node-controlled keys (model/data/run dirs, batch, lr…) stay node params.
+- Each node's `params_model` gets `advanced: AdvancedOverrides` built from that file: typed keys only, `x-ui.advanced=true`,
+  unknown key = CFG-005. Never a free dict.
+- A test ties the file to the image tag in `IMAGES.lock`; an image bump regenerates it and the diff shows which knobs changed.
 
 ## 4. Open questions
 1. backend: does `expand()` belong in `graph/` (my proposal) or in the app before `validate()`?
