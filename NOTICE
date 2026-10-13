@@ -1,0 +1,46 @@
+NTC-Training
+Copyright 2026 NTC
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository includes or is derived from the third-party works listed below. Each keeps its own licence; the
+full licence texts are next to the files named here. Model weights and datasets are NOT included: users download
+them from the official sources, under the licences listed in configs/catalog/ and shown in the app.
+
+------------------------------------------------------------------------------------------------------------------
+1. NVIDIA NeMo AutoModel (patches)
+   Files:    third_party/patches/automodel/*.patch (applied at image build time, see VENDORED.md)
+   Source:   https://github.com/NVIDIA-NeMo/Automodel, commit 922e83e4207c6aaa0ae1654c4621975dffac6849
+   Licence:  Apache License 2.0
+   Copyright (c) NVIDIA CORPORATION & AFFILIATES. The patches contain modified excerpts of NeMo AutoModel source
+   files; every changed block is marked "PATCH(vlm)". The upstream repository has no NOTICE file at that commit.
+
+2. Lucide icons 1.51.0
+   Files:    site/src/icons/lucide/, design/m2/directions/*/icons/
+   Source:   https://github.com/lucide-icons/lucide (tag 1.51.0)
+   Licence:  ISC License, Copyright (c) Lucide Icons and Contributors; parts derived from Feather
+             (https://github.com/feathericons/feather), MIT License, Copyright (c) 2013-present Cole Bemis.
+   Text:     site/src/icons/lucide/LICENSE
+
+3. Fonts (SIL Open Font License 1.1)
+   Be Vietnam Pro   Copyright 2021 The Be Vietnam Pro Project Authors (https://github.com/bettergui/BeVietnamPro)
+                    frontend/public/fonts/be-vietnam-pro/, site/public/fonts/be-vietnam-pro/, design/m2/fonts/
+   JetBrains Mono   Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+                    frontend/public/fonts/jetbrains-mono/, site/public/fonts/jetbrains-mono/, design/m2/fonts/
+   Big Shoulders    Copyright 2019 The Big Shoulders Project Authors (https://github.com/xotypeco/big_shoulders)
+   Display          design/m2/fonts/ (design mock-ups only)
+   Phudu            Copyright 2022 The Phudu Project Authors (https://github.com/duongtrtype/DTPhudu)
+                    design/m2/fonts/ (design mock-ups only)
+   Text:     the OFL.txt / OFL-*.txt file next to each font. Font files are unmodified (no subsetting, names kept).
+
+4. Licence texts reproduced verbatim (for attribution in exported models; not licences of this product)
+   configs/licenses/: Apache-2.0, CC BY 4.0 legal code, NVIDIA Open Model License Agreement (24 Oct 2025),
+   OpenMDW 1.1. Sources and checksums: configs/licenses/LICENSES.lock.
+
+------------------------------------------------------------------------------------------------------------------
+Dependencies installed by package managers (Python via uv.lock, JavaScript via package-lock.json) are not part of
+this repository. Their licences are listed in configs/security/licenses.yaml; the website ships
+site/public/THIRD_PARTY_LICENSES.txt, generated from that file.
+
+NVIDIA, NeMo, Nemotron, Cosmos, DGX, CUDA and TensorRT are trademarks or registered trademarks of NVIDIA Corporation.
+This project is independent and is not affiliated with or endorsed by NVIDIA.
