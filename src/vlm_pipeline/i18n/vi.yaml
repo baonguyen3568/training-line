@@ -1008,7 +1008,10 @@ license:
     commercial_ok: Dùng thương mại được
     conditional: Dùng được, có điều kiện
     non_commercial: Chỉ cho nghiên cứu, không dùng thương mại
+    unknown: Chưa rõ giấy phép, chỉ dùng để chấm điểm
   obligations_title: 'Khi dùng model này, bạn cần:'
+  obligations_use: 'Khi dùng:'
+  obligations_distribute: 'Khi chia sẻ model hoặc thứ bạn tạo ra từ nó:'
   obligation:
     attribution_notice: 'Giữ nguyên câu ghi công này khi chia sẻ model hoặc model bạn tạo ra từ nó: "{notice}".'
     no_guardrail_bypass: Không dùng để gỡ hoặc làm yếu cơ chế an toàn của model, kể cả khi fine-tune; vi phạm thì mất quyền sử dụng.
@@ -1016,6 +1019,15 @@ license:
     share_alike: Model hoặc dữ liệu bạn tạo ra từ đây phải phát hành cùng giấy phép này.
     non_commercial: Không được dùng cho mục đích thương mại, kể cả model bạn fine-tune từ nó.
     cc_by_attribution: Một phần của model ({component}) dùng giấy phép CC BY 4.0 — cần ghi nguồn khi chia sẻ.
+    include_license_copy: Kèm bản đầy đủ của giấy phép này khi chia sẻ.
+    state_changes: Ghi rõ những gì bạn đã sửa so với bản gốc khi chia sẻ.
+    keep_notices: Giữ nguyên các thông báo bản quyền và ghi công có sẵn khi chia sẻ.
+    patent_litigation_termination: Nếu bạn khởi kiện về bằng sáng chế liên quan tới model này, quyền dùng model của bạn chấm dứt.
+    no_additional_restrictions: Khi chia sẻ, không đặt thêm điều kiện nào hạn chế quyền mà giấy phép này cho người nhận.
+    built_on_cosmos: 'Ghi dòng "{notice}" khi chia sẻ model bạn tạo ra từ model Cosmos.'
+    eval_only: Chỉ dùng để chấm điểm, không dùng để train.
+    no_redistribution: Không chia sẻ lại bộ dữ liệu này.
+    per_source_terms: Mỗi ảnh giữ điều khoản riêng của nguồn gốc; xem trang mô tả của bộ dữ liệu.
   policy_link: Xem chính sách
   notice_from_license: (câu ghi công lấy nguyên văn từ giấy phép)
 gated:

@@ -1008,7 +1008,10 @@ license:
     commercial_ok: Commercial use OK
     conditional: Allowed, with conditions
     non_commercial: Research only, no commercial use
+    unknown: License unclear, for scoring only
   obligations_title: 'When you use this model, you must:'
+  obligations_use: 'When using it:'
+  obligations_distribute: 'When you share it or anything you build from it:'
   obligation:
     attribution_notice: 'Keep this credit line when you share the model or anything you build from it: "{notice}".'
     no_guardrail_bypass: Don't use it to remove or weaken the model's safety measures, including through fine-tuning; doing so ends your right to use it.
@@ -1016,6 +1019,15 @@ license:
     share_alike: Models or data you create from this must be released under the same license.
     non_commercial: It can't be used commercially, including models you fine-tune from it.
     cc_by_attribution: Part of the model ({component}) is under CC BY 4.0 — you must credit the source when sharing.
+    include_license_copy: Include a full copy of this license when you share.
+    state_changes: Say what you changed from the original when you share.
+    keep_notices: Keep the existing copyright and credit notices when you share.
+    patent_litigation_termination: If you start a patent lawsuit over this model, your right to use it ends.
+    no_additional_restrictions: When you share, don't add terms that limit what this license lets recipients do.
+    built_on_cosmos: 'Include the line "{notice}" when you share a model you built from a Cosmos model.'
+    eval_only: Use it for scoring only, not for training.
+    no_redistribution: Don't share this dataset onward.
+    per_source_terms: Each image keeps its own source's terms; see the dataset card.
   policy_link: View policy
   notice_from_license: (credit line quoted from the license)
 gated:
