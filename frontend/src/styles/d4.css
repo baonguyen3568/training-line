@@ -1012,15 +1012,18 @@
 .adv-group summary::-webkit-details-marker {
   display: none;
 }
-.adv-group summary .chev {
+.adv-group summary .chev,
+.gated-steps summary .chev {
   display: inline-flex;
   transition: transform 0.15s ease;
 }
-.adv-group[open] summary .chev {
+.adv-group[open] summary .chev,
+.gated-steps[open] summary .chev {
   transform: rotate(90deg);
 }
 @media (prefers-reduced-motion: reduce) {
-  .adv-group summary .chev {
+  .adv-group summary .chev,
+  .gated-steps summary .chev {
     transition: none;
   }
 }
@@ -1162,4 +1165,31 @@ button.hairline.sm {
 }
 .license-terms a {
   color: var(--color-action-link);
+}
+
+/* G-5 gated flow inside the download dialog: four numbered steps behind one disclosure */
+.gated-steps {
+  margin: 0 0 var(--space-12);
+}
+.gated-steps summary {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+.gated-steps ol {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* the token row must not push the dialog wider */
+  gap: var(--space-12);
+}
+.gated-steps li p {
+  margin: var(--space-4) 0;
+}
+.gated-steps .set-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  border-bottom: 0;
 }

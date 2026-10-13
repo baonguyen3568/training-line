@@ -306,3 +306,50 @@ describe("licence terms", () => {
     expect(link.getAttribute("rel")).toContain("noopener");
   });
 });
+
+describe("gated model", () => {
+  it("offers the four-step Hugging Face flow before 'I agree', linking the model's own page", async () => {
+    const { DownloadDialog } = await import("../src/components/DownloadDialog");
+    render(
+      <DownloadDialog
+        target={{
+          kind: "model",
+          catalogId: "cosmos-reason2-8b",
+          name: "NVIDIA Cosmos Reason2 8B",
+          gated: true,
+          publisher: "NVIDIA",
+          repo: "nvidia/Cosmos-Reason2-8B",
+          license: "nvidia-open-model-license",
+        }}
+        onClose={() => {}}
+      />,
+    );
+    const { t } = await import("../src/i18n");
+    const summary = screen.getByText(t("gated.title", { model: "NVIDIA Cosmos Reason2 8B" }));
+    fireEvent.click(summary);
+    expect(screen.getByText(t("gated.step_count", { step: 4, total_count: 4 }))).toBeTruthy();
+    const model = screen.getByRole("link", { name: new RegExp(t("gated.step2.open")) });
+    expect(model.getAttribute("href")).toBe("https://huggingface.co/nvidia/Cosmos-Reason2-8B");
+    expect(model.getAttribute("rel")).toContain("noopener");
+    expect(await screen.findByLabelText("Token Hugging Face")).toBeTruthy(); // the same write-only row
+    // the gated flow comes before the licence agreement
+    const dialog = screen.getByRole("dialog");
+    const order = [...dialog.querySelectorAll("details, input[type=checkbox]")].map(
+      (e) => e.tagName,
+    );
+    expect(order[0]).toBe("DETAILS");
+    expect(dialog.textContent).not.toContain(t("license.obligations_title"));
+  });
+
+  it("a repo id from the server that is not org/name never becomes a link", async () => {
+    const { useWorkflow } = await import("../src/store/workflow");
+    await useWorkflow.getState().loadCatalog();
+    const { downloadTargetOf } = await import("../src/lib/downloadTarget");
+    const issue = net002("not_cached");
+    const target = downloadTargetOf(
+      { ...issue, params: { ...issue.params, repo: "../../evil?x=1" } },
+      useWorkflow.getState().specs,
+    );
+    expect(target?.repo).toBeUndefined();
+  });
+});

@@ -61,7 +61,7 @@ export function LicenseTerms({
           </span>
         )}
       </p>
-      {groups.length > 0 && <p className="small">{tpOptional(["license", "obligations_title"])}</p>}
+      {/* grouped: the group titles say it; obligations_title is for the ungrouped model picker (design r3 #1) */}
       {groups.map((g) => (
         <div key={g.key}>
           <p className="small muted">{tpOptional(["license", g.key])}</p>

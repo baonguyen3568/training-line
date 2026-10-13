@@ -4,6 +4,7 @@ import { t, tpOptional } from "../i18n";
 import { formatDuration } from "../lib/format";
 import { type DownloadKind, downloadKey, downloadPercent, useDownloads } from "../store/downloads";
 import { ErrorIcon } from "./ErrorIcon";
+import { GatedSteps } from "./GatedSteps";
 import { Icon } from "./Icon";
 import { LicenseTerms } from "./LicenseTerms";
 
@@ -15,6 +16,8 @@ export interface DownloadTarget {
   sizeGb?: number;
   license?: string;
   gated?: boolean;
+  /** Hugging Face repo id (org/name) from the server's NET-002; the gated flow links to its page. */
+  repo?: string;
   /** Publisher of a gated model (catalog vendor_name, else the repo's org), for the gated intro. */
   publisher?: string;
   /** Minutes the server expects the download to take (NET-002 est_min). */
@@ -92,7 +95,12 @@ export function DownloadDialog({
         )}
         {gated && target.publisher && (
           // gated models need the user's own Hugging Face sign-in and terms first (the gated flow, Settings token)
-          <p className="small">{t("gated.intro", { publisher: target.publisher })}</p>
+          <>
+            <p className="small">{t("gated.intro", { publisher: target.publisher })}</p>
+            {target.repo && (
+              <GatedSteps repo={target.repo} model={name} publisher={target.publisher} />
+            )}
+          </>
         )}
         {license && (
           <>

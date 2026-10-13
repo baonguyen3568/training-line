@@ -30,7 +30,7 @@ function errorText(e: unknown): string {
  * One secret (D-7). The value is write-only: the input always starts empty, is cleared right after saving and is
  * never kept in state beyond the request; the row shows only "set …ab12 · updated <date>" (PM/security rules).
  */
-function SecretRow({
+export function SecretRow({
   field,
   state,
   onChange,

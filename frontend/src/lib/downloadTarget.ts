@@ -33,6 +33,8 @@ export function downloadTargetOf(
     catalogId,
     name: meta?.label ?? str(p.name) ?? catalogId,
     ...(typeof p.size_gb === "number" ? { sizeGb: p.size_gb } : {}),
+    // the Hugging Face repo, for the gated flow's "open the model page" link: a catalog repo id shape only
+    ...(typeof p.repo === "string" && /^[\w.-]+\/[\w.-]+$/.test(p.repo) ? { repo: p.repo } : {}),
     ...(license ? { license } : {}),
     ...(meta?.license_class ? { licenseClass: meta.license_class } : {}),
     ...(meta?.obligations?.length ? { obligations: meta.obligations } : {}),
