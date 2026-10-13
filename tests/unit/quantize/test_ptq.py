@@ -74,3 +74,12 @@ def test_check_support_covers_the_calibration_wire() -> None:
     with pytest.raises(QuantizeNotSupportedError) as err:
         check_support("n3", QuantizeParams(), _entry("nemotron-parse-v1.1"), {"calib_data": "dataset:hub"})
     assert err.value.params["reason"] == "remote_code_model"
+
+
+def test_block_recipe_keeps_the_sub_block_qwen35_projections_bf16() -> None:
+    # vLLM 0.31 cannot load fp8_pb_wo merged columns with < 128-channel shards (.team/upstream draft): drop this test
+    # and BLOCK_EXTRA_SKIP together once vLLM loads them.
+    from vlm_pipeline.quantize.ptq import SKIP_PATTERNS, skip_patterns
+
+    assert "*linear_attn.in_proj_a*" in skip_patterns("block")
+    assert skip_patterns("per_tensor") == skip_patterns("per_channel") == SKIP_PATTERNS

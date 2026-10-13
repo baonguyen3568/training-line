@@ -119,12 +119,21 @@ def parity_stats(agree: list[float], kls: list[float]) -> dict[str, Any]:
 # activation scale per token, dynamic). The 0.8B per-tensor export drifted on receipt digits under vLLM (fixcode).
 # block = FP8_2D_BLOCKWISE_WEIGHT_ONLY_CFG (128x128 weight blocks, like Qwen's own FP8 releases); weight-only here, so
 # its in-container parity misses activation error, but vLLM serves it W8A8 (FP8_PB_WO, dynamic per-block activations).
+# Qwen3.5 linear_attn.in_proj_a / in_proj_b have < 128 output channels: one 128x128 block scale each, and vLLM 0.31
+# fuses them into one merged column layer whose second shard then starts past the single scale (load fails, fixcode
+# 2026-10-13, .team/upstream). They are tiny, so the block recipe keeps them BF16.
+BLOCK_EXTRA_SKIP = ("*linear_attn.in_proj_a*", "*linear_attn.in_proj_b*")
 FP8Scaling = Literal["per_tensor", "per_channel", "block"]
 FP8_SCALINGS: dict[FP8Scaling, str] = {
     "per_tensor": "FP8_DEFAULT_CFG",
     "per_channel": "FP8_PER_CHANNEL_PER_TOKEN_CFG",
     "block": "FP8_2D_BLOCKWISE_WEIGHT_ONLY_CFG",
 }
+
+
+def skip_patterns(scaling: FP8Scaling) -> tuple[str, ...]:
+    """Modules kept BF16 for ``scaling`` (what quant_cfg disables and what report.json records)."""
+    return SKIP_PATTERNS + (BLOCK_EXTRA_SKIP if scaling == "block" else ())
 
 
 def quant_cfg(fmt: str, scaling: FP8Scaling = "per_tensor") -> dict[str, Any]:
@@ -134,7 +143,7 @@ def quant_cfg(fmt: str, scaling: FP8Scaling = "per_tensor") -> dict[str, Any]:
     if fmt not in FORMATS:
         raise ValueError(f"unsupported format {fmt!r}")
     cfg = copy.deepcopy(getattr(mtq, FP8_SCALINGS[scaling]))
-    for pattern in SKIP_PATTERNS:
+    for pattern in skip_patterns(scaling):
         if isinstance(cfg["quant_cfg"], list):
             cfg["quant_cfg"].append({"quantizer_name": pattern, "enable": False})
         else:
@@ -170,7 +179,8 @@ def run(
         "format": fmt, "fp8_scaling": scaling,
         "modelopt": modelopt.__version__, "transformers": transformers.__version__,
         "model_class": type(model).__name__, "calib_split": "train", "calib_samples": len(calib),
-        "parity_split": "validation" if held else None, "skip_patterns": list(SKIP_PATTERNS),
+        "parity_split": "validation" if held else None,
+        "skip_patterns": list(skip_patterns(scaling)),
     }  # fmt: skip
     with torch.no_grad():
         refs = []
