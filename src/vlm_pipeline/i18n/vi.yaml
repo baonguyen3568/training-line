@@ -1130,3 +1130,6 @@ pipelines:
     available: Có sẵn
     planned: Đang chuẩn bị
     reference_only: Chỉ để tham khảo
+param_unsupported:
+  default: chưa hỗ trợ
+  worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.

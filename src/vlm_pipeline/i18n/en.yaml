@@ -1130,3 +1130,6 @@ pipelines:
     available: Available
     planned: In preparation
     reference_only: Reference only
+param_unsupported:
+  default: not supported yet
+  worker_v1: This option is still being built and the app cannot run it yet. Choose another value.
