@@ -545,6 +545,9 @@ node_state:
   running_indeterminate: Running
   waiting_memory: Waiting for memory
   waiting_memory_tooltip: This step needs about {need_gb} GB but only {avail_gb} GB is free because other apps are running. It will start on its own when there is enough memory.
+  waiting_gpu: Waiting for the GPU
+  waiting_gpu_tooltip: Another heavy job is using the GPU. The app will run this step when the GPU is free.
+  waited_for: Waiting for {duration} so far.
 preflight:
   title: Pre-run check
   summary_ok: Everything is ready

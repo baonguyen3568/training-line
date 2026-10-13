@@ -545,6 +545,9 @@ node_state:
   running_indeterminate: Đang chạy
   waiting_memory: Chờ bộ nhớ trống
   waiting_memory_tooltip: Bước này cần khoảng {need_gb} GB nhưng máy chỉ còn {avail_gb} GB trống vì đang chạy ứng dụng khác. App sẽ tự chạy khi đủ bộ nhớ.
+  waiting_gpu: Chờ GPU rảnh
+  waiting_gpu_tooltip: Một việc nặng khác đang dùng GPU. App sẽ tự chạy bước này khi GPU rảnh.
+  waited_for: Đã chờ {duration}.
 preflight:
   title: Kiểm tra trước khi chạy
   summary_ok: Mọi thứ đã sẵn sàng
