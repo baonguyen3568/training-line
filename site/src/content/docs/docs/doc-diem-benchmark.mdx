@@ -1,0 +1,68 @@
+---
+title: Benchmark và cách đọc điểm
+description: Các benchmark app dùng, ý nghĩa từng chỉ số, và khi nào hai con số so sánh được với nhau.
+sidebar:
+  order: 8
+sources:
+  - docs/adr/ADR-002-eval-benchmark-protocol.md
+  - .team/proposals/002-eval-benchmark-protocol.md
+  - .team/proposals/001a-nvidia-default-model.md
+---
+import Hint from '~/components/Hint.astro';
+
+Node **Đo điểm benchmark** chạy model trên một bộ câu hỏi chuẩn rồi chấm điểm theo đúng cách tác giả benchmark công bố. Mọi điểm hiển thị trên thang **0–100**. Mỗi chỉ số ghi rõ **cao hơn là tốt hơn** hay **thấp hơn là tốt hơn**.
+
+## Benchmark cho template hoá đơn: CORD v2
+
+CORD v2 là bộ hoá đơn bán lẻ có nhãn từng trường (tên món, số lượng, đơn giá, tổng tiền…). App chấm trên **100 ảnh của tập test**. Tập này không bao giờ được dùng để train.
+
+| Chỉ số | Ý nghĩa | Tốt hơn khi |
+|---|---|---|
+| **Field F1** (chính) | Model điền đúng bao nhiêu trường, cân bằng giữa "bỏ sót" và "điền thừa" | Cao |
+| JSON khớp hoàn toàn | Tỉ lệ hoá đơn mà toàn bộ kết quả khớp đáp án, không sai trường nào | Cao |
+| nTED | Độ giống cấu trúc cây giữa kết quả và đáp án | Cao |
+| Tỉ lệ không đọc được | Tỉ lệ kết quả không chuyển được thành JSON | Thấp |
+| Tỉ lệ bị cắt | Tỉ lệ kết quả chạm giới hạn độ dài trước khi model kết thúc | Thấp |
+
+<Hint title="Field F1 tính thế nào?">
+Mỗi hoá đơn được tách thành các cặp (tên trường, giá trị). F1 so tập cặp model sinh ra với tập cặp đáp án: thiếu cặp làm giảm độ phủ, thừa hoặc sai cặp làm giảm độ chính xác, F1 là trung bình điều hoà của hai thứ đó. App chấm theo đúng cách của bài báo Donut: chỉ bỏ khoảng trắng ở hai đầu giá trị, không sửa gì khác.
+</Hint>
+
+<Hint title="&quot;Tỉ lệ bị cắt&quot; cao nghĩa là gì?">
+Thường là model rơi vào vòng lặp, viết đi viết lại một đoạn cho tới giới hạn độ dài. Đây là dấu hiệu model chưa học đủ hoặc cách sinh chữ chưa phù hợp, không phải lỗi dữ liệu.
+</Hint>
+
+## Benchmark chung
+
+Dùng để kiểm tra model **không quên kiến thức chung** sau khi fine-tune, và để so với số mà hãng công bố.
+
+| Benchmark | Đo khả năng | Chỉ số |
+|---|---|---|
+| MMMU | Kiến thức và suy luận đa ngành | Độ chính xác trắc nghiệm |
+| MMBench (EN) | Nhận thức hình ảnh tổng quát | Độ chính xác |
+| DocVQA | Đọc tài liệu | ANLS |
+| ChartQA | Hiểu biểu đồ | Độ chính xác nới lỏng (±5%) |
+| OCRBench | Đọc chữ trong ảnh | Điểm/1000, quy ra thang 100 |
+| AI2D | Hiểu sơ đồ | Độ chính xác |
+| MathVista (testmini) | Toán có hình | Độ chính xác, cần model chấm phụ nên chỉ dùng nội bộ |
+| Video-MME | Hiểu video | Độ chính xác trắc nghiệm |
+
+<Hint title="Vì sao app không tự tải sẵn mọi benchmark?">
+Một số benchmark có giấy phép hạn chế (ví dụ ChartQA dùng GPL-3.0). Chúng chỉ được dùng để đo điểm, không dùng để train. App không đóng gói các bộ này; bạn tự tải từ nguồn gốc, và app chỉ công bố điểm tổng hợp, không công bố câu hỏi hay ảnh.
+</Hint>
+
+## Khi nào hai con số so sánh được?
+
+Hai điểm chỉ so được khi chạy cùng điều kiện: cùng benchmark và tập con, cùng cách sinh chữ, cùng giới hạn độ dài, cùng độ phân giải ảnh, cùng phiên bản bộ chấm. App lưu toàn bộ điều kiện này cùng mỗi kết quả, và **cảnh báo** khi bạn so hai kết quả chạy khác điều kiện.
+
+- **Sau fine-tune**, app hiện thay đổi trên bài toán của bạn **cạnh** thay đổi trên benchmark chung. Nếu điểm chung tụt rõ ở từ hai benchmark trở lên, app cảnh báo "model quên kiến thức chung".
+- **Sau khi nén**, mức tụt chấp nhận được là trung bình không quá 1 điểm với FP8, và 2–3 điểm với NVFP4 (không benchmark nào tụt quá 5 điểm).
+- App **không gộp** các benchmark thành một điểm tổng. Mỗi nhóm năng lực có ký hiệu ↑ / ≈ / ↓ dựa trên khoảng tin cậy 95%.
+
+<Hint title="Khoảng tin cậy 95% là gì?">
+Đo trên 100 ảnh thì điểm có sai số ngẫu nhiên. Khoảng tin cậy cho biết điểm thật có thể nằm trong khoảng nào. Nếu khoảng chênh lệch giữa hai model còn chứa số 0, app hiện ≈ (chưa đủ bằng chứng là khác nhau).
+</Hint>
+
+## So với số hãng công bố
+
+Hãng thường công bố điểm với cài đặt riêng (ví dụ chế độ "suy nghĩ" dài, nhiều lần lấy mẫu). App ghi rõ cài đặt của mình. Khi đối chiếu, team yêu cầu điểm của app lệch số công bố **không quá 1,5 điểm** trên benchmark chấm theo luật, cùng cài đặt, rồi mới coi đường đo là đáng tin.

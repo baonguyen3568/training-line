@@ -1,0 +1,55 @@
+---
+title: Catalog model
+description: Danh sách model có sẵn trong app, kèm giấy phép, bộ nhớ cần khi train, cách train và khả năng nén FP8.
+sidebar:
+  order: 4
+sources:
+  - configs/catalog/models.yaml
+  - .team/proposals/001-stack-model-catalog.md
+  - .team/proposals/001a-nvidia-default-model.md
+  - src/vlm_pipeline/common/memguard.py
+---
+import Hint from '~/components/Hint.astro';
+
+Catalog là danh sách model đã được team kiểm trước: phiên bản cố định, giấy phép đã đọc, mã đi kèm đã rà soát. Node **Chọn model gốc** chỉ cho chọn model trong catalog.
+
+<Hint title="Vì sao phải cố định phiên bản?">
+Model trên Hugging Face có thể được cập nhật bất kỳ lúc nào. App tải đúng một bản (một mã commit 40 ký tự) đã được kiểm, nên chạy lại hôm nay hay tháng sau đều ra cùng một model.
+</Hint>
+
+## Bảng model
+
+| Model | Hãng | Kích thước (tỉ tham số) | Giấy phép | Cách train | RAM khi train | Nén FP8 | Ghi chú |
+|---|---|---|---|---|---|---|---|
+| **NVIDIA Nemotron Parse v1.1** (mặc định) | NVIDIA | 0,94 | NVIDIA Open Model License | Fine-tune toàn bộ | 20 GB (đã đo) | Thử nghiệm | Đọc tài liệu, hoá đơn → văn bản có cấu trúc |
+| NVIDIA Nemotron Parse 2.0 | NVIDIA | 0,95 | OpenMDW 1.1 | Fine-tune toàn bộ | 14 GB (ước tính) | Thử nghiệm | Đang nghiên cứu, chưa vào template |
+| NVIDIA Cosmos Reason2 2B | NVIDIA | 2,4 | NVIDIA Open Model License | LoRA | 14 GB (ước tính) | Chính thức | Ảnh và video; cần chấp nhận điều khoản trên Hugging Face |
+| NVIDIA Cosmos Reason2 8B | NVIDIA | 8,8 | NVIDIA Open Model License | LoRA | 32 GB (ước tính) | Chính thức | Ảnh và video; cần chấp nhận điều khoản |
+| Qwen3-VL 2B Instruct | Qwen | 2,1 | Apache-2.0 | LoRA | 14 GB (ước tính) | Chính thức | Model tham chiếu để so sánh |
+| Qwen3.5 0.8B | Qwen | 0,9 | Apache-2.0 | LoRA | 13 GB (đã đo) | Chính thức | Nhỏ nhất, hợp để thử nhanh |
+| Qwen3.5 2B | Qwen | 2,3 | Apache-2.0 | LoRA | 16 GB (ước tính) | Chính thức | |
+| Qwen3.5 4B | Qwen | 5,0 | Apache-2.0 | LoRA | 24 GB (ước tính) | Chính thức | |
+| Qwen3.5 9B | Qwen | 10,0 | Apache-2.0 | LoRA | 38 GB (ước tính) | Chính thức | Gần giới hạn bộ nhớ trống của máy dùng chung |
+| Gemma 4 E2B | Google | 5,1 | Apache-2.0 | LoRA | 20 GB (ước tính) | Không hỗ trợ | |
+| Gemma 4 E4B | Google | 8,0 | Apache-2.0 | LoRA | 28 GB (ước tính) | Không hỗ trợ | |
+
+Mọi model trong bảng đều cho phép dùng thương mại theo giấy phép của chúng. Khi chia sẻ model đã train, bạn cần giữ kèm giấy phép và ghi công của model gốc và dữ liệu.
+
+<Hint title="&quot;Đã đo&quot; và &quot;ước tính&quot; khác nhau thế nào?">
+**Đã đo**: team đã train thật trên DGX Spark và ghi lại mức bộ nhớ cao nhất. **Ước tính**: tính từ kích thước model và cấu hình, chưa chạy thật; con số có thể lệch. Khi kiểm tra trước khi chạy, app cộng thêm phần dự phòng (ít nhất 10 GB) vào con số này, xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
+</Hint>
+
+<Hint title="FP8 &quot;chính thức&quot;, &quot;thử nghiệm&quot;, &quot;không hỗ trợ&quot;">
+**Chính thức**: công cụ nén của NVIDIA (ModelOpt) hỗ trợ dòng model này. **Thử nghiệm**: có thể nén nhưng chưa có hướng dẫn chính thức, cần đo lại điểm sau khi nén. **Không hỗ trợ**: app ẩn lựa chọn FP8 cho model này.
+</Hint>
+
+## Fine-tune toàn bộ hay LoRA?
+
+- **Fine-tune toàn bộ**: cập nhật phần lớn model (với Nemotron Parse, khoảng 30% tham số; phần nhìn ảnh được giữ nguyên). Hợp với model nhỏ, khi bạn cần model học sâu một định dạng đầu ra.
+- **LoRA**: giữ nguyên model gốc, chỉ học thêm một phần nhỏ. Tốn ít bộ nhớ hơn, hợp với model 2B trở lên.
+
+App chỉ cho chọn cách train mà model đó đã được kiểm (xem mã lỗi CFG-010 ở [Node và cổng nối](/docs/node-va-cong/)).
+
+<Hint title="Vì sao Nemotron Parse dùng fine-tune toàn bộ?">
+Model chỉ khoảng 0,9 tỉ tham số nên fine-tune toàn bộ vẫn vừa bộ nhớ (đo được khoảng 20 GB), và đây cũng là cách NVIDIA dùng trong công thức mẫu của họ.
+</Hint>

@@ -1,0 +1,63 @@
+---
+title: Câu hỏi kỹ thuật thường gặp
+description: Trả lời ngắn cho các câu hỏi kỹ thuật hay gặp khi train, đo điểm và lưu model.
+sidebar:
+  order: 11
+sources:
+  - configs/catalog/models.yaml
+  - configs/catalog/datasets.yaml
+  - .team/proposals/001a-nvidia-default-model.md
+  - .team/proposals/002-eval-benchmark-protocol.md
+  - src/vlm_pipeline/common/memguard.py
+---
+import Hint from '~/components/Hint.astro';
+
+## Train
+
+### Tôi nên chọn model nào?
+Bắt đầu bằng template có sẵn. Với hoá đơn, chứng từ: **Nemotron Parse v1.1**. Để thử nhanh trên ảnh hỏi–đáp: **Qwen3.5 0.8B** (nhỏ nhất, đã đo bộ nhớ thật). Xem [Catalog model](/docs/catalog-model/).
+
+### Val loss giảm đều, sao kết quả chạy thử vẫn tệ?
+Val loss đo khi model được "nhắc" đáp án đúng ở từng bước. Khi tự sinh, một lỗi sớm có thể kéo theo cả chuỗi sai hoặc lặp. Hãy xem **điểm benchmark** và **tỉ lệ bị cắt**, không chỉ val loss.
+
+<Hint title="Ví dụ thật">
+Trong một lần train lỗi của team, val loss đạt 0,195 nhưng model vẫn lặp và bị cắt ở 86% hoá đơn. Nguyên nhân: trọng số được cập nhật ở bf16 thuần nên phần lớn bước học bị làm tròn mất. Lỗi này đã được sửa trong template.
+</Hint>
+
+### Train bao lâu thì đủ?
+Tuỳ model và dữ liệu. Với template hoá đơn, team đang đo điểm sau 1 epoch và nhiều epoch để chọn mặc định; trang template sẽ ghi số khi có.
+
+### Tôi bấm Dừng rồi chạy tiếp được không?
+Với Nemotron Parse thì hiện **chưa** (xem [Giới hạn đã biết](/docs/gioi-han-da-biet/)).
+
+### App có dùng dữ liệu kiểm tra để train không?
+Không. Tập test của dataset (ví dụ 100 hoá đơn test của CORD v2) bị khoá, không bao giờ đưa vào train. Mọi quyết định chọn checkpoint hay cài đặt đều dựa trên tập validation; tập test chỉ dùng để báo điểm cuối.
+
+## Đo điểm
+
+### Vì sao điểm của tôi khác số hãng công bố?
+Hãng thường đo với cài đặt riêng: chế độ suy nghĩ dài, nhiều lần lấy mẫu, prompt riêng. App ghi rõ cài đặt của mình và chỉ so khi cùng điều kiện. Xem [Benchmark và cách đọc điểm](/docs/doc-diem-benchmark/).
+
+### Vì sao template hoá đơn tắt "phạt lặp từ"?
+Cấu hình gốc của Nemotron Parse phạt các token lặp lại (`repetition_penalty` 1,1). Kết quả JSON của hoá đơn lặp thẻ cấu trúc theo bản chất, và trong một phép thử ban đầu, phạt lặp làm hỏng cấu trúc. Template đặt 1,0 khi đo điểm và chạy thử. Model bạn lưu vẫn giữ nguyên cấu hình gốc của NVIDIA. Team đang đo lại trên model đã train đúng để chốt.
+
+<Hint title="Ghi chú thận trọng">
+Phép thử ban đầu chỉ có 6 ảnh và đổi hai thứ cùng lúc, nên kết luận đang để ở trạng thái tạm. Trang này sẽ cập nhật khi có số đo trên tập validation.
+</Hint>
+
+## Bộ nhớ và máy
+
+### App báo thiếu bộ nhớ dù máy có 128 GB?
+Máy dùng chung với ứng dụng khác, và app giữ thêm phần dự phòng (ít nhất 10 GB, không dưới 20 GB tổng) để máy không bị treo. Xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
+
+### Train bị dừng giữa chừng với lỗi MEM-002?
+Bộ nhớ trống xuống dưới 8 GB nên app đã lưu tiến độ (nếu kịp) và dừng để bảo vệ máy. Chạy lại khi máy rảnh hơn, hoặc chọn model nhỏ hơn.
+
+## Giấy phép
+
+### Tôi dùng model đã train vào việc thương mại được không?
+Phụ thuộc giấy phép của **model gốc** và **dữ liệu**. Mọi model trong catalog hiện cho phép dùng thương mại theo giấy phép của chúng. CORD v2 dùng CC BY 4.0: được dùng, kể cả thương mại, nhưng phải ghi công và ghi rõ nếu đã chỉnh sửa. Khi chia sẻ model, bạn cần gửi kèm giấy phép và dòng ghi công bên dưới. App chưa tự đính kèm chúng vào thư mục model đã lưu; tính năng này đang được làm.
+
+<Hint title="Ghi công CORD v2">
+"CORD: A Consolidated Receipt Dataset for Post-OCR Parsing (Park et al., NAVER Clova), CC BY 4.0."
+</Hint>

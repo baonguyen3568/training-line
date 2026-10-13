@@ -1,0 +1,78 @@
+---
+title: Node và cổng nối
+description: Mỗi bước trong workflow là một node. Node nối với nhau qua cổng có kiểu, app kiểm tra kiểu trước khi chạy.
+sidebar:
+  order: 2
+sources:
+  - src/vlm_pipeline/nodes/source.py
+  - src/vlm_pipeline/nodes/data.py
+  - src/vlm_pipeline/nodes/train.py
+  - src/vlm_pipeline/nodes/model_ops.py
+  - src/vlm_pipeline/nodes/evaluate.py
+  - src/vlm_pipeline/nodes/rules.py
+  - src/vlm_pipeline/i18n/vi.yaml
+---
+import Hint from '~/components/Hint.astro';
+
+Workflow trong app là một sơ đồ gồm các **node** (bước) nối với nhau bằng **dây**. Mỗi node làm một việc: lấy dữ liệu, chọn model, train, đo điểm, nén, lưu. Bạn kéo node vào bảng vẽ, nối đầu ra của bước trước vào đầu vào của bước sau, rồi bấm **Chạy**.
+
+## Cổng có kiểu
+
+Mỗi node có **cổng vào** (bên trái) và **cổng ra** (bên phải). Mỗi cổng mang một **kiểu dữ liệu**. App chỉ cho nối hai cổng cùng kiểu (hoặc tương thích), nên bạn không thể vô tình đưa dữ liệu vào chỗ cần model.
+
+| Kiểu | Nghĩa |
+|---|---|
+| `Dataset` | Tập dữ liệu: ảnh (hoặc video) kèm câu hỏi và đáp án mẫu |
+| `Model` | Một model có thể dùng ngay: model gốc, hoặc model đã train/nén |
+| `Checkpoint` | Model sau khi fine-tune toàn bộ; dùng được ở mọi chỗ cần `Model` |
+| `Adapter` | Phần học thêm của LoRA; cần gộp vào model gốc trước khi dùng như một model |
+| `QuantizedModel` | Model đã nén |
+| `EvalReport` | Bảng điểm benchmark |
+| `BenchReport` | Kết quả đo tốc độ và bộ nhớ |
+| `Endpoint` | Model đang được bật để chạy thử |
+| `ExportArtifact` | Thư mục model đã lưu, mang đi chỗ khác được |
+
+<Hint title="Vì sao Adapter không nối thẳng vào bước đo điểm?">
+LoRA không sửa model gốc mà học thêm một phần nhỏ đặt bên cạnh. Phần đó một mình không trả lời được câu hỏi, nên phải đi qua bước **Gộp phần học thêm vào model** để thành một `Checkpoint` hoàn chỉnh.
+</Hint>
+
+## Các node hiện có
+
+| Nhóm | Node | Vào → Ra |
+|---|---|---|
+| Nguồn | **Chọn model gốc** | → `Model` |
+| Nguồn | **Dataset Hugging Face** | → `Dataset` |
+| Nguồn | **Thư mục ảnh + câu hỏi/đáp án** | → `Dataset` |
+| Dữ liệu | **Chia dữ liệu học / kiểm tra** | `Dataset` → `Dataset` (học), `Dataset` (kiểm tra) |
+| Train | **Fine-tune nhẹ (LoRA)** | `Model` + `Dataset` (+ `Dataset` kiểm tra, tuỳ chọn) → `Adapter` |
+| Train | **Fine-tune toàn bộ** | `Model` + `Dataset` (+ `Dataset` kiểm tra, tuỳ chọn) → `Checkpoint` |
+| Train | **Gộp phần học thêm vào model** | `Model` + `Adapter` → `Checkpoint` |
+| Nén | **Nén model** | `Model` (+ `Dataset` hiệu chỉnh, tuỳ chọn) → `QuantizedModel` |
+| Đánh giá | **Đo điểm benchmark** | `Model` (+ `Dataset`, tuỳ chọn) → `EvalReport` |
+| Đánh giá | **Đo tốc độ & bộ nhớ** | `Model` → `BenchReport` |
+| Chạy thử | **Bật model để chạy thử** | `Model` → `Endpoint` |
+| Xuất | **Lưu model** | `Model` → `ExportArtifact` |
+
+<Hint title="Node nặng và node nhẹ">
+Các node train, nén, đo điểm, chạy thử và lưu model chạy trong container riêng trên GPU. Máy chỉ chạy **một tác vụ nặng tại một thời điểm**; tác vụ sau sẽ chờ. Các node nguồn và chia dữ liệu chạy nhẹ, không cần GPU.
+</Hint>
+
+## App chặn lỗi trước khi chạy
+
+Khi bạn bấm **Kiểm tra** hoặc **Chạy**, app rà toàn bộ sơ đồ và báo lỗi bằng lời dễ hiểu, trước khi tốn bất kỳ phút GPU nào. Một số lỗi thường gặp:
+
+| Mã | Khi nào |
+|---|---|
+| CFG-001 | Hai cổng khác kiểu bị nối với nhau |
+| CFG-002 | Dây nối tạo thành vòng tròn |
+| CFG-003 | Một cổng bắt buộc chưa có dây vào |
+| CFG-005 | Một thiết lập nằm ngoài khoảng cho phép |
+| CFG-010 | Model không hỗ trợ cách train bạn chọn (ví dụ dùng LoRA với Nemotron Parse, model chỉ hỗ trợ fine-tune toàn bộ) |
+| MEM-001 | Bước cần nhiều bộ nhớ hơn mức máy đang trống |
+| SYS-001 | GPU đang bận với tác vụ khác |
+
+Xem thêm [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
+
+<Hint title="Cách train nào hợp với model nào?">
+Mỗi model trong [catalog](/docs/catalog-model/) ghi rõ cách train đã được kiểm: fine-tune toàn bộ hay LoRA. Chọn sai, app báo CFG-010 và chưa chạy gì.
+</Hint>

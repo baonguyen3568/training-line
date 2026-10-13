@@ -1,0 +1,60 @@
+---
+title: Kiểm tra trước khi chạy
+description: App kiểm tra sơ đồ, bộ nhớ, ổ đĩa và GPU trước khi bắt đầu, và tự dừng an toàn nếu bộ nhớ xuống quá thấp khi đang chạy.
+sidebar:
+  order: 3
+sources:
+  - src/vlm_pipeline/common/memguard.py
+  - docs/adr/ADR-005-storage-retention.md
+  - src/vlm_pipeline/i18n/vi.yaml
+  - configs/catalog/models.yaml
+  - .team/proposals/005-storage-retention-policy.md
+---
+import Hint from '~/components/Hint.astro';
+
+Train một model có thể mất vài giờ. Lỗi phát hiện ở phút thứ 90 là 90 phút GPU bị phí. Vì vậy app kiểm tra mọi thứ có thể kiểm được **trước khi** bắt đầu.
+
+## 1. Kiểm tra sơ đồ
+
+- Dây nối đúng kiểu cổng, không có vòng tròn, không thiếu đầu vào bắt buộc.
+- Thiết lập của từng node nằm trong khoảng cho phép.
+- Cách train hợp với model đã chọn.
+
+Lỗi được báo ngay trên node có vấn đề, bằng lời dễ hiểu. Xem danh sách mã lỗi ở [Node và cổng nối](/docs/node-va-cong/).
+
+## 2. Kiểm tra bộ nhớ
+
+DGX Spark dùng **bộ nhớ hợp nhất**: CPU và GPU dùng chung 128 GB. Máy thường chạy cùng các ứng dụng khác, nên phần trống thực tế ít hơn nhiều.
+
+Trước khi chạy một bước nặng, app so **bộ nhớ đang trống** với **bộ nhớ bước đó cần**:
+
+> Cần trống ≥ mức cao nhất dự kiến + dự phòng (lớn hơn trong hai giá trị: 10 GB, hoặc 20% mức cao nhất), và không dưới 20 GB.
+
+Ví dụ: train Nemotron Parse v1.1 cần khoảng 20 GB, nên máy phải còn trống ít nhất 30 GB. Không đủ thì app báo **MEM-001** và chưa chạy gì.
+
+<Hint title="Mức bộ nhớ dự kiến lấy từ đâu?">
+Từ cột "RAM khi train" trong [catalog model](/docs/catalog-model/). Với model ghi "đã đo", đó là mức cao nhất team đo được khi train thật. Với model ghi "ước tính", con số chưa được kiểm bằng lần chạy thật.
+</Hint>
+
+## 3. Bảo vệ khi đang chạy
+
+Trong lúc chạy, app theo dõi bộ nhớ trống mỗi giây:
+
+| Bộ nhớ trống | App làm gì |
+|---|---|
+| Dưới 14 GB | Ghi cảnh báo |
+| Dưới 8 GB | Yêu cầu dừng có kiểm soát: lưu tiến độ rồi dừng (**MEM-002**) |
+| Đang lưu checkpoint | Cho thêm tới 5 phút để lưu xong, trừ khi bộ nhớ trống xuống dưới 4 GB |
+| Giảm quá nhanh | Dừng ngay, không chờ, để máy không bị treo |
+
+<Hint title="Vì sao app ưu tiên dừng hơn chạy tiếp?">
+Máy dùng chung. Nếu bộ nhớ cạn, cả máy có thể treo, ảnh hưởng mọi ứng dụng khác chứ không chỉ bước train của bạn. Mất một checkpoint dở dang ít tệ hơn.
+</Hint>
+
+## 4. GPU chỉ chạy một việc nặng
+
+Mỗi lúc chỉ một tác vụ nặng (train, nén, đo điểm) được dùng GPU. Nếu GPU đang bận, app báo **SYS-001** kèm tên tác vụ đang chạy và workflow của bạn sẽ chờ. Chờ quá lâu thì app báo **SYS-002**.
+
+## 5. Ổ đĩa
+
+App ước lượng dung lượng cần để lưu model và checkpoint. Không đủ thì báo **DISK-001**. Ví dụ: mỗi checkpoint khi fine-tune toàn bộ Nemotron Parse v1.1 chiếm khoảng 8 GB.
