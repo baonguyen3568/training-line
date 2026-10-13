@@ -165,7 +165,13 @@ class RealWorker:
             "export.hf_dir": functools.partial(run_export, self),  # B-2: native models (ADR-012)
             "quantize.modelopt_ptq": functools.partial(run_quantize, self),  # B-4 (app/quantize_worker.py, research)
             "serve.vllm": functools.partial(run_trial, self),  # B-7 "Chạy thử" (app/trial_worker.py)
+            "data.caption_vlm": self._caption,  # app/caption_worker.py (bao-fixcode)
         }
+
+    def _caption(self, job: NodeJob) -> NodeResult:
+        from vlm_pipeline.app.caption_worker import run_caption  # imports this module: loaded on first use
+
+        return run_caption(self, job)
 
     def supports(self, spec: NodeSpec) -> bool:
         return spec.type_id in self._handlers
@@ -645,15 +651,6 @@ def _check_merge(q: SupportQuery) -> None:
         )
 
 
-def _check_caption(q: SupportQuery) -> None:
-    """data.caption_vlm v1: a native catalog model on a local folder dataset (no hub parquet on the host)."""
-    params = {"node": q.node_id, "node_type": q.spec.type_id}
-    if q.model is not None and q.model.auto_class != "AutoModelForImageTextToText":
-        raise NodeNotRunnableError("caption needs a native (AutoModelForImageTextToText) model", params=params)
-    if q.inputs.get("dataset", "dataset:local") != "dataset:local":  # allowlist; unwired is CFG-003's job
-        raise NodeNotRunnableError("caption reads local datasets only (v1)", params=params)
-
-
 def _check_export(q: SupportQuery) -> None:
     from vlm_pipeline.app.export_worker import ExportUnsupportedError
 
@@ -682,7 +679,7 @@ def _support_checks() -> dict[str, Callable[[SupportQuery], None]]:
         "train.lora_vlm": _check_train,
         "train.sft_vlm": _check_train,
         "train.merge_lora": _check_merge,
-        "data.caption_vlm": _check_caption,
+        "data.caption_vlm": _owner_check("vlm_pipeline.app.caption_worker"),
         "export.hf_dir": _check_export,
         "quantize.modelopt_ptq": _owner_check("vlm_pipeline.quantize.scope"),
         "eval.benchmarks": _owner_check("vlm_pipeline.eval.node_worker"),
