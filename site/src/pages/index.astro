@@ -314,15 +314,16 @@ const invoiceMeasured = pipes.find((p) => p.id === "invoice-to-json")?.measured;
     <details>
       <summary><Icon name="chevron-right" size={16} class="chev" />Dữ liệu của tôi có bị gửi đi đâu không?</summary>
       <p>
-        Không. App chạy trên máy của bạn. App chỉ kết nối ra ngoài để tải model hoặc bộ dữ liệu bạn chọn, ví dụ từ Hugging
-        Face.
+        Không. App chạy trên máy của bạn.
+        {/* "only goes online to download the model/dataset you pick" comes back with G-5 (tester: no download yet) */}
       </p>
     </details>
     <details>
       <summary><Icon name="chevron-right" size={16} class="chev" />Có mất phí không?</summary>
       <p>
-        Không. App miễn phí, mã nguồn theo giấy phép Apache-2.0. Mỗi model và bộ dữ liệu có giấy phép riêng; app cho bạn
-        xem trước khi tải. Xem <a class="link" href="/ma-nguon-mo/">Miễn phí &amp; mã nguồn mở</a>.
+        Không. App miễn phí, mã nguồn theo giấy phép Apache-2.0. Mỗi model và bộ dữ liệu có giấy phép riêng.
+        {/* "the app shows it before downloading" comes back with G-5's download screen */}
+        Xem <a class="link" href="/ma-nguon-mo/">Miễn phí &amp; mã nguồn mở</a>.
       </p>
     </details>
     <details>
