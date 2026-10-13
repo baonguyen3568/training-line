@@ -31,6 +31,18 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | P1-9 | Spike NVIDIA containers trên GB10 (AutoModel 26.08 VLM, ModelOpt, vLLM) + Proposal 008: backend runtime (host orchestrator ↔ container worker, job runner, GPU lock/memguard, RunManifest) | bao-backend | PAUSED (RESET: spike hoãn; P008 giữ hướng, chờ ghép vào P009) |
 | P1-7 | PM tổng hợp → ADR-001..00N, chốt với user | bao-pm | TODO |
 
+## 📦 MILESTONE M3 — Đóng gói Docker đa kiến trúc + dọn rác liên tục (user yêu cầu 2026-10-13)
+YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được cả **amd64 và arm64**; (3) MỌI thứ đóng thành Docker, quản lý bằng
+**docker compose**, cấu hình bằng **1 file `.env.local`** (đã gitignore; mẫu `.env.local.example` được commit).
+| ID | Task | Owner | Status |
+|----|------|-------|--------|
+| D-1 | Proposal ngắn + ADR: kiến trúc compose (app API+UI, job containers, vLLM), cách app tạo job container an toàn (KHÔNG mount docker.sock trần → socket-proxy/allowlist), GPU trong compose, volumes | bao-backend + bao-security | TODO |
+| D-2 | Dockerfile đa kiến trúc (buildx linux/amd64,linux/arm64): app (FastAPI + frontend dist), site tĩnh, image train dẫn xuất; kiểm NGC/vLLM base có manifest amd64 | bao-backend + bao-research (xác minh base image) | TODO |
+| D-3 | `.env.local.example` + loader: gộp mọi cấu hình (HF_TOKEN, ports, paths, profile, quota); bỏ .env cũ; secrets không vào image/layer | bao-backend + bao-security | TODO |
+| D-4 | Memguard/preflight cho GPU rời (amd64: VRAM riêng + RAM host) bên cạnh UMA (GB10) | bao-fixcode | TODO |
+| D-5 | CI local: build cả 2 arch (amd64 qua QEMU = build-only), smoke compose up/down trên arm64 thật; ghi rõ amd64 CHƯA test GPU | bao-tester + bao-cleancode | TODO |
+| D-6 | Dọn rác liên tục: scheduler bật xoá THẬT item an toàn trên máy này (user yêu cầu), + dọn repo (file rác, worktree, outputs smoke, image/container/build-cache vlm-* cũ), báo cáo định kỳ | bao-cleanup (+ bao-cleancode: code chết, file thừa trong repo) | TODO |
+
 ## 🔧 MILESTONE M1b — Mọi node chạy THẬT (2026-10-13). RealWorker hiện chỉ có model.hf_pick, data.hf_load, train.lora_vlm/sft_vlm
 Ưu tiên ngang M2 với backend/research/tester/fixcode. Node chưa có worker thật → báo lỗi LÚC VALIDATE ("bước này chưa chạy thật được"), không fail giữa chừng.
 | ID | Node | Owner | Status |
@@ -73,7 +85,7 @@ RÀNG BUỘC CỨNG (PM):
 | M2-5 | Build docs + chính sách + trang phụ | bao-cleancode (dựng) + bao-design (review) | IN PROGRESS: 5 trang chính sách import từ docs/legal (chờ security review); tiếp: docs + trang phụ |
 | M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | TODO |
 | M2-7 | QA: link checker, a11y (WCAG AA), visual regression 3 viewport, Lighthouse, kiểm "không bịa số" | bao-tester | IN PROGRESS (P011 draft; G1 check_site_numbers.py xong report-only) |
-| M2-8 | Security: CSP, không tracker, license ảnh/font/icon, trademark NVIDIA, trang chính sách đúng thực tế | bao-security | REVIEW (spec + gate site_check + docs/legal + SECURITY.md xong; chờ U7–U10 của user, fix CSP Starlight của frontend) |
+| M2-8 | Security: CSP, không tracker, license ảnh/font/icon, trademark NVIDIA, trang chính sách đúng thực tế | bao-security | REVIEW (spec, gate site_check, docs/legal, SECURITY.md, CSP Starlight, THIRD_PARTY_LICENSES xong; chỉ còn chờ U7–U10 + license nội dung site của user) |
 
 ## 🎯 MILESTONE M1 — "Kéo thả → nối → Chạy thật" (ƯU TIÊN SỐ 1, user phản hồi 2026-10-12: app còn thô, chưa tạo/nối pipeline được)
 Definition of Done: user mở app → tạo workflow TRỐNG → kéo node từ thư viện vào canvas → nối dây → bấm Chạy →
