@@ -184,6 +184,16 @@ class SampleCount(_Check):
         return None if samples is None else (samples < self.below, samples)
 
 
+class ReachesNode(_Check):
+    """A node of type ``target`` is downstream of this node (direct wire today; transitive for multi-hop paths)."""
+
+    kind: Literal["reaches_node"]
+    target: str
+
+    def violation(self, ctx: _Context, value: Any) -> Result:
+        return not _reaches(ctx.view, ctx.node_id, self.target), None
+
+
 # ------------------------------------------------------------------------------------ data_profile-phase checks
 
 
@@ -227,6 +237,7 @@ Check = Annotated[
     | WiredOrDatasetHasSplit
     | DatasetSplitNotHeldout
     | SampleCount
+    | ReachesNode
     | ImageStats
     | TokenLenStats
     | DupRate
@@ -310,6 +321,9 @@ def _check_against_repo(rule: Rule, by_type: Mapping[str, NodeSpec], root: Path,
             raise StandardsError(f"{where}: {type_id} has no param {missing}")
         if rule.applies_to.port is not None and rule.applies_to.port not in spec.inputs:
             raise StandardsError(f"{where}: {type_id} has no input port {rule.applies_to.port!r}")
+    target = getattr(rule.check, "target", None)
+    if target is not None and target not in by_type:
+        raise StandardsError(f"{where}: unknown target node {target!r}")
     for ref in _REPO_PATH.findall(rule.source):
         if not (root / ref).exists():
             raise StandardsError(f"{where}: source path {ref!r} does not exist")
@@ -345,6 +359,22 @@ def _sample_count(upstream: tuple[str, Any] | None) -> int | None:
         return None  # local folder / unknown: the data profile knows
     limit = int(getattr(upstream[1] if upstream else None, "max_samples", 0) or 0)
     return min(entry.num_train, limit) if limit else entry.num_train
+
+
+def _reaches(view: GraphView, node_id: str, target: str) -> bool:
+    """Whether a node of type ``target`` consumes, directly or transitively, an output of ``node_id``."""
+    consumers: dict[str, set[str]] = {}
+    for (dst, _port), srcs in view.sources.items():
+        for src in srcs:
+            consumers.setdefault(src, set()).add(dst)
+    todo, seen = [node_id], {node_id}
+    while todo:
+        for nxt in consumers.get(todo.pop(), set()) - seen:
+            if view.specs[nxt].type_id == target:
+                return True
+            seen.add(nxt)
+            todo.append(nxt)
+    return False
 
 
 def _model_entry(view: GraphView, node_id: str) -> CatalogEntry | None:

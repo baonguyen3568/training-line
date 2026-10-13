@@ -150,6 +150,7 @@ STD-001:
     - above_count
     - min_short_side_px
     - limit_from_catalog
+    - target
   match:
     - {kind: validate, value: "configs/standards rule failed (graph.standards)"}
   actions:

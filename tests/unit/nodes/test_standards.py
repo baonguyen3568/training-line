@@ -81,6 +81,7 @@ def test_no_standards_dir_means_no_rules(tmp_path: Path) -> None:
         ({"applies_to": {"node": "train.lora_vlm", "port": "eval_data"}}, "no input port"),
         ({"check": {"kind": "ratio_to_param", "other": "rank", "min": 1, "max": 4}}, "no param"),
         ({"source": "see .team/proposals/does-not-exist.md"}, "does not exist"),
+        ({"check": {"kind": "reaches_node", "target": "eval.nope"}}, "unknown target"),
     ],
 )
 def test_bad_rules_fail_loading(tmp_path: Path, override: dict[str, Any], needle: str) -> None:
@@ -182,6 +183,29 @@ def test_unwired_val_port_is_fine_when_the_dataset_has_a_validation_split(tmp_pa
     rule["check"]["split"] = "dev"
     [issue] = _issues(tmp_path, _lora(), rule)
     assert issue.port == "val_data"
+
+
+def test_reaches_node_follows_the_wires_downstream(tmp_path: Path) -> None:
+    rule = _rule(
+        id="TEST-EVAL-DOWNSTREAM",
+        level="warn",
+        applies_to={"node": "quantize.modelopt_ptq"},
+        check={"kind": "reaches_node", "target": "eval.benchmarks"},
+    )
+    exported = [
+        _n("m", "model.hf_pick", model="qwen3.5-0.8b"),
+        _n("q", "quantize.modelopt_ptq"),
+        _n("x", "export.hf_dir"),
+    ]
+    wf = {"format": "vlm-workflow", "schema_version": 1, "name": "q", "nodes": exported, "edges": []}
+    wf["edges"] = [_e("m", "model", "q", "model"), _e("q", "quantized", "x", "model")]
+    [issue] = _issues(tmp_path, wf, rule)  # exported but never measured
+    assert (issue.severity, issue.node_id, issue.params["target"]) == ("warn", "q", "eval.benchmarks")
+    wf["nodes"] = [*exported, _n("e", "eval.benchmarks")]
+    wf["edges"] = [*wf["edges"], _e("q", "quantized", "e", "model")]
+    assert _issues(tmp_path, wf, rule) == []
+    wf["edges"] = [_e("m", "model", "q", "model"), _e("m", "model", "e", "model")]  # eval of the parent only
+    assert len(_issues(tmp_path, wf, rule)) == 1
 
 
 def test_data_profile_kinds_load_but_never_run_at_validation(tmp_path: Path) -> None:
