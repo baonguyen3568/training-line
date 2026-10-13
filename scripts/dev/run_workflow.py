@@ -29,9 +29,9 @@ def main() -> int:
     workflow = data.get("workflow", data)  # templates wrap the workflow
     nodes = {n["id"]: n for n in workflow.get("nodes", [])}
     for item in a.set:
-        target, _, raw = item.partition("=")
-        node_id, _, param = target.partition(".")
-        if node_id not in nodes or not param or not _:
+        target, eq, raw = item.partition("=")
+        node_id, dot, param = target.partition(".")
+        if not (eq and dot and param) or node_id not in nodes:
             p.error(f"--set {item!r}: expected NODE.PARAM=VALUE with an existing node id")
         try:
             value = json.loads(raw)
