@@ -89,11 +89,19 @@ validation_dataloader:
   collate_fn:
     _target_: nemo_automodel.components.datasets.vlm.collate_fns.nemotron_parse_collate_fn
 
-optimizer:
-  _target_: torch.optim.AdamW
+optimizer:  # fp32 master weights: on 1 GPU AutoModel skips FSDP2/mp_policy, plain AdamW on bf16 params loses most
+  # updates (001a §10.9; P-3: 5.3% of decoder elements changed). Same block as the v1.1 template / P-3b-A (configs/train/smoke/
+  # nemotron_parse_v1_1_p3b_fp32master.yaml). recipe.py overrides only lr / weight_decay.
+  _target_: transformer_engine.pytorch.optimizers.fused_adam.FusedAdam
   lr: 1.0e-5
   weight_decay: 0.01
   betas: [0.9, 0.95]
+  eps: 1.0e-8
+  adam_w_mode: true
+  master_weights: true
+  store_param_remainders: true
+  exp_avg_dtype: torch.float32
+  exp_avg_sq_dtype: torch.float32
 
 freeze_config:  # adapter enforces: freeze encoder.model_encoder (RADIO backbone), neck + decoder + embeddings train (001a §9.3)
   freeze_vision_tower: true
