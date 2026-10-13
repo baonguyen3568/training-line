@@ -399,6 +399,7 @@
             "default": 3,
             "enum": [
               1,
+              2,
               3,
               5
             ],
@@ -552,6 +553,7 @@
             "default": 3,
             "enum": [
               1,
+              2,
               3,
               5
             ],
@@ -560,6 +562,7 @@
             "x-ui": {
               "option_keys": "epoch_count",
               "order": 0,
+              "recommended": 3,
               "summary": true,
               "widget": "segmented"
             }

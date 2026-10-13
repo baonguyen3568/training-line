@@ -43,6 +43,7 @@ def test_api_item_matches_frontend_contract(spec: NodeSpec) -> None:
         assert hints is not None, f"{spec.type_id}.{name} has no x-ui hints"
         assert set(hints) <= {
             "widget", "order", "preset", "advanced", "option_keys", "summary", "option_meta", "disabled_options",
+            "recommended",
         }  # fmt: skip
 
 

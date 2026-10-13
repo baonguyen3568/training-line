@@ -15,7 +15,7 @@ from vlm_pipeline.common.params import Params, ui
 DEFAULT_SEED = 1234
 
 LrPreset = Literal["slow", "medium", "fast"]
-Epochs = Literal[1, 3, 5]
+Epochs = Literal[1, 2, 3, 5]
 
 # Learning rate per preset: full fine-tune follows the Nemotron-Parse / Qwen3-VL recipes (1e-5),
 # LoRA follows the qwen3_8 LoRA recipe (1e-4).
@@ -54,6 +54,11 @@ class LoraParams(_FinetuneParams):
 
 
 class FullFinetuneParams(_FinetuneParams):
+    # "3 passes" is measured for full SFT only (Parse + CORD, research 001a §10.10); LoRA has no recommendation yet.
+    epochs: Epochs = Field(
+        3,
+        json_schema_extra=ui(order=0, widget="segmented", summary=True, option_keys="epoch_count", recommended=3),
+    )
     freeze_vision_tower: bool = Field(True, json_schema_extra=ui(advanced=True))
 
     @property
