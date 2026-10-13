@@ -3,6 +3,7 @@
   "pipelines": [
     {
       "id": "invoice-to-json",
+      "summary_key": "reference_pipeline.invoice-to-json.summary",
       "kind": "app_template",
       "template_id": "invoice_to_json",
       "status": "available",
@@ -80,6 +81,7 @@
     },
     {
       "id": "image-video-understanding",
+      "summary_key": "reference_pipeline.image-video-understanding.summary",
       "kind": "app_template",
       "template_id": "image_video_understanding",
       "status": "available",
@@ -143,6 +145,7 @@
     },
     {
       "id": "quantize-fp8-benchmark",
+      "summary_key": "reference_pipeline.quantize-fp8-benchmark.summary",
       "kind": "app_template",
       "template_id": "quantize_bench",
       "status": "planned",
@@ -192,6 +195,7 @@
     },
     {
       "id": "gemma4-e4b-lora",
+      "summary_key": "reference_pipeline.gemma4-e4b-lora.summary",
       "kind": "candidate",
       "template_id": null,
       "status": "planned",
@@ -248,6 +252,7 @@
     },
     {
       "id": "qwen35-4b-lora",
+      "summary_key": "reference_pipeline.qwen35-4b-lora.summary",
       "kind": "candidate",
       "template_id": null,
       "status": "planned",
@@ -297,6 +302,7 @@
     },
     {
       "id": "grpo-geometry",
+      "summary_key": "reference_pipeline.grpo-geometry.summary",
       "kind": "external",
       "template_id": null,
       "status": "reference_only",
@@ -346,6 +352,7 @@
     },
     {
       "id": "dgx-spark-vlm-playbook",
+      "summary_key": "reference_pipeline.dgx-spark-vlm-playbook.summary",
       "kind": "external",
       "template_id": null,
       "status": "reference_only",
@@ -395,6 +402,7 @@
     },
     {
       "id": "donut-cord",
+      "summary_key": "reference_pipeline.donut-cord.summary",
       "kind": "external",
       "template_id": null,
       "status": "reference_only",
@@ -437,6 +445,7 @@
     },
     {
       "id": "curator-image-curation",
+      "summary_key": "reference_pipeline.curator-image-curation.summary",
       "kind": "external",
       "template_id": null,
       "status": "reference_only",
@@ -486,6 +495,7 @@
     },
     {
       "id": "cosmos-reason2-lora",
+      "summary_key": "reference_pipeline.cosmos-reason2-lora.summary",
       "kind": "candidate",
       "template_id": null,
       "status": "reference_only",

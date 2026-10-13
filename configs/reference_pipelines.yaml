@@ -10,12 +10,14 @@
 #   model_parts parts of the model under another licence (optional)
 #   requires_hf_terms  true when the user must accept the model's terms on Hugging Face themself (optional)
 #   publisher   who published the source recipe (name shown next to source_url)
+#   summary_key i18n key of the one-line "what it does" (bao-design writes vi/en): reference_pipeline.<id>.summary
 #   measured    our own run on one DGX Spark (GB10), or null = "chưa có số đo". Every number cites `sources`
 #               (committed repo paths; site gate check_site_numbers). Fields: train_minutes, peak_ram_gb (run.json, whole
 #               container), score {benchmark, metric, value, ci95, n} or null, config (what exactly was run), sources.
 schema_version: 1
 pipelines:
   - id: invoice-to-json
+    summary_key: reference_pipeline.invoice-to-json.summary
     kind: app_template
     template_id: invoice_to_json
     status: available
@@ -40,6 +42,7 @@ pipelines:
       - {node: eval.benchmarks, label: {vi: "Chấm CORD", en: "Score on CORD"}}
 
   - id: image-video-understanding
+    summary_key: reference_pipeline.image-video-understanding.summary
     kind: app_template
     template_id: image_video_understanding
     status: available
@@ -58,6 +61,7 @@ pipelines:
       - {node: eval.benchmarks, label: {vi: "Đo điểm", en: "Benchmark"}}
 
   - id: quantize-fp8-benchmark
+    summary_key: reference_pipeline.quantize-fp8-benchmark.summary
     kind: app_template
     template_id: quantize_bench
     status: planned  # becomes available when the quantize worker (B-4), a Qwen eval suite and FP8 serving land
@@ -74,6 +78,7 @@ pipelines:
       - {node: eval.benchmarks, label: {vi: "So điểm với bản gốc", en: "Compare with the original"}}
 
   - id: gemma4-e4b-lora
+    summary_key: reference_pipeline.gemma4-e4b-lora.summary
     kind: candidate
     template_id: null
     status: planned
@@ -91,6 +96,7 @@ pipelines:
       - {node: eval.benchmarks, label: {vi: "Chấm theo trường", en: "Field-level scoring"}}
 
   - id: qwen35-4b-lora
+    summary_key: reference_pipeline.qwen35-4b-lora.summary
     kind: candidate
     template_id: null
     status: planned
@@ -108,6 +114,7 @@ pipelines:
       - {node: train.merge_lora, label: {vi: "Gộp vào model", en: "Merge"}}
 
   - id: grpo-geometry
+    summary_key: reference_pipeline.grpo-geometry.summary
     kind: external
     template_id: null
     status: reference_only  # needs a GRPO train node + reward functions (P4-3)
@@ -124,6 +131,7 @@ pipelines:
       - {node: eval.benchmarks, label: {vi: "Đo điểm", en: "Benchmark"}}
 
   - id: dgx-spark-vlm-playbook
+    summary_key: reference_pipeline.dgx-spark-vlm-playbook.summary
     kind: external
     template_id: null
     status: reference_only  # GRPO + vLLM rollout; the playbook assumes the whole 128 GB
@@ -140,6 +148,7 @@ pipelines:
       - {node: serve.vllm, label: {vi: "So sánh trước/sau", en: "Before/after comparison"}}
 
   - id: donut-cord
+    summary_key: reference_pipeline.donut-cord.summary
     kind: external
     template_id: null
     status: reference_only  # baseline only: different engine (VisionEncoderDecoder)
@@ -155,6 +164,7 @@ pipelines:
       - {node: null, label: {vi: "Fine-tune toàn bộ", en: "Full fine-tune"}}
 
   - id: curator-image-curation
+    summary_key: reference_pipeline.curator-image-curation.summary
     kind: external
     template_id: null
     status: reference_only  # 1.0: rebuilt with app CPU nodes (filter + dedupe); Curator itself when its container
@@ -172,6 +182,7 @@ pipelines:
       - {node: null, label: {vi: "Khử trùng", en: "Dedup"}}
 
   - id: cosmos-reason2-lora
+    summary_key: reference_pipeline.cosmos-reason2-lora.summary
     kind: candidate
     template_id: null
     status: reference_only  # ADR-001 am.2: candidate only; HF gated; Spark officially supported for inference only
