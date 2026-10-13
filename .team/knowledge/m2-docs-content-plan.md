@@ -37,3 +37,10 @@ Nguyên tắc (PM, BOARD M2):
 - Gemma 4: không hỗ trợ FP8.
 - Không resume giữa chừng cho run đã xong (optim bị strip theo D3).
 - MMBench v1.1 chưa tải được (host timeout); G1 hoãn.
+
+## Việc cần cập nhật docs khi tính năng xong (theo dõi)
+- [ ] Backend: export kèm LICENSE + NOTICE/ATTRIBUTION. Khi xong, sửa `faq-ky-thuat` (mục Giấy phép) và `catalog-model` từ "user phải tự giữ kèm" thành mô tả đúng.
+- [ ] Parse resume sửa xong: sửa `gioi-han-da-biet` + `faq-ky-thuat`.
+- [ ] Điểm P-3b (val gate → test 100 ảnh): viết `template-hoa-don`, cập nhật `gioi-han-da-biet`.
+- [ ] Kết luận repetition_penalty trên validation: cập nhật FAQ.
+- [ ] Template còn lại chuyển sang FusedAdam: cập nhật `phan-cung-va-bo-nho`.
