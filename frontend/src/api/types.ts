@@ -358,7 +358,20 @@ export interface StoragePlan {
   auto_reclaim_gb: number;
   shortfall_gb: number;
   items: StorageItem[];
+  /** Reminders that need the user soon (P013 G-1), e.g. an interrupted run with ≤ 24 h left to resume. */
+  attention?: StorageAttention[];
   error: RenderedError | null;
+}
+
+export interface StorageAttention {
+  code: string;
+  run_id: string;
+  /** Node title (i18n), else the run's name, else its id. */
+  node: string;
+  /** Local time "YYYY-MM-DD HH:MM". */
+  resume_until: string;
+  /** Server-rendered in the request locale; used only when the app has no copy for `code`. */
+  message: string;
 }
 export interface StorageApplyRequest {
   plan_id: string;

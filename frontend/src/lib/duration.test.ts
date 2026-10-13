@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ValidationResult } from "../api/types";
-import { durationRunCount, estimateLine, formatMinutesRange, workflowDurationText } from "./format";
+import {
+  durationRunCount,
+  estimateLine,
+  formatMinutesRange,
+  formatShortDeadline,
+  workflowDurationText,
+} from "./format";
 
 type Est = ValidationResult["estimate"];
 const base: Est = {
@@ -73,5 +79,13 @@ describe("measured duration", () => {
         duration: null,
       }),
     ).toBe("Dự kiến: RAM ~40–48 GB · Ổ đĩa ~30–35 GB · Chưa có số đo: thời gian");
+  });
+});
+
+describe("short deadline", () => {
+  it("reads like design's examples, and leaves unknown shapes alone", () => {
+    expect(formatShortDeadline("2026-10-27 09:00", "vi")).toBe("09:00 27/10");
+    expect(formatShortDeadline("2026-10-27 09:00", "en")).toBe("Oct 27, 09:00");
+    expect(formatShortDeadline("soon", "vi")).toBe("soon");
   });
 });

@@ -4,12 +4,13 @@ import { ApiError } from "../api/client";
 import type {
   RenderedError,
   StorageApplyResult,
+  StorageAttention,
   StorageItem,
   StoragePlan,
   StorageSection,
 } from "../api/types";
 import { getLocale, t, tpOptional } from "../i18n";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatShortDeadline } from "../lib/format";
 import { untrustedText } from "../lib/safeText";
 
 const SECTIONS: StorageSection[] = ["manual", "auto", "kept"];
@@ -38,11 +39,25 @@ function consequence(item: StorageItem): string | undefined {
 }
 
 function reason(item: StorageItem): string | undefined {
-  if (item.lock_reason)
-    return filled(["storage", "lock_reason", item.lock_reason], item.lock_params ?? {});
+  if (item.lock_reason) {
+    const p = { ...(item.lock_params ?? {}) };
+    if (typeof p.until === "string") p.until = formatShortDeadline(p.until); // "09:00 27/10" (design)
+    return filled(["storage", "lock_reason", item.lock_reason], p);
+  }
   if (item.protected_reason)
     return filled(["storage", "protected_reason", item.protected_reason], {});
   return undefined;
+}
+
+/** Reminder copy (storage.attention.<code>), else the server's own rendered sentence. */
+function attentionText(a: StorageAttention): string {
+  return (
+    filled(["storage", "attention", a.code], {
+      node: untrustedText(a.node, 80),
+      run: untrustedText(a.run_id, 80),
+      until: formatShortDeadline(a.resume_until),
+    }) ?? untrustedText(a.message, 300)
+  );
 }
 
 const gb = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v.toFixed(1));
@@ -152,6 +167,16 @@ export function StoragePanel() {
           <p>{plan.error.what}</p>
         </div>
       )}
+      {plan.attention?.map((a) => (
+        <div
+          key={`${a.code}:${a.run_id}`}
+          className="error-card warn"
+          role="status"
+          data-code={a.code}
+        >
+          <p>{attentionText(a)}</p>
+        </div>
+      ))}
       {notice && <p className="banner">{notice}</p>}
       {outcome?.kind === "busy" && (
         <p className="banner" role="status">

@@ -27,13 +27,35 @@ describe("StoragePanel", () => {
     expect(screen.getByText(/Bộ nhớ đệm đầy/)).toBeTruthy(); // DISK-003 rendered by the server
   });
 
+  it("reminds about an interrupted run close to its resume deadline, and says why its checkpoint is kept", async () => {
+    const { container } = await setup();
+    const card = container.querySelector('[data-code="RUN_INTERRUPTED_EXPIRING"]');
+    expect(card?.textContent).toContain('Bước "Dạy model bằng LoRA" (run "r-int")');
+    expect(card?.textContent).toContain("trước 09:00 14/10");
+    expect(card?.textContent).not.toMatch(/\{\w+\}/);
+    const kept = row(container, "r-int/checkpoints/epoch_0_step_10");
+    expect(kept.querySelector("input[type=checkbox]")).toBeNull();
+    expect(kept.textContent).toContain("tới 09:00 14/10");
+  });
+
+  it("falls back to the server sentence when the app has no copy for a reminder code", async () => {
+    const { api } = await import("../src/api");
+    const real = await api.storagePlan("vi");
+    real.attention = [
+      { code: "NEW_CODE", run_id: "r", node: "n", resume_until: "", message: "Câu từ server." },
+    ];
+    vi.spyOn(api, "storagePlan").mockResolvedValue(real);
+    await setup();
+    expect(screen.getByText("Câu từ server.")).toBeTruthy();
+  });
+
   it("shows how much the kept section holds once sizes are known", async () => {
     const { api } = await import("../src/api");
     const real = await api.storagePlan("vi");
     real.items = real.items.map((i) => (i.section === "kept" ? { ...i, size_gb: 31.5 } : i));
     vi.spyOn(api, "storagePlan").mockResolvedValue(real);
     await setup();
-    expect(screen.getByText("Đang giữ 31.5 GB")).toBeTruthy();
+    expect(screen.getByText("Đang giữ 63.0 GB")).toBeTruthy(); // 2 kept items × 31.5
   });
 
   it("locks an item that needs typing but has no confirm_text (it could never pass)", async () => {

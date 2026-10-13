@@ -165,6 +165,43 @@
       "confirm_required": true,
       "confirm_text": "n1",
       "event_type": "checkpoint_pruned"
+    },
+    {
+      "item_id": "r-int/checkpoints/epoch_0_step_10",
+      "source": "checkpoint",
+      "section": "kept",
+      "auto": false,
+      "group": "trained_model",
+      "display_name": null,
+      "display_key": "storage.item.checkpoint_of_run",
+      "display_params": {
+        "run_name": "r-int",
+        "checkpoint": "epoch_0_step_10"
+      },
+      "size_gb": null,
+      "run_id": "r-int",
+      "action": "keep",
+      "protected_reason": null,
+      "lock_reason": "RUN_INTERRUPTED",
+      "lock_params": {
+        "run": "r-int",
+        "until": "2026-10-14 09:00"
+      },
+      "regenerable": false,
+      "consequence_code": null,
+      "consequence_params": {},
+      "confirm_required": false,
+      "confirm_text": null,
+      "event_type": "checkpoint_pruned"
+    }
+  ],
+  "attention": [
+    {
+      "code": "RUN_INTERRUPTED_EXPIRING",
+      "run_id": "r-int",
+      "node": "Dạy model bằng LoRA",
+      "resume_until": "2026-10-14 09:00",
+      "message": "Bước \"Dạy model bằng LoRA\" (run \"r-int\") bị gián đoạn. Hãy chạy tiếp trước 09:00 14/10; sau mốc đó app dọn các bản lưu cũ, chỉ giữ lại bản lưu cuối cùng."
     }
   ],
   "error": {

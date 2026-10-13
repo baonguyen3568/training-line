@@ -103,3 +103,18 @@ export function estimateLine(est: ValidationResult["estimate"]): string {
   const tail = missing.length ? ` · ${t("estimate.missing", { names: missing.join(", ") })}` : "";
   return `${t("preflight.estimate_known", { parts: known.join(" · ") })}${tail}`;
 }
+
+/**
+ * Server local time "YYYY-MM-DD HH:MM" in the short form design uses for deadlines: vi "09:00 27/10",
+ * en "Oct 27, 09:00". Anything else is shown as given.
+ */
+export function formatShortDeadline(value: string, locale: string = getLocale()): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(value);
+  if (!m) return value;
+  const [, y, mo, d, h, mi] = m;
+  if (locale === "vi") return `${h}:${mi} ${d}/${mo}`;
+  const day = new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }).format(
+    new Date(Number(y), Number(mo) - 1, Number(d)),
+  );
+  return `${day}, ${h}:${mi}`;
+}
