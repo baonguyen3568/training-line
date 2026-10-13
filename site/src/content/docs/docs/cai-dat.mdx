@@ -1,18 +1,88 @@
 ---
 title: Cài đặt và chạy app
-description: Cài từ mã nguồn, dựng image train và mở giao diện trên máy của bạn.
+description: Máy cần gì, cách cài từ mã nguồn, dựng image train, mở giao diện và đọc trang Cài đặt.
 sidebar:
   order: 2
 sources:
+  - .team/knowledge/research.md
+  - .team/proposals/005-storage-retention-policy.md
+  - .team/contracts/S-4-preflight.md
+  - src/vlm_pipeline/app/settings_api.py
+  - src/vlm_pipeline/app/storage_scheduler.py
   - src/vlm_pipeline/app/server.py
   - scripts/dev/app.sh
   - src/vlm_pipeline/app/storage.py
   - docker/automodel-2.Dockerfile
   - docker/IMAGES.lock
+numbers_without_source: ["74"]  # 8,1 × 3 + 50, computed from the formula shown on the page
 ---
 import Hint from '~/components/Hint.astro';
 
-Hiện chỉ có cách cài **từ mã nguồn**. Xem [Yêu cầu hệ thống](/docs/yeu-cau-he-thong/) trước.
+Hiện chỉ có cách cài **từ mã nguồn**. Đọc mục [Trước khi cài](#yeu-cau-he-thong) trước để biết máy của bạn có chạy được không.
+
+<a id="yeu-cau-he-thong"></a>
+
+## Trước khi cài
+
+App hiện được phát triển và kiểm thử trên **một loại máy duy nhất: NVIDIA DGX Spark**. Các cấu hình khác chưa được kiểm thử, nên trang này chỉ ghi những gì đã chạy thật.
+
+### Phần cứng đã kiểm thử
+
+| Hạng mục | Cấu hình |
+|---|---|
+| Máy | NVIDIA DGX Spark, 1 GPU GB10 |
+| Kiến trúc CPU | ARM 64-bit (aarch64) |
+| Bộ nhớ | 128 GB, dùng chung cho CPU và GPU |
+| Driver và CUDA | Driver 580 (đã thử bản 580.142), CUDA 13 |
+| Ổ đĩa trống cho dự án | Nên từ 500 GB (xem bên dưới) |
+
+Vì sao máy 128 GB vẫn có lúc báo thiếu bộ nhớ: xem [Phần cứng và bộ nhớ](/docs/phan-cung-va-bo-nho/).
+
+### Phần mềm
+
+| Thành phần | Yêu cầu |
+|---|---|
+| Hệ điều hành | Linux aarch64 (DGX OS) |
+| Docker và NVIDIA Container Toolkit | Bản đi kèm DGX OS; việc train chạy trong container |
+| Python | `3.12`, cài và quản lý bằng `uv` |
+| Node.js | `22.12` trở lên, chỉ cần khi tự build giao diện |
+| Image train | `vlm-automodel:26.08-5`, dựng từ image `nvcr.io/nvidia/nemo-automodel:26.08` bản arm64 |
+
+Mọi image và thư viện phải có bản **arm64**. Image gốc được ghim theo mã băm (digest), không dùng tag có thể bị đổi nội dung.
+
+<Hint title="Vì sao không dùng thẳng image của NVIDIA?">
+Image gốc thiếu vài thư viện xử lý ảnh mà Nemotron Parse cần, và có một số lỗi chúng tôi đã vá. Mỗi bản vá được kiểm mã băm khi build; bản vá lạ làm build thất bại.
+</Hint>
+
+### Dung lượng ổ đĩa
+
+Ước lượng cho các model hiện có trong app:
+
+| Hạng mục | Ước lượng |
+|---|---|
+| Model tải về (Qwen3.5 0.8B, 2B, 4B, 9B) | khoảng 36 GB |
+| Image gốc của NVIDIA | khoảng 29,4 GB |
+| Image train của app (dựng trên image gốc, phần thêm rất nhỏ) | khoảng 29,6 GB |
+| Dữ liệu đánh giá | khoảng 10–30 GB |
+| Checkpoint LoRA | vài trăm MB mỗi lần chạy |
+| Checkpoint khi fine-tune toàn bộ Nemotron Parse v1.1 (đo thật) | khoảng 8,1 GB mỗi checkpoint |
+| Model đã gộp, bản nén và engine | khoảng 60 GB |
+| Kết quả tạm của các node (giới hạn trên) | tối đa 200 GB |
+| **Tổng trường hợp xấu nhất** | **khoảng 430 GB** |
+
+Mức cảnh báo dung lượng của dự án: xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/).
+
+#### Ổ đĩa cần trống trước khi train
+
+Trước khi train, app kiểm ổ đĩa còn đủ chỗ cho các checkpoint sắp ghi:
+
+**dung lượng một checkpoint × (số checkpoint giữ lại + 1) + 50 GB dự phòng**
+
+Ví dụ: giữ 2 checkpoint 8,1 GB thì cần khoảng 8,1 × 3 + 50 ≈ 74 GB trống.
+
+### Trên máy dùng chung
+
+App được thiết kế để chạy cạnh các ứng dụng khác: chỉ ghi và xoá trong thư mục dự án, không dùng `sudo`. Các quy tắc chạy an toàn (mỗi lúc một tác vụ nặng, kiểm bộ nhớ): xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
 
 ## 1. Lấy mã nguồn và cài Python
 
@@ -80,6 +150,44 @@ Nếu quên `--worker container`, app chỉ **giả lập**: giao diện chạy 
 Khi khởi động, app in **một lần** đường dẫn đăng nhập dạng `http://127.0.0.1:7870/?token=…`. Mở đường dẫn này bằng trình duyệt trên cùng máy. App chỉ nghe ở `127.0.0.1`, không mở ra mạng ngoài.
 
 App tự kiểm tra bộ nhớ, ổ đĩa và GPU trước mỗi tác vụ nặng. Muốn tự kiểm bằng dòng lệnh: xem [Xử lý sự cố](/docs/xu-ly-su-co-bo-nho/#tu-kiem-tra).
+
+## Trang Cài đặt
+
+Mở biểu tượng bánh răng trong app để vào trang **Cài đặt**. Trang có hai phần.
+
+### Kết nối
+
+Nơi bạn nhập token (ví dụ token Hugging Face để tải model cần đăng nhập). Token chỉ **ghi được, không đọc lại được**: sau khi lưu, app chỉ hiện 4 ký tự cuối và thời điểm cập nhật. Muốn đổi thì nhập token mới; muốn bỏ thì bấm xoá.
+
+### Do quản trị viên đặt
+
+Các mục có **biểu tượng khoá** do quản trị viên của máy quyết định. Bạn chỉ xem được, không sửa được trong app:
+
+| Mục | Ý nghĩa |
+|---|---|
+| Kiểu cài đặt | Máy cá nhân hay máy dùng chung. Máy dùng chung có quy tắc chặt hơn |
+| Lịch dọn dẹp | App có tự dọn dữ liệu cũ theo lịch không, hay chỉ liệt kê. Xem [Chính sách lưu giữ](/docs/chinh-sach-luu-giu/) |
+| Duyệt khi xoá nhiều | Xoá quá ngưỡng trong 24 giờ có cần quản trị viên duyệt không. Xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/) |
+| Ngưỡng cần duyệt | Nếu tổng dung lượng xoá trong 24 giờ vượt mức này thì cần quản trị viên duyệt |
+| Node bên thứ 3 được phép | Các node ngoài thư viện chuẩn được cài trên máy này (tính năng cài node bên thứ ba sẽ có ở bản sau) |
+
+Mục ghi "Mặc định của app" nghĩa là quản trị viên chưa đặt và app dùng giá trị an toàn của nó. Muốn đổi, hãy liên hệ quản trị viên.
+
+<details>
+<summary>Dành cho quản trị viên</summary>
+
+Các giá trị này nằm trong `~/.config/ntc-training/policy.toml` của tài khoản chạy app. App **chỉ đọc**, không bao giờ ghi file này. App bỏ qua file nếu nó là symlink, hoặc nếu file hay thư mục chứa nó cho phép người khác ghi; khi đó app dùng mặc định an toàn (như máy dùng chung, không tự xoá). Biến môi trường chỉ được làm quy tắc **chặt hơn**, không nới được giá trị trong file.
+
+```toml
+[deployment]
+profile = "shared_dev"   # hoặc "personal"
+
+[storage]
+schedule = "dry_run"     # "off", "dry_run" hoặc "apply"
+```
+
+Đổi file xong, khởi động lại app để áp dụng.
+</details>
 
 ## Dữ liệu được lưu ở đâu
 
