@@ -1,6 +1,6 @@
 # 017 — Một job mỗi run dir: attempt dir cho retry/resume, mount thu hẹp (M3-W)
 
-- Tác giả: bao-backend · 2026-10-13 · Trạng thái: PM đồng ý hướng đi 2026-10-13 (Q3 chốt); Q1 chờ security, Q2 chờ cleanup
+- Tác giả: bao-backend · 2026-10-13 · Trạng thái: PM đồng ý hướng đi 2026-10-13 (Q3 chốt); Q1 security chốt có điều kiện C1–C6, Q2 chờ cleanup
 - Liên quan: ADR-015, P015 §3.2, `common/run_claims.py` (7f18102), `common/host_paths.py`, `runner/protocol.py`
 
 ## 1. Vấn đề
@@ -42,8 +42,19 @@ CLI (`train/smoke.py`, `jobrun_cli`) đã đúng: run_id mới mỗi lần, resu
 - **Eval / bench / quantize worker**: run dir con theo luật mới.
 
 ## 4. Câu hỏi mở
-- Q1 (security): mount ckpt attempt trước ro vào job mới. Job mới đọc file do job cũ viết, nhưng ckpt là safetensors +
-  JSON, engine đọc như dữ liệu. Chấp nhận được không?
+- Q1 (security) — CHỐT 2026-10-13: CHẤP NHẬN có điều kiện (ckpt = đường thực thi code qua pickle; cùng miền tin cậy):
+  - C1 không leo quyền: attempt nguồn cùng `<nid>-<key16>` + cùng image id (digest trong run.json do HOST ghi). Quyền của
+    job mới ≤ job cũ. Image đổi → không resume, chạy từ đầu, báo rõ.
+  - C2 host chọn path: liệt kê thư mục step bằng regex `^epoch_\d+_step_\d+$`, không theo LATEST/symlink do job viết.
+    resume_from_step = int parse từ tên thư mục. Nếu phải đọc JSON thì cap 1 MB + lstat.
+  - C3 mount hẹp: chỉ thư mục ckpt step đó, ro. Không mount attempt dir, `.cache/`, logs, result.json. Source qua
+    check_mount_source, và host walk cây ckpt: symlink hoặc file không-regular → từ chối.
+  - C4 remote code từ base đã pin (snapshot/prepared), không từ config.json/auto_map/*.py trong ckpt. Có test: .py bẫy
+    trong ckpt không bao giờ được import.
+  - C5 không cần secret_scan trước mount; scan_tokens cuối job vẫn giữ.
+  - C6 attempt nguồn có lease tới khi attempt mới kết thúc (chờ Q2 cleanup).
+  - Regression bước 3: symlink trong ckpt → từ chối; image khác → không resume; argv chỉ có mount ckpt step ro;
+    resume_from_step không đọc từ file do job viết.
 - Q2 (cleanup): giữ attempt cũ bao lâu khi attempt mới đã completed?
 - Q3 (PM) — CHỐT: tối đa 10 attempt mỗi node; lần thứ 11 dừng, báo lỗi rõ kèm gợi ý "đặt lại bước này" (xoá các attempt qua panel Dung lượng).
 
