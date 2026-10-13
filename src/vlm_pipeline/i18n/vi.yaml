@@ -1474,6 +1474,7 @@ download:
   dialog_title: Tải về máy
   intro: 'App sẽ tải "{name}" (khoảng {size_gb} GB) về máy này. Sau đó các bước chạy dùng bản trên máy, không cần mạng.'
   intro_prepare: '"{name}" đã có trên máy nhưng cần thêm một bước chuẩn bị trước khi chạy. App làm bước đó, không tải lại phần đã có.'
+  prepare_only: Chỉ cần chuẩn bị, không tải lại
   estimate: Dự kiến khoảng {duration}, tuỳ tốc độ mạng.
   license_lead: "Giấy phép:"
   license_accept: Tôi đã đọc và đồng ý với giấy phép này

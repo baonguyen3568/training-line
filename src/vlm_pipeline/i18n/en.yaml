@@ -1474,6 +1474,7 @@ download:
   dialog_title: Download to this machine
   intro: 'The app will download "{name}" (about {size_gb} GB) to this machine. After that, steps use the local copy and need no network.'
   intro_prepare: '"{name}" is already on this machine but needs an extra preparation step before it can run. The app does that step without downloading again.'
+  prepare_only: Only needs preparing, no download
   estimate: Expected to take about {duration}, depending on your connection.
   license_lead: "License:"
   license_accept: I have read and accept this license
