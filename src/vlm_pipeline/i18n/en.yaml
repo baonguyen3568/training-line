@@ -1119,7 +1119,6 @@ standards:
     too_few_samples: "Fewer than {below} training samples. The model may memorise instead of learning the task."
     one_epoch: "One pass is enough to see the whole pipeline run, but the model usually has not learned enough yet. For a real run, choose 3 passes."
   quant:
-    calib_size: "Calibration size {value} is outside the recommended range ({min}–{max}). Too few makes the quantized model less accurate; too many takes longer without helping."
     calib_from_heldout: "Calibration data comes from the benchmark set. Use training data so the post-quantization score stays trustworthy."
     eval_downstream: "The quantized model is not scored. Quantization can make it weaker than the original; add a Benchmark step after it to know for sure."
   data:

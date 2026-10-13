@@ -1119,7 +1119,6 @@ standards:
     too_few_samples: "Chỉ có dưới {below} mẫu dữ liệu học. Model dễ học thuộc thay vì học cách làm."
     one_epoch: "1 lượt đủ để xem cả pipeline chạy, nhưng model thường chưa học đủ. Khi chạy thật, nên chọn 3 lượt."
   quant:
-    calib_size: "Số mẫu hiệu chỉnh {value} nằm ngoài khoảng khuyến nghị ({min}–{max}). Ít quá thì bản nén kém chính xác, nhiều quá thì chạy lâu mà không tốt hơn."
     calib_from_heldout: "Dữ liệu hiệu chỉnh đang lấy từ bộ chấm điểm. Hãy dùng dữ liệu học để điểm sau khi nén còn đáng tin."
     eval_downstream: "Model sau khi nén chưa được đo điểm. Nén có thể làm model kém hơn bản gốc; hãy nối thêm bước Đo điểm phía sau để biết chắc."
   data:

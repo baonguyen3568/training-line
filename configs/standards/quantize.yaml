@@ -3,16 +3,10 @@
 # message in the `standards.` i18n namespace, non-empty source (repo paths must exist). Owner of content: bao-research.
 # Hard limits of the quantize worker (format vs model, vision / KV-cache quantization, calibration wire) are NOT
 # here: validate calls quantize.scope.check_support directly (b563b29), one source with the worker. This file keeps
-# recommendations and rules that are not about worker support.
+# recommendations and rules that are not about worker support. The calib size has no rule: the param only offers
+# 128 | 512, both fine (A/B 2026-10-13, .team/proposals/001-stack-model-catalog.md B-4).
 schema_version: 1
 rules:
-  - id: QUANT-CALIB-SIZE
-    applies_to: {node: quantize.modelopt_ptq, param: calib_size}
-    check: {kind: range, min: 128, max: 512}
-    level: warn
-    message: standards.quant.calib_size
-    source: "ModelOpt hf_ptq default calib_size 512; app default 128: calib 32/128/512 gave the same parity on Qwen3.5-0.8B FP8 (A/B 2026-10-13, .team/proposals/001-stack-model-catalog.md B-4)"
-
   - id: QUANT-CALIB-NOT-HELDOUT
     applies_to: {node: quantize.modelopt_ptq, port: calib_data}
     check: {kind: dataset_split_not_heldout}
