@@ -95,7 +95,10 @@ def test_validate_renders_text_but_keeps_code(client: TestClient) -> None:
     assert errors[0]["code"] == "CFG-003"
     assert errors[0]["title_key"] == "error.CFG-003.title"
     assert errors[0]["title"]
-    assert client.post("/api/graphs/validate", json={"nodes": []}).json() == {"errors": []}
+    empty = client.post("/api/graphs/validate", json={"nodes": []}).json()
+    assert empty["errors"] == []
+    assert empty["estimate"]["duration_min"] is None  # nothing measured for this graph: null, never a guess
+    assert empty["estimate"]["source"] == "unknown"
 
 
 def test_invalid_graph_is_not_started(client: TestClient) -> None:

@@ -114,6 +114,31 @@ def _start_graph_run(services: Services, bus: EventBus, workflow: dict[str, Any]
     return graph_run_id
 
 
+def _train_image(services: Services) -> str | None:
+    """The image real train jobs run in; None for the demo (fake) worker: its runs say nothing about real speed."""
+    worker = getattr(getattr(services, "executor", None), "worker", None)
+    image = getattr(worker, "image", None)
+    return image if isinstance(image, str) and getattr(services, "worker", "container") != "fake" else None
+
+
+def _workflow_estimate(services: Services, workflow: dict[str, Any]) -> dict[str, Any]:
+    """RAM/disk from the catalog (as the gallery), duration from measured runs; unknown stays null, never a guess."""
+    from vlm_pipeline.app.estimates import workflow_duration
+    from vlm_pipeline.app.templates import catalog_estimate
+
+    base = catalog_estimate(workflow)
+    root, image = getattr(services, "root", None), _train_image(services)
+    duration = workflow_duration(root, workflow, image) if root is not None and image is not None else None
+    return {
+        "ram_gb_peak": base["ram_gb"],
+        "disk_gb": base["disk_gb"],
+        "duration_min": duration["duration_min"] if duration else None,
+        "gpu_exclusive": base["gpu_exclusive"],
+        "source": base["source"],
+        "duration": duration,  # per train node {steps, minutes, based_on} + heavy nodes without a measurement
+    }
+
+
 def _register_graph_routes(app: FastAPI, services: Services, bus: EventBus) -> None:
     @app.get("/api/node-types")
     @app.get("/api/nodes")
@@ -123,7 +148,8 @@ def _register_graph_routes(app: FastAPI, services: Services, bus: EventBus) -> N
     @app.post("/api/graphs/validate")
     def validate(workflow: Workflow, locale: Locale = i18n.DEFAULT_LOCALE) -> dict[str, Any]:
         labels = _labels(workflow, services.registry, locale)
-        return {"errors": [_render_issue(i, locale, labels) for i in services.validate(workflow)]}
+        errors = [_render_issue(i, locale, labels) for i in services.validate(workflow)]
+        return {"errors": errors, "estimate": _workflow_estimate(services, workflow)}
 
     @app.post("/api/runs", status_code=202)
     def start_run(workflow: Workflow) -> dict[str, Any]:
@@ -147,7 +173,7 @@ def _register_template_routes(app: FastAPI, services: Services) -> None:
 
     @app.get("/api/templates")
     def list_templates() -> list[dict[str, Any]]:
-        return [template_meta(t) for t in load_templates(root)]
+        return [template_meta(t) for t in load_templates(root, image=_train_image(services))]
 
     @app.get("/api/templates/{template_id}")
     def get_template(template_id: str) -> dict[str, Any]:

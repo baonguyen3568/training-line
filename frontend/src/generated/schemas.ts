@@ -21,6 +21,7 @@ export type RunManifest = {
   config_path?: string | null;
   container_digest?: string | null;
   container_image?: string | null;
+  container_started_at?: number | null;
   dataset?: string | null;
   dataset_revision?: string | null;
   ended_at?: number | null;

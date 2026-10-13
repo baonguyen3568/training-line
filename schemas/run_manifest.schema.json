@@ -90,6 +90,18 @@
       "default": null,
       "title": "Container Image"
     },
+    "container_started_at": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Container Started At"
+    },
     "dataset": {
       "anyOf": [
         {

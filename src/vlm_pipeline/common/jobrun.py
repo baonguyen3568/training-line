@@ -496,6 +496,7 @@ def run_job(
                 "git_dirty": dirty if manifest.git_dirty is None else manifest.git_dirty,
                 "container_image": manifest.container_image or job.image,
                 "container_digest": manifest.container_digest or pinned_id,  # what the gate approved = what runs
+                "container_started_at": time.time(),  # after the memory wait and the lock: no queueing in it
             }
         )
         write_manifest(run_dir, manifest)

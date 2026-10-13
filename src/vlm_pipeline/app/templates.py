@@ -1,7 +1,7 @@
 """Template gallery (P010): ``configs/templates/<id>.json`` = gallery metadata + a ready-to-open workflow.
 
-Estimates are derived from the model catalog (``ram_gb_train`` + ``ram_source``) of the template's base model;
-nothing is invented (unknown -> nulls, source "unknown").
+Estimates are derived from the model catalog (``ram_gb_train`` + ``ram_source``) of the template's base model and,
+for ``minutes``, from measured train runs (``app.estimates``); nothing is invented (unknown -> nulls).
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ class TemplateFile(BaseModel):
     workflow: dict[str, Any]
 
 
-def _estimate(workflow: dict[str, Any]) -> dict[str, Any]:
+def catalog_estimate(workflow: dict[str, Any]) -> dict[str, Any]:
     catalog = load_catalog()
     for node in workflow.get("nodes", []):
         if node.get("type") == "model.hf_pick":
@@ -49,17 +49,23 @@ def _estimate(workflow: dict[str, Any]) -> dict[str, Any]:
     return {"ram_gb": None, "disk_gb": None, "minutes": None, "gpu_exclusive": True, "source": "unknown"}
 
 
-def load_templates(root: Path, *, include_hidden: bool = False) -> list[dict[str, Any]]:
+def load_templates(root: Path, *, include_hidden: bool = False, image: str | None = None) -> list[dict[str, Any]]:
     """Templates (full, with workflow), sorted by ``order`` then id. Invalid files raise (tests catch them).
 
     Hidden templates are left out unless ``include_hidden`` (tests and tooling): the API never serves them.
+    ``image``: the real train image; with it, ``estimate.minutes`` comes from measured runs (app.estimates).
     """
     out = []
     for path in (root / TEMPLATE_DIR).glob("*.json"):
         tpl = TemplateFile.model_validate(json.loads(path.read_text(encoding="utf-8")))
         if tpl.hidden and not include_hidden:
             continue
-        out.append({**tpl.model_dump(), "estimate": _estimate(tpl.workflow)})
+        estimate = catalog_estimate(tpl.workflow)
+        if image is not None:
+            from vlm_pipeline.app.estimates import workflow_duration
+
+            estimate["minutes"] = workflow_duration(root, tpl.workflow, image)["duration_min"]
+        out.append({**tpl.model_dump(), "estimate": estimate})
     return sorted(out, key=lambda t: (t["order"], t["id"]))
 
 
