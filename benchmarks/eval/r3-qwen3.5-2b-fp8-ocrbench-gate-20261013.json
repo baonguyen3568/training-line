@@ -1,0 +1,49 @@
+{
+ "purpose": "R3 quant gate (P002 B3, configs/eval/gates.yaml quant_vs_parent.fp8): Qwen3.5-2B FP8 (ModelOpt PTQ, per-tensor, calib 128, through the app node) vs its bf16 parent, paired on the same OCRBench questions, same vLLM engine settings",
+ "models": {
+  "reference_bf16": "Qwen/Qwen3.5-2B@15852e8c16360a2fea060d615a32b45270f8a8fc",
+  "candidate_fp8": "outputs/graph/runs/n3-beaf85b927870c8d/ptq/quantized (quant_method modelopt; vision + lm_head kept bf16; research)"
+ },
+ "benchmark": {
+  "name": "OCRBench",
+  "dataset": "echo840/OCRBench@92a54bd1384387c178d5a07140a2d85e0a3d12e1 (eval_only)",
+  "subset": "regression_500 (configs/eval/subsets/regression_500/ocrbench.json, q_sha256 verified)",
+  "data_copy_manifest_sha256": "e6e6f4460c621bb515ef81744f85dd854a33d75599041b3c6028f04039f29a47",
+  "scoring": "vlm_pipeline.eval.ocrbench.score_one (reference substring rule)",
+  "prompt": "question verbatim (VLMEvalKit protocol), enable_thinking=False",
+  "citation": "Liu et al., OCRBench: On the Hidden Mystery of OCR in Large Multimodal Models, Science China Information Sciences 2024 (arXiv:2305.07895)",
+  "comparability": "measured in this app (vLLM, no thinking, 500-question subset): NOT comparable with model-card OCRBench numbers; only the paired FP8 - bf16 delta is the gate number"
+ },
+ "engine": {
+  "vllm": "0.31.0",
+  "image": "vlm-vllm:0.31.0",
+  "container_digest": "sha256:bbe7045055707d1027079ed01cca40812578a235c56032d85c16108ad473384c",
+  "kv_cache_gb": 8.0,
+  "chunk": 64,
+  "max_num_seqs": 256,
+  "enforce_eager": true,
+  "sampling": "greedy (temperature 0, n 1), max_tokens 256",
+  "pixels": {"min_pixels": 200704, "max_pixels": 1003520},
+  "num_preemptions": {"bf16_a": 0, "fp8": 0},
+  "driver": "scripts/qa/ocrbench_vllm_gate.py (compare refuses pairs whose engine settings differ other than quantization)"
+ },
+ "runs": {
+  "bf16_a": "20261013-2053-ocrbench-q2b-bf16-a-fb36",
+  "bf16_b_noise": "20261013-2101-ocrbench-q2b-bf16-b-98b6",
+  "fp8": "20261013-2108-ocrbench-q2b-fp8-888e"
+ },
+ "results": {
+  "accuracy_pct": {"bf16_a": 88.2, "bf16_b": 88.0, "fp8": 87.6},
+  "truncated_pct": {"bf16_a": 1.8, "fp8": 2.0},
+  "gen_tokens_mean": {"bf16_a": 43.1, "fp8": 43.6},
+  "fp8_minus_bf16": {"delta": -0.6, "ci95": [-1.8, 0.4], "n": 500, "resamples": 1000, "seed": 0},
+  "engine_noise_bf16_b_minus_a": {"delta": -0.2, "ci95": [-0.8, 0.4], "changed_answers": 3},
+  "gate": {"status": "PASS", "rule": "fp8: mean delta >= -1 PASS, [-2, -1) WARN, < -2 or any benchmark < -5 FAIL; WARN uncertain_run_full if CI low < -2", "reasons": []}
+ },
+ "speed_note": "load 206.5 s (bf16) vs 233.2 s (fp8); generate 500 questions 230.1 / 193.4 s (bf16 a/b) vs 223.3 s (fp8), enforce_eager on a shared GB10: no FP8 speed-up measured here; a CUDA-graph latency benchmark is a separate item (bench R3)",
+ "caveats": [
+  "vLLM batched greedy is not bit-reproducible run to run: two identical bf16 runs differ on 3/500 answers (-0.2 points); the FP8 delta (-0.6) is within about 3x that noise and its CI contains 0",
+  "one benchmark only (OCRBench subset); the P002 forgetting check on general benchmarks is not part of this gate yet",
+  "single quantization run (calib 128); calibration sensitivity not measured for 2B"
+ ]
+}
