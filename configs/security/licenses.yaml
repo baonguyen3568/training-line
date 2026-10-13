@@ -333,6 +333,39 @@ assets:
     scope: [serve]
     reviewer: bao-security  # uv.lock (ec726ac) pypi.org only, upload >= 7 days, OSV none 2026-10-12
     date: 2026-10-12
+  - repo_id: pypi:cryptography
+    kind: code
+    version: 50.0.2
+    license: Apache-2.0 OR BSD-3-Clause
+    license_url: https://pypi.org/project/cryptography/50.0.2/
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "keep copyright + license text in THIRD_PARTY_LICENSES"
+    scope: [serve]
+    reviewer: bao-security  # D-7 settings secrets (AESGCM only); abi3 wheels aarch64+x86_64, released 2026-09-30, fixes CVE-2026-69247/69248/69249
+    date: 2026-10-13
+  - repo_id: pypi:cffi
+    kind: code
+    version: 2.1.1
+    license: MIT-0
+    license_url: https://pypi.org/project/cffi/2.1.1/
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "none (MIT-0); keep notice as courtesy"
+    scope: [serve]
+    reviewer: bao-security  # transitive of cryptography
+    date: 2026-10-13
+  - repo_id: pypi:pycparser
+    kind: code
+    version: 3.0
+    license: BSD-3-Clause
+    license_url: https://pypi.org/project/pycparser/3.0/
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "keep copyright + license text in THIRD_PARTY_LICENSES"
+    scope: [serve]
+    reviewer: bao-security  # transitive of cffi
+    date: 2026-10-13
   - repo_id: pypi:pillow
     kind: code
     version: 12.3.0

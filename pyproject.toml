@@ -8,6 +8,7 @@ requires-python = ">=3.12,<3.13"
 # Host-safe dependencies only. Heavy runtime libs (torch, transformers, nemo_automodel, modelopt, vllm, ...)
 # live in the NGC container images (docker/IMAGES.lock), never here (ADR-004 D1).
 dependencies = [
+    "cryptography==50.0.2",
     "fastapi>=0.142.2,<0.143",
     "pillow==12.3.0",
     "pydantic>=2.13,<3",
