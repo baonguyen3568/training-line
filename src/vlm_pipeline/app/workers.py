@@ -35,6 +35,13 @@ from vlm_pipeline.common.jobrun import (
     MemoryPreemptedBeforeStartError,
     run_job,
 )
+from vlm_pipeline.common.local_cache import (
+    PREPARED_DIRS,
+    dataset_missing,
+    hub_snapshot,
+    model_missing,
+    prepared_model_dir,
+)
 from vlm_pipeline.common.model_ref import PickedModel, is_model_ref, resolve_model_ref, write_model_ref
 from vlm_pipeline.common.run_log import log_tail
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest
@@ -54,7 +61,6 @@ from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path, templates_digest
 
 logger = logging.getLogger(__name__)
-PREPARED_DIRS = {"nemotron-parse-v1.1": "nemotron-parse-v1.1_fd1e3c6b"}  # train.prepare outputs (hash-verified)
 # Models whose AutoModel checkpoints cannot be resumed: a resume starts over instead of failing on every retry.
 # Empty since vlm-automodel:26.08-6 (patch 0005, BUG-003 closed: Parse resumes, also from 26.08-5 checkpoints).
 # Run dirs marked .not-resumable earlier stay so (graph.worker.NOT_RESUMABLE_MARKER).
@@ -89,15 +95,6 @@ class UnknownModelError(VlmPipelineError):
     """A model reference that is not a catalog model (validated params make this an internal error)."""
 
     code: ClassVar[str] = "SYS-000"
-
-
-def _hub_snapshot(root: Path, repo: str, revision: str, kind: str, *, catalog_id: str, size_gb: float) -> Path:
-    prefix = "models" if kind == "model" else "datasets"
-    path = root / ".cache" / "hf" / "hub" / f"{prefix}--{repo.replace('/', '--')}" / "snapshots" / revision
-    if not path.is_dir():  # NET-002: catalog_id + kind feed POST /api/downloads (G-5), size_gb the card
-        params = {"repo": repo, "reason": "not_cached", "catalog_id": catalog_id, "kind": kind, "size_gb": size_gb}
-        raise NotCachedError(f"{repo}@{revision} not in cache", params=params)
-    return path
 
 
 def caller_id() -> str:
@@ -276,15 +273,10 @@ class RealWorker:
 
     def _catalog_model_path(self, entry: CatalogEntry) -> Path:
         """Host dir of a catalog model: the pinned prepared copy (remote code) or the hub snapshot."""
-        if entry.remote_code == "pinned_prepared":
-            prepared = PREPARED_DIRS.get(entry.id)
-            path = self.root / ".cache" / "prepared" / (prepared or "") / "model"
-            if prepared is None or not (path / "config.json").is_file():
-                raise NotCachedError("prepared snapshot missing", params={
-                    "repo": entry.repo, "reason": "not_prepared", "catalog_id": entry.id, "kind": "model",
-                    "size_gb": entry.disk_gb})  # fmt: skip
-            return path
-        return _hub_snapshot(self.root, entry.repo, entry.revision, "model", catalog_id=entry.id, size_gb=entry.disk_gb)
+        if (missing := model_missing(self.root, entry)) is not None:  # validate warned already (NET-002)
+            raise NotCachedError(f"{entry.repo}@{entry.revision}: {missing['reason']}", params=missing)
+        prepared = prepared_model_dir(self.root, entry.id) if entry.remote_code == "pinned_prepared" else None
+        return prepared or hub_snapshot(self.root, "model", entry.repo, entry.revision)
 
     def base_of(self, model: ArtifactRef) -> CatalogEntry:
         """Catalog model a Model/Checkpoint artifact comes from: itself, or the base recorded in its run.json."""
@@ -329,7 +321,9 @@ class RealWorker:
         if entry is None:
             raise NotCachedError("dataset not in the catalog", params={"repo": repo, "reason": "not_pinned"})
         revision = entry.revision
-        path = _hub_snapshot(self.root, repo, revision, "dataset", catalog_id=entry.id, size_gb=entry.disk_gb)
+        if (missing := dataset_missing(self.root, entry)) is not None:
+            raise NotCachedError(f"{repo}@{revision} not in cache", params=missing)
+        path = hub_snapshot(self.root, "dataset", repo, revision)
         limit = int(getattr(job.params, "max_samples", 0) or 0)
         # The artifact is a small descriptor (snapshot + split + sample limit), so "quick run" sizes cost no copy.
         ref = DatasetRef(repo=repo, revision=revision, path=self.container_path(path), limit=limit)
@@ -733,6 +727,7 @@ def _run_id_of(artifact: ArtifactRef) -> str | None:
 
 __all__ = [
     "DEFAULT_TRAIN_IMAGE",
+    "PREPARED_DIRS",
     "NodeNotRunnableError",
     "NotCachedError",
     "RealWorker",

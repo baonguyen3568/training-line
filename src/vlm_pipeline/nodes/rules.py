@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from vlm_pipeline.common.catalog import load_catalog
+from vlm_pipeline.common.catalog import load_catalog, load_dataset_catalog
 from vlm_pipeline.common.heldout_data import is_heldout_folder
+from vlm_pipeline.common.local_cache import dataset_missing, model_missing
 from vlm_pipeline.data.local_folder import preview_folder
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ
@@ -183,5 +184,36 @@ def local_folder_preview(view: GraphView) -> Iterator[Issue]:
         yield Issue("DATA-006", severity="warn", node_id=node_id, param="path", params=params_out)
 
 
-RULES = (train_node_matches_model, export_needs_portable_model, heldout_data_never_trains, local_folder_preview)
+def catalog_assets_on_this_machine(view: GraphView) -> Iterator[Issue]:
+    """NET-002 (warn, P018 §3.1): a picked model / hub dataset the run needs is not downloaded (or not prepared) yet.
+
+    Same check and params as the run's NotCachedError (``common.local_cache``), so the UI can offer "download all
+    missing" before Run. A warning, not an error: the run itself says it again if nothing was downloaded.
+    """
+    if view.workspace is None:
+        return
+    root = view.workspace
+    for node_id, spec in view.specs.items():
+        params = view.params.get(node_id)
+        missing: dict[str, object] | None = None
+        if spec.type_id == MODEL_HF_PICK.type_id:
+            entry = load_catalog().get(str(getattr(params, "model", "")))
+            missing = model_missing(root, entry) if entry is not None else None
+            param = "model"
+        elif spec.type_id == "data.hf_load":
+            repo = getattr(params, "repo", None)
+            dataset = next((d for d in load_dataset_catalog().datasets if d.repo == repo), None)
+            missing = dataset_missing(root, dataset) if dataset is not None else None
+            param = "repo"
+        if missing is not None:
+            yield Issue("NET-002", severity="warn", node_id=node_id, param=param, params=missing)
+
+
+RULES = (
+    train_node_matches_model,
+    export_needs_portable_model,
+    heldout_data_never_trains,
+    local_folder_preview,
+    catalog_assets_on_this_machine,
+)
 __all__ = ["RULES", "input_kinds", "model_input", "origin_model_id"]
