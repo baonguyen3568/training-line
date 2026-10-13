@@ -39,7 +39,8 @@ export interface UiHint {
     | "number"
     | "toggle"
     | "textarea"
-    | "image_upload";
+    | "image_upload"
+    | "advanced"; // P016 §3 engine options (object); widget not built yet
   order?: number;
   preset?: boolean;
   advanced?: boolean;
@@ -71,7 +72,7 @@ export interface OptionMeta {
 }
 
 export interface ParamSchema {
-  type: "string" | "number" | "integer" | "boolean" | "array";
+  type: "string" | "number" | "integer" | "boolean" | "array" | "object"; // object: P016 `advanced`
   enum?: (string | number)[];
   maxLength?: number;
   pattern?: string;

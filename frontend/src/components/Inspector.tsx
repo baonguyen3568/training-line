@@ -119,6 +119,9 @@ function ParamField({
   const availGb = useSystem((s) => s.status?.mem_available_gb);
   const current = value ?? schema.default;
   const widget = schema["x-ui"]?.widget;
+  // P016 §3 `advanced` (engine options, object): its own widget fed by /api/node-types/{id}/advanced is not built
+  // yet; never render an object as a text box ("[object Object]") — the value is kept untouched.
+  if ((widget as string | undefined) === "advanced" || schema.type === "object") return null;
   if (widget === "image_upload") {
     return <ImageUpload id={id} label={label} value={String(current ?? "")} onChange={onChange} />;
   }
@@ -436,6 +439,8 @@ export function Inspector() {
       return vals.map(String).includes(String(cur));
     }) || fieldErrors(name).length > 0;
   const params = Object.entries(props)
+    // P016 `advanced` (object) has no widget yet: no row at all, not even its "?" help
+    .filter(([, s]) => s["x-ui"]?.widget !== "advanced" && s.type !== "object")
     .filter(([name, s]) => applies(name, s))
     .sort(([, a], [, b]) => (a["x-ui"]?.order ?? 99) - (b["x-ui"]?.order ?? 99));
   // "Chạy thử": a model with a fixed task (Nemotron-Parse) ignores the question, so do not ask it (B-7).
