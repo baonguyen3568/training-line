@@ -52,7 +52,7 @@ plugin chưa duyệt) đọc được `.env.local` nếu file nằm trong projec
 - `outputs/runs/<run_id>/` hoặc `outputs/graph/runs/<node_dir>/` → **rw** (chỉ thư mục của job đó);
 - `data/` + `.cache/prepared/` + HF hub cache → **ro**;
 - code `src/` → **ro** (overlay như hiện tại);
-- **không bao giờ** mount: `.env*`, `.team/`, `~/.config/vlm-app/`, `/var/run/docker.sock`, `$HOME`.
+- **không bao giờ** mount: `.env*`, `.team/`, `~/.config/ntc-training/` (trừ đúng file policy.toml, bind ro), `/var/run/docker.sock`, `$HOME`.
 - Đường dẫn nguồn là **host path**. Runner nhận `VLM_HOST_PROJECT_ROOT` từ `.env.local` (cấu hình triển khai, không lấy
   từ app). Runner resolve, đối chiếu dưới root đó, từ chối symlink ra ngoài.
 - **Symlink ở source bind mount (docker daemon theo symlink trên host):** runner mount data_root + src (ro) vào chính
@@ -112,11 +112,11 @@ và từ chối job download (fail-closed, giống D12 Simple mode).
 Config phân tầng: mặc định → `.env.local` → DB (`outputs/app.db`, bảng settings), chỉnh qua UI. Yêu cầu security:
 - **Phân loại field** ngay trong schema settings: `public` (port, ngôn ngữ, quota cá nhân…), `secret` (HF_TOKEN, NGC_API_KEY,
   WANDB_API_KEY), `admin_policy` (`deployment.profile`, approval policy/threshold, plugin allowlist, schedule apply).
-  - `admin_policy` **không có** API ghi và không hiện như ô sửa trong UI. Chỉ đọc từ `~/.config/vlm-app/policy.toml`
+  - `admin_policy` **không có** API ghi và không hiện như ô sửa trong UI. Chỉ đọc từ `~/.config/ntc-training/policy.toml`
     (D17). Env/DB chỉ được siết. API nhận key `admin_policy` thì 403, không lưu gì.
-- **Secret trong DB phải mã hoá**: AEAD (AES-256-GCM, `cryptography` đã qua review dep, hoặc libsodium secretbox),
+- **Secret trong DB phải mã hoá**: AEAD (AES-256-GCM, `cryptography` 50.0.2 — duyệt 2026-10-13, xem §4.6; ghi chú cũ "đã qua review" là SAI, chưa từng có review, hoặc libsodium secretbox),
   nonce ngẫu nhiên mỗi lần ghi, AAD = tên field (chống tráo ô).
-  - Khoá 32 byte lấy từ `VLM_SECRETS_KEY_FILE` (file 0600, mặc định `~/.config/vlm-app/secrets.key`, sinh lần đầu bằng
+  - Khoá 32 byte ở `~/.config/ntc-training/secrets.key` (home theo pwd, KHÔNG có env override; file 0600, sinh lần đầu bằng
     `secrets.token_bytes`), hoặc `VLM_SECRETS_KEY` trong `.env.local`.
   - Khoá **không** nằm trong DB, image hay thư mục mà job mount.
   - Mất khoá thì secret không đọc được: UI báo "nhập lại token", không crash.
@@ -141,7 +141,7 @@ Config phân tầng: mặc định → `.env.local` → DB (`outputs/app.db`, b�
 - Không `network_mode: host`, `pid: host`, `ipc: host`, `privileged`. Có `cap_drop: [ALL]` + `no-new-privileges` cho
   mọi service, `read_only: true` + `tmpfs: /tmp` cho app/runner.
 - Tên `vlm-*`, label `project=vlm-training`; `name: vlm` cho project compose. `docker compose down` không đụng service khác.
-- File admin `~/.config/vlm-app/policy.toml` (D17) được mount **ro** từ host vào home của user trong container app và runner. App không bao giờ ghi file này. Reader lấy home bằng `pwd.getpwuid(os.getuid())`, không dùng `$HOME`.
+- File admin `~/.config/ntc-training/policy.toml` (D17) được mount **ro** từ host vào home của user trong container app và runner. App không bao giờ ghi file này. Reader lấy home bằng `pwd.getpwuid(os.getuid())`, không dùng `$HOME`.
 - vLLM serve là một `job_kind=serve` của runner (port publish `127.0.0.1` + `--api-key` sinh mỗi lần, app giữ trong
   bộ nhớ), không phải service compose thường trực (tránh giữ ~GB RAM trên UMA).
 - `deploy.resources` / `mem_limit` cho mọi service (UMA dùng chung với service khác).
@@ -206,3 +206,21 @@ User giữ token hiện tại (có quyền write, có thể phát sinh chi phí)
    quy tắc khi ADR chốt (cleanup làm).
 5. **Spec pydantic strict trong runner: OK** (pydantic đã qua review dep). Runner image = python slim + docker CLI: pin
    digest, non-root + group docker gid, read_only, cap_drop ALL, không port; review image như mọi image (IMAGES.lock).
+
+### 4.6 Chốt D-7 (security ↔ backend, 2026-10-13)
+- **Dep:** `cryptography==50.0.2` (pyca, Apache-2.0 OR BSD-3-Clause, wheel abi3 manylinux aarch64 + x86_64, phát hành
+  2026-09-30, qua cooldown 7 ngày). Đã có các bản sửa 2026: CVE-2026-69247 (oracle PKCS#7, sửa ở 50.0.0),
+  CVE-2026-69248/69249 (X.509 path building, sửa ở 49.0.0), OpenSSL trong wheel (GHSA-537c-gmf6-5ccf). Chỉ dùng
+  `cryptography.hazmat.primitives.ciphers.aead.AESGCM`. Không chọn PyNaCl (thêm libsodium, không cần).
+  Ghi chú: image 26.08-6 có sẵn cryptography 49.0.0 (bị CVE-2026-69247 ảnh hưởng, nhưng ta không dùng PKCS#7 trong
+  job); nâng khi rebuild image.
+- **Khoá v1 do app giữ** (runner chưa có):
+  - file `~/.config/ntc-training/secrets.key`: tạo bằng O_CREAT|O_EXCL|O_NOFOLLOW, mode 0600, thư mục 0700;
+  - đọc bằng cùng kiểm của `read_policy` (O_NOFOLLOW + fstat: regular, owner = user, không g/o-readable).
+    Sai thì từ chối dùng secret, KHÔNG tự sinh khoá mới đè lên;
+  - không env override đường dẫn; khoá không bao giờ vào DB, log, job mount hay build context;
+  - mất khoá → các secret hiện có thành "cần nhập lại".
+- **Compose:** khi app chạy trong container, `secrets.key` do bước cài đặt tạo trên host và bind đúng 1 file (ro).
+  App trong container không tạo khoá. Khi có runner thì chuyển khoá sang runner, schema DB giữ nguyên
+  (ciphertext, nonce 12 B, AAD = tên field, key_id).
+- App tạo `secrets.key` lúc user chạy là hành vi sản phẩm. Agent không tạo hay đọc file này. Test dùng tmp path.
