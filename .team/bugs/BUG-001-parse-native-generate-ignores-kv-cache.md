@@ -37,3 +37,5 @@ Golden gate (b) native: 50-token generation + text equal to golden; regression t
   near-equal logits, identical on the HF remote path -> accepted.
 - Cost: 28 tokens in 2.45 s warm (3.54 s cold), ~8-11 tok/s, max_alloc 2.21 GiB. Long pages (O(n^2), CORD,
   max_new_tokens 1536) still to be measured from bao-tester's eval -> TD-1 on BOARD.
+- Timing data (forced lengths 256/512/1024 tokens, VENDORED.md §0003) comes from `scripts/probe/parse_generate_timing.py`
+  (native class, NVIDIA's golden image; runs in vlm-automodel on GPU under the lock).
