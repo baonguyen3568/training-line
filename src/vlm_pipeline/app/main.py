@@ -269,6 +269,29 @@ def _register_info_routes(app: FastAPI, services: Services, bus: EventBus) -> No
         return _report(code, locale, run_id)
 
 
+def _register_advanced_routes(app: FastAPI, services: Services) -> None:
+    """P016 §3: the engine options a train node's ``advanced`` param accepts (fetched when the panel opens)."""
+
+    @app.get("/api/node-types/{type_id}/advanced")
+    def advanced_options(type_id: str, model: str | None = None) -> dict[str, Any]:
+        from vlm_pipeline.train.advanced import engine_options
+
+        spec = services.registry.get(type_id)
+        if spec is None or "advanced" not in spec.params_model.model_fields:  # unknown, or no Advanced panel
+            raise HTTPException(status_code=404, detail={"code": "CFG-004", "params": {}})
+        options = [
+            {
+                "key": key,
+                "group": key.rsplit(".", 1)[0],  # P016 §3 prefix: model.backend.attn -> model.backend
+                **{f: entry.get(f) for f in ("type", "default", "choices", "min", "max")},
+                "templates": list(entry.get("templates", ())),
+            }
+            for key, entry in sorted(engine_options().items())
+            if model is None or model in entry.get("templates", ())
+        ]
+        return {"options": options}
+
+
 def _register_ws(app: FastAPI, bus: EventBus, ws_auth: Callable[[WebSocket], Awaitable[None]] | None) -> None:
     @app.websocket("/api/runs/{graph_run_id}/events")
     async def events(websocket: WebSocket, graph_run_id: str) -> None:
@@ -416,6 +439,7 @@ def create_app(
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
     _register_info_routes(app, services, bus)
+    _register_advanced_routes(app, services)
     _register_template_routes(app, services)
     _register_ws(app, bus, ws_auth)
     if static_dir is None and getattr(services, "root", None) is not None:
