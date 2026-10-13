@@ -110,6 +110,7 @@ Khuyến nghị của security: nếu user chưa chắc sẽ chọn A hay B về
 Nguồn: [GPL-3.0 text](https://www.gnu.org/licenses/gpl-3.0.html), [GNU GPL FAQ — plugins, aggregate, separate programs](https://www.gnu.org/licenses/gpl-faq.html#GPLPlugins).
 
 ### D7. Dataset hygiene
+**Bổ sung 2026-10-12 (review patch 0004):** text do user cung cấp (caption/target) có thể chứa nguyên văn chuỗi special token (`</s>`, `<s>`, token task như `<predict_bbox>`). Tokenizer HF mặc định (`split_special_tokens=False`) sẽ hiểu chúng là token đặc biệt thật, nên có thể chèn EOS sớm hoặc giả lệnh task (data poisoning). Bước validate dataset của app phải phát hiện và escape/loại các chuỗi này, hoặc tokenize phần target với `split_special_tokens=True`.
 Dataset chỉ nhận parquet/arrow/webdataset, **không chạy loading script**. Đặt `Image.MAX_IMAGE_PIXELS`, decode có timeout/giới hạn bộ nhớ. Ghi sha256 manifest cho từng shard sau curate. Có test chặn benchmark lọt vào train mix. Không đưa ảnh y tế/PII lên dashboard/W&B.
 
 ### D8. Host chung & mạng
@@ -346,7 +347,7 @@ Mount do orchestrator cố định: `/in` (ro, artifact được nối vào), `/
 |---|------|----|
 | U1 | Vá NVIDIA Container Toolkit lên ≥1.19.1 (sudo + restart docker ảnh hưởng mọi service) | user (qua PM) |
 | U2 | ~~Chọn nhánh A/B~~ → user chốt **F** (miễn phí, phân phối, không bán). Còn chờ: user đồng ý (ii) xây trên MIT + phát hành Apache-2.0, hay chấp nhận fork GPL-3.0 | user (qua PM) |
-| U3 | HF token: token đã đưa bị 401 và đã lộ trong transcript chat → **revoke**, tạo token fine-grained read-only mới, user tự dán vào `.env` (không qua chat) | user |
+| U3 | HF token: token đã đưa bị 401 và đã lộ trong transcript chat → **revoke**, tạo token fine-grained read-only mới, user tự dán vào `.env` (không qua chat) | user — **ĐÓNG 2026-10-13: user giữ token hiện tại, chấp nhận rủi ro**; bù bằng 5 bảo vệ có test hồi quy (P015 §6.1) |
 | U6 | Tạo `~/.config/vlm-app/policy.toml` với `profile = "shared_dev"` (agent không được ghi ngoài repo) | user (qua PM) |
 | U5 | D17: trên host dev, xác nhận chặn cả plugin **không GPU** nhưng chưa review (chặt hơn bản đã duyệt ở giai đoạn trước vá) | user (qua PM) |
 | U4 | ~~v1 không custom node bên thứ 3~~ → user CHO PHÉP (ADR-009) ⇒ D16. Chờ user duyệt **chính sách host dev**: cấm node bên thứ 3 có GPU tới khi vá toolkit; sau vá chỉ node đã được team review | user (qua PM) |

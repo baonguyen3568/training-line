@@ -155,6 +155,16 @@ Config phân tầng: mặc định → `.env.local` → DB (`outputs/app.db`, b�
    lúc build).
 6. Compose: mọi port `127.0.0.1`; gitleaks chạy trên repo (đã có) + `.env.local.example` không có value thật.
 
+### 6.1 Test hồi quy bắt buộc vì token có quyền ghi (user chấp nhận rủi ro, PM 2026-10-13, U3 đóng)
+User giữ token hiện tại (có quyền write, có thể phát sinh chi phí). Vì vậy 4 bảo vệ sau là bắt buộc, mỗi cái có test hồi quy:
+| Bảo vệ | Test | Owner |
+|---|---|---|
+| Chỉ job `download` first-party nhận token (file `/run/secrets`, không qua env) | runner: `submit` job_kind khác + yêu cầu token → từ chối; `docker inspect` job thường không có `HF_TOKEN*` | backend |
+| `.env*` bị che trong mọi job (SEC-005) | `test_jobrun` mask + integration `test -s /workspace/.env` fail | backend (đã có) |
+| Không có token trong outputs/log/UI | `scripts/security/scan_tokens.py paths outputs/` chạy sau mỗi e2e/integration; e2e UI assert response không khớp pattern | tester |
+| Settings D-7 chỉ ghi (last4) | property test GET settings + `sqlite3 .dump` không chứa plaintext | backend |
+| Không có token trong file tracked | CI gate `scan_tokens.py tracked` trong `scripts/check.sh` (bổ sung gitleaks) | security (đã có) |
+
 ## 7. Câu hỏi mở cho backend / PM
 - Q1: Runner viết bằng Python stdlib (tái dùng `jobrun.docker_args`) hay Go nhỏ? Mình nghiêng Python vì tái dùng code đã review.
 - Q2: Chế độ dev hiện tại (app chạy trên host, gọi `docker` trực tiếp) giữ lại song song? Đề xuất: giữ cho dev, nhưng app
