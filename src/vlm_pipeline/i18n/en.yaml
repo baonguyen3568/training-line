@@ -1221,7 +1221,7 @@ standards:
     eval_downstream: "The quantized model is not scored. Quantization can make it weaker than the original; add a Benchmark step after it to know for sure."
   data:
     broken_images_some: "Some images are broken or too small (short side under {min_short_side_px} px). The app will skip them."
-    leak_check_unwired: "The dedupe step has no test data to compare with. Connect your test set to the heldout port to drop training images that also appear in the scored set."
+    leak_check_unwired: "The \"Remove duplicates\" step has no test data to compare with. Connect your test data to its \"Test data\" port to drop training images that also appear in the scored set."
     broken_images_many: "More than {above}% of images are broken or too small. The folder may be wrong; check it before training."
     aspect_ratio: "Some images are extremely long or narrow (aspect ratio above {above}:1). The model cannot process them; crop or remove them."
     truncated: "More than {above}% of answers exceed the model's length limit and will be cut during training."
