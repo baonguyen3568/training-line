@@ -170,3 +170,35 @@ User giữ token hiện tại (có quyền write, có thể phát sinh chi phí)
 - Q2: Chế độ dev hiện tại (app chạy trên host, gọi `docker` trực tiếp) giữ lại song song? Đề xuất: giữ cho dev, nhưng app
   trên host cũng chuyển dần sang gọi runner để chỉ còn 1 đường tạo container.
 - Q3: Nơi đặt `.env.local` khi user cài đặt thật (ngoài repo, vd `~/.local/share/vlm-app/`)? Ảnh hưởng §3.2.
+
+### 7.1 Trả lời của backend (2026-10-13)
+- **Q1: Python stdlib.** Đồng ý. Runner tái dùng nguyên `jobrun.docker_args` / `validate_rw_dirs` / `classify_exit` /
+  memguard / `check_pinned_image` (đã review, có test). API trên unix socket chỉ gồm các thao tác kiểu hoá
+  (`create_job(spec)`, `stop(name)`, `inspect(name)`, `logs(name, tail)`), trong đó `spec` là một pydantic model
+  strict (extra="forbid"): image phải là một TAG có trong IMAGES.lock, argv là list, không có trường mount/privileged/
+  network. Runner tự dựng argv bằng `docker_args`, không bao giờ nhận argv docker từ app. Package `vlm_pipeline.runner`
+  nằm ở layer common/app như một service riêng; image runner = python slim + docker CLI (buildx 2 arch).
+- **Q2: giữ chế độ dev, nhưng chỉ còn 1 đường tạo container.** `run_job` sẽ gọi qua một interface `JobLauncher`:
+  `LocalDockerLauncher` (dev trên host, như hiện nay) và `RunnerLauncher` (compose, gọi socket). Cả hai dùng chung
+  `docker_args`, nên luật mount/secret/image chỉ có một nguồn. Mặc định dùng runner khi có `VLM_RUNNER_SOCKET`.
+- **Q3: `.env.local` ngoài repo khi cài thật**: `${XDG_CONFIG_HOME:-~/.config}/ntc-training/.env.local` (0600), còn
+  dữ liệu ở `${XDG_DATA_HOME:-~/.local/share}/ntc-training/{cache,outputs,data,uploads}`. Compose mount hai chỗ này;
+  project root trong container chỉ còn code (ro). Ở chế độ dev, file `.env.local` ở gốc repo vẫn được hỗ trợ và luôn
+  bị mask trong job (54955d8). Việc thu hẹp mount (§3.2) dùng đúng tách biệt này: job chỉ thấy `cache` (ro, trừ
+  thư mục HF modules), `outputs/<run>` (rw), và dữ liệu đầu vào cụ thể (ro).
+
+### 7.2 Security chấp nhận 7.1, kèm 5 điều kiện (2026-10-13)
+1. **App image không có docker CLI và không có docker.sock.** Trong compose, `LocalDockerLauncher` phải fail ngay (không
+   có đường fallback). Có test: app container gọi `run_job` khi thiếu `VLM_RUNNER_SOCKET` → lỗi rõ ràng, không thử `docker`.
+2. **`.env.local` không mount vào service nào.** Compose đọc nó trên host (`env_file` cho biến KHÔNG bí mật của runner,
+   `secrets:` cho token). Thư mục `~/.config/<app>/` **không** được bind vào app, vì nếu bind cả thư mục thì app thấy luôn
+   `.env.local`. App chỉ nhận đúng file `policy.toml` (bind file, ro). Runner nhận token qua `/run/secrets`.
+3. **Đường dẫn policy không đi theo env.** `.env.local` và dữ liệu được dùng `XDG_*` (tiện cho người dùng). Nhưng
+   `policy.toml` (D17) luôn đọc từ `pwd.getpwuid(uid).pw_dir/.config/<app>/policy.toml`, không theo `XDG_CONFIG_HOME`
+   hay `HOME`, vì env không được phép nới policy (cùng lý do với admin_schedule). Tên thư mục `<app>` là MỘT hằng số
+   dùng chung, đổi theo tên sản phẩm khi user chọn (M2-1). Không để "ntc-training" và "vlm-app" cùng tồn tại.
+4. **Gốc xoá theo data root.** Khi dữ liệu chuyển sang `~/.local/share/<app>/`, `check_project_root` / retention / cache
+   phải đổi sang data root đó, kèm cùng các kiểm resolve/symlink. CLAUDE.md hiện ghi "chỉ xoá trong repo", nên PM cập nhật
+   quy tắc khi ADR chốt (cleanup làm).
+5. **Spec pydantic strict trong runner: OK** (pydantic đã qua review dep). Runner image = python slim + docker CLI: pin
+   digest, non-root + group docker gid, read_only, cap_drop ALL, không port; review image như mọi image (IMAGES.lock).
