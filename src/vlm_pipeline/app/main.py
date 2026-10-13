@@ -209,6 +209,41 @@ def _register_run_routes(app: FastAPI, services: Services) -> None:
         return services.system()
 
 
+def _register_info_routes(app: FastAPI, services: Services, bus: EventBus) -> None:
+    """/api/health (the code this process runs) and the public bug-report card (no log, no path: security)."""
+    from vlm_pipeline.app import build_info
+    from vlm_pipeline.common.paths import project_root
+
+    root = getattr(services, "root", None) or project_root()
+    info = build_info.read_build_info(root)  # once: what is RUNNING
+    _log.info("vlm-app %s (commit %s, dirty %s)", info.app_version, info.commit, info.dirty)
+    app.state.build_info = info
+
+    def _locale(value: str | None) -> str:
+        return value if value in i18n.LOCALES else i18n.DEFAULT_LOCALE
+
+    def _report(code: str, locale: str | None, run_id: str | None = None) -> dict[str, str]:
+        try:
+            key = build_info.ref_key(root) if run_id is not None else None
+            return build_info.bug_report(code, _locale(locale), info, run_id=run_id, key=key)
+        except KeyError:  # only catalog codes: never echo a string the client made up
+            raise HTTPException(status_code=404, detail={"code": "CFG-004", "params": {}}) from None
+
+    @app.get("/api/health")
+    def health() -> dict[str, Any]:
+        return {"ok": True, **info.to_api()}
+
+    @app.get("/api/bug-report")
+    def bug_report(code: str, locale: str | None = None) -> dict[str, str]:
+        return _report(code, locale)
+
+    @app.get("/api/runs/{run_id}/bug-report")
+    def run_bug_report(run_id: str, code: str, locale: str | None = None) -> dict[str, str]:
+        if services.get_run(run_id) is None and not bus.known(run_id):
+            raise HTTPException(status_code=404, detail={"code": "CFG-004", "params": {}})
+        return _report(code, locale, run_id)
+
+
 def _register_ws(app: FastAPI, bus: EventBus, ws_auth: Callable[[WebSocket], Awaitable[None]] | None) -> None:
     @app.websocket("/api/runs/{graph_run_id}/events")
     async def events(websocket: WebSocket, graph_run_id: str) -> None:
@@ -355,6 +390,7 @@ def create_app(
     _reconcile_stale_runs(services)
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
+    _register_info_routes(app, services, bus)
     _register_template_routes(app, services)
     _register_ws(app, bus, ws_auth)
     if static_dir is None and getattr(services, "root", None) is not None:

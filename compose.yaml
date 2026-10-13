@@ -16,7 +16,7 @@ services:
     build:
       context: .
       dockerfile: docker/app.Dockerfile
-      args: {VLM_UID: "${VLM_UID:?run scripts/install.sh}", VLM_GID: "${VLM_GID:?}"}
+      args: {VLM_UID: "${VLM_UID:?run scripts/install.sh}", VLM_GID: "${VLM_GID:?}", VLM_BUILD_COMMIT: "${VLM_BUILD_COMMIT:-}"}
     image: ntc-training-app:local
     user: "${VLM_UID}:${VLM_GID}"
     group_add: ["${VLM_GID}"]  # the runner socket is 0660 runner:<run gid>
