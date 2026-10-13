@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.stubEnv("VITE_MOCK_API", "1");
 
 describe("severity info", () => {
-  it("is listed with ⓘ but does not count as an error nor disable Run", async () => {
+  it("is listed with the info icon but does not count as an error nor disable Run", async () => {
     const { useWorkflow } = await import("../src/store/workflow");
     const { CheckBar } = await import("../src/components/CheckBar");
     const { ReactFlowProvider } = await import("@xyflow/react");
@@ -47,6 +47,8 @@ describe("severity info", () => {
     expect(screen.queryByText(/1 lỗi/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Xem chi tiết/ }));
     const item = document.querySelector("[data-code='STD-001']");
-    expect(item?.textContent).toContain("ⓘ");
+    // the Lucide info icon in muted ink (text glyphs were OS-dependent)
+    expect(item?.querySelector(".si-muted svg")).not.toBeNull();
+    expect(item?.className).toContain("info");
   });
 });

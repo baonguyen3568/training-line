@@ -522,7 +522,8 @@ export function Inspector() {
       )}
       {mode === "simple" && customized.length > 0 && (
         <p className="badge customized">
-          ⚙ {t("canvas.customized", { param_count: customized.length })}
+          <Icon name="sliders-horizontal" size={14} />{" "}
+          {t("canvas.customized", { param_count: customized.length })}
         </p>
       )}
 

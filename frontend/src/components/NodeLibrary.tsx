@@ -6,6 +6,7 @@ import { nodeDesc, nodeTitle } from "../lib/nodeText";
 import { portShape, tokenVar } from "../lib/ports";
 import { expandQuery, matches } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
+import { Icon } from "./Icon";
 
 export const DRAG_MIME = "application/vlm-node-type";
 
@@ -141,7 +142,9 @@ export function NodeLibrary({
                     </span>
                     <span className="library-desc">{nodeDesc(spec, spec.type_id)}</span>
                     {spec.policy_block && (
-                      <span className="badge blocked">⛔ {t("library.blocked")}</span>
+                      <span className="badge blocked">
+                        <Icon name="ban" size={12} /> {t("library.blocked")}
+                      </span>
                     )}
                   </button>
                 </li>

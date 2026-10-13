@@ -2,13 +2,16 @@ import { useReactFlow } from "@xyflow/react";
 import { useState } from "react";
 import { t } from "../i18n";
 import { estimateLine, formatDuration } from "../lib/format";
-import { nodeTitle, SEVERITY_GLYPH } from "../lib/nodeText";
+import { nodeTitle } from "../lib/nodeText";
 import { requestRun } from "../lib/requestRun";
 import { runErrorText, runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
+
+const SEVERITY_ICON = { error: "circle-x", warn: "triangle-alert", info: "info" } as const;
+const SEVERITY_TONE = { error: "bad", warn: "warn", info: "muted" } as const;
 
 /** Always-visible pre-flight bar (P010 §6): Run is disabled only by blocking errors; warnings never open dialogs. */
 export function CheckBar() {
@@ -196,7 +199,9 @@ export function CheckBar() {
               className={`issue ${e.severity}`}
               data-code={e.code}
             >
-              <span aria-hidden="true">{SEVERITY_GLYPH[e.severity]}</span>
+              <span className={`si si-${SEVERITY_TONE[e.severity]}`} aria-hidden="true">
+                <Icon name={SEVERITY_ICON[e.severity]} size={14} />
+              </span>
               {/* Server-rendered copy is plain text; React escapes it. */}
               <span>
                 <strong>{e.title}</strong> — {e.what}

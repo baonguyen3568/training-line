@@ -39,14 +39,22 @@ function portColor(ports: PortType[], type: string): string {
   return pt ? tokenVar(pt.color_token) : "var(--color-port-value)";
 }
 
+// Node permission → icon (text glyphs were OS-dependent emoji)
+const PERM_ICON: Record<string, string> = { gpu: "cpu", network: "globe", time: "timer" };
+
 function ThirdPartyBadge({ spec }: { spec: NodeSpec }) {
   // Badge depends ONLY on origin.kind/reviewed from the server, never on the node's name (P003 D16 T8).
   const publisher = identifierView(spec.origin.publisher ?? "?");
   const key = spec.origin.reviewed ? "custom_node.badge.reviewed" : "custom_node.badge.unverified";
   return (
-    <span className="badge third-party" title={publisher.suspicious ? "⚠ non-ASCII" : undefined}>
-      🧩 {t(key, { publisher: publisher.text })}
-      {publisher.suspicious && " ⚠"}
+    <span className="badge third-party" title={publisher.suspicious ? "non-ASCII" : undefined}>
+      <Icon name="puzzle" size={12} /> {t(key, { publisher: publisher.text })}
+      {publisher.suspicious && (
+        <span className="si si-warn">
+          {" "}
+          <Icon name="triangle-alert" size={12} />
+        </span>
+      )}
     </span>
   );
 }
@@ -208,7 +216,12 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
     const id = identifierView(typeId);
     return (
       <div className={classes}>
-        <div className="node-header">⚠ {id.text}</div>
+        <div className="node-header">
+          <span className="si si-warn" aria-hidden="true">
+            <Icon name="triangle-alert" size={14} />
+          </span>{" "}
+          {id.text}
+        </div>
         <div className="node-body muted">{t("error.CFG-004.title")}</div>
       </div>
     );
@@ -236,7 +249,9 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
       {thirdParty && <ThirdPartyBadge spec={spec} />}
       {summary.length > 0 && <div className="node-summary">{summary.join(" · ")}</div>}
       {spec.policy_block && (
-        <span className="badge blocked">⛔ {t("custom_node.badge.policy_block")}</span>
+        <span className="badge blocked">
+          <Icon name="ban" size={12} /> {t("custom_node.badge.policy_block")}
+        </span>
       )}
       <div className="node-ports">
         <ul className="ports in">
@@ -289,13 +304,14 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
             className={`perm level-${p.level}`}
             title={t(p.perm_copy_key, { max_runtime: "" })}
           >
-            {p.id === "gpu" ? "▣" : p.id === "network" ? "🌐" : "⏱"}{" "}
+            <Icon name={PERM_ICON[p.id] ?? "timer"} size={12} />{" "}
             {t(`custom_node.badge_perm.${p.id}`)}
           </span>
         ))}
         {customized.length > 0 && (
           <span className="state customized">
-            ⚙ {t("canvas.customized", { param_count: customized.length })}
+            <Icon name="sliders-horizontal" size={12} />{" "}
+            {t("canvas.customized", { param_count: customized.length })}
           </span>
         )}
         {errors.length > 0 && (
