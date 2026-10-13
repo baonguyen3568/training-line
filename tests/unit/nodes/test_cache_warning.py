@@ -35,7 +35,9 @@ def test_missing_assets_are_warned_with_the_download_params(tmp_path: Path) -> N
     by_node = {i.node_id: i for i in issues}
     assert {i.severity for i in issues} == {"warn"}  # Run stays enabled: the UI offers "download all missing"
     assert by_node["m"].params == {"repo": model.repo, "reason": "not_cached", "catalog_id": model.id,
-                                   "kind": "model", "size_gb": model.disk_gb}  # fmt: skip
+                                   "kind": "model", "size_gb": model.disk_gb, "name": model.display_name,
+                                   "license": model.license}  # fmt: skip
+    assert (by_node["d"].params["name"], by_node["d"].params["license"]) == (dataset.display_name, dataset.license)
     assert by_node["m"].param == "model"
     assert by_node["d"].params["catalog_id"] == dataset.id
     assert by_node["d"].params["kind"] == "dataset"

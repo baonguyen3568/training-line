@@ -1,7 +1,8 @@
 """Is a catalog model / dataset on this machine? One answer for the run (raises NET-002) and validate (warns NET-002).
 
 The run never downloads (jobs have no network, ADR-015); what is missing comes from the app's download (G-5, P018).
-The ``params`` returned are the NET-002 params the UI uses: ``catalog_id`` + ``kind`` feed ``POST /api/downloads``.
+The ``params`` returned are the NET-002 params the UI uses: ``catalog_id`` + ``kind`` feed ``POST /api/downloads``,
+``name`` + ``license`` + ``size_gb`` the "download before running" dialog (its license checkbox lists them all).
 """
 
 from __future__ import annotations
@@ -26,7 +27,8 @@ def prepared_model_dir(root: Path, catalog_id: str) -> Path | None:
 
 def model_missing(root: Path, entry: CatalogEntry) -> dict[str, object] | None:
     """NET-002 params when ``entry`` cannot run from this machine's cache, else None."""
-    params: dict[str, object] = {"repo": entry.repo, "catalog_id": entry.id, "kind": "model", "size_gb": entry.disk_gb}
+    params: dict[str, object] = {"repo": entry.repo, "catalog_id": entry.id, "kind": "model", "size_gb": entry.disk_gb,
+                                 "name": entry.display_name, "license": entry.license}  # fmt: skip
     if entry.remote_code == "pinned_prepared":
         prepared = prepared_model_dir(root, entry.id)
         if prepared is None or not (prepared / "config.json").is_file():
@@ -41,7 +43,7 @@ def dataset_missing(root: Path, entry: DatasetEntry) -> dict[str, object] | None
     if hub_snapshot(root, "dataset", entry.repo, entry.revision).is_dir():
         return None
     return {"repo": entry.repo, "reason": "not_cached", "catalog_id": entry.id, "kind": "dataset",
-            "size_gb": entry.disk_gb}  # fmt: skip
+            "size_gb": entry.disk_gb, "name": entry.display_name, "license": entry.license}  # fmt: skip
 
 
 __all__ = ["PREPARED_DIRS", "dataset_missing", "hub_snapshot", "model_missing", "prepared_model_dir"]
