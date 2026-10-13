@@ -55,6 +55,10 @@ plugin chưa duyệt) đọc được `.env.local` nếu file nằm trong projec
 - **không bao giờ** mount: `.env*`, `.team/`, `~/.config/vlm-app/`, `/var/run/docker.sock`, `$HOME`.
 - Đường dẫn nguồn là **host path**. Runner nhận `VLM_HOST_PROJECT_ROOT` từ `.env.local` (cấu hình triển khai, không lấy
   từ app). Runner resolve, đối chiếu dưới root đó, từ chối symlink ra ngoài.
+- **Symlink ở source bind mount (docker daemon theo symlink trên host):** runner mount data_root + src (ro) vào chính
+  nó ở đúng path host; trước mỗi bind đi từng component bằng O_NOFOLLOW, có symlink thì từ chối; source phải tồn tại,
+  đúng loại, owner = user. Run dir rw do runner tạo mới ngay trước job; input chỉ ro. Giả định TOCTOU: không job đang
+  chạy nào có quyền ghi vào thư mục cha của một source khác (có test). (security, review host_paths 2026-10-13)
 - `download` là job_kind duy nhất có mạng (network `vlm-egress`, không có port) và là job duy nhất nhận token (§4.3).
 
 ### 3.3 Cứng hoá runner (vì runner = root-equivalent)
