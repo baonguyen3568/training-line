@@ -1,0 +1,72 @@
+---
+title: Yêu cầu hệ thống
+description: Phần cứng, phần mềm và dung lượng ổ đĩa cần có để chạy app. Hiện chỉ DGX Spark đã được kiểm thử.
+sidebar:
+  order: 0
+sources:
+  - .team/knowledge/research.md
+  - docker/IMAGES.lock
+  - .team/proposals/005-storage-retention-policy.md
+  - docs/adr/ADR-005-storage-retention.md
+  - .team/contracts/S-4-preflight.md
+---
+import Hint from '~/components/Hint.astro';
+
+App hiện được phát triển và kiểm thử trên **một loại máy duy nhất: NVIDIA DGX Spark**. Các cấu hình khác chưa được kiểm thử, nên trang này chỉ ghi những gì đã chạy thật.
+
+## Phần cứng đã kiểm thử
+
+| Hạng mục | Cấu hình |
+|---|---|
+| Máy | NVIDIA DGX Spark, 1 GPU GB10 |
+| Kiến trúc CPU | ARM 64-bit (aarch64) |
+| Bộ nhớ | 128 GB bộ nhớ hợp nhất (CPU và GPU dùng chung) |
+| Driver và CUDA | Driver 580 (đã thử bản 580.142), CUDA 13 |
+| Ổ đĩa trống cho dự án | Nên từ 500 GB (xem bên dưới) |
+
+Bộ nhớ hợp nhất và chuyện máy dùng chung ảnh hưởng ra sao tới việc train: xem [Phần cứng và bộ nhớ](/docs/phan-cung-va-bo-nho/).
+
+## Phần mềm
+
+| Thành phần | Yêu cầu |
+|---|---|
+| Hệ điều hành | Linux aarch64 (DGX OS) |
+| Docker và NVIDIA Container Toolkit | Bản đi kèm DGX OS; việc train chạy trong container |
+| Python | `3.12`, cài và quản lý bằng `uv` |
+| Node.js | `22.12` trở lên, chỉ cần khi tự build giao diện |
+| Image train | `vlm-automodel:26.08-5`, dựng từ image chính thức `nvcr.io/nvidia/nemo-automodel:26.08` bản arm64 |
+
+Mọi image và thư viện phải có bản **arm64**. Image gốc được ghim theo mã băm (digest), không dùng tag có thể bị đổi nội dung.
+
+<Hint title="Vì sao không dùng thẳng image của NVIDIA?">
+Image gốc thiếu vài thư viện xử lý ảnh mà Nemotron Parse cần, và có một số lỗi team đã vá. Mỗi bản vá được kiểm mã băm khi build; bản vá lạ làm build thất bại.
+</Hint>
+
+## Dung lượng ổ đĩa
+
+Ước lượng cho các model hiện có trong catalog (chưa tính model từ 27B trở lên):
+
+| Hạng mục | Ước lượng |
+|---|---|
+| Model tải về (Qwen3.5 0.8B, 2B, 4B, 9B) | khoảng 36 GB |
+| Mỗi image container của dự án | khoảng 29,6 GB |
+| Dữ liệu đánh giá | khoảng 10–30 GB |
+| Checkpoint LoRA | vài trăm MB mỗi lần chạy |
+| Checkpoint khi fine-tune toàn bộ Nemotron Parse v1.1 (đo thật) | khoảng 8,1 GB mỗi checkpoint |
+| Model đã gộp, bản nén FP8/NVFP4 và engine | khoảng 60 GB |
+| Bộ nhớ đệm kết quả node (giới hạn trên) | tối đa 200 GB |
+| **Tổng trường hợp xấu nhất** | **khoảng 430 GB** |
+
+Mỗi model cỡ 27–35B cần thêm khoảng 55–72 GB.
+
+App cảnh báo khi dữ liệu dự án vượt **500 GB** và báo mức nguy hiểm từ **800 GB**.
+
+<Hint title="App kiểm ổ đĩa trước khi train thế nào?">
+Cần trống ít nhất: dung lượng một checkpoint × (số checkpoint giữ lại + 1) + 50 GB dự phòng. Ví dụ giữ 2 checkpoint 8,1 GB thì cần khoảng 74 GB trống.
+</Hint>
+
+## Trên máy dùng chung
+
+- Mỗi lúc chỉ **một tác vụ nặng** được dùng GPU.
+- App chỉ ghi và xoá dữ liệu **trong thư mục dự án**, không đụng container, image hay cache của ứng dụng khác.
+- App không dùng `sudo` và không xoá bộ nhớ đệm của hệ điều hành để lấy thêm bộ nhớ.

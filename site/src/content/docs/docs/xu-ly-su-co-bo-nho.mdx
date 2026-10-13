@@ -1,0 +1,89 @@
+---
+title: Xử lý sự cố bộ nhớ, ổ đĩa và GPU
+description: Ý nghĩa các thông báo về bộ nhớ, dung lượng và khoá GPU, và nên làm gì.
+sidebar:
+  order: 7
+sources:
+  - src/vlm_pipeline/common/error_catalog.yaml
+  - src/vlm_pipeline/i18n/vi.yaml
+  - docs/adr/ADR-005-storage-retention.md
+  - .team/contracts/S-4-preflight.md
+  - src/vlm_pipeline/app/storage.py
+---
+import Hint from '~/components/Hint.astro';
+
+App chặn phần lớn sự cố **trước khi chạy** (xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/)). Trang này nói mỗi thông báo nghĩa là gì và nên làm gì. Thông báo hiện trên node có vấn đề; nút **Cách sửa** đưa bạn tới thiết lập cần đổi.
+
+## MEM-001: Không đủ bộ nhớ cho bước này
+
+Bước này cần nhiều bộ nhớ hơn mức máy đang còn trống.
+
+Nên thử:
+
+- Dùng **LoRA** hoặc **QLoRA** thay cho fine-tune toàn bộ, nếu model hỗ trợ.
+- Giảm kích thước ảnh tối đa, ví dụ còn một nửa.
+- Giảm batch, ví dụ còn một nửa.
+
+Hoặc đợi các ứng dụng khác trên máy dùng ít bộ nhớ hơn rồi chạy lại. App **không** tự giải phóng bộ nhớ bằng cách dừng ứng dụng khác hay xoá bộ nhớ đệm của hệ điều hành.
+
+## MEM-002: Đã tạm dừng để bảo vệ máy
+
+Bộ nhớ trống xuống dưới mức an toàn khi đang chạy, nên app đã lưu tiến độ và dừng.
+
+- Chạy tiếp từ checkpoint, nếu model hỗ trợ train tiếp.
+- Bật gradient checkpointing trước khi chạy tiếp: chậm hơn nhưng tốn ít bộ nhớ hơn.
+
+Nếu model chưa hỗ trợ train tiếp, chạy lại khi máy rảnh hơn.
+
+## MEM-003: Hết bộ nhớ khi đang chạy
+
+Model dùng nhiều bộ nhớ hơn dự kiến giữa chừng, thường do ảnh lớn hoặc chuỗi quá dài.
+
+Nên thử: giảm độ dài chuỗi tối đa, bật gradient checkpointing, hoặc giảm batch.
+
+## MEM-004: Phục vụ model chiếm quá nhiều bộ nhớ
+
+Thiết lập phục vụ model đang giữ quá nhiều bộ nhớ cho bộ đệm, có thể ảnh hưởng ứng dụng khác. Nên giảm tỉ lệ bộ nhớ dành cho phục vụ model, hoặc giảm độ dài tối đa của model.
+
+## DISK-001: Không đủ dung lượng ổ đĩa
+
+Ổ đĩa không đủ chỗ cho model và các checkpoint sắp ghi.
+
+- Dọn kết quả tạm (xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/)).
+- Hoặc chỉ giữ 1 checkpoint gần nhất cho node train.
+
+<Hint title="App cần bao nhiêu chỗ trống?">
+Dung lượng một checkpoint × (số checkpoint giữ lại + 1) + 50 GB dự phòng.
+</Hint>
+
+## DISK-003: Bộ nhớ đệm đầy, cần bạn chọn mục xoá
+
+Kết quả tạm vượt giới hạn, nhưng các mục còn lại đều được bảo vệ (model đã train, mục đã ghim, bản xuất) nên không mục nào bị xoá tự động. Bạn tự chọn mục muốn xoá (xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/)).
+
+## DISK-002: Cần duyệt trước khi dọn dung lượng
+
+Chỉ có trên máy dùng chung, khi tổng dung lượng xoá trong 24 giờ vượt 20 GB. **Chưa có gì bị xoá.** Gửi lệnh trong thông báo cho quản trị viên.
+
+## SYS-001: Chưa dùng được GPU lúc này
+
+Mỗi lúc chỉ một tác vụ nặng được dùng GPU.
+
+| Thông báo | Ý nghĩa | Nên làm |
+|---|---|---|
+| … đang chạy "…" từ … | Tác vụ khác đang dùng GPU | Đợi trong hàng chờ, hoặc huỷ |
+| Khoá máy … vẫn còn nhưng tiến trình đã dừng | Khoá bị bỏ lại | Báo quản trị viên kiểm tra |
+| Không đọc được file khoá máy | File khoá hỏng | Báo quản trị viên; app coi như máy đang bận |
+
+<Hint title="Vì sao app không tự gỡ khoá bị bỏ lại?">
+Tiến trình có thể vẫn đang chạy ở chỗ app không thấy, ví dụ trong container. Gỡ nhầm sẽ để hai tác vụ cùng dùng GPU và có thể làm hỏng cả hai. Quản trị viên kiểm tra rồi mới gỡ.
+</Hint>
+
+## Tự kiểm tra bằng dòng lệnh
+
+Cả ba lệnh dưới đây chỉ đọc, không thay đổi gì:
+
+```bash
+uv run python scripts/cleanup/preflight.py --est-peak-gb 40 --ckpt-gb 9
+uv run python -m vlm_pipeline.common.gpu_lock status
+uv run python scripts/cleanup/disk_report.py --no-write
+```
