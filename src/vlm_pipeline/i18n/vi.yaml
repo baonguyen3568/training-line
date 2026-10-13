@@ -1067,3 +1067,31 @@ standards:
     duplicates: "Hơn {above}% mẫu bị trùng lặp. Mẫu trùng làm model học lệch; nên bỏ bớt."
     train_eval_leak: "Có mẫu train trùng với câu hỏi trong bộ chấm điểm. Điểm sẽ cao giả; hãy bỏ các mẫu đó."
     image_seen_in_eval: "Có ảnh train cũng xuất hiện trong bộ chấm điểm (với câu hỏi khác). Điểm có thể cao hơn thực tế một chút."
+docs_placeholder:
+  _fallback: "…"
+  node: tên bước
+  node_type: loại bước
+  node_id: mã bước
+  model: tên model
+  saved_at: thời điểm lưu
+  param: tên thiết lập
+  port: tên cổng
+  image: tên môi trường
+  name: tên
+  path: đường dẫn
+  license_ids: tên giấy phép
+  who: người đang dùng
+  job: tên công việc
+  workflow_version: phiên bản trong file
+  installed_version: phiên bản đã cài
+  field: tên trường
+  rule: tên quy tắc
+  packages: tên gói
+  a: bước thứ nhất
+  b: bước thứ hai
+  type_a: kiểu thứ nhất
+  type_b: kiểu thứ hai
+  nodes: danh sách bước
+  use: cách dùng
+  value: giá trị
+  since: thời điểm bắt đầu

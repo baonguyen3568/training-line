@@ -1067,3 +1067,31 @@ standards:
     duplicates: "More than {above}% of samples are duplicates. Duplicates skew training; consider removing them."
     train_eval_leak: "Some training samples match questions in the benchmark. Scores would be inflated; remove those samples."
     image_seen_in_eval: "Some training images also appear in the benchmark (with different questions). Scores may be slightly higher than reality."
+docs_placeholder:
+  _fallback: "…"
+  node: step name
+  node_type: step type
+  node_id: step ID
+  model: model name
+  saved_at: save time
+  param: setting name
+  port: port name
+  image: environment name
+  name: name
+  path: path
+  license_ids: license names
+  who: current user
+  job: job name
+  workflow_version: version in the file
+  installed_version: installed version
+  field: field name
+  rule: rule name
+  packages: package names
+  a: first step
+  b: second step
+  type_a: first type
+  type_b: second type
+  nodes: list of steps
+  use: usage
+  value: value
+  since: start time
