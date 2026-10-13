@@ -31,6 +31,8 @@ export interface NodeRunState {
   /** D5: queued for memory / the GPU lock (node_state); cleared by the next node_status. */
   waiting?: {
     state: "waiting_memory" | "waiting_gpu";
+    reason?: string;
+    retry_in_s?: number;
     need_gb?: number;
     avail_gb?: number;
     waited_s?: number;
@@ -362,6 +364,8 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
           const prev = run.nodes[ev.node_id] ?? { status: "running" as const };
           const waiting = {
             state: ev.state,
+            ...(ev.reason !== undefined ? { reason: ev.reason } : {}),
+            ...(ev.retry_in_s !== undefined ? { retry_in_s: ev.retry_in_s } : {}),
             ...(ev.need_gb !== undefined ? { need_gb: ev.need_gb } : {}),
             ...(ev.avail_gb !== undefined ? { avail_gb: ev.avail_gb } : {}),
             ...(ev.waited_s !== undefined ? { waited_s: ev.waited_s } : {}),

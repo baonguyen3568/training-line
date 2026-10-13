@@ -377,6 +377,10 @@ export interface NodeStateEvent {
   type: "node_state";
   node_id: string;
   state: "waiting_memory" | "waiting_gpu";
+  /** Why it waits, when it is not the plain queue: "gpu_alloc_transient" = a load hit CUDA OOM and is retried once. */
+  reason?: string;
+  /** Seconds until that automatic retry. */
+  retry_in_s?: number;
   need_gb?: number;
   avail_gb?: number;
   since?: number;

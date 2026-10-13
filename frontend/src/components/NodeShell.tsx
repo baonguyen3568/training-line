@@ -95,8 +95,15 @@ function StateGlyph({ icon, tone }: { icon: string; tone: "bad" | "warn" | "mute
  */
 function WaitingBadge({ waiting }: { waiting: NonNullable<NodeRunState["waiting"]> }) {
   const label = tpOptional(["node_state", waiting.state]) ?? t("node_state.queued"); // waiting_gpu copy may not exist yet
-  const why =
-    waiting.state === "waiting_gpu"
+  // a known reason (e.g. a CUDA OOM at load retried once) says what happens next; unknown → the plain sentence
+  const reasoned = waiting.reason
+    ? tpOptional(["node_state", "waiting_reason", waiting.reason], {
+        seconds: Math.round(waiting.retry_in_s ?? 0), // from the server (120 s today), never hard-coded
+      })
+    : undefined;
+  const why = reasoned
+    ? reasoned
+    : waiting.state === "waiting_gpu"
       ? t("node_state.waiting_gpu_tooltip")
       : waiting.need_gb !== undefined && waiting.avail_gb !== undefined
         ? t("node_state.waiting_memory_tooltip", {
