@@ -1095,3 +1095,5 @@ docs_placeholder:
   use: cách dùng
   value: giá trị
   since: thời điểm bắt đầu
+docs_error:
+  actions_lead: "Tuỳ trường hợp, app sẽ đề xuất một trong các cách sau:"
