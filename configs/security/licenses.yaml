@@ -451,7 +451,7 @@ assets:
     commercial: "yes"
     derivatives: "yes"
     obligations: "dev/test only (E2E), not shipped in dist; keep LICENSE + NOTICE if ever redistributed"
-    scope: [dev]
+    scope: [dev, site-dev]
     reviewer: bao-security  # approved 2026-10-12; LICENSE + NOTICE read by bao-tester; dev-only (chromium headless shell + ffmpeg-1011 in .cache/ms-playwright, not distributed)
     date: 2026-10-12
   - repo_id: npm:playwright
@@ -462,7 +462,7 @@ assets:
     commercial: "yes"
     derivatives: "yes"
     obligations: "dev/test only (E2E), not shipped in dist; keep LICENSE + NOTICE if ever redistributed"
-    scope: [dev]
+    scope: [dev, site-dev]
     reviewer: bao-security  # approved 2026-10-12; LICENSE + NOTICE read by bao-tester; dev-only (chromium headless shell + ffmpeg-1011 in .cache/ms-playwright, not distributed)
     date: 2026-10-12
   - repo_id: npm:playwright-core
