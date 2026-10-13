@@ -65,3 +65,4 @@
 - 2026-10-13 Template Parse: ckpt + val chỉ ở ranh giới epoch (AutoModel 26.08-6 luôn val khi ckpt, không tách được). Ước ~115–118 phút cho 3 lượt (trước 153'). Resume lùi tối đa 1 epoch. Epochs = 1|2|3|5, mặc định 3.
 - 2026-10-13 ✅ SỐ CÔNG BỐ template Đọc hoá đơn (Parse v1.1, P-3b s299): CORD test F1 70.97 CI95 [66.3, 75.4], nTED 78.7, parse_fail 0%, truncated 0%, 100 ảnh, worktree sạch, tất định 100/100. benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json.
 - 2026-10-13 P017 (run claims + attempt dir) duyệt hướng đi; tối đa 10 attempt/node. Stale running runs tự chuyển interrupted (SYS-003) khi app khởi động + mỗi lượt scheduler. GPU_LOCK who ghi caller thật.
+- 2026-10-13 Nén: parity 2 mức (warn bàn giao model / fail khi hỏng hẳn). QUANT-EVAL-DOWNSTREAM là WARNING (giữ tự do cho user giỏi); template nén luôn có Đo điểm; thiếu Đo điểm + parity warn → badge cảnh báo + ghi NOTICE/model card khi export.
