@@ -25,6 +25,21 @@ REVISION_PATTERN = r"^[0-9a-f]{40}$"
 Tier = Literal["default", "template", "catalog", "baseline", "rnd"]
 
 
+# Required notice sentences (Proposal 012 §2.2): research-written, security-approved, copied into an export's NOTICE.
+# The export fills {repo} {revision} {date} {tool}; any other {placeholder} is kept visible, never dropped.
+Notices = tuple[str, ...]
+
+
+class ModelPart(BaseModel):
+    """Part of a model snapshot licensed separately from the weights (e.g. Parse's CC-BY-4.0 tokenizer)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str = Field(min_length=1)
+    license: str = Field(min_length=1)
+    notices: Notices = ()
+
+
 def _empty_as_none(value: object) -> object:
     return None if value == [] else value  # the YAML writes `[]` for "not fixed"
 
@@ -70,6 +85,8 @@ class CatalogEntry(BaseModel):
     task_prompt_fixed: bool
     gallery_gates: tuple[str, ...]
     min_image: str
+    notices: Notices = ()
+    model_parts: tuple[ModelPart, ...] = ()
 
     @property
     def sft_trainable_pct(self) -> tuple[float, float] | None:
@@ -169,6 +186,7 @@ class DatasetEntry(BaseModel):
     loader: str = Field(pattern=r"^[a-z_][a-z0-9_]*$")
     gated: bool
     disk_gb: float = Field(gt=0)
+    notices: Notices = ()
 
     @model_validator(mode="after")
     def _heldout_are_splits(self) -> Self:
