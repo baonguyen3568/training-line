@@ -637,6 +637,86 @@ node:
       dataset: Dữ liệu
       train: Dữ liệu học
       val: Dữ liệu kiểm tra
+  data.filter:
+    title: Lọc dữ liệu
+    desc: Bỏ các mẫu có ảnh quá nhỏ, ảnh hỏng hoặc đáp án quá dài, trước khi train.
+    param:
+      min_short_side_px:
+        label: Cạnh ngắn tối thiểu (px)
+        help: Ảnh có cạnh ngắn nhỏ hơn số này sẽ bị bỏ, vì quá nhỏ để model đọc được chữ.
+      max_target_chars:
+        label: Đáp án dài tối đa (ký tự)
+        help: Mẫu có đáp án dài hơn số này sẽ bị bỏ, vì dễ bị cắt cụt khi train.
+      drop_broken:
+        label: Bỏ ảnh hỏng
+        help: Bỏ ảnh không mở được hoặc sai định dạng thay vì báo lỗi giữa chừng.
+      max_long_side_px:
+        label: Cạnh dài tối đa (px)
+        help: Ảnh có cạnh dài hơn số này sẽ bị bỏ để tránh tốn RAM.
+      max_megapixels:
+        label: Kích thước ảnh tối đa (megapixel)
+        help: Ảnh lớn hơn số megapixel này sẽ bị bỏ để tránh tốn RAM (tối đa 40).
+      min_target_chars:
+        label: Đáp án ngắn tối thiểu (ký tự)
+        help: Mẫu có đáp án ngắn hơn số này (ví dụ đáp án rỗng) sẽ bị bỏ.
+    port:
+      dataset: Dữ liệu
+  data.dedupe:
+    title: Bỏ mẫu trùng
+    desc: Bỏ các mẫu trùng nhau, và bỏ mẫu train trùng ảnh với dữ liệu kiểm tra, để điểm đo không cao hơn thực tế.
+    param:
+      compare:
+        label: Cách so trùng
+        help: '"Giống hệt" chỉ bỏ file ảnh giống từng byte; "Gần giống" bỏ cả ảnh đã đổi cỡ hoặc nén lại.'
+      check_leak:
+        label: Bỏ mẫu trùng với dữ liệu kiểm tra
+        help: Nếu ảnh dùng để train cũng có trong dữ liệu kiểm tra (cổng "Dữ liệu kiểm tra"), model sẽ được chấm trên chính ảnh nó đã học và điểm sẽ cao hơn thực tế. Nên bật.
+      dhash_max_distance:
+        label: Độ lệch tối đa khi so gần giống
+        help: Chỉ dùng với "Gần giống". Số càng lớn thì càng nhiều ảnh bị coi là trùng (0–16).
+    port:
+      dataset: Dữ liệu
+      heldout: Dữ liệu kiểm tra
+  data.format_convert:
+    title: Đổi định dạng dữ liệu
+    desc: Chuyển dữ liệu dạng LLaVA hoặc ShareGPT sang dạng hội thoại mà app dùng để train.
+    param:
+      input_format:
+        label: Định dạng gốc
+        help: Để "Tự nhận biết" nếu không chắc; app sẽ báo nếu không nhận ra.
+      system_prompt:
+        label: Lời dặn chung (system prompt)
+        help: Câu dặn chung thêm vào đầu mọi hội thoại. Để trống nếu không cần.
+    port:
+      dataset: Dữ liệu
+  data.mix:
+    title: Trộn dữ liệu
+    desc: Gộp 2 đến 4 bộ dữ liệu thành một bộ để train.
+    param:
+      strategy:
+        label: Cách trộn
+        help: '"Nối tiếp" gộp hết mọi mẫu; "Xen kẽ" lấy mẫu theo tỉ lệ đã đặt.'
+      weight_1:
+        label: Tỉ lệ bộ 1
+        help: Chỉ dùng khi xen kẽ. Tỉ lệ tương đối so với các bộ khác.
+      weight_2:
+        label: Tỉ lệ bộ 2
+        help: Chỉ dùng khi xen kẽ. Tỉ lệ tương đối so với các bộ khác.
+      weight_3:
+        label: Tỉ lệ bộ 3
+        help: Chỉ dùng khi xen kẽ và có nối bộ 3.
+      weight_4:
+        label: Tỉ lệ bộ 4
+        help: Chỉ dùng khi xen kẽ và có nối bộ 4.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
+    port:
+      dataset_1: Bộ dữ liệu 1
+      dataset_2: Bộ dữ liệu 2
+      dataset_3: Bộ dữ liệu 3
+      dataset_4: Bộ dữ liệu 4
+      dataset: Dữ liệu đã trộn
   data.preview:
     title: Xem trước dữ liệu
     desc: Xem vài mẫu và các lỗi thường gặp trước khi train.
@@ -674,6 +754,9 @@ node:
       lora_alpha:
         label: LoRA alpha
         help: Độ mạnh của phần học thêm (8–128). Nên giữ mặc định.
+      quantize_base:
+        label: Nén model gốc khi học (QLoRA)
+        help: Nén model gốc xuống 4-bit để tiết kiệm bộ nhớ khi học. Chỉ có lợi với model lớn (từ ~9B). Chưa dùng được trên máy này.
     port:
       base_model: Model gốc
       train_data: Dữ liệu học
@@ -972,6 +1055,21 @@ sample_limit:
   '100': 100 mẫu
   '500': 500 mẫu
   '1000': 1000 mẫu
+dedupe_method:
+  sha256: Giống hệt
+  dhash: Gần giống
+input_format:
+  auto: Tự nhận biết
+  llava: LLaVA
+  sharegpt: ShareGPT
+  hf_messages: Hội thoại (HF messages)
+mix_strategy:
+  concat: Nối tiếp
+  interleave_under: Xen kẽ (dừng khi một bộ hết mẫu)
+  interleave_over: Xen kẽ (lặp lại bộ ít mẫu)
+quantize_base:
+  none: Không nén
+  nf4: 4-bit (QLoRA)
 lr_preset:
   slow: Chậm – an toàn
   medium: Vừa

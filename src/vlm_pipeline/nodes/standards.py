@@ -20,7 +20,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from vlm_pipeline.common.catalog import CatalogEntry, DatasetEntry, load_catalog, load_dataset_catalog
-from vlm_pipeline.nodes.data import DATA_SPLIT
+from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.rules import origin_model_id
 from vlm_pipeline.nodes.source import DATA_HF_LOAD, DATA_LOCAL_FOLDER
 from vlm_pipeline.nodes.spec import GraphRule, GraphView, Issue, NodeSpec
@@ -333,13 +333,15 @@ def _check_against_repo(rule: Rule, by_type: Mapping[str, NodeSpec], root: Path,
 
 
 def _dataset_upstream(view: GraphView, node_id: str, port: str) -> tuple[str, Any] | None:
-    """(source node type, its validated params) of the data source feeding ``port``, through data.split."""
+    """(source node type, its validated params) of the data source feeding ``port``, through same-dataset nodes."""
     current = view.source(node_id, port)
     seen: set[str] = set()
     while current is not None and current not in seen:
         seen.add(current)
         spec = view.specs[current]
-        if spec.type_id == DATA_SPLIT.type_id:
+        if spec.type_id == DATA_SPLIT.type_id or spec.type_id in PASS_THROUGH:
+            # Still the same dataset: a split / filter / dedupe only removes samples, so catalog counts stay an upper
+            # bound and the "too few samples" checks never fire wrongly through them.
             current = view.source(current, "dataset")
             continue
         return spec.type_id, view.params.get(current)

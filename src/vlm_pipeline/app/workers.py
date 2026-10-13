@@ -625,6 +625,10 @@ def _check_train(q: SupportQuery) -> None:
             "train node not vetted for this model",
             params={"node": q.node_id, "model": q.model.display_name, "supported": q.model.train_node},
         )
+    if getattr(q.params, "quantize_base", "none") != "none":  # QLoRA: offered disabled until smoke-tested on GB10
+        raise NodeNotRunnableError(
+            "QLoRA (quantize_base) is not runnable yet", params={"node": q.node_id, "node_type": q.spec.type_id}
+        )
 
 
 def _check_merge(q: SupportQuery) -> None:

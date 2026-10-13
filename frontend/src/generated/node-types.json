@@ -355,6 +355,342 @@
     },
     {
       "cacheable": true,
+      "category": "data",
+      "icon": "filter",
+      "inputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "drop_broken": {
+            "default": true,
+            "title": "Drop Broken",
+            "type": "boolean",
+            "x-ui": {
+              "order": 2
+            }
+          },
+          "max_long_side_px": {
+            "default": 4096,
+            "maximum": 8192,
+            "minimum": 512,
+            "title": "Max Long Side Px",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "max_megapixels": {
+            "default": 40.0,
+            "maximum": 40,
+            "minimum": 1,
+            "title": "Max Megapixels",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "max_target_chars": {
+            "default": 8000,
+            "maximum": 100000,
+            "minimum": 100,
+            "title": "Max Target Chars",
+            "type": "integer",
+            "x-ui": {
+              "order": 1
+            }
+          },
+          "min_short_side_px": {
+            "default": 64,
+            "maximum": 1024,
+            "minimum": 16,
+            "title": "Min Short Side Px",
+            "type": "integer",
+            "x-ui": {
+              "order": 0,
+              "summary": true
+            }
+          },
+          "min_target_chars": {
+            "default": 1,
+            "maximum": 1000,
+            "minimum": 0,
+            "title": "Min Target Chars",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "FilterParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "data.filter",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "data",
+      "icon": "copy",
+      "inputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "heldout": {
+          "many": true,
+          "optional": true,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "check_leak": {
+            "default": true,
+            "title": "Check Leak",
+            "type": "boolean",
+            "x-ui": {
+              "order": 1
+            }
+          },
+          "compare": {
+            "default": "sha256",
+            "enum": [
+              "sha256",
+              "dhash"
+            ],
+            "title": "Compare",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "dedupe_method",
+              "order": 0,
+              "summary": true
+            }
+          },
+          "dhash_max_distance": {
+            "default": 4,
+            "maximum": 16,
+            "minimum": 0,
+            "title": "Dhash Max Distance",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "DedupeParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "data.dedupe",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "data",
+      "icon": "file-text",
+      "inputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "input_format": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "llava",
+              "sharegpt",
+              "hf_messages"
+            ],
+            "title": "Input Format",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "input_format",
+              "order": 0,
+              "summary": true
+            }
+          },
+          "system_prompt": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "System Prompt",
+            "type": "string",
+            "x-ui": {
+              "order": 1,
+              "widget": "textarea"
+            }
+          }
+        },
+        "title": "FormatConvertParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "data.format_convert",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "data",
+      "icon": "layers",
+      "inputs": {
+        "dataset_1": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "dataset_2": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "dataset_3": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        },
+        "dataset_4": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "strategy": {
+            "default": "concat",
+            "enum": [
+              "concat",
+              "interleave_under",
+              "interleave_over"
+            ],
+            "title": "Strategy",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "mix_strategy",
+              "order": 0,
+              "summary": true
+            }
+          },
+          "weight_1": {
+            "default": 1.0,
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Weight 1",
+            "type": "number",
+            "x-ui": {
+              "order": 1
+            }
+          },
+          "weight_2": {
+            "default": 1.0,
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Weight 2",
+            "type": "number",
+            "x-ui": {
+              "order": 2
+            }
+          },
+          "weight_3": {
+            "default": 1.0,
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Weight 3",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "weight_4": {
+            "default": 1.0,
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Weight 4",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "MixParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "host",
+      "type_id": "data.mix",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
       "category": "train",
       "icon": "train",
       "inputs": {
@@ -477,6 +813,22 @@
             "type": "integer",
             "x-ui": {
               "advanced": true
+            }
+          },
+          "quantize_base": {
+            "default": "none",
+            "enum": [
+              "none",
+              "nf4"
+            ],
+            "title": "Quantize Base",
+            "type": "string",
+            "x-ui": {
+              "advanced": true,
+              "disabled_options": {
+                "nf4": "param_unsupported.worker_v1"
+              },
+              "option_keys": "quantize_base"
             }
           },
           "seed": {
@@ -855,11 +1207,17 @@
             }
           },
           "format": {
-            "const": "fp8",
             "default": "fp8",
+            "enum": [
+              "fp8",
+              "nvfp4"
+            ],
             "title": "Format",
             "type": "string",
             "x-ui": {
+              "disabled_options": {
+                "nvfp4": "param_unsupported.worker_v1"
+              },
               "option_keys": "quantize_preset",
               "order": 0,
               "summary": true

@@ -637,6 +637,86 @@ node:
       dataset: Data
       train: Training data
       val: Validation data
+  data.filter:
+    title: Filter data
+    desc: Drop samples whose image is too small or broken, or whose answer is too long, before training.
+    param:
+      min_short_side_px:
+        label: Minimum short side (px)
+        help: Images with a shorter side below this are dropped; they are too small for the model to read text.
+      max_target_chars:
+        label: Maximum answer length (characters)
+        help: Samples with a longer answer are dropped; they would be cut off during training.
+      drop_broken:
+        label: Drop broken images
+        help: Skip images that cannot be opened instead of failing halfway.
+      max_long_side_px:
+        label: Maximum long side (px)
+        help: Images with a longer side above this are dropped to save memory.
+      max_megapixels:
+        label: Maximum image size (megapixels)
+        help: Images larger than this are dropped to save RAM (at most 40).
+      min_target_chars:
+        label: Minimum answer length (characters)
+        help: Samples with a shorter answer (for example an empty one) are dropped.
+    port:
+      dataset: Data
+  data.dedupe:
+    title: Remove duplicates
+    desc: Drop duplicate samples, and training samples whose image is also in the test data, so scores stay honest.
+    param:
+      compare:
+        label: How to compare
+        help: '"Identical" drops byte-identical images only; "Near-identical" also drops resized or re-compressed copies.'
+      check_leak:
+        label: Drop samples that match the test data
+        help: If a training image is also in the test data (the "Test data" port), the model is scored on images it has already learned and the score looks better than it is. Keep it on.
+      dhash_max_distance:
+        label: Maximum difference for near-identical
+        help: Only with "Near-identical". Higher means more images count as duplicates (0–16).
+    port:
+      dataset: Data
+      heldout: Test data
+  data.format_convert:
+    title: Convert data format
+    desc: Turn LLaVA or ShareGPT style data into the chat format the app trains on.
+    param:
+      input_format:
+        label: Original format
+        help: Keep "Detect automatically" if unsure; the app tells you when it cannot recognise it.
+      system_prompt:
+        label: General instruction (system prompt)
+        help: A general instruction added at the start of every conversation. Leave empty if not needed.
+    port:
+      dataset: Data
+  data.mix:
+    title: Mix data
+    desc: Combine 2 to 4 datasets into one for training.
+    param:
+      strategy:
+        label: How to mix
+        help: '"One after another" keeps every sample; "Interleave" samples by the shares you set.'
+      weight_1:
+        label: Share of set 1
+        help: Interleave only. Relative to the other sets.
+      weight_2:
+        label: Share of set 2
+        help: Interleave only. Relative to the other sets.
+      weight_3:
+        label: Share of set 3
+        help: Interleave only, when set 3 is wired.
+      weight_4:
+        label: Share of set 4
+        help: Interleave only, when set 4 is wired.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
+    port:
+      dataset_1: Dataset 1
+      dataset_2: Dataset 2
+      dataset_3: Dataset 3
+      dataset_4: Dataset 4
+      dataset: Mixed data
   data.preview:
     title: Preview data
     desc: Look at a few samples and common problems before training.
@@ -674,6 +754,9 @@ node:
       lora_alpha:
         label: LoRA alpha
         help: Strength of the add-on (8–128). Keep the default.
+      quantize_base:
+        label: Compress the base model while training (QLoRA)
+        help: Loads the base model in 4-bit to save memory while training. Only pays off for large models (~9B and up). Not available on this machine yet.
     port:
       base_model: Base model
       train_data: Training data
@@ -972,6 +1055,21 @@ sample_limit:
   '100': 100 samples
   '500': 500 samples
   '1000': 1000 samples
+dedupe_method:
+  sha256: Identical
+  dhash: Near-identical
+input_format:
+  auto: Detect automatically
+  llava: LLaVA
+  sharegpt: ShareGPT
+  hf_messages: Chat (HF messages)
+mix_strategy:
+  concat: One after another
+  interleave_under: Interleave (stop when one set runs out)
+  interleave_over: Interleave (repeat the smaller sets)
+quantize_base:
+  none: No compression
+  nf4: 4-bit (QLoRA)
 lr_preset:
   slow: Slow – safe
   medium: Medium
