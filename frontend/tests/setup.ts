@@ -1,5 +1,9 @@
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach } from "vitest";
+
+// Shared host: with a GPU job next door (load 9-14) a cold first render can take > 1 s, so findBy*/waitFor
+// timed out in full runs while every file passed alone (run-monitor, storage-panel, settings-panel, 2026-10-13).
+configure({ asyncUtilTimeout: 5000 });
 
 // Global zustand stores outlive a test: reset them so results never depend on test order.
 // Imported lazily so test files can stub VITE_MOCK_API before src/api is first evaluated.
