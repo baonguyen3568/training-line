@@ -19,3 +19,4 @@
 2. Không service compose nào bind gốc repo (kể cả compose dev); chỉ bind thư mục con. Có test parse `docker compose config`.
 3. Git: `.gitignore` `.env.*` (đã có) + gitleaks + scan_tokens tracked.
 4. Người/agent: không đọc/in `.env*`. README cảnh báo không zip/chia sẻ thư mục dự án khi còn `.env.local`.
+- Amendment (2026-10-13): HF token có quyền write → CẢNH BÁO (không từ chối), vì user chấp nhận giữ token hiện tại (U3). UI cảnh báo 1 lần lúc lưu + link hướng dẫn token Read; audit `warning:write_scope`; 5 bảo vệ bù (P015 §6.1) bắt buộc. Khoá AEAD: ~/.config/ntc-training/secrets.key.
