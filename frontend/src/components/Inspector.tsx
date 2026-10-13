@@ -16,6 +16,7 @@ import { selfAndDownstream } from "../lib/topo";
 import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
+import { AdvancedOptions } from "./AdvancedOptions";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
 import { ImageUpload } from "./ImageUpload";
@@ -657,6 +658,30 @@ export function Inspector() {
             optionMinutes={name === "epochs" ? nodeEst?.by_epochs : undefined}
           />
         ))}
+      {showAdvanced && props.advanced?.["x-ui"]?.widget === "advanced" && (
+        // P016 §3 engine options: their own panel, Advanced only (the generic rows skip this object param)
+        <section className="field adv-field" aria-labelledby="adv-label">
+          <h3 id="adv-label" className="adv-title">
+            {tp(["node", node.type, "param", "advanced", "label"])}
+            {tpOptional(["node", node.type, "param", "advanced", "help"]) && (
+              <>
+                <button
+                  type="button"
+                  className="help-btn inline"
+                  popoverTarget="help-advanced-panel"
+                  aria-label={t("d4.explain")}
+                >
+                  <Icon name="circle-question-mark" size={14} />
+                </button>
+                <span id="help-advanced-panel" popover="auto" className="pop">
+                  {tpOptional(["node", node.type, "param", "advanced", "help"])}
+                </span>
+              </>
+            )}
+          </h3>
+          <AdvancedOptions nodeId={node.id} typeId={node.type} issues={issues} />
+        </section>
+      )}
       {node.type.startsWith("serve.") && run?.nodes[node.id]?.status === "completed" && (
         <TrialResult
           runId={run.id}

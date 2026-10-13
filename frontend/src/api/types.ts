@@ -404,6 +404,18 @@ export interface BugReport {
   ref_code?: string;
 }
 
+/** P016 §3 engine option (GET /api/node-types/{id}/advanced?model=), from configs/engine/automodel-*.json. */
+export interface AdvancedOption {
+  key: string;
+  group: string;
+  type: "bool" | "int" | "float" | "enum" | "list";
+  default: unknown;
+  choices: (string | number)[] | null;
+  min?: number | null;
+  max?: number | null;
+  templates: string[];
+}
+
 export interface NodeResetResult {
   deleted: string[];
   failed: string[];

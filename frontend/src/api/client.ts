@@ -4,6 +4,7 @@
 // and never localStorage. It changes on every server restart; a 403 csrf_invalid triggers one refresh + retry.
 import { getLocale } from "../i18n";
 import type {
+  AdvancedOption,
   BugReport,
   MetricsPage,
   MetricsQuery,
@@ -123,6 +124,8 @@ export interface Api {
     q: { nodeId?: string; code?: string },
     locale: string,
   ): Promise<BugReport>;
+  /** P016 §3: engine options of a train node, filtered to the model's template when `model` is given. */
+  advancedOptions(typeId: string, model: string | null): Promise<{ options: AdvancedOption[] }>;
   /** G-4. 422 on a malformed node. */
   nodeResetPlan(node: string, locale: string): Promise<NodeResetPlan>;
   /** 400 {code: CONFIRM_REQUIRED}, 403 {error: DISK-002 + admin_command}, 409 {code: PLAN_EXPIRED | … }. */
@@ -175,6 +178,11 @@ export const httpApi: Api = {
       runId ? `/api/runs/${encodeURIComponent(runId)}/bug-report?${qs}` : `/api/bug-report?${qs}`,
     );
   },
+  advancedOptions: (typeId, model) =>
+    request(
+      "GET",
+      `/api/node-types/${encodeURIComponent(typeId)}/advanced${model ? `?model=${encodeURIComponent(model)}` : ""}`,
+    ),
   nodeResetPlan: (node, locale) =>
     request(
       "GET",

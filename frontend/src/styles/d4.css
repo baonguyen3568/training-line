@@ -966,3 +966,103 @@
 .bug-report-preview a {
   color: var(--color-action-link);
 }
+/* P016 §3 "Tuỳ chọn engine": grouped dotted keys (mono, untranslated), changed rows bold with a reset */
+.adv-title {
+  display: flex;
+  align-items: center;
+  margin: var(--space-12) 0 var(--space-8);
+  font-size: var(--font-size-body);
+}
+.adv-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-8);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+.adv-search:focus-within {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+.adv-search input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  outline: none;
+}
+.adv-group {
+  border-top: 1px solid var(--color-grid);
+  padding: var(--space-4) 0;
+}
+.adv-group summary {
+  cursor: pointer;
+  font-size: var(--font-size-caption);
+}
+.adv-group ul {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+.adv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto 24px; /* key · control · ? · reset (icon, fixed slot) */
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-caption);
+}
+.adv-row code {
+  font-family: var(--font-family-mono);
+  overflow-wrap: anywhere;
+}
+.adv-row.changed label code {
+  font-weight: 700; /* changed is said by weight + reset + aria-description, never colour alone */
+  color: var(--color-text-primary);
+}
+.adv-row input[type="number"],
+.adv-row input[type="text"],
+.adv-row select {
+  width: 120px;
+  height: 26px;
+}
+.adv-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+button.hairline.sm {
+  padding: 2px var(--space-8);
+  font-size: var(--font-size-caption);
+}
+.adv-reset,
+.adv-reset-slot {
+  width: 24px;
+  height: 24px;
+}
+.adv-reset {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.adv-reset:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+.adv-row input[type="number"],
+.adv-row input[type="text"],
+.adv-row select {
+  width: 96px;
+}

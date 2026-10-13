@@ -1,0 +1,166 @@
+{
+  "options": [
+    {
+      "key": "dataloader.collate_fn.drop_overlong",
+      "type": "bool",
+      "default": false,
+      "choices": null,
+      "min": null,
+      "max": null,
+      "group": "dataloader.collate_fn",
+      "templates": [
+        "gemma-4-e2b-it",
+        "gemma-4-e4b-it",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    },
+    {
+      "key": "dataloader.collate_fn.max_length",
+      "type": "int",
+      "default": null,
+      "choices": null,
+      "min": 128,
+      "max": 32768,
+      "group": "dataloader.collate_fn",
+      "templates": [
+        "gemma-4-e2b-it",
+        "gemma-4-e4b-it",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    },
+    {
+      "key": "dataloader.drop_last",
+      "type": "bool",
+      "default": false,
+      "choices": null,
+      "min": null,
+      "max": null,
+      "group": "dataloader",
+      "templates": [
+        "cosmos-reason2-2b",
+        "cosmos-reason2-8b",
+        "gemma-4-e2b-it",
+        "gemma-4-e4b-it",
+        "nemotron-parse-2.0",
+        "nemotron-parse-v1.1",
+        "qwen3-vl-2b-instruct",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    },
+    {
+      "key": "dataloader.in_order",
+      "type": "bool",
+      "default": true,
+      "choices": null,
+      "min": null,
+      "max": null,
+      "group": "dataloader",
+      "templates": [
+        "cosmos-reason2-2b",
+        "cosmos-reason2-8b",
+        "gemma-4-e2b-it",
+        "gemma-4-e4b-it",
+        "nemotron-parse-2.0",
+        "nemotron-parse-v1.1",
+        "qwen3-vl-2b-instruct",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    },
+    {
+      "key": "dataloader.num_workers",
+      "type": "int",
+      "default": 0,
+      "choices": null,
+      "min": 0,
+      "max": 8,
+      "group": "dataloader",
+      "templates": [
+        "cosmos-reason2-2b",
+        "cosmos-reason2-8b",
+        "gemma-4-e2b-it",
+        "gemma-4-e4b-it",
+        "nemotron-parse-2.0",
+        "nemotron-parse-v1.1",
+        "qwen3-vl-2b-instruct",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    },
+    {
+      "key": "dataloader.persistent_workers",
+      "type": "bool",
+      "default": false,
+      "choices": null,
+      "min": null,
+      "max": null,
+      "group": "dataloader",
+      "templates": [
+        "cosmos-reason2-2b",
+        "cosmos-reason2-8b",
+        "gemma-4-e2b-it",
+        "gemma-4-e4b-it",
+        "nemotron-parse-2.0",
+        "nemotron-parse-v1.1",
+        "qwen3-vl-2b-instruct",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    },
+    {
+      "key": "dataloader.timeout",
+      "type": "float",
+      "default": 0,
+      "choices": null,
+      "min": 0,
+      "max": 600,
+      "group": "dataloader",
+      "templates": [
+        "cosmos-reason2-2b",
+        "cosmos-reason2-8b",
+        "gemma-4-e2b-it",
+        "gemma-4-e4b-it",
+        "nemotron-parse-2.0",
+        "nemotron-parse-v1.1",
+        "qwen3-vl-2b-instruct",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    },
+    {
+      "key": "model.backend.attn",
+      "type": "enum",
+      "default": "sdpa",
+      "choices": ["te", "sdpa", "flex", "eager", "tilelang"],
+      "min": null,
+      "max": null,
+      "group": "model.backend",
+      "templates": [
+        "cosmos-reason2-2b",
+        "cosmos-reason2-8b",
+        "qwen3-vl-2b-instruct",
+        "qwen3.5-0.8b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 
 import type { Api } from "../api/client";
 import type {
+  AdvancedOption,
   BugReport,
   NodeResetPlan,
   NodeResetResult,
@@ -29,6 +30,7 @@ import { tp } from "../i18n";
 import { parseJsonl } from "../lib/metrics";
 import { isCompatible } from "../lib/ports";
 import { stepNumbers } from "../lib/topo";
+import advancedFixture from "./fixtures/advanced-options.json";
 import s3aMetrics from "./fixtures/s3a.metrics.jsonl?raw";
 import s3aRun from "./fixtures/s3a.run.json";
 import storagePlanSample from "./fixtures/storage-plan.v3.json";
@@ -538,6 +540,13 @@ export const mockApi: Api = {
       app_version: "1.0.0-dev",
       gpu: "NVIDIA GB10 (DGX Spark)",
       ...(runId ? { ref_code: "a1b2c3d4e5f6" } : {}), // the server derives it; the mock only pretends
+    }),
+  // P016 §3: 8 real keys of configs/engine/automodel-26.08-6.json; filtered by template like the server
+  advancedOptions: (_typeId, model) =>
+    delay({
+      options: (advancedFixture.options as AdvancedOption[]).filter(
+        (o) => !model || o.templates.includes(model),
+      ),
     }),
   // G-4 (storage_reset.py shape): one finished attempt with a checkpoint; typed confirmation with the node title.
   nodeResetPlan: (node) => {
