@@ -38,7 +38,7 @@ SPECS = (
 # Container images are not pinned per node yet (M1 runs with the FakeWorker first).
 REGISTRY = Registry(
     SPECS,
-    rules=(*RULES, standards_rule(load_standards(project_root(), SPECS, check_sources=False))),  # P4-2
+    rules=(*RULES, standards_rule(load_standards(project_root(), SPECS))),  # P4-2: configs/standards/*.yaml
     allow_unpinned=True,
 )
 
