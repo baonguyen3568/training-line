@@ -1,4 +1,4 @@
-import type { NodeSpec } from "../api/types";
+import type { NodeSpec, Severity } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { untrustedText } from "./safeText";
 
@@ -18,3 +18,6 @@ export function workflowTitle(name: string): string {
   if (name === "untitled") return t("workflow.untitled");
   return tpOptional(["template", name, "title"]) ?? untrustedText(name, 60);
 }
+
+/** Glyph of an issue severity (CheckBar, inspector cards); a Record so a new severity fails the type check. */
+export const SEVERITY_GLYPH: Record<Severity, string> = { error: "✕", warn: "⚠", info: "ⓘ" };

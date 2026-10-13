@@ -993,3 +993,10 @@ textarea {
   width: 100%;
   font: inherit;
 }
+/* severity "info" (STD-001 standards): neutral, informational only */
+.issue.info > span:first-child {
+  color: var(--color-text-secondary);
+}
+.error-card.info {
+  border-left-color: var(--color-axis);
+}

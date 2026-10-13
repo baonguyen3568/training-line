@@ -2,7 +2,7 @@ import { useReactFlow } from "@xyflow/react";
 import { useState } from "react";
 import { t } from "../i18n";
 import { formatDuration, formatEstimate } from "../lib/format";
-import { nodeTitle } from "../lib/nodeText";
+import { nodeTitle, SEVERITY_GLYPH } from "../lib/nodeText";
 import { runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
 import { useWorkflow } from "../store/workflow";
@@ -18,6 +18,8 @@ export function CheckBar() {
 
   const errors = validation?.errors.filter((e) => e.severity === "error") ?? [];
   const warnings = validation?.errors.filter((e) => e.severity === "warn") ?? [];
+  // "info" (STD-001 standards, P4-2): shown in the details only, never counted as a problem, never blocks Run.
+  const infos = validation?.errors.filter((e) => e.severity === "info") ?? [];
   const badNodes = new Set(validation?.errors.map((e) => e.node_id).filter(Boolean));
   const total = workflow.nodes.length;
   const est = validation?.estimate;
@@ -137,7 +139,7 @@ export function CheckBar() {
                     })}
               </span>
             )}
-            {(errors.length > 0 || warnings.length > 0) && (
+            {(errors.length > 0 || warnings.length > 0 || infos.length > 0) && (
               <button
                 type="button"
                 className="link"
@@ -168,13 +170,13 @@ export function CheckBar() {
       </div>
       {open && (
         <ul className="issues">
-          {[...errors, ...warnings].map((e) => (
+          {[...errors, ...warnings, ...infos].map((e) => (
             <li
               key={`${e.code}-${e.node_id}-${e.port}-${e.param}-${e.what}`}
               className={`issue ${e.severity}`}
               data-code={e.code}
             >
-              <span aria-hidden="true">{e.severity === "error" ? "✕" : "⚠"}</span>
+              <span aria-hidden="true">{SEVERITY_GLYPH[e.severity]}</span>
               {/* Server-rendered copy is plain text; React escapes it. */}
               <span>
                 <strong>{e.title}</strong> — {e.what}

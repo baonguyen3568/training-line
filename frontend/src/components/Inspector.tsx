@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { NodeSpec, OptionMeta, ParamSchema, PortType, Workflow } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { formatEstimate } from "../lib/format";
-import { nodeDesc, nodeTitle, workflowTitle } from "../lib/nodeText";
+import { nodeDesc, nodeTitle, SEVERITY_GLYPH, workflowTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
 import { selfAndDownstream } from "../lib/topo";
@@ -390,7 +390,7 @@ export function Inspector() {
               data-code={e.code}
             >
               <strong>
-                {e.severity === "error" ? "✕" : "⚠"} {e.title}
+                {SEVERITY_GLYPH[e.severity]} {e.title}
               </strong>
               <p>{e.what}</p>
               {e.why && (
