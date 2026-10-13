@@ -465,8 +465,9 @@ def run_job(
 
     if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
         _check_gate(job, manifest, project_root)
+    pinned_id = image_digest(job.image)  # the id the gate approves is the id that runs (no retag window)
     check_pinned_image(  # before preflight/lock: cheap, no side effects
-        project_root, job.image, image_digest(job.image), require_approved=require_approved_image
+        project_root, job.image, pinned_id, require_approved=require_approved_image
     )
     waited = _wait_for_memory(
         manifest,
@@ -494,7 +495,7 @@ def run_job(
                 "git_commit": manifest.git_commit or commit,
                 "git_dirty": dirty if manifest.git_dirty is None else manifest.git_dirty,
                 "container_image": manifest.container_image or job.image,
-                "container_digest": manifest.container_digest or image_digest(job.image),
+                "container_digest": manifest.container_digest or pinned_id,  # what the gate approved = what runs
             }
         )
         write_manifest(run_dir, manifest)
@@ -514,7 +515,9 @@ def run_job(
             threading.Thread(target=_watch_cancel, name=f"cancel-{container}", daemon=True).start()
         log_path = run_dir / "logs" / "stdout.log"
         _, guard = run_guarded(
-            lambda: launcher.run(job, project_root, lock_token=handle.info.token, log_path=log_path),
+            lambda: launcher.run(
+                job, project_root, lock_token=handle.info.token, log_path=log_path, image_id=pinned_id
+            ),
             log_path,
             on_abort=lambda: launcher.stop(container, STOP_GRACE_S),
             hard_exit=lambda: launcher.kill(container),

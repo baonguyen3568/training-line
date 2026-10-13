@@ -21,8 +21,13 @@ if TYPE_CHECKING:
 class JobLauncher(Protocol):
     def image_id(self, image: str) -> str | None: ...
 
-    def run(self, job: ContainerJob, project_root: Path, *, lock_token: str | None, log_path: Path) -> int:
-        """Start the container, block until it exits (output appended to ``log_path``); returns the exit code."""
+    def run(
+        self, job: ContainerJob, project_root: Path, *, lock_token: str | None, log_path: Path, image_id: str | None
+    ) -> int:
+        """Start the container, block until it exits (output appended to ``log_path``); returns the exit code.
+
+        ``image_id``: the id the image gate checked; the container runs THAT id, not whatever the tag points at now.
+        """
         ...
 
     def stop(self, name: str, grace_s: int) -> None:
@@ -48,10 +53,15 @@ class LocalDockerLauncher:
         except (OSError, subprocess.CalledProcessError):
             return None
 
-    def run(self, job: ContainerJob, project_root: Path, *, lock_token: str | None, log_path: Path) -> int:
+    def run(
+        self, job: ContainerJob, project_root: Path, *, lock_token: str | None, log_path: Path, image_id: str | None
+    ) -> int:
+        import dataclasses
+
         from vlm_pipeline.common.jobrun import docker_args
 
-        argv = docker_args(job, project_root, lock_token=lock_token, image_id=self.image_id(job.image))
+        pinned = dataclasses.replace(job, image=image_id) if image_id else job  # run by id, never re-resolve the tag
+        argv = docker_args(pinned, project_root, lock_token=lock_token, image_id=image_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("ab") as log:
             proc = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT)  # noqa: S603 - argv from docker_args
