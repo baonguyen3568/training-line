@@ -49,6 +49,9 @@ export interface UiHint {
   summary?: boolean;
   /** Per-option metadata (model catalog): label, tier (Simple hides rnd/baseline), RAM, gated, license. */
   option_meta?: Record<string, OptionMeta>;
+  /** Values the worker cannot run yet: shown dimmed and not selectable. Value → i18n reason key (null = generic).
+   * A value already in an old file stays shown (never silently changed); the STD-001 error still blocks Run. */
+  disabled_options?: Record<string, string | null>;
 }
 
 export interface OptionMeta {

@@ -81,6 +81,15 @@ function visibleOptions(schema: ParamSchema, mode: string, current: unknown): (s
   );
 }
 
+/** Reason text when this value is marked x-ui.disabled_options, else undefined. */
+function disabledReason(schema: ParamSchema, value: unknown): string | undefined {
+  const map = schema["x-ui"]?.disabled_options;
+  const key = String(value);
+  if (!map || !(key in map)) return undefined;
+  const reason = map[key];
+  return reason ? tp(reason.split(".")) : t("param_unsupported.default");
+}
+
 function ParamField({
   nodeType,
   name,
@@ -152,24 +161,46 @@ function ParamField({
             onChange(schema.enum?.find((o) => String(o) === e.target.value) ?? e.target.value)
           }
         >
-          {visibleOptions(schema, mode, current).map((opt) => (
-            <option key={String(opt)} value={String(opt)}>
-              {optionLabel(schema, opt, availGb)}
-            </option>
-          ))}
+          {visibleOptions(schema, mode, current).map((opt) => {
+            const off = disabledReason(schema, opt);
+            return (
+              // a dimmed option is still announced: its text carries "· chưa hỗ trợ"
+              <option
+                key={String(opt)}
+                value={String(opt)}
+                disabled={off !== undefined && opt !== current}
+              >
+                {optionLabel(schema, opt, availGb)}
+                {off !== undefined ? ` · ${t("param_unsupported.default")}` : ""}
+              </option>
+            );
+          })}
         </select>
       </div>
     );
   }
   if (schema.type === "boolean") {
+    // "true" not runnable yet: locked off; an old file that has it on can still turn it off
+    const off = disabledReason(schema, true);
+    const locked = off !== undefined && !current;
     return (
       <label className="field check">
         <input
+          id={id}
           type="checkbox"
           checked={Boolean(current)}
+          disabled={locked}
+          aria-describedby={off !== undefined ? `${id}-unsupported` : undefined}
           onChange={(e) => onChange(e.target.checked)}
         />
         {label}
+        {off !== undefined && (
+          <span id={`${id}-unsupported`} className="unsupported">
+            {" "}
+            · {t("param_unsupported.default")}
+            <span className="sr-only">: {off}</span>
+          </span>
+        )}
       </label>
     );
   }

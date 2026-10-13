@@ -1091,3 +1091,7 @@ textarea {
 .react-flow__handle.hg-double-circle {
   box-shadow: inset 0 0 0 2.5px var(--color-surface);
 }
+.unsupported {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
