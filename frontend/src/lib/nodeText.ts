@@ -1,4 +1,4 @@
-import type { NodeSpec, Severity } from "../api/types";
+import type { NodeSpec } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { untrustedText } from "./safeText";
 

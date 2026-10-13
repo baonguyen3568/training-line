@@ -130,7 +130,6 @@ function WaitingBadge({ waiting }: { waiting: NonNullable<NodeRunState["waiting"
 
 /** Run state on the node face: icon + text (never color alone) and a 3px progress bar while running. */
 function RunBadge({ state }: { state: NodeRunState }) {
-  const d4 = useUi((s) => s.skin) === "d4";
   if (state.waiting && state.status === "running") return <WaitingBadge waiting={state.waiting} />;
   const percent = state.progress === undefined ? undefined : Math.round(state.progress * 100);
   const text =

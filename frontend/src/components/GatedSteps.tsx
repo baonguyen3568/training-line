@@ -3,7 +3,7 @@ import { api } from "../api";
 import type { SecretState } from "../api/types";
 import { t } from "../i18n";
 import { Icon } from "./Icon";
-import { SecretRow } from "./SettingsPanel";
+import { SecretRow } from "./SecretRow";
 
 const HF = "https://huggingface.co";
 

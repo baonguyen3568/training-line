@@ -55,7 +55,9 @@ describe("requestRun", () => {
     expect(useUi.getState().runMissingOpen).toBe(true);
     expect(run).not.toHaveBeenCalled();
     useUi.setState({ runMissingOpen: false });
-    useWorkflow.setState({ validation: { ...useWorkflow.getState().validation!, errors: [] } });
+    const v = useWorkflow.getState().validation;
+    if (!v) throw new Error("no validation");
+    useWorkflow.setState({ validation: { ...v, errors: [] } });
     requestRun();
     expect(run).toHaveBeenCalled();
   });
