@@ -7,7 +7,7 @@ effective_date: "{{TODO_USER: ngày hiệu lực = ngày publish site, điền l
 # Điều khoản sử dụng
 
 ## 1. Phần mềm miễn phí, mã nguồn mở
-Mã nguồn {{PRODUCT_NAME}} được phát hành theo **Giấy phép Apache 2.0**. Bạn được dùng, sửa, phân phối lại, kể cả
+Mã nguồn {{PRODUCT_NAME}} ([github.com/baonguyen3568/training-line](https://github.com/baonguyen3568/training-line)) được phát hành theo **Giấy phép Apache 2.0**. Bạn được dùng, sửa, phân phối lại, kể cả
 cho mục đích thương mại, miễn là tuân thủ giấy phép đó (giữ thông báo bản quyền, file LICENSE và NOTICE, ghi rõ
 thay đổi). Không có gói trả phí và không thu phí sử dụng. Khi có khác biệt giữa trang này và giấy phép Apache 2.0
 đối với mã nguồn, giấy phép Apache 2.0 được ưu tiên.

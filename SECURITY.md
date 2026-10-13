@@ -1,6 +1,6 @@
 # Security Policy
 
-Vietnamese version (source for the website): [`docs/legal/bao-mat-va-bao-cao-lo-hong.md`](docs/legal/bao-mat-va-bao-cao-lo-hong.md).
+Source code: <https://github.com/baonguyen3568/training-line>. Vietnamese version (source for the website): [`docs/legal/bao-mat-va-bao-cao-lo-hong.md`](docs/legal/bao-mat-va-bao-cao-lo-hong.md).
 
 ## Reporting a vulnerability
 
