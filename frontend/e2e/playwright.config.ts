@@ -2,10 +2,17 @@
 // E2E_TIER=mock (default): static build with the in-browser mock API.
 // E2E_TIER=app: real FastAPI + executor + FakeWorker (scripts/qa/e2e_app.py) serving a separate build.
 // Both serve a STATIC build (no HMR): other agents editing src/ in the shared tree cannot reload the page.
+// E2E_TIER=external: an app already running (the compose stack), E2E_BASE_URL = http://127.0.0.1:<port>; only
+// compose.e2e.ts runs (the other specs press Run, which there starts REAL jobs). No trace (the login token is in a
+// URL), no web server.
 import { defineConfig } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 7879);
 const TIER = process.env.E2E_TIER ?? "mock";
+const EXTERNAL = TIER === "external";
+const BASE_URL = EXTERNAL ? (process.env.E2E_BASE_URL ?? "") : `http://127.0.0.1:${PORT}`;
+if (EXTERNAL && !/^http:\/\/127\.0\.0\.1:\d+$/.test(BASE_URL))
+  throw new Error("E2E_BASE_URL must be http://127.0.0.1:<port> (loopback only)");
 // never frontend/dist (served by the developer app); one per port, so two runs side by side never rebuild each
 // other's files mid-run (2026-10-13: a second run wiped the dist a x100 run was serving)
 const DIST = `../.cache/e2e-dist-${TIER}-${PORT}`;
@@ -21,7 +28,7 @@ const server =
 
 export default defineConfig({
   testDir: ".",
-  testMatch: /.*\.e2e\.ts$/,
+  testMatch: EXTERNAL ? /\/compose\.e2e\.ts$/ : /(?<!\/compose)\.e2e\.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -30,14 +37,15 @@ export default defineConfig({
   reporter: [["list"]],
   outputDir: `../../.cache/e2e-results/${TIER}-${STAMP}`,
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
+    baseURL: BASE_URL,
     browserName: "chromium",
     headless: true,
     // chromiumSandbox: false — host has kernel.apparmor_restrict_unprivileged_userns=1; accepted by bao-security
     // (P003, 2026-10-12) with request allowlist + scrubbed env (see fixtures.ts and scripts/qa/e2e.sh).
     launchOptions: { chromiumSandbox: false },
     serviceWorkers: "block", // a service worker could fetch around context.route
-    trace: "retain-on-failure", // only failed tests keep one; app-tier token is a per-run test token (e2e.sh)
+    // only failed tests keep one; app-tier token is a per-run test token (e2e.sh). External: never (a real token).
+    trace: EXTERNAL ? "off" : "retain-on-failure",
     video: "off",
     screenshot: "only-on-failure",
   },
@@ -52,12 +60,14 @@ export default defineConfig({
     },
     { name: "narrow-view", use: { viewport: { width: 1024, height: 768 } }, grep: /@narrow/ },
   ],
-  webServer: {
-    command: server,
-    cwd: "..", // frontend/ root
-    // app tier answers 401 on "/" without the session cookie; Playwright only needs the port to be up
-    port: PORT,
-    reuseExistingServer: false,
-    timeout: 180_000,
-  },
+  webServer: EXTERNAL
+    ? undefined
+    : {
+        command: server,
+        cwd: "..", // frontend/ root
+        // app tier answers 401 on "/" without the session cookie; Playwright only needs the port to be up
+        port: PORT,
+        reuseExistingServer: false,
+        timeout: 180_000,
+      },
 });

@@ -42,8 +42,13 @@ export const test = base.extend<{ blockedRequests: string[] }>({
       const token = process.env.E2E_TOKEN;
       if (token) {
         const page = await context.newPage();
-        await page.goto(`/?token=${token}`);
+        // The token must never reach a log or report: a failure here is rethrown without the URL.
+        const ok = await page
+          .goto(`/?token=${token}`)
+          .then((r) => r !== null && r.status() < 400)
+          .catch(() => false);
         await page.close();
+        if (!ok) throw new Error("login with E2E_TOKEN failed (URL withheld)");
       }
       await use(blocked);
       // The app must never call anything but its own origin (bao-security condition 1).
