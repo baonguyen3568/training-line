@@ -35,6 +35,7 @@ from vlm_pipeline.common.jobrun import (
     run_job,
 )
 from vlm_pipeline.common.model_ref import PickedModel, is_model_ref, resolve_model_ref, write_model_ref
+from vlm_pipeline.common.run_log import log_tail
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import (
@@ -494,7 +495,7 @@ class RealWorker:
                 75 if final.status == RunStatus.INTERRUPTED else (final.exit_code or 1),
                 oom_killed=bool(final.oom_killed),
                 cancelled_by_executor=final.status == RunStatus.CANCELLED,
-                log_tail=_tail(run_dir / "logs" / "stdout.log"),
+                log_tail=log_tail(run_dir),
             )
         port, out_type = next(iter(job.spec.outputs.items()))
         out = run_dir / "checkpoints" / "LATEST" / "model"
@@ -576,7 +577,7 @@ class RealWorker:
         if final.status != RunStatus.COMPLETED:
             raise ContainerExit(final.exit_code or 1, oom_killed=bool(final.oom_killed),
                                 cancelled_by_executor=final.status == RunStatus.CANCELLED,
-                                log_tail=_tail(run_dir / "logs" / "stdout.log"))  # fmt: skip
+                                log_tail=log_tail(run_dir))  # fmt: skip
         from vlm_pipeline.train.ckpt_complete import complete_from_base
 
         # Keys the HF class does not build (e.g. Qwen3.5 MTP head) are dropped on save: restore them from the base.
@@ -704,13 +705,6 @@ def _run_id_of(artifact: ArtifactRef) -> str | None:
     """Run id of a trained artifact (hash ``<run_id>:<config_hash>``), for run.json lineage."""
     head = artifact.hash.split(":", 1)[0]
     return head if ":" in artifact.hash and "@" not in head else None
-
-
-def _tail(path: Path, n: int = 30) -> str:
-    try:
-        return "\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-n:])
-    except OSError:
-        return ""
 
 
 __all__ = [

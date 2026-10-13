@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -551,6 +552,7 @@ def test_a_retry_resumes_from_the_earlier_attempt_checkpoint(tmp_path: Path, mon
     assert "checkpoint_dir: /workspace/outputs/graph/runs/t-0123456789abcdef-a2/checkpoints" in cfg
     assert seen[0].resumed_from == {"run": "t-0123456789abcdef", "checkpoint": "epoch_0_step_9"}  # C6 lease key
 
+
 def test_train_on_a_data_eval_folder_is_refused_before_the_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """DATA-007 at run time (the canvas rule's twin): benchmark test data under data/eval never trains."""
     from vlm_pipeline.common.heldout_data import HeldoutDataInTrainingError
@@ -574,3 +576,32 @@ def test_train_on_a_data_eval_folder_is_refused_before_the_job(tmp_path: Path, m
         w.run(train)
     assert err.value.code == "DATA-007"
 
+
+@pytest.mark.parametrize("kind", ["file", "link", "fifo"])
+def test_failure_log_tail_never_follows_a_job_made_link_or_fifo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    """The run dir is the job's: a stdout.log swapped for a link to a secret (or a FIFO) gives an empty tail."""
+    root = _root(tmp_path)
+    secret = root / ".cache" / "hf" / "token"
+    secret.parent.mkdir(parents=True, exist_ok=True)
+    secret.write_text("hf_SECRETSECRET\n")
+    w = RealWorker(root)
+    run_dir = root / "outputs" / "graph" / "g" / "n"
+
+    def failing(job: Any, m: RunManifest, d: Path, **kw: Any) -> RunManifest:
+        log = d / "logs" / "stdout.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.unlink(missing_ok=True)
+        if kind == "file":
+            log.write_text("step 1\nboom\n")
+        elif kind == "link":
+            log.symlink_to(secret)
+        else:
+            os.mkfifo(log)
+        return m.model_copy(update={"status": RunStatus.FAILED, "exit_code": 1})
+
+    monkeypatch.setattr(workers, "run_job", failing)
+    with pytest.raises(ContainerExit) as ei:
+        w.run(_job("train.lora_vlm", {}, run_dir, _train_inputs(w)))
+    assert ei.value.log_tail == ("step 1\nboom" if kind == "file" else "")
