@@ -28,6 +28,7 @@ class TemplateFile(BaseModel):
     tags: list[str]
     sample_data: bool
     requires_hf_account: bool = False
+    hidden: bool = False  # kept in the repo but not offered (e.g. no runnable model for it yet): never in the gallery
     workflow: dict[str, Any]
 
 
@@ -48,11 +49,16 @@ def _estimate(workflow: dict[str, Any]) -> dict[str, Any]:
     return {"ram_gb": None, "disk_gb": None, "minutes": None, "gpu_exclusive": True, "source": "unknown"}
 
 
-def load_templates(root: Path) -> list[dict[str, Any]]:
-    """All templates (full, with workflow), sorted by ``order`` then id. Invalid files raise (tests catch them)."""
+def load_templates(root: Path, *, include_hidden: bool = False) -> list[dict[str, Any]]:
+    """Templates (full, with workflow), sorted by ``order`` then id. Invalid files raise (tests catch them).
+
+    Hidden templates are left out unless ``include_hidden`` (tests and tooling): the API never serves them.
+    """
     out = []
     for path in (root / TEMPLATE_DIR).glob("*.json"):
         tpl = TemplateFile.model_validate(json.loads(path.read_text(encoding="utf-8")))
+        if tpl.hidden and not include_hidden:
+            continue
         out.append({**tpl.model_dump(), "estimate": _estimate(tpl.workflow)})
     return sorted(out, key=lambda t: (t["order"], t["id"]))
 
