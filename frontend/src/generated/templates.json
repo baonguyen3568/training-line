@@ -7,7 +7,7 @@
       "finetune"
     ],
     "sample_data": false,
-    "requires_hf_account": true,
+    "requires_hf_account": false,
     "workflow": {
       "format": "vlm-workflow",
       "schema_version": 1,
@@ -18,7 +18,7 @@
           "type": "model.hf_pick",
           "version": "1.0.0",
           "params": {
-            "model": "cosmos-reason2-2b"
+            "model": "qwen3.5-2b"
           }
         },
         {
