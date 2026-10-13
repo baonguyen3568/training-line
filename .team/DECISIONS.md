@@ -71,3 +71,4 @@
 - 2026-10-13 USER (pháp lý site): luật VN (Luật BVDLCN 2025 + NĐ 13/2023) + nội dung site CC BY 4.0; vận hành 'NTC', email liên hệ + báo lỗ hổng = email tài khoản của user (user chọn, sẽ public khi publish); repo chưa public (để trống); host site chưa quyết → site CHƯA publish. Ngày hiệu lực = ngày publish (điền lúc release).
 - 2026-10-13 USER: repo công khai = https://github.com/baonguyen3568/training-line (PUBLIC, nhánh main), push bằng tài khoản ambrouse qua gh. PM push lần đầu (db03e7e, 641 commit). Agent vẫn KHÔNG push; chỉ PM push khi user yêu cầu.
 - 2026-10-13 USER: PM push định kỳ (sau check --clean + scan_tokens); branch rule GitHub = chỉ chặn force-push + xoá nhánh. GPU lock dời sang .team/lock/GPU_LOCK (28c2088).
+- 2026-10-13 ✅ Compose smoke thật: install.sh build + up OK; app 127.0.0.1:7880, login OK, /api/health commit == HEAD (7d5f694), 2 image có VLM_BUILD_COMMIT. Data root riêng /home/ntcai/ntc-training-data. S4/S5/S7 ĐẠT (tester).
