@@ -12,6 +12,7 @@
         "en": "Receipts → JSON (Nemotron Parse)"
       },
       "source_url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/nemotron",
+      "publisher": "NVIDIA",
       "license": {
         "code": "apache-2.0",
         "model": "nvidia-open-model-license",
@@ -27,6 +28,25 @@
           "license": "nvidia-open-model-license"
         }
       ],
+      "measured": {
+        "train_minutes": 116,
+        "peak_ram_gb": 23.7,
+        "score": {
+          "benchmark": "CORD v2 test",
+          "metric": "field_f1",
+          "value": 70.97,
+          "ci95": [
+            66.33,
+            75.38
+          ],
+          "n": 100
+        },
+        "config": "3 epochs on the 800 CORD train images, GBS 8, lr 1e-5, FusedAdam fp32 master; image vlm-automodel:26.08-6",
+        "sources": [
+          "benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json",
+          ".team/proposals/001a-nvidia-default-model.md"
+        ]
+      },
       "steps": [
         {
           "node": "model.hf_pick",
@@ -69,11 +89,13 @@
         "en": "Images & video (Qwen3.5-2B)"
       },
       "source_url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/qwen3_5",
+      "publisher": "NVIDIA",
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
         "data": null
       },
+      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
@@ -130,11 +152,13 @@
         "en": "FP8 quantization + re-score (ModelOpt)"
       },
       "source_url": "https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/hf_ptq",
+      "publisher": "NVIDIA",
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
         "data": null
       },
+      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
@@ -177,11 +201,13 @@
         "en": "Gemma 4 E4B LoRA (NVIDIA AutoModel)"
       },
       "source_url": "https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/vlm_finetune/gemma4/gemma4_4b_peft.yaml",
+      "publisher": "NVIDIA",
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
         "data": "cc-by-4.0"
       },
+      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
@@ -231,11 +257,13 @@
         "en": "Qwen3.5-4B LoRA (NVIDIA AutoModel)"
       },
       "source_url": "https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/vlm_finetune/qwen3_5/qwen3_5_4b.yaml",
+      "publisher": "NVIDIA",
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
         "data": null
       },
+      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
@@ -278,11 +306,13 @@
         "en": "GRPO on geometry problems (NVIDIA NeMo-RL)"
       },
       "source_url": "https://github.com/NVIDIA-NeMo/RL",
+      "publisher": "NVIDIA",
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
         "data": "mit"
       },
+      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
@@ -325,11 +355,13 @@
         "en": "DGX Spark playbook: VLM fine-tuning"
       },
       "source_url": "https://build.nvidia.com/spark/vlm-finetuning",
+      "publisher": "NVIDIA",
       "license": {
         "code": null,
         "model": "apache-2.0",
         "data": null
       },
+      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
@@ -372,11 +404,13 @@
         "en": "Donut on CORD (baseline)"
       },
       "source_url": "https://github.com/clovaai/donut",
+      "publisher": "NAVER Clova",
       "license": {
         "code": "mit",
         "model": "mit",
         "data": "cc-by-4.0"
       },
+      "measured": null,
       "steps": [
         {
           "node": null,
@@ -412,11 +446,13 @@
         "en": "Image filtering & dedup (NVIDIA NeMo Curator)"
       },
       "source_url": "https://github.com/NVIDIA-NeMo/Curator/tree/main/tutorials/image",
+      "publisher": "NVIDIA",
       "license": {
         "code": "apache-2.0",
         "model": null,
         "data": null
       },
+      "measured": null,
       "steps": [
         {
           "node": null,
@@ -459,6 +495,7 @@
         "en": "Cosmos Reason2 2B LoRA"
       },
       "source_url": "https://github.com/nvidia-cosmos/cosmos-reason2",
+      "publisher": "NVIDIA",
       "notice": "Built on NVIDIA Cosmos",
       "requires_hf_terms": true,
       "license": {
@@ -466,6 +503,7 @@
         "model": "nvidia-open-model-license",
         "data": null
       },
+      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
