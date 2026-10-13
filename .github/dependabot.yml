@@ -1,0 +1,22 @@
+# Dependabot (bao-security, Release 1.0). SECURITY updates only: `open-pull-requests-limit: 0` turns off routine
+# version bumps while security update PRs still open (GitHub docs). Every PR still goes through the team review
+# (ADR-004): deps/Docker changes need bao-security, and a new base image digest must be added to docker/IMAGES.lock.
+# Requires "Dependabot alerts" + "Dependabot security updates" enabled in the repo settings.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 0
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 0
+  - package-ecosystem: npm
+    directory: /site
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 0
+  - package-ecosystem: docker
+    directory: /docker
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 0
