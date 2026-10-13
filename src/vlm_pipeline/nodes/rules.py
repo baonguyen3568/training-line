@@ -6,6 +6,7 @@ from collections.abc import Iterator
 
 from vlm_pipeline.common.catalog import load_catalog
 from vlm_pipeline.common.heldout_data import is_heldout_folder
+from vlm_pipeline.data.local_folder import preview_folder
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ
 from vlm_pipeline.nodes.source import MODEL_HF_PICK
@@ -147,5 +148,40 @@ def heldout_data_never_trains(view: GraphView) -> Iterator[Issue]:
                 yield Issue("DATA-007", node_id=origin, param="path", params={"node": origin, "target_node": node_id})
 
 
-RULES = (train_node_matches_model, export_needs_portable_model, heldout_data_never_trains)
+def local_folder_preview(view: GraphView) -> Iterator[Issue]:
+    """DATA-006 (warn) on the canvas: a local folder's labels / image headers the run's scan would refuse (DATA-V).
+
+    Header-only, at most ``PREVIEW_BUDGET_S`` per folder, cached until the folder changes; a folder that takes
+    longer gets no verdict here (the run decides). Needs the workspace (validate in the app always passes it).
+    """
+    if view.workspace is None:
+        return
+    root = view.workspace.resolve()
+    for node_id, spec in view.specs.items():
+        if spec.type_id != "data.local_folder":
+            continue
+        params = view.params.get(node_id)
+        path = getattr(params, "path", None)
+        if not isinstance(path, str):
+            continue
+        folder = (root / path).resolve()
+        if folder != root and root not in folder.parents:  # SEC-001 already says it
+            continue
+        side = int(getattr(params, "max_image_side_px", 4096))
+        scan = preview_folder(folder, max_image_side_px=side) if folder.is_dir() else None
+        if folder.is_dir() and scan is None:
+            continue  # over the time budget: the run's full scan decides
+        if not folder.is_dir():
+            problem = {"line": 0, "reason": "labels_missing"}
+            count = 1
+        elif scan is not None and scan.problem_count:
+            problem, count = scan.problems[0], scan.problem_count
+        else:
+            continue
+        params_out = {"node": node_id, "problem_count": count, "first_line": problem["line"],
+                      "first_reason": problem["reason"]}  # fmt: skip
+        yield Issue("DATA-006", severity="warn", node_id=node_id, param="path", params=params_out)
+
+
+RULES = (train_node_matches_model, export_needs_portable_model, heldout_data_never_trains, local_folder_preview)
 __all__ = ["RULES", "input_kinds", "model_input", "origin_model_id"]

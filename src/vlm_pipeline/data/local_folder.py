@@ -12,6 +12,10 @@ import hashlib
 import json
 import posixpath
 import stat
+import threading
+import time
+from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -81,7 +85,7 @@ def _labels_problem(labels: Path) -> str | None:
 
 
 def _check_line(  # noqa: PLR0911 - flat check table, one early return per rule (cheap first)
-    folder: Path, raw: bytes, seen: set[str], max_side: int
+    folder: Path, raw: bytes, seen: set[str], max_side: int, *, hashed: bool = True
 ) -> Record | tuple[str, str | None]:
     """One labels line -> its Record, or (reason, image name if known)."""
     try:
@@ -106,7 +110,7 @@ def _check_line(  # noqa: PLR0911 - flat check table, one early return per rule 
         return f"image_{exc.reason}", name
     if max(width, height) > max_side:
         return "image_too_big_side", name
-    return Record(image=name, target=target, prompt=prompt, sha256=_sha256(path))
+    return Record(image=name, target=target, prompt=prompt, sha256=_sha256(path) if hashed else _NO_HASH)
 
 
 def scan_folder(folder: Path, *, max_samples: int = 0, max_image_side_px: int = 4096) -> ScanResult:
@@ -135,4 +139,66 @@ def scan_folder(folder: Path, *, max_samples: int = 0, max_image_side_px: int = 
     return result
 
 
-__all__ = ["LABELS_FILE", "ScanResult", "scan_folder"]
+_NO_HASH = "0" * 64  # preview only: headers are checked, image bytes are not read
+PREVIEW_BUDGET_S = 3.0
+_OVER_BUDGET = ScanResult()  # cached "no verdict": a big folder is timed once per change, not on every validate
+_PREVIEW_CACHE: OrderedDict[tuple[object, ...], ScanResult] = OrderedDict()
+_PREVIEW_CACHE_SIZE = 32
+_PREVIEW_LOCK = threading.Lock()  # validate runs in the API's thread pool; never held while scanning
+
+
+def preview_folder(
+    folder: Path, *, max_image_side_px: int = 4096, budget_s: float = PREVIEW_BUDGET_S,
+    clock: Callable[[], float] = time.monotonic,
+) -> ScanResult | None:  # fmt: skip
+    """The scan's verdict on ``folder`` from the image HEADERS only (no hashing), for the canvas (DATA-V).
+
+    None when the folder takes longer than ``budget_s`` (no verdict: the run's full scan decides). Cached until
+    labels.jsonl or the folder itself changes (an image replaced in place is only seen by the run's scan). Only the
+    problems are kept: a preview never yields records (they are unhashed and must never become a dataset).
+    """
+    folder = folder.resolve()
+    labels = folder / LABELS_FILE
+    try:
+        lst, fst = labels.stat(), folder.stat()
+        key: tuple[object, ...] = (str(folder), lst.st_mtime_ns, lst.st_size, fst.st_mtime_ns, max_image_side_px)
+    except OSError:
+        key = (str(folder), None, None, None, max_image_side_px)
+    with _PREVIEW_LOCK:
+        cached = _PREVIEW_CACHE.get(key)
+        if cached is not None:
+            _PREVIEW_CACHE.move_to_end(key)
+            return None if cached is _OVER_BUDGET else cached
+    result = _preview_scan(folder, labels, max_image_side_px, clock() + budget_s, clock)
+    with _PREVIEW_LOCK:
+        _PREVIEW_CACHE[key] = _OVER_BUDGET if result is None else result
+        while len(_PREVIEW_CACHE) > _PREVIEW_CACHE_SIZE:
+            _PREVIEW_CACHE.popitem(last=False)
+    return result
+
+
+def _preview_scan(
+    folder: Path, labels: Path, max_side: int, deadline: float, clock: Callable[[], float]
+) -> ScanResult | None:
+    result = ScanResult()
+    if problem := _labels_problem(labels):
+        result.add(0, problem)
+        return result
+    seen: set[str] = set()
+    with labels.open("rb") as fh:
+        for n, raw in enumerate(fh, start=1):
+            if clock() > deadline:
+                return None
+            if not raw.strip():
+                continue
+            checked = _check_line(folder, raw, seen, max_side, hashed=False)
+            if isinstance(checked, Record):
+                seen.add(checked.image)
+            else:
+                result.add(n, *checked)
+    if not seen and not result.problem_count:
+        result.add(0, "no_samples")
+    return result
+
+
+__all__ = ["LABELS_FILE", "PREVIEW_BUDGET_S", "ScanResult", "preview_folder", "scan_folder"]
