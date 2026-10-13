@@ -240,7 +240,7 @@ error:
     title: Không tải được model hoặc dữ liệu
     what: Không kết nối được tới Hugging Face/NGC, hoặc bạn chưa đăng nhập.
   NET-002:
-    title: 'Model hoặc dữ liệu chưa có trên máy'
+    title: 'Model hoặc dữ liệu chưa sẵn sàng trên máy'
     what:
       not_cached: '"{repo}" chưa được tải về máy này. Bước chạy không dùng mạng nên cần có sẵn; bấm "Tải về máy" rồi chạy lại.'
       not_prepared: '"{repo}" đã tải về nhưng chưa được chuẩn bị để chạy, vì model này cần thêm một bước chuẩn bị. Bấm "Tải về máy": app làm nốt bước đó, không tải lại phần đã có.'
@@ -1473,6 +1473,7 @@ advanced_panel:
 download:
   dialog_title: Tải về máy
   intro: 'App sẽ tải "{name}" (khoảng {size_gb} GB) về máy này. Sau đó các bước chạy dùng bản trên máy, không cần mạng.'
+  intro_prepare: '"{name}" đã có trên máy nhưng cần thêm một bước chuẩn bị trước khi chạy. App làm bước đó, không tải lại phần đã có.'
   estimate: Dự kiến khoảng {duration}, tuỳ tốc độ mạng.
   license_lead: "Giấy phép:"
   license_accept: Tôi đã đọc và đồng ý với giấy phép này

@@ -240,7 +240,7 @@ error:
     title: Couldn't download model or data
     what: Couldn't reach Hugging Face/NGC, or you're not signed in.
   NET-002:
-    title: 'Model or data not on this machine yet'
+    title: 'Model or data not ready on this machine'
     what:
       not_cached: '"{repo}" has not been downloaded to this machine. Steps run offline, so it must be here first; click "Download" and run again.'
       not_prepared: '"{repo}" is downloaded but not prepared yet; this model needs an extra preparation step. Click "Download": the app finishes that step without downloading again.'
@@ -1473,6 +1473,7 @@ advanced_panel:
 download:
   dialog_title: Download to this machine
   intro: 'The app will download "{name}" (about {size_gb} GB) to this machine. After that, steps use the local copy and need no network.'
+  intro_prepare: '"{name}" is already on this machine but needs an extra preparation step before it can run. The app does that step without downloading again.'
   estimate: Expected to take about {duration}, depending on your connection.
   license_lead: "License:"
   license_accept: I have read and accept this license
