@@ -712,6 +712,51 @@ def _checks_before_queueing(
     return pinned_id
 
 
+CODE_ROOT_ENV = "VLM_CODE_ROOT"  # a clean worktree of HEAD whose src/ + configs/ jobs run (research/E2E runs)
+
+
+def with_code_root(job: ContainerJob, project_root: Path) -> ContainerJob:
+    """``job`` reading its code from ``$VLM_CODE_ROOT`` (data, outputs and the lock stay the project's).
+
+    The shared working tree holds other people's unfinished code; a run that must be reproducible points this at a
+    ``git worktree add --detach HEAD`` checkout. It must be a checkout of this project INSIDE the project (the
+    worktrees live under .cache/ or .worktrees/), else ValueError. A job that names its own code_root keeps it.
+    """
+    raw = os.environ.get(CODE_ROOT_ENV, "").strip()
+    if job.code_root is not None or not raw:
+        return job
+    code = Path(raw).resolve()
+    root = project_root.resolve()
+    if code == root:
+        return job
+    if not _is_team_worktree(root, code):
+        raise ValueError(
+            f"${CODE_ROOT_ENV} must be a git worktree checkout of this project (.cache/wt-*, .worktrees/*)"
+        )
+    return dataclasses.replace(job, code_root=code)
+
+
+def _is_team_worktree(root: Path, code: Path) -> bool:
+    """A real git worktree of this project where the team keeps them, never a folder a job can write (security C1).
+
+    Under ``.cache/wt-*``, ``.cache/check-clean.*`` or ``.worktrees/*`` only (never outputs/, data/, uploads/: a
+    job could plant pyproject.toml + src/ there), with a ``.git`` FILE (worktree link) and a HEAD git resolves.
+    """
+    if not code.is_relative_to(root):
+        return False
+    parts = code.relative_to(root).parts
+    placed = len(parts) == 2 and (
+        (parts[0] == ".cache" and parts[1].startswith(("wt-", "check-clean."))) or parts[0] == ".worktrees"
+    )
+    if not placed or not (code / ".git").is_file() or code.is_symlink():
+        return False
+    try:
+        project = 'name = "vlm-pipeline"' in (code / "pyproject.toml").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return project and git_state(code)[0] is not None
+
+
 def run_job(
     job: ContainerJob,
     manifest: RunManifest,
@@ -741,6 +786,7 @@ def run_job(
     without starting a container; still no memory after ``memory_wait_s`` -> FAILED with SYS-002 (raised).
     """
     launcher = launcher or default_launcher()
+    job = with_code_root(job, project_root)
     pinned_id = _checks_before_queueing(
         job, manifest, project_root, gate=gate, require_approved=require_approved_image,
         checks_images=getattr(launcher, "checks_images", True),

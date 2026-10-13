@@ -632,3 +632,40 @@ def test_a_refused_input_fails_before_the_run_dir_is_written(tmp_path: Path) -> 
     assert err.value.params == {"path": "outputs/probe/inputs"}
     assert not (run / "run.json").exists()
     assert not is_claimed(root, run.name)
+
+
+def test_vlm_code_root_runs_a_clean_worktrees_code_on_the_projects_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """research/E2E: src + configs from a worktree of HEAD; outputs, caches and the lock stay the project's."""
+    import shutil
+
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.jobrun import CODE_ROOT_ENV, with_code_root
+
+    root, run, _repo, data = _narrow_project(tmp_path)
+    (root / "pyproject.toml").write_text('name = "vlm-pipeline"\n')
+    wt = root / ".cache" / "wt-e2e"
+    for d in ("src/vlm_pipeline", "configs/train"):
+        (wt / d).mkdir(parents=True)
+    (wt / "pyproject.toml").write_text('name = "vlm-pipeline"\n')
+    (wt / ".git").write_text("gitdir: /x/.git/worktrees/wt-e2e\n")  # a worktree's .git is a file
+    monkeypatch.setattr(jobrun, "git_state", lambda path: ("c0ffee", False))
+    job = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(data,))
+    assert with_code_root(job, root) is job  # unset: unchanged
+    monkeypatch.setenv(CODE_ROOT_ENV, str(wt))
+    moved = with_code_root(job, root)
+    sources = {s: t for s, t, _m in _mounts(docker_args(moved, root))}
+    assert sources[str(wt / "src")] == "/workspace/src"
+    assert sources[str(run)] == f"/workspace/{run.relative_to(root)}"  # outputs stay in the project
+    planted = run / "code"  # a run dir: a job could write pyproject.toml + src/ there (security C1)
+    shutil.copytree(wt, planted)
+    for bad in (tmp_path, planted, wt / "src"):
+        monkeypatch.setenv(CODE_ROOT_ENV, str(bad))
+        with pytest.raises(ValueError, match="git worktree checkout"):
+            with_code_root(job, root)
+    (wt / ".git").unlink()
+    (wt / ".git").mkdir()  # a full clone, not a worktree
+    monkeypatch.setenv(CODE_ROOT_ENV, str(wt))
+    with pytest.raises(ValueError, match="git worktree checkout"):
+        with_code_root(job, root)
