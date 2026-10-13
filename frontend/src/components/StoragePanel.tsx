@@ -28,7 +28,10 @@ function filled(path: string[], params: Params): string | undefined {
 
 function itemLabel(item: StorageItem): string {
   if (item.display_name) return untrustedText(item.display_name, 80);
-  const copy = filled(item.display_key.split("."), item.display_params);
+  const params = { ...item.display_params };
+  // server local "YYYY-MM-DD HH:MM", shown like {until} ("21:40 13/10"); anything else passes through as given
+  if (typeof params.stamp === "string") params.stamp = formatShortDeadline(params.stamp);
+  const copy = filled(item.display_key.split("."), params);
   if (copy) return copy;
   // no copy for this key yet: the thing's own name (e.g. an eval dataset), never an internal id like "eval:<name>"
   const named = item.display_params.dataset ?? item.display_params.name;
@@ -44,6 +47,11 @@ function consequence(item: StorageItem): string | undefined {
     filled([...path, "workflow" in p ? "default" : "no_workflow"], p) ??
     undefined
   );
+}
+
+/** The item's own explanatory line (note_key), e.g. "the app cleans this up after 7 days". */
+function note(item: StorageItem): string | undefined {
+  return item.note_key ? filled(item.note_key.split("."), item.note_params ?? {}) : undefined;
 }
 
 function reason(item: StorageItem): string | undefined {
@@ -304,6 +312,7 @@ export function StoragePanel() {
                           : ""}
                       </span>
                       {why && <span className="storage-reason">{why}</span>}
+                      {note(item) && <span className="storage-reason muted">{note(item)}</span>}
                       {what && (
                         // Red is only the icon: critical text on the dark surface is 3.6:1 (< 4.5:1).
                         <span

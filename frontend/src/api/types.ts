@@ -501,6 +501,9 @@ export interface StorageItem {
   protected_reason: string | null;
   lock_reason?: string | null;
   lock_params?: Record<string, string | number>;
+  /** A secondary line under the item (e.g. storage.item_note.eval_data_auto_clean {days}), cleanup plan v3. */
+  note_key?: string | null;
+  note_params?: Record<string, string | number>;
   regenerable: boolean;
   consequence_code: string | null;
   consequence_params: Record<string, string | number>;

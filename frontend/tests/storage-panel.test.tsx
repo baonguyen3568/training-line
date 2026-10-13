@@ -153,4 +153,43 @@ describe("StoragePanel", () => {
     expect(r.textContent).toContain("OCRBench");
     expect(r.textContent).not.toContain("eval:ocrbench");
   });
+
+  it("a recent broken eval dataset asks you (manual), shows when it was set aside and when the app cleans it", async () => {
+    const { api } = await import("../src/api");
+    const { t } = await import("../src/i18n");
+    const real = await api.storagePlan("vi");
+    const first = real.items[0];
+    if (!first) throw new Error("sample plan has no items");
+    const invalid = {
+      ...first,
+      item_id: "eval:docvqa",
+      run_id: ".docvqa-92a54bd1.invalid-20261013-214000-ab12",
+      source: "eval_data" as const,
+      section: "manual" as const,
+      group: "dataset",
+      node_base: null,
+      display_name: null,
+      display_key: "storage.item.eval_data_invalid",
+      display_params: { dataset: "DocVQA", stamp: "2026-10-13 21:40" },
+      note_key: "storage.item_note.eval_data_auto_clean",
+      note_params: { days: "7" },
+      size_gb: 0.8,
+      confirm_required: false,
+      confirm_text: null,
+      lock_reason: null,
+      protected_reason: null,
+      consequence_code: null,
+      action: "delete" as const,
+    };
+    vi.spyOn(api, "storagePlan").mockResolvedValue({ ...real, items: [...real.items, invalid] });
+    const { container } = await setup();
+    const r = row(container, "eval:docvqa");
+    expect(r.closest("section")?.querySelector("h2, h3")?.textContent).toBe("Cần bạn chọn");
+    expect(r.textContent).toContain("DocVQA");
+    expect(r.textContent).toContain("21:40 13/10"); // stamp like {until}, not the raw "2026-10-13 21:40"
+    expect(r.textContent).not.toContain("2026-10-13");
+    expect(r.textContent).toContain(t("storage.item_note.eval_data_auto_clean", { days: "7" }));
+    expect(r.querySelector("input[type=checkbox]")).not.toBeNull();
+    expect(r.querySelector("input[type=text]")).toBeNull(); // no typed confirmation
+  });
 });
