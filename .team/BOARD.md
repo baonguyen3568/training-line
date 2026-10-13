@@ -34,9 +34,9 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 ## 🧩 MILESTONE M4 — Pipeline tự do sâu + chuẩn mực + thư viện 5–10 pipeline tham chiếu (user định hướng cốt lõi 2026-10-13)
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| P4-1 | Khảo sát + chọn 5–10 pipeline tham chiếu (vd NVIDIA AutoModel VLM SFT, DGX Spark VLM playbook (GRPO), NeMo-RL GRPO/DPO VLM, Cosmos-Reason post-training, Qwen3-VL official fine-tune, HF TRL SFT/DPO VLM, LLaMA-Factory VLM LoRA, NeMo Curator data pipeline, ModelOpt PTQ/QAT…): nguồn, license, chạy được trên GB10 không, số công bố để tái lập | bao-research | TODO |
+| P4-1 | Khảo sát + chọn 5–10 pipeline tham chiếu (vd NVIDIA AutoModel VLM SFT, DGX Spark VLM playbook (GRPO), NeMo-RL GRPO/DPO VLM, Cosmos-Reason post-training, Qwen3-VL official fine-tune, HF TRL SFT/DPO VLM, LLaMA-Factory VLM LoRA, NeMo Curator data pipeline, ModelOpt PTQ/QAT…): nguồn, license, chạy được trên GB10 không, số công bố để tái lập | bao-research | DOING (khảo sát đang chạy; báo từng phần) |
 | P4-2 | "Chuẩn mực" thành dữ liệu: định dạng dữ liệu VLM chuẩn (HF datasets/chat template, LLaVA/ShareGPT, WebDataset/Energon), kiểm chất lượng (dedupe, leak train/test, kích thước ảnh, độ dài token), chọn model, recipe train/nén → rule validate + gợi ý trong node | bao-research + bao-tester + bao-fixcode (error catalog) | TODO |
-| P4-3 | Hệ node sâu: thêm node chi tiết (data: filter/dedupe/resize/format-convert/caption/augment/mix; train: SFT/LoRA/QLoRA/DPO/GRPO; eval; quantize FP8/NVFP4/AWQ/QAT; export HF/TRT-LLM), subgraph/group (node to bung thành node nhỏ), tham số Advanced đầy đủ từ engine | bao-backend + bao-cleancode (nodes/ registry) | TODO |
+| P4-3 | Hệ node sâu: thêm node chi tiết (data: filter/dedupe/resize/format-convert/caption/augment/mix; train: SFT/LoRA/QLoRA/DPO/GRPO; eval; quantize FP8/NVFP4/AWQ/QAT; export HF/TRT-LLM), subgraph/group (node to bung thành node nhỏ), tham số Advanced đầy đủ từ engine | bao-backend + bao-cleancode (nodes/ registry) | DOING: proposal 016 (0b51234) chờ review backend/frontend/design/security |
 | P4-4 | UX tự do sâu: subgraph expand/collapse, thư viện node lớn có tìm kiếm/nhóm, Simple/Advanced, gallery pipeline tham chiếu có nhãn nguồn/license/độ khó/thời gian | bao-design + bao-frontend | TODO |
 | P4-5 | Dựng lại từng pipeline tham chiếu bằng node của app + test tái lập (smoke + số công bố khi khả thi) | bao-research + bao-tester + bao-backend | TODO |
 
@@ -45,9 +45,9 @@ YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được c�
 **docker compose**, cấu hình bằng **1 file `.env.local`** (đã gitignore; mẫu `.env.local.example` được commit).
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| D-1 | Proposal ngắn + ADR: kiến trúc compose (app API+UI, job containers, vLLM), cách app tạo job container an toàn (KHÔNG mount docker.sock trần → socket-proxy/allowlist), GPU trong compose, volumes | bao-backend + bao-security | TODO |
+| D-1 | Proposal ngắn + ADR: kiến trúc compose (app API+UI, job containers, vLLM), cách app tạo job container an toàn (KHÔNG mount docker.sock trần → socket-proxy/allowlist), GPU trong compose, volumes | bao-backend + bao-security | DOING (security draft P015: runner sidecar; chờ backend) |
 | D-2 | Dockerfile đa kiến trúc (buildx linux/amd64,linux/arm64): app (FastAPI + frontend dist), site tĩnh, image train dẫn xuất; kiểm NGC/vLLM base có manifest amd64 | bao-backend + bao-research (xác minh base image) | TODO |
-| D-3 | `.env.local.example` + loader: gộp mọi cấu hình (HF_TOKEN, ports, paths, profile, quota); bỏ .env cũ; secrets không vào image/layer | bao-backend + bao-security | TODO |
+| D-3 | `.env.local.example` + loader: gộp mọi cấu hình (HF_TOKEN, ports, paths, profile, quota); bỏ .env cũ; secrets không vào image/layer | bao-backend + bao-security | DOING (P015 §4: .env.local + compose secrets + D-7 mã hoá) |
 | D-4 | Memguard/preflight cho GPU rời (amd64: VRAM riêng + RAM host) bên cạnh UMA (GB10) | bao-fixcode | TODO |
 | D-5 | CI local: build cả 2 arch (amd64 qua QEMU = build-only), smoke compose up/down trên arm64 thật; ghi rõ amd64 CHƯA test GPU | bao-tester + bao-cleancode | WAITING D-1/D-2 (khung `check.sh --docker` đã gửi tester: buildx 2 arch, compose smoke arm64, amd64 build-only) |
 | D-7 | Phân tầng cấu hình (user yêu cầu): `.env.local` = hạ tầng/khởi động (port, đường dẫn volume, profile, URL nội bộ, khoá mã hoá secret); **DB (SQLite app.db)** = mọi thứ user chỉnh được (quota, cache cap, lịch dọn, preset mặc định, ngôn ngữ/theme, HF token mã hoá…); policy admin (shared_dev, chặn plugin) KHÔNG chỉnh qua UI. + **Trang Cài đặt trong dashboard** (icon-first, popover) để chỉnh config trong DB, có validate + lịch sử thay đổi | bao-backend (schema/API) + bao-security (secret, phân quyền) + bao-design (UX) + bao-frontend (UI) | TODO |
@@ -57,8 +57,8 @@ YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được c�
 Ưu tiên ngang M2 với backend/research/tester/fixcode. Node chưa có worker thật → báo lỗi LÚC VALIDATE ("bước này chưa chạy thật được"), không fail giữa chừng.
 | ID | Node | Owner | Status |
 |----|------|-------|--------|
-| B-0 | GraphRule: node chưa có worker thật / model chưa hỗ trợ (vd Parse export) → lỗi validate | bao-backend | TODO |
-| B-1 | train.merge_lora (PEFT merge_and_unload trong container) | bao-backend | TODO |
+| B-0 | GraphRule: node chưa có worker thật / model chưa hỗ trợ (vd Parse export) → lỗi validate | bao-backend | DONE (84d44f9) |
+| B-1 | train.merge_lora (PEFT merge_and_unload trong container) | bao-backend | DONE (f6854b2) |
 | B-2 | export.hf_dir cho model native (ADR-012) → sau đó Parse (B3) | bao-backend | TODO |
 | B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | TODO |
 | B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | DOING (probe 0.44 trên Qwen3.5-0.8B) |
@@ -85,15 +85,15 @@ RÀNG BUỘC CỨNG (PM):
 - Không đổi dist 7870 khi user đang thử app; build dashboard mới ở nhánh/route riêng tới khi user duyệt.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | REVIEW (UI xong 10-13 trên plan v3, chờ security review xoá file + cleanup contract + design copy) |
+| G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | DONE cf93eaf (security + design + cleanup review; còn copy 3 skip_reason mới) |
 | G-2 | GAP: retention chạy theo lịch trong app (hiện chỉ CLI) | bao-cleanup + bao-backend | scheduler DONE (3f6c1bd); còn wiring app + policy loader (backend) |
 | G-3 | GAP: nút "Sửa nhanh" theo error_catalog actions trên UI | bao-frontend + bao-fixcode | TODO |
-| M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | TODO |
+| M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | DONE: user chọn D4; DESIGN.md 13a5729, mock design/m2/directions/chuan |
 | M2-2 | Sitemap 20–30 trang + IA + copy tiếng Việt (nguồn sự thật: ADR, P001/P002, benchmarks) | bao-design (copy) + bao-research (nội dung kỹ thuật docs) + bao-cleanup (docs vận hành/lưu trữ) | TODO |
 | M2-3 | Chọn stack site tĩnh (đề xuất: Astro + MDX, docs Starlight; MIT) trong `site/`, chung design tokens với app | bao-frontend + bao-cleancode | DONE (b61617c khung, b7a402e gate check.sh) |
-| M2-4 | Build landing + trang marketing + animation (prefers-reduced-motion) | bao-frontend (+ bao-fixcode hỗ trợ dựng trang) | TODO |
+| M2-4 | Build landing + trang marketing + animation (prefers-reduced-motion) | bao-frontend (+ bao-fixcode hỗ trợ dựng trang) | IN PROGRESS (landing D4 committed, design r2 APPROVE; trang marketing chờ design review) |
 | M2-5 | Build docs + chính sách + trang phụ | bao-cleancode (dựng) + bao-design (review) | IN PROGRESS: 5 trang chính sách import từ docs/legal (chờ security review); tiếp: docs + trang phụ |
-| M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | TODO |
+| M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | DOING: đợt 1 khung D4 sau cờ ?ui=d4 (frontend), design review từng phần |
 | M2-7 | QA: link checker, a11y (WCAG AA), visual regression 3 viewport, Lighthouse, kiểm "không bịa số" | bao-tester | IN PROGRESS (P011 draft; G1 check_site_numbers.py xong report-only) |
 | M2-8 | Security: CSP, không tracker, license ảnh/font/icon, trademark NVIDIA, trang chính sách đúng thực tế | bao-security | REVIEW (spec, gate site_check, docs/legal, SECURITY.md, CSP Starlight, THIRD_PARTY_LICENSES xong; chỉ còn chờ U7–U10 + license nội dung site của user) |
 
