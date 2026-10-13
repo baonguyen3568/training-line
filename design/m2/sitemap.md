@@ -57,6 +57,8 @@ Footer chia 4 cột:
 5. **Animation chỉ có ở trang P:** một khoảnh khắc chính mỗi trang, `prefers-reduced-motion` tắt hết. Trang R không có animation trang trí.
 6. **App ↔ docs:** thẻ lỗi trong app có link "Đọc thêm" → `/docs/ma-loi#<CODE>`, node có "?" → `/docs/node-va-cong#<type_id>`. Trang #24 cần anchor ổn định.
 
+7. **Không dùng ảnh hay câu hỏi mẫu của các bộ benchmark** (OCRBench, ChartQA, DocVQA, MMMU…) trên site, docs hay screenshot (security 2026-10-13). Benchmark chỉ hiện điểm tổng hợp kèm trích dẫn. Ảnh minh hoạ "chạy thử" dùng CORD-v2 (CC BY 4.0, có ghi công) hoặc ảnh tự tạo.
+
 ## Việc tiếp theo
 - **Chốt slug `mau` → `template`:** frontend/cleancode đổi nếu đồng ý.
 - **Trang #24:** fixcode và mình làm generator (một trang, đọc YAML lúc build).
