@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
-from vlm_pipeline.common.job_kinds import ALLOWED_ARGV
+from vlm_pipeline.common.job_kinds import ALLOWED_ARGV, argv_allowed
 from vlm_pipeline.common.run_claims import RUN_ID  # one definition: the claim and the request agree on run ids
 
 MAX_REQUEST_BYTES = 64 * 1024
@@ -138,7 +138,7 @@ def _argv(value: Any, kind: str) -> tuple[str, ...]:
     if not all(isinstance(a, str) and 0 < len(a) <= MAX_ARG_CHARS and a.isprintable() for a in value):
         raise ProtocolError("bad_argv")
     argv = tuple(value)
-    if not any(argv[: len(prefix)] == prefix and len(argv) >= len(prefix) for prefix in ALLOWED_ARGV[kind]):
+    if not argv_allowed(kind, argv):
         raise ProtocolError("argv_not_allowed")
     return argv
 
