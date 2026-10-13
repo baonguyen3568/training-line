@@ -9,7 +9,7 @@ echo "== container"; { [ -f /.dockerenv ] || [ -f /run/.containerenv ]; } && ech
 echo "== git"; git rev-parse --short HEAD 2>/dev/null; git status --porcelain 2>/dev/null | head -5
 echo "== memory"; grep -E '^(MemTotal|MemAvailable|Cached|SwapTotal|SwapFree):' /proc/meminfo
 df -h /dev/shm 2>/dev/null | tail -1
-echo "== gpu lock"; cat .team/GPU_LOCK 2>/dev/null || echo "free"
+echo "== gpu lock"; uv run python -m vlm_pipeline.common.gpu_lock status 2>/dev/null || echo "unknown"
 echo "== python"
 "$PY" - <<'EOF'
 import importlib, sys

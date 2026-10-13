@@ -17,8 +17,10 @@ Knowledge base with known GB10/aarch64 failure modes: `.team/knowledge/fixcode.m
 ## 2. Reproduce (no repro = no fix)
 - Run the repro exactly. Then shrink: tiny model (`hf-internal-testing/tiny-random-*`), 1–8 samples, CPU if bug is not GPU-specific.
 - Capture fingerprint: `bash .claude/skills/fixcode-triage/scripts/env_fingerprint.sh > outputs/debug/BUG-NNN/env.txt`
-- GPU repro → GPU lock first: `cat .team/GPU_LOCK 2>/dev/null` ; if free:
-  `echo "bao-fixcode | BUG-NNN repro | $(date -Iseconds) | PID $$" > .team/GPU_LOCK` ; `rm .team/GPU_LOCK` when done.
+- GPU repro → never by hand: run it as a job (`uv run python -m vlm_pipeline.common.jobrun_cli --who bao-fixcode --tag
+  bug-NNN --est-peak-gb N … -- <cmd>`), which runs preflight, waits for memory, takes and releases the GPU lock.
+  Status only: `uv run python -m vlm_pipeline.common.gpu_lock status`. Never write or delete `.team/lock/GPU_LOCK`
+  yourself (a hand-written lock counts as corrupt; CLAUDE.md).
 - Memory-heavy repro → follow skill `fixcode-uma-oom` (risk of freezing the shared host).
 
 ## 3. Classify (first matching wins, then go to KB section)
@@ -40,6 +42,12 @@ Useful: `dmesg -T | tail -50` (read-only), `py-spy dump --pid <PID>` for hangs, 
 ## 5. Fix
 - Write a failing regression test FIRST (`tests/...`, CPU-only if possible; `@pytest.mark.gpu` otherwise). Confirm it fails.
 - Minimal diff at the root cause. No drive-by refactors (send those to bao-cleancode instead).
+- Fix inside third-party code (NVIDIA libs in a container): never edit in place — a `.patch` under
+  `third_party/patches/<lib>/` + `PATCHES.sha256` + `VENDORED.md` (P004 §8.3), every block marked `PATCH(vlm)`, made
+  against the exact base *inside the image* (check `git rev-parse HEAD` there, not upstream main). Prove it with a
+  test that FAILS on the unpatched image for a behavioural reason (not ImportError of a new helper) and PASSES with the
+  patched file bind-mounted. **Send the patch to bao-security and bao-cleancode for review at the same time as to
+  bao-backend, and backend builds only after security APPROVE.**
 - Workaround (env var / pin / disabled feature) is allowed only if labelled `# WORKAROUND(BUG-NNN): <why> — remove when <condition>` and tracked.
 - Run: regression test + module tests + `pytest -m "not gpu and not slow"` + skill `cleancode-check` gates.
 - Commit (do NOT push):

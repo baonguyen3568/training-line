@@ -22,18 +22,25 @@ Checklist:
 - [ ] Projector / merger keys mapped (often dropped silently by text-only bridges).
 - [ ] dtype recorded (bf16 vs fp32); vision encoder not down-cast unexpectedly.
 - [ ] `transformers` version used for convert == version pinned for train/eval (per `config.json`).
+- [ ] Silent config renames: every `getattr(config, name, default)` in the model class — does `config.json` (incl. sub-configs) use that exact name? Check alias table in KB §2.6b (e.g. `image_processor_normalizes` vs `processor_normalizes`).
 - [ ] GQA / QKV fused layout: num_heads, num_kv_heads, head_dim identical both sides.
 
-## 2. Round-trip test (mandatory for any converter we ship)
-1. HF → Megatron → HF (Megatron-Bridge `AutoBridge` import/export).
-2. Tensor-wise: every key present both sides; `torch.equal` for lossless dtype, else `allclose(atol=1e-3 bf16)`. List mismatches.
-3. Functional: same fixed batch (1 image + prompt, seed fixed), compare logits of original vs round-tripped: `max_abs_diff`, top-1 token agreement ≥ 99%.
-4. Generate 32 tokens greedy on 3 fixed prompts — outputs must match (bf16 tolerance: allow late divergence only).
-Use a small model (≤4B) or `tiny-random` for the CI version; real model run needs GPU lock.
+## 2. Round-trip / equivalence test (mandatory; thresholds = Proposal 007 R6, agreed with bao-tester)
+1. HF → Megatron → HF same dtype: **bit-exact** — `torch.equal` per tensor, no missing/extra keys (atol would hide a wrong transpose).
+2. Logits on a fixed batch (1 image + prompt, seed fixed, same kernel + `attn_implementation`): gate on cosine ≥ 0.999
+   or mean KL ≤ 1e-3; log `max_abs_diff` only (bf16 logits of 10–30 make absolute atol meaningless).
+3. tiny-random models (CPU, `tests/integration/`): bit-exact weights + fp32 logits allclose. Never gate on top-1 there
+   (random weights give near-ties).
+4. Real model (`tests/gpu/`, GPU lock): greedy decode on ~16 prompts **with images**, short + long; pass if identical or
+   the first divergence is a near-tie (top1 − top2 < 0.1 logit).
 
 ## 3. LoRA merge / quantized export
-- After `merge_and_unload()`: logits(merged) ≈ logits(base+adapter) on same batch.
-- Quantize (ModelOpt): print quantized module names; assert vision tower + projector NOT quantized; compare a mini-eval (e.g. 50 samples) vs bf16 before full benchmark.
+- After `merge_and_unload()`: W_merged vs fp32 reference `W + scale·B·A` (relative tol ~1e-2 for bf16); logits merged vs
+  unmerged with the criteria of §2.2 + §2.4.
+- Quantize (ModelOpt): print quantized module names; assert the actual precision of vision tower + projector **equals
+  `vision_precision` in the config** (default bf16 — P002 allows ModelOpt's FP8 vision recipe). Top-1 agreement is logged,
+  never a gate. A 50-sample mini-eval (CI95 ≈ ±14 pt) is only a smoke test (score ≥ base − 10 pt, non-empty output);
+  the real gate is P002 G3.
 - Export: load the exported ckpt with the exact serving runtime version (TRT-LLM / vLLM) inside the pinned container; pin ModelOpt ↔ TRT-LLM ↔ vLLM together.
 
 ## 4. Typical errors

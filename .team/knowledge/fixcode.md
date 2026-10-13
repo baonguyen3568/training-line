@@ -16,7 +16,7 @@
 4. **Root cause, không bịt triệu chứng.** `try/except: pass`, tăng timeout, hạ batch "cho chạy được" chỉ là workaround → ghi rõ là workaround trong commit + mở ticket.
 5. **Fix tối thiểu + test chống tái phát** (pytest, CPU-only nếu được; test GPU đánh dấu `@pytest.mark.gpu`).
 6. Commit message tiếng Anh: `fix(<module>): <what>` + đoạn `Root cause:` + `Repro:`.
-7. Job nặng → tuân thủ `.team/GPU_LOCK`. Repro OOM trên máy dùng chung có thể làm **treo cả máy** (§2.2) → dùng mô hình nhỏ/giới hạn bộ nhớ trước.
+7. Job nặng → chạy qua `run_job`/`jobrun_cli` (preflight + GPU lock `.team/lock/GPU_LOCK`, chỉ xem bằng `gpu_lock status`, không ghi tay). Repro OOM trên máy dùng chung có thể làm **treo cả máy** (§2.2) → dùng mô hình nhỏ/giới hạn bộ nhớ trước.
 
 ## 2. Các lớp lỗi đặc thù GB10 / aarch64 / UMA
 

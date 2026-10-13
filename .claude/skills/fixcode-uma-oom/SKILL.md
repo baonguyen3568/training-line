@@ -13,10 +13,12 @@ Background: `.team/knowledge/fixcode.md` §2.2. Key facts:
 ## 1. Measure the real budget (before every heavy run)
 ```bash
 grep -E '^(MemAvailable|Cached|SwapFree|SwapTotal):' /proc/meminfo
-free -g; cat .team/GPU_LOCK 2>/dev/null
+free -g; uv run python -m vlm_pipeline.common.gpu_lock status
 docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' | sort -k2 -h | tail   # read-only view of neighbours
 ```
-Budget = `MemAvailable` − 8GB safety margin. If budget < planned peak → do NOT start; tell PM.
+Budget (user rule, ADR-005 A1) = 0.80 × `MemAvailable` now (discrete GPU: also 0.80 × free VRAM), and the job must
+leave ≥ max(8 GB, 0.2 × MemAvailable). Over budget → `run_job` queues it ("waiting for free memory"), SYS-002 after the
+wait; never start it by hand around preflight.
 
 ## 2. Watch during run (separate terminal)
 ```bash
