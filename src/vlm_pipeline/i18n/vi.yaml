@@ -1009,6 +1009,7 @@ gated:
 run_monitor:
   runs_title: Lịch sử chạy
   no_runs: Chưa có lần chạy nào. Mở một mẫu và bấm Chạy để bắt đầu.
+  no_runs_cta: Xem các mẫu
   col_name: Tên
   col_status: Trạng thái
   col_started: Bắt đầu

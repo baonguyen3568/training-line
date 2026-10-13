@@ -1009,6 +1009,7 @@ gated:
 run_monitor:
   runs_title: Run history
   no_runs: No runs yet. Open a template and click Run to start.
+  no_runs_cta: Browse templates
   col_name: Name
   col_status: Status
   col_started: Started
