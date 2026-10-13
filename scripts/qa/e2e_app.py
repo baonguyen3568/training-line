@@ -28,6 +28,9 @@ def main() -> int:
         repo = Path(__file__).resolve().parents[2]
         shutil.copytree(repo / "configs" / "templates", Path(tmp) / "configs" / "templates")
         services = DefaultServices(registry=REGISTRY, root=Path(tmp), worker="fake")
+        # e2e.sh runs this tier while GPU jobs may hold the lock: it must never get a real (lock-taking) worker.
+        if services.worker != "fake":
+            raise SystemExit(f"e2e app tier must run on FakeWorker, got worker={services.worker!r}")
         app = create_app(services, token=token, port=port, static_dir=static_dir)
         uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", access_log=False)
     return 0
