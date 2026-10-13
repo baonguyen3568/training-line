@@ -3,7 +3,8 @@
  "models": {
   "reference_bf16": "Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17",
   "fp8_per_tensor": "outputs/graph/runs/n3-f03d17784e408456/ptq/quantized",
-  "fp8_per_channel": "outputs/runs/20261013-1631-research-quant-perchannel-calib128/ptq/quantized"
+  "fp8_per_channel": "outputs/runs/20261013-1631-research-quant-perchannel-calib128/ptq/quantized",
+  "fp8_block_weight_only": "outputs/runs/20261013-2133-research-quant-block-calib128/ptq/quantized (quant_algo fp8_pb_wo: block-scaled FP8 weights, bf16 activations; research re-export)"
  },
  "benchmark": {
   "name": "OCRBench",
@@ -36,26 +37,30 @@
   "q08-bf16-a": "20261013-2116-ocrbench-q08-bf16-a-3eee",
   "q08-bf16-b": "20261013-2124-ocrbench-q08-bf16-b-8c54",
   "q08-fp8": "20261013-2133-ocrbench-q08-fp8-5bb8",
-  "q08-fp8-perch": "20261013-2144-ocrbench-q08-fp8-perch-67ec"
+  "q08-fp8-perch": "20261013-2144-ocrbench-q08-fp8-perch-67ec",
+  "q08-fp8-block": "20261013-2316-ocrbench-q08-fp8-block-27ec"
  },
  "results": {
   "accuracy_pct": {
    "q08-bf16-a": 78.2,
    "q08-bf16-b": 78.6,
    "q08-fp8": 77.8,
-   "q08-fp8-perch": 78.0
+   "q08-fp8-perch": 78.0,
+   "q08-fp8-block": 78.0
   },
   "truncated_pct": {
    "q08-bf16-a": 1.6,
    "q08-bf16-b": 1.4,
    "q08-fp8": 2.6,
-   "q08-fp8-perch": 1.2
+   "q08-fp8-perch": 1.2,
+   "q08-fp8-block": 1.2
   },
   "gen_tokens_mean": {
    "q08-bf16-a": 41.8,
    "q08-bf16-b": 41.3,
    "q08-fp8": 45.2,
-   "q08-fp8-perch": 40.1
+   "q08-fp8-perch": 40.1,
+   "q08-fp8-block": 42.1
   },
   "engine_noise_bf16_b_minus_a": {
    "delta": 0.4,
@@ -99,12 +104,25 @@
     "status": "PASS",
     "reasons": []
    }
+  },
+  "fp8_block_wo_minus_bf16": {
+   "delta": -0.2,
+   "ci95": [
+    -1.8,
+    1.4
+   ],
+   "n": 500,
+   "gate": {
+    "status": "PASS",
+    "reasons": []
+   },
+   "note": "same accuracy as per-channel by coincidence: 24/500 questions score differently between the two FP8 models; weight-only, so not the same speed class as W8A8 per-tensor/per-channel"
   }
  },
  "reading": "both FP8 exports are within noise of bf16 on the point estimate (-0.4 and -0.2); per-tensor gets WARN uncertain_run_full because its CI reaches -2.2 (500 questions cannot exclude a -2 drop); per-channel PASS. Engine noise for 0.8B is larger than for 2B (+0.4 points, 4 answers).",
  "caveats": [
   "vLLM batched greedy is not bit-reproducible run to run (4/500 answers changed between two bf16 runs)",
   "one benchmark only; P002 forgetting check on general benchmarks not part of this gate",
-  "the block-scaled FP8 export does not load on vLLM 0.31 (in_proj_a/b < 128 channels); research re-exports"
+  "block run is weight-only FP8 (fp8_pb_wo, re-exported by research after the first block export failed to load on vLLM 0.31); it is compared on accuracy only"
  ]
 }
