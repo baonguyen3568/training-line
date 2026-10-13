@@ -1,7 +1,30 @@
 ---
 title: Miễn phí & mã nguồn mở
-description: Sản phẩm miễn phí, mã nguồn Apache-2.0.
-sources: []
+description: NTC-Training miễn phí, mã nguồn mở theo giấy phép Apache-2.0. Không có gói trả phí, không cần tài khoản.
+sources:
+  - docs/adr/ADR-003-license-distribution.md
+  - docs/adr/ADR-009-app-architecture-direction.md
+  - LICENSE
+numbers_without_source: ["2.0", "3"]
 ---
+import Hint from '~/components/Hint.astro';
 
-Trang khung (M2-3), nội dung làm ở M2-4/M2-5.
+## Miễn phí, không có gói trả phí
+
+Bạn cài NTC-Training lên máy của mình và dùng toàn bộ tính năng: không có bản trả phí, không giới hạn số lần chạy, không cần tài khoản. App chạy trên máy của bạn và không gửi dữ liệu của bạn đi đâu.
+
+## Giấy phép Apache-2.0
+
+Mã nguồn phát hành theo giấy phép Apache-2.0. Bạn được dùng, sửa và phân phối lại, kể cả cho mục đích thương mại, miễn là giữ lại thông báo bản quyền và nội dung giấy phép. <Hint title="Apache-2.0 nói gì">Apache-2.0 là giấy phép mã nguồn mở phổ biến. Giấy phép này có điều khoản về bằng sáng chế, và yêu cầu ghi rõ khi bạn sửa các file gốc. Văn bản đầy đủ nằm trong file LICENSE của kho mã.</Hint>
+
+## Model và dữ liệu có giấy phép riêng
+
+Giấy phép Apache-2.0 chỉ áp dụng cho mã của app. App không đóng gói sẵn model hay bộ dữ liệu nào. Khi bạn tải một model hoặc dataset, app cho xem giấy phép của nó trước, và bạn tự quyết định có dùng hay không. <Hint title="Vì sao phải xem giấy phép model">Mỗi model có điều kiện riêng. Có model cho dùng tự do, có model yêu cầu ghi công hoặc giới hạn mục đích sử dụng. Khi xuất model đã train, app kèm theo văn bản giấy phép cần thiết.</Hint>
+
+Node do bên thứ ba viết cũng có giấy phép riêng của tác giả. Xem [Giấy phép & ghi công](/chinh-sach/giay-phep/) và [Phần mềm bên thứ ba](/chinh-sach/ben-thu-ba/).
+
+## Đóng góp
+
+- **Báo lỗi hoặc góp ý:** mở một issue trên kho mã. Hãy kèm mã lỗi mà app hiển thị.
+- **Báo lỗ hổng bảo mật:** không đăng công khai. Làm theo hướng dẫn ở [Bảo mật & báo cáo lỗ hổng](/chinh-sach/bao-mat/).
+- **Viết node mới:** node bên thứ ba chạy trong vùng cách ly và phải khai báo quyền nó cần. Tài liệu cho người viết node sẽ có ở mục Tài liệu.
