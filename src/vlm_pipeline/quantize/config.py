@@ -19,7 +19,13 @@ CalibSize = Literal[128, 512]
 class QuantizeParams(Params):
     format: QuantFormat = Field("fp8", json_schema_extra=ui(order=0, summary=True, option_keys="quantize_preset"))
     calib_size: CalibSize = Field(512, json_schema_extra=ui(order=1, widget="segmented", option_keys="calib_size"))
-    quantize_vision: bool = Field(False, json_schema_extra=ui(advanced=True))
+    # Worker v1 (quantize/scope.py) refuses these: shown disabled; STD-001 still blocks old workflows that set them.
+    quantize_vision: bool = Field(
+        False, json_schema_extra=ui(advanced=True, disabled_options={"true": "param_unsupported.worker_v1"})
+    )
     kv_cache_quant: Literal["none", "fp8"] = Field(
-        "none", json_schema_extra=ui(advanced=True, option_keys="kv_cache_quant")
+        "none",
+        json_schema_extra=ui(
+            advanced=True, option_keys="kv_cache_quant", disabled_options={"fp8": "param_unsupported.worker_v1"}
+        ),
     )

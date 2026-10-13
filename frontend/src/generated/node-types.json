@@ -872,6 +872,9 @@
             "type": "string",
             "x-ui": {
               "advanced": true,
+              "disabled_options": {
+                "fp8": "param_unsupported.worker_v1"
+              },
               "option_keys": "kv_cache_quant"
             }
           },
@@ -880,7 +883,10 @@
             "title": "Quantize Vision",
             "type": "boolean",
             "x-ui": {
-              "advanced": true
+              "advanced": true,
+              "disabled_options": {
+                "true": "param_unsupported.worker_v1"
+              }
             }
           }
         },

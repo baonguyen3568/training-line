@@ -270,6 +270,7 @@
   },
   {
     "id": "quantize_bench",
+    "hidden": true,
     "order": 3,
     "difficulty": "basic",
     "tags": [
