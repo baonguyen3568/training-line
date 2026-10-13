@@ -38,12 +38,14 @@ if [[ "${1:-}" == "--clean" ]]; then
   trap 'cleanup; exit 130' INT
   trap 'cleanup; exit 143' TERM HUP
   git worktree add --detach --quiet "$WORKTREE" HEAD
-  step "clean checkout of $(git rev-parse --short HEAD): unit tests + import layers"
+  step "clean checkout of $(git rev-parse --short HEAD): import layers, API schemas, unit tests"
   (cd "$WORKTREE" && VLM_PROJECT_ROOT="$WORKTREE" uv run --quiet lint-imports --no-cache \
+    && VLM_PROJECT_ROOT="$WORKTREE" uv run --quiet python scripts/export_schemas.py --check \
     && VLM_PROJECT_ROOT="$WORKTREE" uv run --quiet pytest -q \
        -m "not gpu and not slow and not eval and not integration")
   if [[ "${CLEAN_FRONTEND:-0}" == "1" ]] \
-     || ! git diff --quiet HEAD~1 HEAD -- frontend schemas 2>/dev/null; then
+     || ! git diff --quiet HEAD~1 HEAD -- frontend schemas configs/templates 2>/dev/null; then
+    # configs/templates feeds frontend/src/generated/templates.json (gen-schema-types.mjs): 770ffb9 drifted it.
     step "clean checkout: frontend (npm ci + npm run check)"
     (cd "$WORKTREE/frontend" && npm ci --ignore-scripts --silent && npm run check)
   fi
