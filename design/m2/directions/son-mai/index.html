@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NTC Training · Sơn mài (mock D1)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%273%27 fill=%27%23a8261a%27/%3E%3Crect x=%272.5%27 y=%272.5%27 width=%2727%27 height=%2727%27 rx=%271.5%27 fill=%27none%27 stroke=%27%23c9a14a%27/%3E%3Ctext x=%2716%27 y=%2721%27 text-anchor=%27middle%27 font-family=%27sans-serif%27 font-weight=%27800%27 font-size=%2712%27 fill=%27%23efe6d2%27%3ENTC%3C/text%3E%3C/svg%3E">
+<style>
+@font-face { font-family: "Phudu"; src: url("../../fonts/Phudu-wght.ttf") format("truetype"); font-weight: 300 900; font-display: swap; }
+@font-face { font-family: "Be Vietnam Pro"; src: url("../../fonts/BeVietnamPro-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Be Vietnam Pro"; src: url("../../fonts/BeVietnamPro-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Be Vietnam Pro"; src: url("../../fonts/BeVietnamPro-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+
+:root {
+  /* lacquer neutrals: every dark is tinted toward cinnabar/umber, never grey */
+  --lac-0: #0c0807;
+  --lac-1: #140e0b;
+  --lac-2: #1c1410;
+  --lac-3: #261b16;
+  --lac-4: #33251e;
+  --seam: #3f2e25;
+  /* cinnabar (son) — brand field and primary action */
+  --son-deep: #6e1810;
+  --son: #a8261a;
+  --son-hi: #c23424;
+  --son-text: #ec7058;
+  /* gold leaf and eggshell inlay */
+  --gold: #c9a14a;
+  --gold-dim: #8a6d33;
+  --egg: #efe6d2;
+  --egg-2: #c3b398;
+  --egg-3: #9c8a71;
+  /* status: meaning stays, always with icon + text */
+  --ok: #4cbf6a;
+  --warn: #f2b63d;
+  --crit: #ff7a6b;
+  /* port families from the app design system (dark variants) */
+  --p-data: #1baf7a;
+  --p-model: #3987e5;
+  --p-report: #e58a4a;
+  --font-ui: "Be Vietnam Pro", system-ui, sans-serif;
+  --font-display: "Phudu", "Be Vietnam Pro", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--lac-1); scrollbar-color: var(--gold-dim) var(--lac-1); }
+body { margin: 0; color: var(--egg); font: 400 16px/1.55 var(--font-ui); caret-color: var(--gold); font-variant-numeric: tabular-nums; }
+::selection { background: var(--son); color: var(--egg); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--lac-1); }
+::-webkit-scrollbar-thumb { background: var(--lac-4); border: 2px solid var(--lac-1); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+a { color: var(--egg); text-underline-offset: 3px; text-decoration-color: var(--gold-dim); }
+a:hover { text-decoration-color: var(--gold); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
+button { font: inherit; color: inherit; }
+.ic { width: 1em; height: 1em; flex: none; vertical-align: -0.125em; }
+[hidden] { display: none !important; }
+
+/* ---------- shared: "?" + popover, tooltips, provenance stitch ---------- */
+.q { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--egg-3); cursor: pointer; font-size: 16px; vertical-align: -4px; }
+.q:hover { color: var(--gold); }
+[popover] { margin: 0; inset: auto; max-width: 320px; padding: 12px 14px; background: var(--lac-3); color: var(--egg); border: 1px solid var(--gold-dim); border-radius: 6px; font: 400 13px/1.5 var(--font-ui); box-shadow: 0 12px 28px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4); }
+[popover] b { color: var(--gold); font-weight: 600; }
+[popover] code { font-size: 12px; color: var(--egg-2); word-break: break-all; }
+.num { font-weight: 700; color: var(--egg); white-space: nowrap; }
+.stitch { display: inline-block; width: 22px; margin: 0 2px 0 6px; vertical-align: middle; border-top: 1px dashed var(--gold); }
+.demo { font: 600 11px/1 var(--font-ui); letter-spacing: .02em; color: var(--gold); border: 1px dashed var(--gold-dim); border-radius: 3px; padding: 3px 6px; white-space: nowrap; }
+[data-tip] { position: relative; }
+[data-tip]:hover::after, [data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 50;
+  padding: 5px 8px; background: var(--lac-0); color: var(--egg); border: 1px solid var(--seam); border-radius: 4px;
+  font: 400 12px/1.3 var(--font-ui); white-space: nowrap; pointer-events: none; box-shadow: 0 6px 16px rgba(0,0,0,.5);
+}
+[data-tip-pos="right"]:hover::after, [data-tip-pos="right"]:focus-visible::after { top: 50%; left: calc(100% + 8px); transform: translateY(-50%); }
+
+/* ---------- view switch (mock chrome) ---------- */
+.views { position: fixed; right: 16px; top: 76px; z-index: 100; display: flex; gap: 2px; padding: 3px; background: var(--lac-0); border: 1px solid var(--seam); border-radius: 6px; font-size: 12px; }
+.views a { padding: 4px 10px; border-radius: 4px; text-decoration: none; color: var(--egg-2); }
+.views a[aria-current="page"] { background: var(--lac-3); color: var(--egg); }
+body.v-dashboard .views { top: auto; right: auto; bottom: 40px; left: 50%; transform: translateX(-50%); }
+
+/* =================== LANDING =================== */
+.site-nav { display: flex; align-items: center; gap: 28px; height: 64px; padding: 0 40px; background: var(--lac-0); border-bottom: 1px solid var(--seam); }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 22px/1 var(--font-display); letter-spacing: .01em; color: var(--egg); text-decoration: none; }
+.brand-mark { width: 22px; height: 22px; border-radius: 3px; background: var(--son); box-shadow: inset 0 0 0 1px var(--gold-dim), inset 0 -6px 0 rgba(0,0,0,.25); }
+.wm { display: flex; align-items: baseline; gap: 7px; }
+.wm b { font: 800 26px/1 var(--font-display); letter-spacing: .04em; color: var(--egg); }
+.wm span { font: 400 15px/1 var(--font-ui); color: var(--egg-2); letter-spacing: .01em; }
+.logo { flex: none; box-shadow: 0 2px 6px rgba(0,0,0,.5); border-radius: 3px; }
+.foot-wm { display: inline-flex; align-items: center; gap: 8px; color: var(--egg-2); font-weight: 600; }
+.tbmark { flex: none; margin: 0 6px 0 2px; }
+.site-nav nav { display: flex; gap: 24px; margin-left: auto; font-size: 15px; }
+.site-nav nav a { text-decoration: none; color: var(--egg-2); }
+.site-nav nav a:hover { color: var(--egg); }
+.site-nav .src { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--seam); border-radius: 4px; color: var(--egg); text-decoration: none; font-size: 14px; }
+.site-nav .src:hover { border-color: var(--gold-dim); }
+
+/* the hero is one framed lacquer panel; the painting inside is sanded to reveal the pipeline */
+.panel { position: relative; min-height: calc(100vh - 64px); padding: 40px 40px 0; background: var(--lac-1); display: grid; grid-template-rows: auto 1fr auto; gap: 28px; }
+.hook h1 { margin: 0; max-width: 24ch; font: 800 clamp(44px, 6.6vw, 100px)/.95 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; color: var(--egg); }
+.hook h1 em { font-style: normal; color: var(--gold); }
+.hook p { margin: 18px 0 0; max-width: 52ch; font-size: 19px; color: var(--egg-2); }
+.hook-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+
+.painting { position: relative; min-height: 300px; border: 1px solid var(--gold-dim); outline: 6px solid var(--lac-0); outline-offset: 0; box-shadow: 0 0 0 7px var(--seam), 0 18px 40px rgba(0,0,0,.45); background: var(--lac-0); overflow: hidden; }
+.painting canvas.lacquer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; cursor: crosshair; touch-action: pan-y; }
+.painting .sand-all { position: absolute; right: 12px; top: 12px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; background: rgba(12,8,7,.82); border: 1px solid var(--gold-dim); border-radius: 4px; color: var(--egg); font-size: 13px; cursor: pointer; }
+.painting .sand-all:hover { border-color: var(--gold); }
+.painting .hint { position: absolute; left: 14px; top: 14px; z-index: 4; font: 600 13px/1 var(--font-ui); color: var(--egg); background: rgba(12,8,7,.82); padding: 7px 10px; border-radius: 4px; pointer-events: none; transition: opacity .4s; }
+.painting.revealed .hint { opacity: 0; }
+
+/* inlaid pipeline beneath the lacquer */
+.inlay { position: relative; z-index: 1; height: 100%; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: auto 1fr; padding: 18px 18px 22px; }
+.inlay svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.lane-h { grid-row: 1; padding: 0 6px 12px; font: 700 15px/1 var(--font-display); letter-spacing: .04em; color: var(--gold); text-transform: uppercase; border-bottom: 1px solid rgba(201,161,74,.28); }
+.lane { grid-row: 2; position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 18px 8px 0; border-right: 1px solid rgba(201,161,74,.12); }
+.lane:last-of-type { border-right: 0; }
+.piece { position: relative; padding: 10px 11px 11px; text-shadow: 0 0 6px rgba(244,236,218,.95), 0 0 2px rgba(244,236,218,1); border-radius: 3px; color: #1b120e; background-color: var(--egg); background-size: cover; box-shadow: 0 0 0 1px var(--gold), 0 0 0 3px #0c0807, 0 0 0 4px rgba(201,161,74,.45); font: 600 14px/1.25 var(--font-ui); }
+.piece small { display: block; margin-top: 3px; font: 400 12px/1.3 var(--font-ui); color: #4a3a2c; }
+.piece .port { position: absolute; top: 50%; width: 10px; height: 10px; margin-top: -5px; background: var(--gold); border: 1.5px solid #0c0807; }
+.piece .port.in { left: -7px; }
+.piece .port.out { right: -7px; }
+.port.data { border-radius: 1px; }
+.port.model { border-radius: 50%; }
+.port.report { transform: rotate(45deg); border-radius: 1px; }
+
+.plaque > * { min-width: 0; }
+.plaque { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 28px; margin: 0 -40px; padding: 22px 40px 26px; background: var(--lac-0); border-top: 1px solid var(--seam); }
+.install { display: flex; align-items: stretch; gap: 0; min-width: 0; }
+.btn-primary { display: inline-flex; align-items: center; gap: 10px; padding: 0 22px; height: 52px; background: var(--son); color: var(--egg); border: 0; border-radius: 4px 0 0 4px; font: 700 17px/1 var(--font-ui); text-decoration: none; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,220,190,.18), inset 0 -2px 0 rgba(0,0,0,.25); }
+.btn-primary:hover { background: var(--son-hi); }
+.btn-primary:active { transform: translateY(1px); }
+.cmd { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 8px 0 16px; background: var(--lac-2); border: 1px solid var(--seam); border-left: 0; border-radius: 0 4px 4px 0; font: 400 14px/1 ui-monospace, "DejaVu Sans Mono", monospace; color: var(--egg-2); }
+.cmd code { white-space: nowrap; }
+.cmd .copy { display: grid; place-items: center; width: 36px; height: 36px; border: 0; background: transparent; color: var(--egg-2); border-radius: 4px; cursor: pointer; font-size: 17px; }
+.cmd .copy:hover { background: var(--lac-3); color: var(--egg); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; color: var(--egg-2); }
+.facts b { color: var(--egg); font-weight: 600; }
+
+/* section: blocks errors before running */
+.guard { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 72px; align-items: start; padding: 120px 40px 120px; background: var(--lac-1); }
+.guard h2 { margin: 0 0 18px; font: 800 clamp(36px, 4vw, 60px)/1 var(--font-display); color: var(--egg); }
+.guard .lede { margin: 0; max-width: 46ch; font-size: 18px; color: var(--egg-2); }
+.guard ul { margin: 36px 0 0; padding: 0; list-style: none; display: grid; gap: 16px; max-width: 46ch; }
+.guard li { display: grid; grid-template-columns: 28px 1fr; gap: 8px; font-size: 16px; color: var(--egg); }
+.guard li .ic { color: var(--gold); font-size: 20px; margin-top: 2px; }
+.stage { position: relative; display: grid; grid-template-columns: 220px 1fr; gap: 28px; align-items: start; padding: 32px; background: var(--lac-0); border: 1px solid var(--seam); border-radius: 6px; }
+.mini-node { padding: 0; border-radius: 6px; background: var(--lac-2); border: 2px solid var(--crit); font-size: 14px; }
+.mini-node header { padding: 10px 12px; border-bottom: 1px solid var(--seam); font-weight: 600; }
+.mini-node .st { display: flex; align-items: center; gap: 6px; padding: 9px 12px; color: var(--crit); font-size: 13px; font-weight: 600; }
+.ecard { background: var(--lac-2); border: 1px solid var(--seam); border-radius: 6px; padding: 18px 20px; box-shadow: 0 16px 36px rgba(0,0,0,.4); }
+.ecard h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font: 700 18px/1.3 var(--font-ui); color: var(--egg); }
+.ecard h3 .ic { color: var(--crit); font-size: 20px; }
+.ecard .lbl { margin: 14px 0 4px; font-size: 12px; font-weight: 600; color: var(--egg-3); }
+.ecard p { margin: 0; font-size: 15px; color: var(--egg); }
+.ecard p.muted { margin-top: 8px; color: var(--egg-2); font-size: 14px; }
+.ecard .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 4px; border: 1px solid var(--seam); background: var(--lac-3); color: var(--egg); font: 600 14px/1 var(--font-ui); cursor: pointer; }
+.btn:hover { border-color: var(--gold-dim); }
+.btn.son { background: var(--son); border-color: var(--son); }
+.btn.son:hover { background: var(--son-hi); }
+.wire-down { position: absolute; left: 142px; top: 0; }
+
+.site-foot { display: flex; flex-wrap: wrap; gap: 12px 28px; padding: 28px 40px 80px; border-top: 1px solid var(--seam); background: var(--lac-0); font-size: 13px; color: var(--egg-3); }
+.site-foot a { color: var(--egg-2); }
+
+@media (max-width: 900px) {
+  .site-nav { padding: 0 16px; gap: 12px; height: 56px; }
+  .site-nav nav { display: none; }
+  .site-nav .src { margin-left: auto; }
+  .panel { padding: 24px 16px 0; min-height: auto; gap: 20px; grid-template-rows: auto auto auto; }
+  .hook p { font-size: 17px; }
+  .hook-row { display: block; }
+  .panel { overflow: hidden; }
+  .cmd { min-width: 0; }
+  .plaque .demo { justify-self: start; }
+  .plaque { order: 2; grid-template-columns: minmax(0, 1fr); gap: 14px; margin: 0 -16px; padding: 18px 16px; border-top: 0; background: transparent; }
+  .painting { order: 3; min-height: 640px; margin-bottom: 28px; }
+  .install { flex-direction: column; }
+  .btn-primary { border-radius: 4px 4px 0 0; justify-content: center; }
+  .cmd { border-left: 1px solid var(--seam); border-top: 0; border-radius: 0 0 4px 4px; overflow: hidden; }
+  .cmd code { overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+  .inlay { grid-template-columns: 1fr; grid-template-rows: none; gap: 0; padding: 14px; }
+  .lane-h { grid-row: auto; padding: 14px 4px 8px; font-size: 14px; }
+  .lane { grid-row: auto; padding: 4px 18px 6px; gap: 10px; border-right: 0; flex-direction: row; flex-wrap: wrap; }
+  .piece { flex: 1 1 140px; }
+  .piece .port { display: none; }
+  .guard { grid-template-columns: 1fr; gap: 40px; padding: 72px 16px; }
+  .stage { grid-template-columns: 1fr; padding: 16px; }
+  .site-foot { padding: 24px 16px 80px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .painting canvas.lacquer, .painting .sand-all, .painting .hint { display: none; }
+}
+
+/* =================== DASHBOARD (Operate: clean dock editor; lacquer only in details) =================== */
+body.v-dashboard { overflow: hidden; }
+.ed { display: grid; grid-template-rows: 44px 1fr 28px; grid-template-columns: 232px 1fr 300px; height: 100vh; background: var(--lac-0); font-size: 13px; }
+.tb { grid-column: 1 / -1; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--lac-2); border-bottom: 1px solid var(--lac-0); box-shadow: 0 1px 0 var(--seam); }
+.tb .wfname { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; border-radius: 4px; font-weight: 600; color: var(--egg); }
+.tb .wfname .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+.tb .sep { width: 1px; height: 20px; margin: 0 6px; background: var(--seam); }
+.ib { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--egg-2); font-size: 17px; cursor: pointer; }
+.ib:hover { background: var(--lac-3); color: var(--egg); }
+.ib:active { background: var(--lac-4); }
+.ib[disabled] { opacity: .4; cursor: default; }
+.seg { display: flex; padding: 2px; background: var(--lac-0); border: 1px solid var(--seam); border-radius: 5px; }
+.seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 3px; background: transparent; color: var(--egg-3); font: 600 12px/1 var(--font-ui); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--lac-3); color: var(--egg); box-shadow: inset 0 0 0 1px var(--gold-dim); }
+.tb .right { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: 4px; color: var(--egg-2); font-size: 12px; font-weight: 600; }
+.chip .ic { font-size: 15px; }
+.chip:hover { background: var(--lac-3); }
+.chip .okdot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.run { display: inline-flex; align-items: center; gap: 8px; height: 32px; margin-left: 8px; padding: 0 16px 0 12px; border: 0; border-radius: 4px; background: var(--son); color: var(--egg); font: 700 13px/1 var(--font-ui); cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,220,190,.16); }
+.run:hover { background: var(--son-hi); }
+.run.stop { background: var(--lac-4); }
+
+.dock { display: flex; flex-direction: column; min-height: 0; background: var(--lac-2); }
+.dock.left { border-right: 1px solid var(--lac-0); box-shadow: 1px 0 0 var(--seam); }
+.dock.right { border-left: 1px solid var(--lac-0); box-shadow: -1px 0 0 var(--seam); }
+.dock-tabs { display: flex; align-items: center; height: 32px; padding: 0 4px; border-bottom: 1px solid var(--seam); background: var(--lac-1); }
+.dock-tabs .tab { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; background: transparent; color: var(--egg-3); font: 600 12px/1 var(--font-ui); cursor: pointer; border-bottom: 2px solid transparent; }
+.dock-tabs .tab[aria-selected="true"] { color: var(--egg); border-bottom-color: var(--gold); }
+.dock-tabs .sp { margin-left: auto; }
+.search { display: flex; align-items: center; gap: 8px; margin: 8px; padding: 0 8px; height: 30px; background: var(--lac-0); border: 1px solid var(--seam); border-radius: 4px; color: var(--egg-3); }
+.search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--egg); font: 400 13px var(--font-ui); outline: none; }
+.search input::placeholder { color: var(--egg-3); }
+.search kbd { font: 600 11px/1 var(--font-ui); color: var(--egg-3); border: 1px solid var(--seam); border-radius: 3px; padding: 2px 5px; }
+.lib { flex: 1; overflow: auto; padding: 0 0 8px; }
+.grp { display: flex; align-items: center; gap: 6px; width: 100%; height: 26px; padding: 0 10px; border: 0; background: transparent; color: var(--egg-3); font: 700 11px/1 var(--font-ui); letter-spacing: .03em; text-transform: uppercase; cursor: pointer; }
+.grp .ic { font-size: 12px; }
+.item { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 10px 0 24px; border: 0; background: transparent; color: var(--egg); font: 400 13px/1 var(--font-ui); text-align: left; cursor: grab; }
+.item:hover { background: var(--lac-3); }
+.item .ic { font-size: 15px; color: var(--egg-2); }
+.item .pt { margin-left: auto; width: 8px; height: 8px; }
+.pt.data { background: var(--p-data); border-radius: 1px; }
+.pt.model { background: var(--p-model); border-radius: 50%; }
+.pt.report { background: var(--p-report); transform: rotate(45deg); border-radius: 1px; }
+
+.cv { position: relative; overflow: hidden; background-color: var(--lac-1); background-image: radial-gradient(circle at 1px 1px, rgba(201,161,74,.13) 1px, transparent 1.4px); background-size: 20px 20px; }
+.cv .lanes { position: absolute; inset: 0 0 auto 0; display: grid; grid-template-columns: 222px 220px 238px 1fr; height: 26px; border-bottom: 1px solid var(--seam); background: rgba(20,14,11,.9); }
+.cv .lanes span { white-space: nowrap; overflow: hidden; display: flex; align-items: center; padding: 0 12px; font: 700 11px/1 var(--font-ui); letter-spacing: .03em; color: var(--egg-3); text-transform: uppercase; border-right: 1px solid rgba(63,46,37,.6); }
+.cv .bands { position: absolute; inset: 26px 0 0 0; display: grid; grid-template-columns: 222px 220px 238px 1fr; pointer-events: none; }
+.cv .bands i:nth-child(even) { background: rgba(255,240,220,.018); }
+.cv svg.w { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cv .demo { position: absolute; right: 12px; bottom: 12px; }
+.zoom { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; background: var(--lac-2); border: 1px solid var(--seam); border-radius: 5px; }
+.zoom .ib { width: 30px; height: 30px; font-size: 15px; }
+
+.nd { position: absolute; width: 192px; background: var(--lac-2); border: 1px solid var(--seam); border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,.35); color: var(--egg); }
+.nd header { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-bottom: 1px solid var(--seam); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.nd header .t { overflow: hidden; text-overflow: ellipsis; }
+.nd header .ic { font-size: 15px; color: var(--egg-2); }
+.nd header .n { display: grid; place-items: center; width: 18px; height: 18px; margin-left: auto; border-radius: 50%; border: 1px solid var(--seam); font-size: 10px; color: var(--egg-3); }
+.nd .sum { padding: 7px 10px 0; font-size: 12px; color: var(--egg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nd .ports { display: flex; justify-content: space-between; padding: 6px 0 4px; font-size: 11px; color: var(--egg-3); }
+.nd .ports div { display: grid; gap: 4px; }
+.nd .pp { display: flex; align-items: center; gap: 6px; }
+.nd .ports .in .pp { margin-left: -5px; }
+.nd .ports .out .pp { margin-right: -5px; flex-direction: row-reverse; }
+.nd .pp .pt { width: 10px; height: 10px; box-shadow: 0 0 0 2px var(--lac-2); }
+.nd footer { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-top: 1px solid var(--seam); font-size: 12px; font-weight: 600; color: var(--egg-2); }
+.nd footer .ic { font-size: 14px; }
+.nd.done footer { color: var(--ok); }
+.nd.queued footer { color: var(--egg-2); }
+.nd.running { border-color: var(--warn); }
+.nd.running footer { color: var(--warn); position: relative; }
+.nd .bar { position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--lac-0); border-radius: 0 0 6px 6px; overflow: hidden; }
+.nd .bar i { display: block; height: 100%; width: 42%; background: var(--warn); }
+.nd.sel { transform: translateY(-4px); border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 14px 28px rgba(0,0,0,.55), 0 4px 8px rgba(0,0,0,.4); }
+.sats { position: absolute; display: flex; gap: 4px; padding: 3px; background: var(--lac-3); border: 1px solid var(--gold-dim); border-radius: 6px; box-shadow: 0 6px 14px rgba(0,0,0,.45); }
+.sats .ib { width: 28px; height: 28px; font-size: 14px; }
+
+.insp { flex: 1; overflow: auto; padding: 14px 14px 20px; }
+.insp h2 { display: flex; align-items: center; gap: 8px; margin: 0; font: 700 15px/1.3 var(--font-ui); }
+.insp h2 .ic { color: var(--egg-2); }
+.insp .stchip { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 4px 8px; border-radius: 4px; background: rgba(242,182,61,.1); color: var(--warn); font-size: 12px; font-weight: 600; }
+.prog { height: 3px; margin-top: 10px; background: var(--lac-0); border-radius: 2px; overflow: hidden; }
+.prog i { display: block; height: 100%; width: 42%; background: var(--warn); }
+.fld { margin-top: 18px; }
+.fld .l { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--egg-2); }
+.fld .seg { width: 100%; }
+.fld .seg button { flex: 1; height: 28px; }
+.est { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--seam); display: grid; gap: 8px; }
+.est .r { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--egg-2); }
+.est .r .ic { font-size: 15px; }
+.est .r .v { margin-left: auto; color: var(--egg); font-weight: 600; display: flex; align-items: center; }
+.est .r .v.unk { color: var(--egg-3); font-weight: 400; font-style: italic; }
+.adv { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 16px; padding: 8px 0; border: 0; border-top: 1px solid var(--seam); background: transparent; color: var(--egg-2); font: 600 12px/1 var(--font-ui); cursor: pointer; }
+.adv:hover { color: var(--egg); }
+
+.sb { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 10px; background: var(--lac-2); border-top: 1px solid var(--seam); font-size: 12px; color: var(--egg-2); }
+.sb .ok { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); font-weight: 600; }
+.sb .runp { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); font-weight: 600; }
+.sb .r { margin-left: auto; display: flex; gap: 14px; }
+</style>
+</head>
+<body>
+<div class="views" role="navigation" aria-label="Mock view">
+  <a href="?v=landing" data-v="landing">Landing</a>
+  <a href="?v=dashboard" data-v="dashboard">Dashboard</a>
+</div>
+
+<!-- =============================== LANDING =============================== -->
+<div id="landing">
+  <header class="site-nav">
+    <a class="brand" href="?v=landing" aria-label="NTC Training"><svg class="logo" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="3" fill="#a8261a"/><rect x="2.5" y="2.5" width="27" height="27" rx="1.5" fill="none" stroke="#c9a14a" stroke-width="1"/><path d="M2.5 23.5h27" stroke="#c9a14a" stroke-width=".75" opacity=".55"/><text x="16" y="20.5" text-anchor="middle" font-family="Phudu" font-weight="800" font-size="13.5" letter-spacing=".2" fill="#efe6d2">NTC</text></svg><span class="wm"><b>NTC</b><span>Training</span></span></a>
+    <nav aria-label="Chính">
+      <a href="#">Tính năng</a><a href="#">Template</a><a href="#">Tài liệu</a><a href="#">Giới thiệu</a>
+    </nav>
+    <a class="src" href="#"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /> </svg> Mã nguồn</a>
+  </header>
+
+  <section class="panel" aria-labelledby="hook-title">
+    <div class="hook-row">
+      <div class="hook">
+        <h1 id="hook-title">Dạy AI đọc <em>hoá đơn</em>, biểu đồ, ảnh của bạn.</h1>
+        <p>Kéo thả từng bước, nối dây, bấm Chạy. Không cần viết code — app kiểm tra mọi thứ trước khi chạy.</p>
+      </div>
+    </div>
+
+    <div class="painting" id="painting">
+      <div class="inlay" id="inlay">
+        <svg class="wires" id="wires" aria-hidden="true"></svg>
+        <div class="lane-h">① Nguồn</div><div class="lane-h">② Chuẩn bị</div><div class="lane-h">③ Huấn luyện</div><div class="lane-h">④ Chạy thử</div><div class="lane-h">⑤ Nén</div><div class="lane-h">⑥ Đo điểm</div><div class="lane-h">⑦ Xuất</div>
+        <div class="lane">
+          <div class="piece" id="p-data">Dataset Hugging Face<small>CORD-v2 · hoá đơn</small><span class="port out data"></span></div>
+          <div class="piece" id="p-model">Chọn model gốc<small>Nemotron-Parse v1.1</small><span class="port out model"></span></div>
+        </div>
+        <div class="lane"><div class="piece" id="p-split"><span class="port in data"></span>Chia dữ liệu học / kiểm tra<span class="port out data"></span></div></div>
+        <div class="lane"><div class="piece" id="p-train"><span class="port in data"></span>Fine-tune toàn bộ<small>Dạy model theo dữ liệu của bạn</small><span class="port out model"></span></div></div>
+        <div class="lane"><div class="piece" id="p-try"><span class="port in model"></span>Chat thử với model<span class="port out model"></span></div></div>
+        <div class="lane"><div class="piece" id="p-q"><span class="port in model"></span>Nén model<small>FP8</small><span class="port out model"></span></div></div>
+        <div class="lane"><div class="piece" id="p-eval"><span class="port in model"></span>Đo điểm<small>so với model gốc</small><span class="port out report"></span></div></div>
+        <div class="lane"><div class="piece" id="p-out"><span class="port in model"></span>Lưu model<small>định dạng Hugging Face</small></div></div>
+      </div>
+      <canvas class="lacquer" id="lacquer" aria-hidden="true"></canvas>
+      <span class="hint" id="hint">Rê chuột hoặc vuốt để mài lớp sơn</span>
+      <button class="sand-all" id="sand-all" type="button"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21" /> <path d="m5.082 11.09 8.828 8.828" /> </svg> Mài hết</button>
+    </div>
+
+    <div class="plaque">
+      <div class="install">
+        <a class="btn-primary" href="#"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1" /> <path d="M2 13h10" /> <path d="m9 16 3-3-3-3" /> </svg> Tải về &amp; cài đặt</a>
+        <div class="cmd"><code>git clone https://github.com/&lt;tổ-chức&gt;/&lt;repo&gt; &amp;&amp; ./install.sh</code><button class="copy" type="button" data-tip="Sao chép lệnh" aria-label="Sao chép lệnh"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /> </svg></button></div>
+      </div>
+      <div class="facts">
+        <span><b>Miễn phí</b> · mã nguồn mở Apache-2.0</span>
+        <span>Chạy trên NVIDIA NeMo AutoModel · Tối ưu cho DGX Spark</span>
+      </div>
+      <span class="demo" title="Đường dẫn repo chưa chốt">lệnh minh hoạ</span>
+    </div>
+  </section>
+
+  <section class="guard" aria-labelledby="guard-title">
+    <div>
+      <h2 id="guard-title">Chặn lỗi trước khi chạy</h2>
+      <p class="lede">Train một model có thể mất hàng giờ. App kiểm tra dây nối, bộ nhớ và dung lượng ngay khi bạn nối xong, để lỗi không xuất hiện ở giờ thứ ba.<button class="q" popovertarget="pop-shared" aria-label="Vì sao cần kiểm tra bộ nhớ"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button></p>
+      <div popover id="pop-shared"><b>Máy dùng chung.</b> DGX Spark có 128 GB bộ nhớ dùng chung cho CPU và GPU, và thường đang chạy cả ứng dụng khác. Vì vậy app luôn so ước lượng của từng bước với bộ nhớ còn trống thật, đọc từ máy.</div>
+      <ul>
+        <li><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="8" height="8" x="3" y="3" rx="2" /> <path d="M7 11v4a2 2 0 0 0 2 2h4" /> <rect width="8" height="8" x="13" y="13" rx="2" /> </svg><span>Dây chỉ nối được giữa hai cổng cùng kiểu: dữ liệu với dữ liệu, model với model.</span></li>
+        <li><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 12v-2" /> <path d="M12 18v-2" /> <path d="M16 12v-2" /> <path d="M16 18v-2" /> <path d="M2 11h1.5" /> <path d="M20 18v-2" /> <path d="M20.5 11H22" /> <path d="M4 18v-2" /> <path d="M8 12v-2" /> <path d="M8 18v-2" /> <rect x="2" y="6" width="20" height="10" rx="2" /> </svg><span>Mỗi bước có ước lượng bộ nhớ, kèm nguồn của con số.</span></li>
+        <li><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /> </svg><span>Lỗi nói bằng lời thường, kèm nút sửa ngay.</span></li>
+      </ul>
+    </div>
+    <div class="stage">
+      <div class="mini-node">
+        <header>Fine-tune toàn bộ</header>
+        <div class="st"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /> </svg> Lỗi · Không đủ bộ nhớ</div>
+      </div>
+      <div class="ecard" role="group" aria-labelledby="e-title">
+        <h3 id="e-title"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /> </svg> Không đủ bộ nhớ cho bước này</h3>
+        <div class="lbl">Chuyện gì xảy ra</div>
+        <p>Bước này cần khoảng <span class="num">35 GB</span><span class="stitch" aria-hidden="true"></span><button class="q" popovertarget="src-p1" aria-label="Nguồn của số 35 GB"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button> nhưng máy chỉ còn <span class="num">9 GB</span><span class="stitch" aria-hidden="true"></span><button class="q" popovertarget="src-demo" aria-label="Nguồn của số 9 GB"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button> trống, vì máy đang dùng chung với ứng dụng khác.</p>
+        <p class="muted">Mẫu này đã dùng cấu hình tiết kiệm bộ nhớ nhất. Hãy đợi các tác vụ khác xong, hoặc xếp hàng để tự chạy khi đủ bộ nhớ.</p>
+        <div class="lbl">Cách sửa</div>
+        <div class="acts">
+          <button class="btn son" type="button"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /> </svg> Xếp hàng — tự chạy khi đủ bộ nhớ</button>
+          <button class="btn" type="button"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 12v-2" /> <path d="M12 18v-2" /> <path d="M16 12v-2" /> <path d="M16 18v-2" /> <path d="M2 11h1.5" /> <path d="M20 18v-2" /> <path d="M20.5 11H22" /> <path d="M4 18v-2" /> <path d="M8 12v-2" /> <path d="M8 18v-2" /> <rect x="2" y="6" width="20" height="10" rx="2" /> </svg> Xem ứng dụng nào đang dùng bộ nhớ</button>
+        </div>
+      </div>
+      <div popover id="src-p1"><b>Đo thật trên máy này.</b> Fine-tune toàn bộ Nemotron-Parse v1.1 trên DGX Spark: đỉnh bộ nhớ lúc khởi động khoảng 35 GB.<br><code>benchmarks/perf/p1-parse-v1.1-full-26.08-2-20261012.json</code></div>
+      <div popover id="src-demo"><b>Số minh hoạ.</b> Bộ nhớ trống thay đổi theo máy; app đọc số thật từ <code>/proc/meminfo</code> lúc kiểm tra.</div>
+    </div>
+  </section>
+
+  <footer class="site-foot">
+    <span class="foot-wm"><svg class="logo" width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="3" fill="#a8261a"/><rect x="2.5" y="2.5" width="27" height="27" rx="1.5" fill="none" stroke="#c9a14a" stroke-width="1"/><path d="M2.5 23.5h27" stroke="#c9a14a" stroke-width=".75" opacity=".55"/><text x="16" y="20.5" text-anchor="middle" font-family="Phudu" font-weight="800" font-size="13.5" letter-spacing=".2" fill="#efe6d2">NTC</text></svg> NTC Training</span><span>Mã nguồn Apache-2.0</span><a href="#">Giấy phép &amp; ghi công</a><a href="#">Chính sách bảo mật</a><a href="#">Điều khoản</a>
+    <span>NVIDIA, NeMo và DGX Spark là nhãn hiệu của NVIDIA Corporation. Dự án không liên kết với NVIDIA.</span>
+  </footer>
+</div>
+
+<!-- =============================== DASHBOARD =============================== -->
+<div id="dashboard" hidden>
+  <div class="ed">
+    <div class="tb" role="toolbar" aria-label="Thanh công cụ">
+      <svg class="tbmark" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="3" fill="#a8261a"/><rect x="2.5" y="2.5" width="27" height="27" rx="1.5" fill="none" stroke="#c9a14a" stroke-width="1"/><path d="M2.5 23.5h27" stroke="#c9a14a" stroke-width=".75" opacity=".55"/><text x="16" y="20.5" text-anchor="middle" font-family="Phudu" font-weight="800" font-size="13.5" letter-spacing=".2" fill="#efe6d2">NTC</text></svg>
+      <span class="wfname">Đọc hoá đơn → JSON <span class="dot" aria-label="Có thay đổi chưa lưu"></span></span>
+      <span class="sep"></span>
+      <button class="ib" data-tip="Workflow mới (Ctrl+N)" aria-label="Workflow mới"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M9 15h6" /> <path d="M12 18v-6" /> </svg></button>
+      <button class="ib" data-tip="Mở (Ctrl+O)" aria-label="Mở"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /> </svg></button>
+      <button class="ib" data-tip="Lưu (Ctrl+S)" aria-label="Lưu"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /> </svg></button>
+      <span class="sep"></span>
+      <button class="ib" data-tip="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /> </svg></button>
+      <button class="ib" data-tip="Làm lại (Ctrl+Shift+Z)" aria-label="Làm lại" disabled><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m15 14 5-5-5-5" /> <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" /> </svg></button>
+      <span class="sep"></span>
+      <button class="ib" data-tip="Sắp xếp gọn" aria-label="Sắp xếp gọn"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="8" height="8" x="3" y="3" rx="2" /> <path d="M7 11v4a2 2 0 0 0 2 2h4" /> <rect width="8" height="8" x="13" y="13" rx="2" /> </svg></button>
+      <button class="ib" data-tip="Vừa màn hình" aria-label="Vừa màn hình"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> </svg></button>
+      <span class="sep"></span>
+      <div class="seg" role="group" aria-label="Chế độ">
+        <button aria-pressed="true">Cơ bản</button><button aria-pressed="false">Nâng cao</button>
+      </div>
+      <div class="right">
+        <span class="chip" tabindex="0" data-tip="GPU: rảnh"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 20v2" /> <path d="M12 2v2" /> <path d="M17 20v2" /> <path d="M17 2v2" /> <path d="M2 12h2" /> <path d="M2 17h2" /> <path d="M2 7h2" /> <path d="M20 12h2" /> <path d="M20 17h2" /> <path d="M20 7h2" /> <path d="M7 20v2" /> <path d="M7 2v2" /> <rect x="4" y="4" width="16" height="16" rx="2" /> <rect x="8" y="8" width="8" height="8" rx="1" /> </svg><span class="okdot" aria-hidden="true"></span>Rảnh</span>
+        <span class="chip" tabindex="0" data-tip="RAM đã dùng / tổng · còn trống 63 GB"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 12v-2" /> <path d="M12 18v-2" /> <path d="M16 12v-2" /> <path d="M16 18v-2" /> <path d="M2 11h1.5" /> <path d="M20 18v-2" /> <path d="M20.5 11H22" /> <path d="M4 18v-2" /> <path d="M8 12v-2" /> <path d="M8 18v-2" /> <rect x="2" y="6" width="20" height="10" rx="2" /> </svg>58/121 GB</span>
+        <span class="chip" tabindex="0" data-tip="Dung lượng còn trống"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16h.01" /> <path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /> <path d="M21.946 12.013H2.054" /> <path d="M6 16h.01" /> </svg>1,4 TB</span>
+        <button class="ib" data-tip="Trợ giúp" aria-label="Trợ giúp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button>
+        <button class="run stop" data-tip="Dừng lần chạy" aria-label="Dừng"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M18 6 6 18" /> <path d="m6 6 12 12" /> </svg> Dừng</button>
+      </div>
+    </div>
+
+    <aside class="dock left" aria-label="Thư viện bước">
+      <div class="dock-tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /> </svg> Thư viện</button>
+        <button class="tab" role="tab" aria-selected="false" data-tip="Template" aria-label="Template"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /> <path d="M12 22V12" /> <polyline points="3.29 7 12 12 20.71 7" /> <path d="m7.5 4.27 9 5.15" /> </svg></button>
+        <button class="tab" role="tab" aria-selected="false" data-tip="Lịch sử chạy" aria-label="Lịch sử chạy"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> </svg></button>
+      </div>
+      <label class="search"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /> </svg><input placeholder="Tìm bước…" aria-label="Tìm bước"><kbd>/</kbd></label>
+      <div class="lib">
+        <button class="grp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 9 6 6 6-6" /> </svg> ① Nguồn</button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /> <path d="m3.3 7 8.7 5 8.7-5" /> <path d="M12 22V12" /> </svg> Chọn model gốc<i class="pt model"></i></button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <ellipse cx="12" cy="5" rx="9" ry="3" /> <path d="M3 5V19A9 3 0 0 0 21 19V5" /> <path d="M3 12A9 3 0 0 0 21 12" /> </svg> Dataset Hugging Face<i class="pt data"></i></button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /> </svg> Thư mục ảnh<i class="pt data"></i></button>
+        <button class="grp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 9 6 6 6-6" /> </svg> ② Chuẩn bị</button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="6" cy="6" r="3" /> <path d="M8.12 8.12 12 12" /> <path d="M20 4 8.12 15.88" /> <circle cx="6" cy="18" r="3" /> <path d="M14.8 14.8 20 20" /> </svg> Chia dữ liệu<i class="pt data"></i></button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> </svg> Xem trước dữ liệu<i class="pt data"></i></button>
+        <button class="grp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 9 6 6 6-6" /> </svg> ③ Huấn luyện</button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M9 13a4.5 4.5 0 0 0 3-4" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M12 13h4" /> <path d="M12 18h6a2 2 0 0 1 2 2v1" /> <path d="M12 8h8" /> <path d="M16 8V5a2 2 0 0 1 2-2" /> <circle cx="16" cy="13" r=".5" /> <circle cx="18" cy="3" r=".5" /> <circle cx="20" cy="21" r=".5" /> <circle cx="20" cy="8" r=".5" /> </svg> Fine-tune toàn bộ<i class="pt model"></i></button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M9 13a4.5 4.5 0 0 0 3-4" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M12 13h4" /> <path d="M12 18h6a2 2 0 0 1 2 2v1" /> <path d="M12 8h8" /> <path d="M16 8V5a2 2 0 0 1 2-2" /> <circle cx="16" cy="13" r=".5" /> <circle cx="18" cy="3" r=".5" /> <circle cx="20" cy="21" r=".5" /> <circle cx="20" cy="8" r=".5" /> </svg> Fine-tune nhẹ (LoRA)<i class="pt model"></i></button>
+        <button class="grp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 9 6 6 6-6" /> </svg> ④ Chạy thử</button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /> </svg> Chat thử<i class="pt model"></i></button>
+        <button class="grp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 9 6 6 6-6" /> </svg> ⑤ Nén</button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m15 15 6 6m-6-6v4.8m0-4.8h4.8" /> <path d="M9 19.8V15m0 0H4.2M9 15l-6 6" /> <path d="M15 4.2V9m0 0h4.8M15 9l6-6" /> <path d="M9 4.2V9m0 0H4.2M9 9 3 3" /> </svg> Nén model<i class="pt model"></i></button>
+        <button class="grp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 9 6 6 6-6" /> </svg> ⑥ Đo điểm</button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" /> </svg> Đo điểm benchmark<i class="pt report"></i></button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" /> </svg> Đo tốc độ &amp; bộ nhớ<i class="pt report"></i></button>
+        <button class="grp"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m6 9 6 6 6-6" /> </svg> ⑦ Xuất</button>
+        <button class="item"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /> </svg> Lưu model<i class="pt model"></i></button>
+      </div>
+    </aside>
+
+    <main class="cv" id="cv" aria-label="Canvas">
+      <div class="bands" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="lanes" aria-hidden="true"><span>① Nguồn</span><span>② Chuẩn bị</span><span>③ Huấn luyện</span><span>④–⑦ Chạy thử · Đo điểm · Xuất</span></div>
+      <svg class="w" id="dw" aria-hidden="true"></svg>
+
+      <div class="nd done" id="n1" style="left:16px; top:70px">
+        <header><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <ellipse cx="12" cy="5" rx="9" ry="3" /> <path d="M3 5V19A9 3 0 0 0 21 19V5" /> <path d="M3 12A9 3 0 0 0 21 12" /> </svg> <span class="t">Dataset Hugging Face</span><span class="n">1</span></header>
+        <div class="sum">cord-v2 · 800 mẫu</div>
+        <div class="ports"><div class="in"></div><div class="out"><span class="pp" data-port="data"><i class="pt data"></i>Dữ liệu</span></div></div>
+        <footer><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /> </svg> Xong · 0:12</footer>
+      </div>
+      <div class="nd done" id="n2" style="left:16px; top:300px">
+        <header><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /> <path d="m3.3 7 8.7 5 8.7-5" /> <path d="M12 22V12" /> </svg> <span class="t">Chọn model gốc</span><span class="n">2</span></header>
+        <div class="sum">Nemotron-Parse v1.1</div>
+        <div class="ports"><div class="in"></div><div class="out"><span class="pp" data-port="model"><i class="pt model"></i>Model</span></div></div>
+        <footer><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /> </svg> Xong · 0:03</footer>
+      </div>
+      <div class="nd done" id="n3" style="left:238px; top:90px">
+        <header><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="6" cy="6" r="3" /> <path d="M8.12 8.12 12 12" /> <path d="M20 4 8.12 15.88" /> <circle cx="6" cy="18" r="3" /> <path d="M14.8 14.8 20 20" /> </svg> <span class="t">Chia dữ liệu</span><span class="n">3</span></header>
+        <div class="sum">Kiểm tra 10%</div>
+        <div class="ports"><div class="in"><span class="pp" data-port="data"><i class="pt data"></i>Dữ liệu</span></div><div class="out"><span class="pp" data-port="data"><i class="pt data"></i>Học</span><span class="pp" data-port="data2"><i class="pt data"></i>Kiểm tra</span></div></div>
+        <footer><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /> </svg> Xong · 0:01</footer>
+      </div>
+      <div class="nd running sel" id="n4" style="left:462px; top:230px">
+        <header><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M9 13a4.5 4.5 0 0 0 3-4" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M12 13h4" /> <path d="M12 18h6a2 2 0 0 1 2 2v1" /> <path d="M12 8h8" /> <path d="M16 8V5a2 2 0 0 1 2-2" /> <circle cx="16" cy="13" r=".5" /> <circle cx="18" cy="3" r=".5" /> <circle cx="20" cy="21" r=".5" /> <circle cx="20" cy="8" r=".5" /> </svg> <span class="t">Fine-tune toàn bộ</span><span class="n">4</span></header>
+        <div class="sum">1 lượt · tốc độ học Vừa</div>
+        <div class="ports"><div class="in"><span class="pp" data-port="data"><i class="pt data"></i>Dữ liệu học</span><span class="pp" data-port="model"><i class="pt model"></i>Model</span></div><div class="out"><span class="pp" data-port="model"><i class="pt model"></i>Model</span></div></div>
+        <footer>◐ Đang chạy 42%<span class="bar"><i></i></span></footer>
+      </div>
+      <div class="sats" id="sats" style="left:506px; top:186px">
+        <button class="ib" data-tip="Nhân bản (Ctrl+D)" aria-label="Nhân bản"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <line x1="15" x2="15" y1="12" y2="18" /> <line x1="12" x2="18" y1="15" y2="15" /> <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /> </svg></button>
+        <button class="ib" data-tip="Xem log" aria-label="Xem log"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /> <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /> </svg></button>
+        <button class="ib" data-tip="Xoá (Delete)" aria-label="Xoá"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /> </svg></button>
+      </div>
+      <div class="nd queued" id="n5" style="left:700px; top:70px">
+        <header><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /> </svg> <span class="t">Chat thử</span><span class="n">5</span></header>
+        <div class="sum">vLLM · trả lời ngắn</div>
+        <div class="ports"><div class="in"><span class="pp" data-port="model"><i class="pt model"></i>Model</span></div><div class="out"></div></div>
+        <footer><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /> </svg> Đang chờ</footer>
+      </div>
+      <div class="nd queued" id="n6" style="left:700px; top:270px">
+        <header><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" /> </svg> <span class="t">Đo điểm benchmark</span><span class="n">6</span></header>
+        <div class="sum">Tự động · so với model gốc</div>
+        <div class="ports"><div class="in"><span class="pp" data-port="model"><i class="pt model"></i>Model</span><span class="pp" data-port="data"><i class="pt data"></i>Dữ liệu kiểm tra</span></div><div class="out"><span class="pp" data-port="report"><i class="pt report"></i>Kết quả</span></div></div>
+        <footer><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /> </svg> Đang chờ</footer>
+      </div>
+      <div class="nd" id="n7" style="left:700px; top:500px">
+        <header><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /> </svg> <span class="t">Lưu model</span><span class="n">7</span></header>
+        <div class="sum">outputs/hoa-don-v1</div>
+        <div class="ports"><div class="in"><span class="pp" data-port="model"><i class="pt model"></i>Model</span></div><div class="out"></div></div>
+        <footer>○ Sẵn sàng</footer>
+      </div>
+
+      <div class="zoom">
+        <button class="ib" data-tip="Phóng to" data-tip-pos="right" aria-label="Phóng to"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 12h14" /> <path d="M12 5v14" /> </svg></button>
+        <button class="ib" data-tip="Thu nhỏ" data-tip-pos="right" aria-label="Thu nhỏ"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 12h14" /> </svg></button>
+        <button class="ib" data-tip="Vừa màn hình" data-tip-pos="right" aria-label="Vừa màn hình"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> </svg></button>
+      </div>
+      <span class="demo">trạng thái minh hoạ</span>
+    </main>
+
+    <aside class="dock right" aria-label="Thuộc tính">
+      <div class="dock-tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /> </svg> Thiết lập</button>
+        <button class="tab" role="tab" aria-selected="false" data-tip="Kiểm tra trước khi chạy" aria-label="Kiểm tra"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /> </svg></button>
+        <span class="sp"></span>
+        <button class="ib" data-tip="Đóng" aria-label="Đóng"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M18 6 6 18" /> <path d="m6 6 12 12" /> </svg></button>
+      </div>
+      <div class="insp">
+        <h2><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M9 13a4.5 4.5 0 0 0 3-4" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M12 13h4" /> <path d="M12 18h6a2 2 0 0 1 2 2v1" /> <path d="M12 8h8" /> <path d="M16 8V5a2 2 0 0 1 2-2" /> <circle cx="16" cy="13" r=".5" /> <circle cx="18" cy="3" r=".5" /> <circle cx="20" cy="21" r=".5" /> <circle cx="20" cy="8" r=".5" /> </svg> Fine-tune toàn bộ<button class="q" popovertarget="pop-sft" aria-label="Bước này làm gì"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button></h2>
+        <div popover id="pop-sft">Dạy model trả lời theo dữ liệu của bạn bằng cách cập nhật các trọng số của model. Tốn bộ nhớ hơn LoRA nhưng Nemotron-Parse chỉ hỗ trợ cách này.</div>
+        <div class="stchip">◐ Đang chạy 42% · bước 4/7</div>
+        <div class="prog"><i></i></div>
+
+        <div class="fld">
+          <div class="l">Thời lượng huấn luyện<button class="q" popovertarget="pop-ep" aria-label="Giải thích"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button></div>
+          <div popover id="pop-ep">Số lượt model đọc hết dữ liệu. Nhiều lượt hơn thì lâu hơn và dễ học vẹt.</div>
+          <div class="seg"><button aria-pressed="true">1 lượt</button><button aria-pressed="false">3 lượt</button><button aria-pressed="false">5 lượt</button></div>
+        </div>
+        <div class="fld">
+          <div class="l">Tốc độ học<button class="q" popovertarget="pop-lr" aria-label="Giải thích"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button></div>
+          <div popover id="pop-lr">Chậm an toàn hơn, nhanh học nhanh hơn nhưng dễ hỏng model. Nên giữ "Vừa".</div>
+          <div class="seg"><button aria-pressed="false">Chậm</button><button aria-pressed="true">Vừa</button><button aria-pressed="false">Nhanh</button></div>
+        </div>
+
+        <div class="est">
+          <div class="r"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 12v-2" /> <path d="M12 18v-2" /> <path d="M16 12v-2" /> <path d="M16 18v-2" /> <path d="M2 11h1.5" /> <path d="M20 18v-2" /> <path d="M20.5 11H22" /> <path d="M4 18v-2" /> <path d="M8 12v-2" /> <path d="M8 18v-2" /> <rect x="2" y="6" width="20" height="10" rx="2" /> </svg> Bộ nhớ dự kiến<span class="v"><span class="num">≥ 35 GB</span><span class="stitch" aria-hidden="true"></span><button class="q" popovertarget="src-p1b" aria-label="Nguồn"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" /> </svg></button></span></div>
+          <div popover id="src-p1b"><b>Đo thật</b> trên DGX Spark, đỉnh lúc khởi động.<br><code>benchmarks/perf/p1-parse-v1.1-full-26.08-2-20261012.json</code></div>
+          <div class="r"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /> </svg> Thời gian<span class="v unk">chưa có số đo</span></div>
+          <div class="r"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 16h.01" /> <path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /> <path d="M21.946 12.013H2.054" /> <path d="M6 16h.01" /> </svg> Dung lượng<span class="v unk">chưa có số đo</span></div>
+        </div>
+        <button class="adv" type="button"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m9 18 6-6-6-6" /> </svg> Nâng cao · 7 thiết lập</button>
+      </div>
+    </aside>
+
+    <div class="sb" role="status">
+      <span class="ok"><svg class="ic" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" /> </svg> Kiểm tra: 7/7 ổn</span>
+      <span class="runp">◐ Đang chạy bước 4/7 · Fine-tune toàn bộ</span>
+      <span class="r"><span>Tiếng Việt</span><span>Tự lưu 09:41</span></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const view = params.get("v") === "dashboard" ? "dashboard" : "landing";
+  document.getElementById("landing").hidden = view !== "landing";
+  document.getElementById("dashboard").hidden = view !== "dashboard";
+  document.body.classList.add("v-" + view);
+  document.querySelectorAll(".views a").forEach(a => { if (a.dataset.v === view) a.setAttribute("aria-current", "page"); });
+
+  // popovers anchor to the button that opens them
+  document.querySelectorAll("[popovertarget]").forEach(btn => {
+    const pop = document.getElementById(btn.getAttribute("popovertarget"));
+    pop.addEventListener("toggle", e => {
+      if (e.newState !== "open") return;
+      const r = btn.getBoundingClientRect(), w = pop.offsetWidth;
+      pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+      pop.style.top = (r.bottom + 8) + "px";
+      pop.style.position = "fixed";
+    });
+  });
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function curve(svg, a, b, color, width, dash) {
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const dx = Math.max(40, Math.abs(b.x - a.x) / 2);
+    p.setAttribute("d", `M${a.x},${a.y} C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`);
+    p.setAttribute("fill", "none"); p.setAttribute("stroke", color); p.setAttribute("stroke-width", width);
+    if (dash) p.setAttribute("stroke-dasharray", dash);
+    svg.appendChild(p);
+  }
+
+  if (view === "landing") {
+    // ---------- inlaid gold wires between pieces ----------
+    const inlay = document.getElementById("inlay"), wires = document.getElementById("wires");
+    const links = [["p-data","p-split"],["p-split","p-train"],["p-model","p-train"],["p-train","p-try"],["p-try","p-q"],["p-q","p-eval"],["p-eval","p-out"]];
+    function drawWires() {
+      wires.innerHTML = "";
+      if (innerWidth <= 900) return;
+      const o = inlay.getBoundingClientRect();
+      for (const [f, t] of links) {
+        const a = document.getElementById(f).getBoundingClientRect(), b = document.getElementById(t).getBoundingClientRect();
+        const pa = { x: a.right - o.left + 4, y: a.top + a.height / 2 - o.top }, pb = { x: b.left - o.left - 4, y: b.top + b.height / 2 - o.top };
+        curve(wires, pa, pb, "#0c0807", 6);
+        curve(wires, pa, pb, "#c9a14a", 2);
+      }
+    }
+
+    // ---------- eggshell crackle (procedural voronoi) for the inlaid pieces ----------
+    function eggshell(w, h, seed) {
+      let s = seed; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const g = c.getContext("2d"), img = g.createImageData(w, h), cell = 24, pts = [];
+      const gw = Math.ceil(w / cell) + 2, gh = Math.ceil(h / cell) + 2;
+      for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) pts.push([(i - 1 + rnd()) * cell, (j - 1 + rnd()) * cell, rnd()]);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const ci = Math.floor(x / cell) + 1, cj = Math.floor(y / cell) + 1;
+        let d1 = 1e9, d2 = 1e9, t = 0;
+        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+          const p = pts[(cj + dj) * gw + (ci + di)]; if (!p) continue;
+          const d = Math.hypot(p[0] - x, p[1] - y);
+          if (d < d1) { d2 = d1; d1 = d; t = p[2]; } else if (d < d2) d2 = d;
+        }
+        const k = (y * w + x) * 4, edge = d2 - d1;
+        let r = 241 - t * 8, gg = 233 - t * 9, b = 214 - t * 12;
+        if (edge < 0.9) { r = 150; gg = 124; b = 92; } else if (edge < 1.8) { r -= 16; gg -= 17; b -= 18; }
+        img.data[k] = r; img.data[k + 1] = gg; img.data[k + 2] = b; img.data[k + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      return c.toDataURL();
+    }
+    document.querySelectorAll(".piece").forEach((el, i) => { el.style.backgroundImage = `url(${eggshell(200, 90, 7919 * (i + 3))})`; });
+
+    // ---------- the lacquer layer that gets sanded ----------
+    // Brush pattern is seeded from real measurements in benchmarks/perf/s3-lora-qwen3.5-0.8b-20261012.json
+    // (throughput 390–664 tok/s, step memory 3.2–4.2 GiB, steady 6.5 GB, peak 12.6 GB, 308 s): illustration, not a chart.
+    const S3 = [390, 664, 3.2, 4.2, 6.5, 12.6, 308];
+    const painting = document.getElementById("painting"), cvs = document.getElementById("lacquer"), hint = document.getElementById("hint");
+    let ctx, W, H, dpr, sanded = 0;
+    function paintLacquer() {
+      dpr = Math.min(2, devicePixelRatio || 1);
+      W = painting.clientWidth; H = painting.clientHeight;
+      cvs.width = W * dpr; cvs.height = H * dpr;
+      ctx = cvs.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#8f2116"; ctx.fillRect(0, 0, W, H);
+      let s = S3.reduce((a, v) => a * 31 + Math.round(v * 10), 7) % 2147483647 || 1;
+      const rnd = () => (s = (s * 48271) % 2147483647) / 2147483647;
+      // long horizontal brush strokes of darker and brighter cinnabar
+      for (let i = 0; i < 520; i++) {
+        const y = rnd() * H, len = W * (0.25 + rnd() * 0.75), x = rnd() * W - len / 3;
+        const amp = (S3[i % S3.length] % 7) / 7;
+        ctx.strokeStyle = rnd() < 0.55 ? `rgba(70,10,6,${0.05 + amp * 0.07})` : `rgba(214,72,46,${0.04 + amp * 0.05})`;
+        ctx.lineWidth = 1 + rnd() * 6;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.bezierCurveTo(x + len / 3, y + (rnd() - 0.5) * 8, x + 2 * len / 3, y + (rnd() - 0.5) * 8, x + len, y + (rnd() - 0.5) * 6);
+        ctx.stroke();
+      }
+      // gold dust flecks
+      for (let i = 0; i < 380; i++) { ctx.fillStyle = `rgba(222,186,104,${0.15 + rnd() * 0.35})`; ctx.fillRect(rnd() * W, rnd() * H, 1 + rnd() * 1.6, 1 + rnd() * 1.6); }
+      // polished sheen band
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, "rgba(255,190,160,0)"); g.addColorStop(0.46, "rgba(255,190,160,0.07)"); g.addColorStop(0.5, "rgba(255,210,180,0.11)"); g.addColorStop(0.54, "rgba(255,190,160,0.07)"); g.addColorStop(1, "rgba(255,190,160,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "destination-out";
+    }
+    function sand(x, y, r) {
+      const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
+      g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(0.65, "rgba(0,0,0,.85)"); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      // abrasion grit at the edge of the stroke
+      for (let i = 0; i < 10; i++) { const a = Math.random() * Math.PI * 2, d = r * (0.8 + Math.random() * 0.5); ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(x + Math.cos(a) * d, y + Math.sin(a) * d, 2, 2); }
+    }
+    let last = null;
+    cvs.addEventListener("pointermove", e => {
+      const r = cvs.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      if (++sanded > 12) painting.classList.add("revealed");
+      if (last) { const steps = Math.ceil(Math.hypot(x - last.x, y - last.y) / 10); for (let i = 1; i <= steps; i++) sand(last.x + (x - last.x) * i / steps, last.y + (y - last.y) * i / steps, 54); }
+      else sand(x, y, 54);
+      last = { x, y };
+    });
+    cvs.addEventListener("pointerleave", () => { last = null; });
+    function autoStroke(rows, dur, done) {
+      // first pass across every lane so the mechanism shows without touching anything
+      const t0 = performance.now();
+      const step = now => {
+        const k = Math.min(1, (now - t0) / dur);
+        for (const row of rows) {
+          const x = -40 + k * (W + 80), y = H * row + Math.sin(k * Math.PI * 3 + row * 4) * H * 0.07;
+          sand(x, y, Math.min(96, H * 0.2));
+        }
+        if (k < 1) requestAnimationFrame(step); else if (done) done();
+      };
+      requestAnimationFrame(step);
+    }
+    document.getElementById("sand-all").addEventListener("click", () => { cvs.style.transition = "opacity .6s"; cvs.style.opacity = 0; painting.classList.add("revealed"); });
+    function init() {
+      drawWires();
+      if (reduce) return;
+      paintLacquer();
+      setTimeout(() => autoStroke([0.5, 0.74], 1800), 350);
+    }
+    let started = false;
+    addEventListener("scroll", () => { if (!started && scrollY > 80 && !reduce) { started = true; autoStroke([0.26, 0.8], 1300); } }, { passive: true });
+    addEventListener("resize", () => { drawWires(); });
+    document.fonts.ready.then(init);
+  }
+
+  if (view === "dashboard") {
+    const cv = document.getElementById("cv"), svg = document.getElementById("dw");
+    const col = { data: "#1baf7a", data2: "#1baf7a", model: "#3987e5", report: "#e58a4a" };
+    const port = (id, side, kind, nth = 0) => {
+      const el = [...document.querySelectorAll(`#${id} .${side} .pp`)].filter(p => p.dataset.port === kind)[nth];
+      const r = el.querySelector(".pt").getBoundingClientRect(), o = cv.getBoundingClientRect();
+      return { x: r.left + r.width / 2 - o.left, y: r.top + r.height / 2 - o.top };
+    };
+    const edges = [["n1","data","n3","data"],["n3","data","n4","data"],["n2","model","n4","model"],["n4","model","n5","model"],["n4","model","n6","model"],["n3","data2","n6","data"],["n4","model","n7","model"]];
+    function draw() {
+      svg.innerHTML = "";
+      for (const [f, fk, t, tk] of edges) {
+        const a = port(f, "out", fk), b = port(t, "in", tk);
+        const live = f === "n4";
+        curve(svg, a, b, col[fk], live ? 2 : 2.25, live ? "6 5" : null);
+      }
+    }
+    document.fonts.ready.then(draw);
+  }
+})();
+</script>
+</body>
+</html>

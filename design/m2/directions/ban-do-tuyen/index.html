@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NTC Training — Bản đồ tuyến</title>
+<style>
+@font-face { font-family: "BVP"; src: url("../../fonts/BeVietnamPro-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "BVP"; src: url("../../fonts/BeVietnamPro-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "BVP"; src: url("../../fonts/BeVietnamPro-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+
+:root {
+  /* paper: enamel signage panel, warm-neutral, not cream */
+  --paper: #f1f0ec;
+  --paper-2: #e7e6e0;
+  --ink: #15171a;
+  --ink-2: #4a4c50;
+  --ink-3: #626469;
+  --rule: #cfcdc5;
+  /* brand: signage yellow plate, always with ink text */
+  --plate: #ffd21f;
+  --plate-ink: #15171a;
+  /* line colours = app port families (design/tokens) */
+  --l-data: #1b9669;   /* Dataset ■ (ft2.fp8 step: ≥3:1 on paper) */
+  --l-model: #2a78d6;  /* Model ● */
+  --l-report: #ca5a2e; /* Report ◆ (ft.fp8 step: ≥3:1 on paper) */
+  --l-endpoint: #52514e; /* Endpoint ▲ */
+  --crit: #d03b3b;
+  --warn: #fab219;
+  --good: #0ca30c;
+  --focus: #15171a;
+  --font: "BVP", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--font); font-feature-settings: "tnum" 1; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--plate); color: var(--plate-ink); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+a { color: inherit; text-underline-offset: 3px; }
+button { font: inherit; color: inherit; }
+.ico { width: 18px; height: 18px; display: inline-block; flex: none; }
+.ico svg { width: 100%; height: 100%; display: block; }
+[hidden] { display: none !important; }
+
+/* view switcher (mock only) */
+.switch { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; gap: 2px; background: var(--ink); padding: 3px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.switch a { color: #f1f0ec; text-decoration: none; padding: 5px 10px; border-radius: 4px; }
+.switch a[aria-current="page"] { background: var(--plate); color: var(--plate-ink); }
+body.dash .switch { bottom: 48px; }
+.switch span { color: #9a9ca0; padding: 5px 8px; font-weight: 400; }
+
+/* ───────────── LANDING ───────────── */
+.topbar { background: var(--ink); color: #f1f0ec; }
+.topbar .in { max-width: 1440px; margin: 0 auto; height: 60px; padding: 0 40px; display: flex; align-items: center; gap: 32px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand .plate { background: var(--plate); color: var(--plate-ink); font-weight: 700; font-size: 16px; letter-spacing: -0.01em; padding: 5px 10px 4px; border-radius: 3px; }
+.wm { display:block; overflow: visible; color: #f1f0ec; }
+.brand .tmp { font-size: 11px; color: #a7a9ad; border: 1px dashed #6e7075; border-radius: 3px; padding: 1px 6px; }
+.topbar nav { display: flex; gap: 26px; font-size: 15px; font-weight: 600; }
+.topbar nav a { text-decoration: none; color: #e4e3df; padding: 4px 0; border-bottom: 2px solid transparent; }
+.topbar nav a:hover { border-bottom-color: var(--plate); color: #fff; }
+.topbar .right { margin-left: auto; display: flex; gap: 14px; align-items: center; font-size: 14px; }
+.topbar .lang { color: #a7a9ad; font-weight: 600; }
+.topbar .lang b { color: #fff; }
+
+.hero { max-width: 1440px; margin: 0 auto; padding: 56px 40px 0; }
+.hero h1 { margin: 0; font-weight: 700; font-size: 4.25rem; line-height: 1.04; letter-spacing: -0.035em; max-width: 17ch; text-wrap: balance; }
+.hero h1 em { font-style: normal; background: linear-gradient(transparent 62%, var(--plate) 62%, var(--plate) 92%, transparent 92%); }
+.hero .lede { margin: 20px 0 0; font-size: 20px; line-height: 1.5; color: var(--ink-2); max-width: 54ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 22px 0 0; padding: 0; list-style: none; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.facts li { display: flex; align-items: center; gap: 8px; }
+.facts li::before { content: ""; width: 8px; height: 8px; background: var(--ink); border-radius: 50%; }
+
+/* the map */
+.map { position: relative; max-width: 1440px; margin: 26px auto 0; padding: 0 40px; }
+.map-frame { position: relative; display: grid; grid-template-columns: 256px 1fr; align-items: stretch; border-top: 3px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.depart { padding: 26px 22px 24px 0; display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+.depart .k { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.cta { display: inline-flex; align-items: center; gap: 10px; background: var(--plate); color: var(--plate-ink); border: 2px solid var(--ink); border-radius: 4px; padding: 12px 16px; font-weight: 700; font-size: 17px; text-decoration: none; transition: transform .16s cubic-bezier(.2,.8,.2,1); }
+.cta:hover { transform: translateX(3px); }
+.cta .ico { width: 20px; height: 20px; }
+.cmd { font: 500 13px/1.45 ui-monospace, "DejaVu Sans Mono", monospace; background: var(--ink); color: #e9e8e3; border-radius: 4px; padding: 9px 11px; position: relative; }
+.cmd .demo { position: absolute; top: -9px; right: 8px; background: var(--paper); color: var(--ink-2); border: 1px solid var(--rule); font: 600 10px/1 var(--font); padding: 3px 5px; border-radius: 3px; }
+.depart .alt { font-size: 14px; color: var(--ink-2); }
+.depart .alt a { font-weight: 600; }
+
+.svgwrap { position: relative; }
+.svgwrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+.line { fill: none; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+.line.alt { stroke-width: 7; stroke-dasharray: 2 13; }
+.tick { fill: #fff; stroke: var(--ink); stroke-width: 3.5; }
+.cap { fill: #fff; stroke: var(--ink); stroke-width: 3.5; }
+.slabel { font: 600 16px var(--font); fill: var(--ink); letter-spacing: -0.005em; }
+.slabel.sm { font-size: 14px; fill: var(--ink-2); }
+.lname { font: 700 12px var(--font); letter-spacing: .04em; }
+.train { fill: var(--plate); stroke: var(--ink); stroke-width: 3; }
+
+.stn { position: absolute; transform: translate(-50%, -50%); width: 34px; height: 34px; border-radius: 50%; border: 0; background: transparent; cursor: help; padding: 0; }
+.stn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; border-radius: 50%; }
+.pop { position: absolute; z-index: 20; width: 300px; background: #fff; border: 2px solid var(--ink); border-radius: 6px; padding: 12px 14px 13px; font-size: 14px; line-height: 1.5; box-shadow: 0 10px 28px -10px rgba(21,23,26,.35); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .15s ease-out, transform .18s cubic-bezier(.2,.8,.2,1); }
+.pop.on { opacity: 1; transform: none; }
+.pop h4 { margin: 0 0 4px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.pop p { margin: 0; color: var(--ink-2); }
+.pop .ports { margin-top: 8px; display: flex; gap: 12px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.sym { display: inline-block; width: 11px; height: 11px; vertical-align: -1px; margin-right: 4px; }
+.sym.sq { background: var(--l-data); }
+.sym.ci { background: var(--l-model); border-radius: 50%; }
+.sym.di { background: var(--l-report); transform: rotate(45deg) scale(.82); }
+.sym.tr { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 11px solid var(--l-endpoint); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 26px; padding: 14px 0 0 256px; margin: 0; list-style: none; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.legend .sw { width: 26px; height: 6px; border-radius: 3px; }
+.legend .sw.dash { height: 0; border-top: 4px dotted var(--l-model); background: none; }
+
+/* section: block errors */
+.sec > * { min-width: 0; }
+.sec { max-width: 1440px; margin: 0 auto; padding: 120px 40px 120px; display: grid; grid-template-columns: 5fr 7fr; gap: 64px; align-items: start; }
+.sec h2 { font-size: 3rem; line-height: 1.08; letter-spacing: -0.03em; margin: 0; font-weight: 700; text-wrap: balance; }
+.sec .body { font-size: 18px; color: var(--ink-2); max-width: 46ch; margin: 18px 0 0; }
+.help { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--ink-3); background: transparent; color: var(--ink-2); cursor: help; vertical-align: 2px; margin-left: 6px; padding: 0; position: relative; }
+.help .ico { width: 15px; height: 15px; }
+.help:hover, .help:focus-visible { border-color: var(--ink); color: var(--ink); }
+.help .tip { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); width: 280px; text-align: left; background: var(--ink); color: #eeede8; font-size: 13.5px; font-weight: 400; line-height: 1.5; padding: 10px 12px; border-radius: 5px; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 30; }
+.help:hover .tip, .help:focus-visible .tip { opacity: 1; }
+
+.board { position: relative; background: #fff; border: 1px solid var(--rule); border-radius: 8px; height: 540px; overflow: hidden;
+  background-image: radial-gradient(circle, #d9d7cf 1px, transparent 1.2px); background-size: 20px 20px; }
+.stage { position: absolute; left: 0; top: 0; width: 760px; height: 540px; transform-origin: 0 0; }
+.nd { position: absolute; width: 228px; background: #fff; border: 2px solid var(--ink); border-radius: 6px; font-size: 14px; }
+.nd .hd { padding: 9px 12px 8px; font-weight: 700; border-bottom: 1px solid var(--rule); display: flex; gap: 8px; align-items: center; }
+.nd .num { width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 11px; display: grid; place-items: center; flex: none; }
+.nd .row { padding: 7px 12px; display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; font-weight: 600; }
+.nd .row.r { justify-content: flex-end; }
+.pt { position: absolute; width: 14px; height: 14px; border: 2px solid #fff; box-shadow: 0 0 0 1.5px var(--ink); }
+.pt.sq { background: var(--l-data); }
+.pt.ci { background: var(--l-model); border-radius: 50%; }
+.pt.di { background: var(--l-report); transform: rotate(45deg); }
+.wire { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.wire.bad { stroke: var(--l-report); stroke-dasharray: 1 10; }
+.reject { position: absolute; left: 300px; top: 236px; max-width: 360px; background: var(--ink); color: #fff; font-size: 13.5px; font-weight: 600; padding: 8px 12px; border-radius: 5px; display: flex; gap: 8px; align-items: center; }
+.reject .ico { color: var(--warn); }
+.ecard { position: absolute; right: 22px; bottom: 22px; width: 372px; background: #fff; border: 2px solid var(--crit); border-radius: 8px; padding: 14px 16px; box-shadow: 0 16px 30px -18px rgba(21,23,26,.4); }
+.ecard h3 { margin: 0; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+.ecard h3 .ico { color: var(--crit); }
+.ecard p { margin: 8px 0 0; font-size: 14px; color: var(--ink-2); }
+.ecard .acts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 14px; border-radius: 4px; padding: 8px 12px; border: 1.5px solid var(--ink); background: #fff; cursor: pointer; }
+.btn.pri { background: var(--plate); }
+.btn:hover { background: var(--paper-2); }
+.btn.pri:hover { background: #ffdc4d; }
+.note-demo { position: absolute; left: 12px; top: 10px; font-size: 11px; font-weight: 600; color: var(--ink-3); }
+
+.foot { border-top: 3px solid var(--ink); }
+.foot .in { max-width: 1440px; margin: 0 auto; padding: 22px 40px 60px; display: flex; gap: 24px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
+
+/* ───────────── DASHBOARD ───────────── */
+body.dash { --bg: #121417; --panel: #1a1d21; --panel-2: #20242a; --line: #2d3238; --tx: #ecebe6; --tx-2: #b9bbbf; --tx-3: #8a8d93;
+  --l-data: #199e70; --l-model: #3987e5; --l-report: #d95926; --l-endpoint: #c3c2b7; --focus: #ffd21f;
+  background: var(--bg); color: var(--tx); color-scheme: dark; height: 100vh; overflow: hidden; font-size: 13px; }
+body.dash ::-webkit-scrollbar { width: 10px; height: 10px; }
+body.dash ::-webkit-scrollbar-thumb { background: #353a41; border-radius: 6px; border: 2px solid var(--panel); }
+body.dash ::-webkit-scrollbar-track { background: transparent; }
+.app { display: grid; grid-template-rows: 44px 1fr 38px; grid-template-columns: 52px 1fr 300px; height: 100vh; }
+.tb { grid-column: 1 / -1; display: flex; align-items: center; gap: 2px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.tb .brand .plate { font-size: 13px; padding: 3px 7px 2px; }
+.tb .wf { margin-left: 14px; margin-right: 10px; font-weight: 600; font-size: 13px; color: var(--tx); display: flex; gap: 6px; align-items: center; }
+.tb .wf .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--plate); }
+.sep { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
+.ib { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 5px; border: 0; background: transparent; color: var(--tx-2); cursor: pointer; position: relative; }
+.ib:hover { background: var(--panel-2); color: var(--tx); }
+.ib .ico { width: 17px; height: 17px; }
+.ib.on { background: #2b3036; color: var(--tx); box-shadow: inset 0 -2px 0 var(--plate); }
+[data-tip] { position: relative; }
+[data-tip]:hover::after, [data-tip]:focus-visible::after { content: attr(data-tip); position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: #f1f0ec; color: #15171a; font: 600 12px/1 var(--font); padding: 6px 8px; border-radius: 4px; z-index: 60; pointer-events: none; }
+.seg { display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px; }
+.seg .ib { width: 30px; height: 26px; }
+.chip { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: 5px; color: var(--tx-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip .ico { width: 15px; height: 15px; }
+.chip .st { width: 7px; height: 7px; border-radius: 50%; }
+.tb .sp { flex: 1; }
+.run { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px 0 11px; border-radius: 5px; border: 0; background: var(--plate); color: #15171a; font-weight: 700; font-size: 13px; cursor: pointer; margin-left: 6px; }
+.run .ico { width: 15px; height: 15px; }
+.run.stop { background: #f1f0ec; }
+
+.rail { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; }
+.rail .ib { width: 38px; height: 38px; }
+.rail .ib i { position: absolute; left: 11px; right: 11px; bottom: 4px; height: 3px; border-radius: 2px; opacity: .9; }
+.rail .rsep { width: 24px; height: 1px; background: var(--line); margin: 4px 0; }
+.rail [data-tip]:hover::after, .rail [data-tip]:focus-visible::after { top: 50%; left: calc(100% + 10px); transform: translateY(-50%); }
+.lib { background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 10px 8px; }
+.search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--tx-3); margin-bottom: 10px; }
+.search .ico { width: 15px; height: 15px; }
+.search kbd { margin-left: auto; font: 600 11px var(--font); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; }
+.grp { margin: 8px 0 2px; padding: 4px 6px; font-size: 11.5px; font-weight: 700; color: var(--tx-3); display: flex; align-items: center; gap: 8px; }
+.grp .bar { width: 14px; height: 4px; border-radius: 2px; }
+.it { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 5px; color: var(--tx); font-weight: 600; cursor: grab; }
+.it:hover { background: var(--panel-2); }
+.it .s { width: 18px; display: grid; place-items: center; }
+
+.cv { position: relative; overflow: hidden; background: var(--bg);
+  background-image: radial-gradient(circle, #23272d 1px, transparent 1.3px); background-size: 20px 20px; }
+.lanes { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, 1fr); pointer-events: none; }
+.lanes div { border-right: 1px solid #1f2328; }
+.lanes div:nth-child(odd) { background: rgba(255,255,255,.012); }
+.lanes span { display: block; margin: 10px 0 0 12px; font-size: 11.5px; font-weight: 700; color: var(--tx-3); letter-spacing: .02em; }
+.cv svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; }
+.w { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.w.done { stroke-width: 6; }
+.w.flow { stroke-dasharray: 2 10; animation: flow 1s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -12; } }
+.n { position: absolute; width: 146px; background: var(--panel); border: 1.5px solid #3a4047; border-radius: 6px; }
+.n .h { display: flex; align-items: flex-start; gap: 7px; padding: 8px 10px 6px; font-weight: 700; font-size: 12.5px; line-height: 1.3; min-height: 50px; color: var(--tx); }
+.n .num { width: 18px; height: 18px; border-radius: 50%; background: #f1f0ec; color: #15171a; font-size: 10.5px; display: grid; place-items: center; flex: none; }
+.n .v { padding: 0 10px 8px; color: var(--tx-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n .f { border-top: 1px solid var(--line); padding: 6px 10px; font-size: 11.5px; font-weight: 600; color: var(--tx-2); display: flex; gap: 6px; align-items: center; position: relative; overflow: hidden; border-radius: 0 0 6px 6px; }
+.n .f.ok { color: #7fd67f; }
+.n .f.going { color: var(--tx); }
+.n .f .pg { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--l-model); }
+.n.sel { border-color: var(--plate); box-shadow: 0 0 0 3px rgba(255,210,31,.18); }
+.n.running { border-color: var(--l-model); }
+.n .p { position: absolute; width: 12px; height: 12px; border: 2px solid var(--bg); }
+.n .p.in { left: -7px; }
+.n .p.out { right: -7px; }
+.p.sq { background: var(--l-data); }
+.p.ci { background: var(--l-model); border-radius: 50%; }
+.p.di { background: var(--l-report); transform: rotate(45deg) scale(.9); }
+.p.tr { width: 0 !important; height: 0 !important; border: 0 !important; border-left: 7px solid transparent !important; border-right: 7px solid transparent !important; border-bottom: 12px solid var(--l-endpoint) !important; }
+.mini { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 2px; }
+.mini .ib { width: 28px; height: 28px; }
+
+.insp { background: var(--panel); border-left: 1px solid var(--line); overflow: auto; }
+.insp .ih { padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
+.insp .ih .t { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.insp .ih .st { margin-top: 8px; display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--tx-2); }
+.insp .bar2 { height: 4px; background: #2b3036; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.insp .bar2 i { display: block; height: 100%; width: 42%; background: var(--l-model); }
+.insp section { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.insp h5 { margin: 0 0 10px; font-size: 11.5px; font-weight: 700; color: var(--tx-3); display: flex; align-items: center; justify-content: space-between; }
+.fld { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; margin: 0 0 10px; }
+.fld label { color: var(--tx-2); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.fld .ctl { background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; min-width: 132px; color: var(--tx); font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.segs { display: flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.segs span { padding: 5px 9px; color: var(--tx-2); font-weight: 600; }
+.segs span.on { background: #2b3036; color: var(--tx); box-shadow: inset 0 -2px 0 var(--plate); }
+.qh { width: 18px; height: 18px; border: 0; background: none; color: var(--tx-3); padding: 0; cursor: help; display: grid; place-items: center; }
+.qh .ico { width: 14px; height: 14px; }
+.qh:hover { color: var(--tx); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; color: var(--tx-2); }
+.kv b { color: var(--tx); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.kv .na { color: var(--tx-3); font-weight: 600; }
+.ports { display: flex; flex-direction: column; gap: 6px; }
+.ports div { display: flex; align-items: center; gap: 8px; color: var(--tx-2); font-weight: 600; }
+.ports .p { position: static; width: 11px; height: 11px; border: 0; }
+
+.cb { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 12px; background: var(--panel); border-top: 1px solid var(--line); font-weight: 600; color: var(--tx-2); }
+.cb .ok { color: #7fd67f; display: flex; align-items: center; gap: 6px; }
+.cb .prog { display: flex; align-items: center; gap: 10px; color: var(--tx); }
+.cb .track { width: 180px; height: 4px; background: #2b3036; border-radius: 2px; overflow: hidden; }
+.cb .track i { display: block; height: 100%; width: 40%; background: var(--l-model); }
+.cb .r { margin-left: auto; display: flex; gap: 14px; align-items: center; color: var(--tx-3); }
+
+@media (prefers-reduced-motion: reduce) { .w.flow { animation: none; } .pop, .cta { transition: none; } }
+
+/* narrow */
+@media (max-width: 900px) {
+  .topbar .in { padding: 0 16px; gap: 14px; }
+  .topbar nav, .topbar .lang { display: none; }
+  .hero { padding: 32px 16px 0; }
+  .hero h1 { font-size: 2.4rem; }
+  .hero .lede { font-size: 17px; }
+  .map { padding: 0 16px; }
+  .map-frame { grid-template-columns: 1fr; }
+  .depart { padding: 20px 0 8px; }
+  .svgwrap { overflow-x: auto; overscroll-behavior-x: contain; margin: 0 -16px; padding: 0 16px 8px; }
+  .svgwrap .inner { width: 940px; position: relative; }
+  .legend { padding: 12px 0 0; }
+  .sec { grid-template-columns: 1fr; padding: 72px 16px; gap: 32px; }
+  .sec h2 { font-size: 2.1rem; }
+  .board { height: auto; overflow: visible; background: none; border: 0; }
+  .stage { position: relative; transform: none; zoom: .45; height: 540px; background: #fff radial-gradient(circle, #d9d7cf 1px, transparent 1.2px) 0 0/20px 20px; border: 1px solid var(--rule); border-radius: 8px; }
+  .ecard { position: static; width: auto; margin-top: 14px; }
+  .foot .in { padding: 22px 16px 60px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= LANDING ======================= -->
+<div id="landing">
+<header class="topbar"><div class="in">
+  <a class="brand" href="#"><svg class="wm" viewBox="0 0 196 34" height="34" role="img" aria-label="NTC Training"><rect x="1.5" y="1.5" width="70" height="31" rx="15.5" fill="var(--plate)" stroke="#15171a" stroke-width="3"/><rect x="-6" y="14" width="13" height="6" rx="3" fill="var(--l-model)"/><rect x="66" y="14" width="13" height="6" rx="3" fill="var(--l-data)"/><text x="36.5" y="23.5" text-anchor="middle" font-family="BVP" font-weight="700" font-size="17" letter-spacing="0.5" fill="#15171a">NTC</text><text x="86" y="23.5" font-family="BVP" font-weight="600" font-size="16" fill="currentColor">Training</text></svg></a>
+  <nav aria-label="Chính">
+    <a href="#">Tính năng</a><a href="#">Template</a><a href="#">Tài liệu</a><a href="#">Giới thiệu</a><a href="#">Mã nguồn</a>
+  </nav>
+  <div class="right"><span class="lang"><b>VI</b> · EN</span></div>
+</div></header>
+
+<main>
+<section class="hero" aria-labelledby="h1">
+  <h1 id="h1">Dạy AI đọc <em>hoá đơn</em> của bạn — kéo, nối, bấm Chạy.</h1>
+  <p class="lede">Mỗi bước là một ga trên tuyến: lấy dữ liệu, chọn model, fine-tune, chạy thử, nén, đo điểm, xuất. Không cần viết code, app kiểm tra cả tuyến trước khi khởi hành.</p>
+  <ul class="facts">
+    <li>Miễn phí · mã nguồn mở Apache-2.0</li>
+    <li>Chạy trên NVIDIA NeMo AutoModel · Tối ưu cho DGX Spark</li>
+  </ul>
+</section>
+
+<section class="map" aria-label="Tuyến huấn luyện một model">
+  <div class="map-frame">
+    <div class="depart">
+      <span class="k">Ga xuất phát</span>
+      <a class="cta" href="#"><span class="ico" data-i="hard-drive"></span>Tải về &amp; cài đặt</a>
+      <div class="cmd"><span class="demo">minh hoạ</span>git clone …/ntc-training<br>./install.sh</div>
+      <span class="alt">hoặc <a href="#">xem template "Đọc hoá đơn → JSON"</a></span>
+    </div>
+    <div class="svgwrap"><div class="inner" id="mapInner">
+      <svg id="mapSvg" viewBox="0 0 1180 400" role="img" aria-labelledby="mapT">
+        <title id="mapT">Sơ đồ tuyến: Dữ liệu và Chọn model gốc gặp nhau ở ga Fine-tune, rồi đi qua Chạy thử, Nén FP8, Đo điểm và tới Xuất. Nhánh phụ: Fine-tune nhẹ (LoRA) rồi Gộp.</title>
+        <!-- data line (aqua) -->
+        <path class="line" stroke="var(--l-data)" d="M40 80 H300 L430 210"/>
+        <!-- model main line (blue) -->
+        <path id="mainPath" class="line" stroke="var(--l-model)" d="M40 220 H 1130"/>
+        <!-- alternative LoRA branch (dotted blue) -->
+        <path class="line alt" stroke="var(--l-model)" d="M450 330 H 560 L 670 220"/>
+        <!-- report line (orange) -->
+        <path class="line" stroke="var(--l-report)" d="M960 220 L 1040 300 H 1130"/>
+
+        <!-- stations -->
+        <g id="ticks"></g>
+        <!-- interchange capsule at Fine-tune -->
+        <rect class="cap" x="434" y="198" width="32" height="154" rx="16"/>
+        <!-- train -->
+        <circle id="train" class="train" r="11" cx="40" cy="220"/>
+        <g id="labels"></g>
+      </svg>
+      <div id="stnLayer"></div>
+      <div class="pop" id="pop" role="tooltip"><h4 id="popT"></h4><p id="popD"></p><div class="ports" id="popP"></div></div>
+    </div></div>
+  </div>
+  <ul class="legend" aria-label="Chú giải">
+    <li><span class="sw" style="background:var(--l-data)"></span><span class="sym sq"></span>Dữ liệu</li>
+    <li><span class="sw" style="background:var(--l-model)"></span><span class="sym ci"></span>Model</li>
+    <li><span class="sw" style="background:var(--l-report)"></span><span class="sym di"></span>Điểm benchmark</li>
+    <li><span class="sw dash"></span>Đường đi khác</li>
+    <li>Rê chuột hoặc Tab vào một ga để xem bước đó làm gì</li>
+  </ul>
+</section>
+
+<section class="sec" aria-labelledby="h2">
+  <div>
+    <h2 id="h2">Chặn lỗi trước khi chạy<button class="help" aria-label="Kiểm tra những gì?"><span class="ico" data-i="circle-question-mark"></span><span class="tip">Trước khi chạy, app kiểm tra kiểu của từng dây, bước nào còn thiếu đầu vào, và ước lượng RAM, thời gian, dung lượng đĩa. Số ước lượng luôn ghi nguồn: đo thực tế, công thức hay chưa có số đo.</span></button></h2>
+    <p class="body">Dây chỉ cắm được vào cổng cùng loại, giống như tàu chỉ chạy trên đúng tuyến. Thiếu bộ nhớ thì app báo ngay bằng lời thường, kèm cách sửa, chứ không đợi ba giờ sau mới hỏng.</p>
+  </div>
+  <div class="board" aria-label="Ví dụ minh hoạ trên canvas"><div class="stage">
+    <span class="note-demo">minh hoạ</span>
+    <svg style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true">
+      <path class="wire" stroke="var(--l-data)" d="M248 92 H 300 L 340 132 H 372"/>
+      <path class="wire bad" d="M248 276 H 290 L 352 214"/>
+    </svg>
+    <div class="nd" style="left:20px;top:50px"><div class="hd"><span class="num">1</span>Dataset Hugging Face</div><div class="row r">Dữ liệu <span class="sym sq"></span></div><span class="pt sq" style="right:-9px;top:35px"></span></div>
+    <div class="nd" style="left:20px;top:232px"><div class="hd"><span class="num">5</span>Đo điểm benchmark</div><div class="row r">Điểm benchmark <span class="sym di"></span></div><span class="pt di" style="right:-9px;top:37px"></span></div>
+    <div class="nd" style="left:372px;top:96px"><div class="hd"><span class="num">3</span>Fine-tune toàn bộ</div><div class="row"><span class="sym sq"></span>Dữ liệu</div><div class="row"><span class="sym ci"></span>Model gốc</div><span class="pt sq" style="left:-9px;top:43px"></span><span class="pt ci" style="left:-9px;top:76px"></span></div>
+    <div class="reject" role="status"><span class="ico" data-i="triangle-alert"></span>Cổng "Model gốc" cần Model, bạn đang nối Điểm benchmark.</div>
+    </div><div class="ecard" role="alert">
+      <h3><span class="ico" data-i="x"></span>Không đủ bộ nhớ cho bước này</h3>
+      <p>Bước này cần khoảng 14 GB nhưng máy chỉ còn 9 GB trống, vì máy đang dùng chung với ứng dụng khác.<button class="help" aria-label="Vì sao?"><span class="ico" data-i="circle-question-mark"></span><span class="tip">Máy DGX Spark dùng chung bộ nhớ cho CPU và GPU với các dịch vụ khác. Đây không phải lỗi của bạn. Số 14/9 GB ở đây là minh hoạ.</span></button></p>
+      <div class="acts"><button class="btn pri"><span class="ico" data-i="play"></span>Xếp hàng chờ</button><button class="btn">Mở bước này</button></div>
+    </div>
+  </div>
+</section>
+</main>
+<footer class="foot"><div class="in"><span>NTC Training · Apache-2.0</span><span>NVIDIA, NeMo và DGX Spark là nhãn hiệu của NVIDIA Corporation. Dự án này không liên kết với NVIDIA.</span></div></footer>
+</div>
+
+<!-- ======================= DASHBOARD ======================= -->
+<div id="dashboard" hidden>
+<div class="app">
+  <header class="tb" role="toolbar" aria-label="Thanh công cụ">
+    <a class="brand" href="#" data-tip="NTC Training"><svg class="wm32" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="NTC Training"><rect x="1.5" y="6.5" width="29" height="19" rx="9.5" fill="var(--plate)" stroke="#15171a" stroke-width="2"/><text x="16" y="20" text-anchor="middle" font-family="BVP" font-weight="700" font-size="9.5" letter-spacing="0.2" fill="#15171a">NTC</text></svg></a>
+    <span class="wf"><span class="dot" aria-label="Có thay đổi chưa lưu"></span>Đọc hoá đơn → JSON</span>
+    <button class="ib" data-tip="Workflow mới" aria-label="Workflow mới"><span class="ico" data-i="file-plus"></span></button>
+    <button class="ib" data-tip="Mở" aria-label="Mở"><span class="ico" data-i="folder-open"></span></button>
+    <button class="ib" data-tip="Lưu (Ctrl+S)" aria-label="Lưu"><span class="ico" data-i="save"></span></button>
+    <span class="sep"></span>
+    <button class="ib" data-tip="Hoàn tác" aria-label="Hoàn tác"><span class="ico" data-i="undo-2"></span></button>
+    <button class="ib" data-tip="Làm lại" aria-label="Làm lại"><span class="ico" data-i="redo-2"></span></button>
+    <button class="ib" data-tip="Sắp xếp gọn" aria-label="Sắp xếp gọn"><span class="ico" data-i="layout-grid"></span></button>
+    <span class="sep"></span>
+    <div class="seg" role="radiogroup" aria-label="Chế độ">
+      <button class="ib on" role="radio" aria-checked="true" data-tip="Đơn giản" aria-label="Đơn giản"><span class="ico" data-i="sliders-horizontal"></span></button>
+      <button class="ib" role="radio" aria-checked="false" data-tip="Nâng cao" aria-label="Nâng cao"><span class="ico" data-i="settings-2"></span></button>
+    </div>
+    <span class="sp"></span>
+    <span class="chip" data-tip="GPU đang chạy workflow này"><span class="ico" data-i="cpu"></span><span class="st" style="background:var(--l-model)"></span>Bận</span>
+    <span class="chip" data-tip="RAM đã dùng / tổng (minh hoạ)"><span class="ico" data-i="memory-stick"></span>72 / 121 GB</span>
+    <span class="chip" data-tip="Ổ đĩa còn trống (minh hoạ)"><span class="ico" data-i="hard-drive"></span>1,4 TB</span>
+    <button class="run stop" aria-label="Dừng"><span class="ico" data-i="square"></span>Dừng</button>
+  </header>
+
+  <nav class="rail" aria-label="Thư viện bước">
+    <button class="ib" data-tip="Tìm bước ( / )" aria-label="Tìm bước"><span class="ico" data-i="search"></span></button>
+    <span class="rsep"></span>
+    <button class="ib on" data-tip="① Nguồn" aria-label="① Nguồn"><span class="ico" data-i="database"></span><i style="background:var(--l-data)"></i></button>
+    <button class="ib" data-tip="② Chuẩn bị" aria-label="② Chuẩn bị"><span class="ico" data-i="scissors"></span><i style="background:var(--l-data)"></i></button>
+    <button class="ib" data-tip="③ Huấn luyện" aria-label="③ Huấn luyện"><span class="ico" data-i="git-branch"></span><i style="background:var(--l-model)"></i></button>
+    <button class="ib" data-tip="④ Chạy thử" aria-label="④ Chạy thử"><span class="ico" data-i="message-square"></span><i style="background:var(--l-endpoint)"></i></button>
+    <button class="ib" data-tip="⑤ Nén" aria-label="⑤ Nén"><span class="ico" data-i="package"></span><i style="background:var(--l-model)"></i></button>
+    <button class="ib" data-tip="⑥ Đo điểm" aria-label="⑥ Đo điểm"><span class="ico" data-i="gauge"></span><i style="background:var(--l-report)"></i></button>
+    <button class="ib" data-tip="⑦ Xuất" aria-label="⑦ Xuất"><span class="ico" data-i="save"></span><i style="background:var(--l-model)"></i></button>
+  </nav>
+
+  <main class="cv" aria-label="Canvas">
+    <div class="lanes"><div><span>① Nguồn</span></div><div><span>② Chuẩn bị</span></div><div><span>③ Huấn luyện</span></div><div><span>④ Chạy thử</span></div><div><span>⑤ Nén</span></div><div><span>⑥ Đo điểm</span></div><div><span>⑦ Xuất</span></div></div>
+    <svg class="wires" id="wires" aria-hidden="true"></svg>
+    <div id="nodes"></div>
+    <div class="mini"><button class="ib" data-tip="Phóng to" aria-label="Phóng to"><span class="ico" data-i="plus"></span></button><button class="ib" data-tip="Thu nhỏ" aria-label="Thu nhỏ"><span class="ico" data-i="minus"></span></button><button class="ib" data-tip="Vừa màn hình" aria-label="Vừa màn hình"><span class="ico" data-i="scan"></span></button></div>
+  </main>
+
+  <aside class="insp" aria-label="Thiết lập bước">
+    <div class="ih">
+      <div class="t"><span class="num" style="width:20px;height:20px;border-radius:50%;background:#f1f0ec;color:#15171a;font-size:11px;display:grid;place-items:center">4</span>Fine-tune toàn bộ<button class="qh" aria-label="Bước này làm gì?" data-tip="Dạy model trả lời theo dữ liệu của bạn"><span class="ico" data-i="circle-question-mark"></span></button></div>
+      <div class="st"><span style="color:var(--l-model)">◐</span> Đang chạy 42% <span style="color:var(--tx-3);font-weight:400">· minh hoạ</span></div>
+      <div class="bar2"><i></i></div>
+    </div>
+    <section>
+      <h5>Thiết lập</h5>
+      <div class="fld"><label>Số lượt học<button class="qh" aria-label="Giải thích" data-tip="Số lần model đọc hết dữ liệu"><span class="ico" data-i="circle-question-mark"></span></button></label><div class="segs"><span>1</span><span class="on">3</span><span>5</span></div></div>
+      <div class="fld"><label>Tốc độ học</label><div class="ctl">An toàn <span style="color:var(--tx-3)">▾</span></div></div>
+      <div class="fld"><label>Dữ liệu mẫu</label><div class="ctl">Toàn bộ <span style="color:var(--tx-3)">▾</span></div></div>
+    </section>
+    <section>
+      <h5>Cổng</h5>
+      <div class="ports">
+        <div><span class="p sq"></span>Dữ liệu ← Chia dữ liệu</div>
+        <div><span class="p ci"></span>Model gốc ← Nemotron-Parse v1.1</div>
+        <div><span class="p ci"></span>Model → Chạy thử, Nén</div>
+      </div>
+    </section>
+    <section>
+      <h5>Dự kiến<button class="qh" aria-label="Nguồn số liệu" data-tip="Chưa có số đo trên máy này"><span class="ico" data-i="circle-question-mark"></span></button></h5>
+      <div class="kv"><span>RAM</span><span class="na" style="text-align:right">chưa có số đo</span><span>Thời gian</span><span class="na" style="text-align:right">chưa có số đo</span><span>Ổ đĩa</span><span class="na" style="text-align:right">chưa có số đo</span></div>
+    </section>
+  </aside>
+
+  <footer class="cb" aria-label="Kiểm tra và tiến độ">
+    <span class="ok"><span class="ico" data-i="check" style="width:15px;height:15px"></span>8/8 bước ổn</span>
+    <span class="prog">Đang chạy bước 4/8 · Fine-tune toàn bộ <span class="track"><i></i></span></span>
+    <span class="r"><span>Dữ liệu: CORD-v2 · CC BY 4.0</span></span>
+  </footer>
+</div>
+</div>
+
+<nav class="switch" aria-label="Chọn màn mock"><span>mock D2</span><a href="?v=landing" id="swL">Landing</a><a href="?v=dashboard" id="swD">Dashboard</a></nav>
+
+<script>
+const ICONS = {"scan": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M3 7V5a2 2 0 0 1 2-2h2\" /> <path d=\"M17 3h2a2 2 0 0 1 2 2v2\" /> <path d=\"M21 17v2a2 2 0 0 1-2 2h-2\" /> <path d=\"M7 21H5a2 2 0 0 1-2-2v-2\" /> </svg>", "hard-drive": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M10 16h.01\" /> <path d=\"M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" /> <path d=\"M21.946 12.013H2.054\" /> <path d=\"M6 16h.01\" /> </svg>", "search": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"m21 21-4.34-4.34\" /> <circle cx=\"11\" cy=\"11\" r=\"8\" /> </svg>", "sliders-horizontal": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M10 5H3\" /> <path d=\"M12 19H3\" /> <path d=\"M14 3v4\" /> <path d=\"M16 17v4\" /> <path d=\"M21 12h-9\" /> <path d=\"M21 19h-5\" /> <path d=\"M21 5h-7\" /> <path d=\"M8 10v4\" /> <path d=\"M8 12H3\" /> </svg>", "layout-grid": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <rect width=\"7\" height=\"7\" x=\"3\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"7\" x=\"14\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"7\" x=\"14\" y=\"14\" rx=\"1\" /> <rect width=\"7\" height=\"7\" x=\"3\" y=\"14\" rx=\"1\" /> </svg>", "settings-2": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M14 17H5\" /> <path d=\"M19 7h-9\" /> <circle cx=\"17\" cy=\"17\" r=\"3\" /> <circle cx=\"7\" cy=\"7\" r=\"3\" /> </svg>", "circle-question-mark": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /> <path d=\"M12 17h.01\" /> </svg>", "triangle-alert": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /> <path d=\"M12 9v4\" /> <path d=\"M12 17h.01\" /> </svg>", "git-branch": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M15 6a9 9 0 0 0-9 9V3\" /> <circle cx=\"18\" cy=\"6\" r=\"3\" /> <circle cx=\"6\" cy=\"18\" r=\"3\" /> </svg>", "message-square": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z\" /> </svg>", "save": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\" /> <path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7\" /> <path d=\"M7 3v4a1 1 0 0 0 1 1h7\" /> </svg>", "scissors": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <circle cx=\"6\" cy=\"6\" r=\"3\" /> <path d=\"M8.12 8.12 12 12\" /> <path d=\"M20 4 8.12 15.88\" /> <circle cx=\"6\" cy=\"18\" r=\"3\" /> <path d=\"M14.8 14.8 20 20\" /> </svg>", "x": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M18 6 6 18\" /> <path d=\"m6 6 12 12\" /> </svg>", "file-plus": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /> <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /> <path d=\"M9 15h6\" /> <path d=\"M12 18v-6\" /> </svg>", "redo-2": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"m15 14 5-5-5-5\" /> <path d=\"M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13\" /> </svg>", "gauge": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"m12 14 4-4\" /> <path d=\"M3.34 19a10 10 0 1 1 17.32 0\" /> </svg>", "square": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> </svg>", "check": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M20 6 9 17l-5-5\" /> </svg>", "cpu": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M12 20v2\" /> <path d=\"M12 2v2\" /> <path d=\"M17 20v2\" /> <path d=\"M17 2v2\" /> <path d=\"M2 12h2\" /> <path d=\"M2 17h2\" /> <path d=\"M2 7h2\" /> <path d=\"M20 12h2\" /> <path d=\"M20 17h2\" /> <path d=\"M20 7h2\" /> <path d=\"M7 20v2\" /> <path d=\"M7 2v2\" /> <rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\" /> <rect x=\"8\" y=\"8\" width=\"8\" height=\"8\" rx=\"1\" /> </svg>", "undo-2": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M9 14 4 9l5-5\" /> <path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" /> </svg>", "database": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /> <path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /> <path d=\"M3 12A9 3 0 0 0 21 12\" /> </svg>", "plus": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M5 12h14\" /> <path d=\"M12 5v14\" /> </svg>", "memory-stick": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M12 12v-2\" /> <path d=\"M12 18v-2\" /> <path d=\"M16 12v-2\" /> <path d=\"M16 18v-2\" /> <path d=\"M2 11h1.5\" /> <path d=\"M20 18v-2\" /> <path d=\"M20.5 11H22\" /> <path d=\"M4 18v-2\" /> <path d=\"M8 12v-2\" /> <path d=\"M8 18v-2\" /> <rect x=\"2\" y=\"6\" width=\"20\" height=\"10\" rx=\"2\" /> </svg>", "play": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\" /> </svg>", "box": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\" /> <path d=\"m3.3 7 8.7 5 8.7-5\" /> <path d=\"M12 22V12\" /> </svg>", "package": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z\" /> <path d=\"M12 22V12\" /> <polyline points=\"3.29 7 12 12 20.71 7\" /> <path d=\"m7.5 4.27 9 5.15\" /> </svg>", "folder-open": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2\" /> </svg>", "minus": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"> <path d=\"M5 12h14\" /> </svg>"};
+document.querySelectorAll("[data-i]").forEach(el => { const s = ICONS[el.dataset.i]; if (s) el.innerHTML = s; });
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const view = new URLSearchParams(location.search).get("v") === "dashboard" ? "dashboard" : "landing";
+document.getElementById("landing").hidden = view !== "landing";
+document.getElementById("dashboard").hidden = view !== "dashboard";
+document.body.classList.toggle("dash", view === "dashboard");
+document.getElementById(view === "landing" ? "swL" : "swD").setAttribute("aria-current", "page");
+
+/* ---------- landing map ---------- */
+const STATIONS = [
+  // id, x, y, label, label side, desc (vi.yaml node.*.desc), in, out
+  ["data", 40, 80, "Dữ liệu", "t", "Lấy bộ dữ liệu có sẵn trên Hugging Face, hoặc dùng ảnh và câu hỏi/đáp án của bạn trong thư mục dự án.", "", "sq:Dữ liệu"],
+  ["split", 300, 80, "Chia dữ liệu", "t", "Tách một phần dữ liệu để kiểm tra model sau khi học.", "sq:Dữ liệu", "sq:Dữ liệu"],
+  ["model", 40, 220, "Chọn model gốc", "b", "Chọn model có sẵn để bắt đầu. Danh sách đã được kiểm tra giấy phép.", "", "ci:Model"],
+  ["ft", 450, 220, "Fine-tune", "t", "Dạy model trả lời theo dữ liệu của bạn bằng cách cập nhật các phần model cần học.", "sq:Dữ liệu ci:Model", "ci:Model"],
+  ["lora", 450, 330, "Fine-tune nhẹ (LoRA)", "b", "Dạy model trả lời theo dữ liệu của bạn, tốn ít bộ nhớ.", "sq:Dữ liệu ci:Model", "ci:Phần học thêm"],
+  ["merge", 560, 330, "Gộp", "b", "Gộp LoRA vào model gốc thành một model hoàn chỉnh.", "ci:Phần học thêm", "ci:Model"],
+  ["try", 720, 220, "Chạy thử", "t", "Chạy model như một dịch vụ để chat thử hoặc đo tốc độ.", "ci:Model", "tr:Model đang chạy thử"],
+  ["quant", 840, 220, "Nén FP8", "b", "Làm model nhỏ và chạy nhanh hơn, chất lượng có thể giảm nhẹ.", "ci:Model", "ci:Model đã nén"],
+  ["eval", 960, 220, "Đo điểm", "t", "Chấm điểm model trên các bộ đề chuẩn theo năng lực.", "ci:Model", "di:Điểm benchmark"],
+  ["cmp", 1130, 300, "So sánh", "b", "Đặt điểm của các model cạnh nhau để thấy cái nào tốt hơn.", "di:Điểm benchmark", ""],
+  ["export", 1130, 220, "Xuất", "t", "Lưu model theo định dạng Hugging Face để dùng ở nơi khác.", "ci:Model", "ci:Model đã xuất"],
+];
+const svgNS = "http://www.w3.org/2000/svg";
+const ticks = document.getElementById("ticks"), labels = document.getElementById("labels");
+const layer = document.getElementById("stnLayer"), pop = document.getElementById("pop");
+const mk = (n, a) => { const e = document.createElementNS(svgNS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+const symHtml = s => s.split(" ").filter(Boolean).map(t => { const [k, l] = t.split(":"); return `<span><span class="sym ${k}"></span>${l}</span>`; }).join("");
+for (const [id, x, y, label, side, desc, pin, pout] of STATIONS) {
+  if (id !== "ft" && id !== "lora") ticks.appendChild(mk("circle", { class: "tick", cx: x, cy: y, r: id === "data" || id === "model" || id === "export" || id === "cmp" ? 13 : 10 }));
+  else ticks.appendChild(mk("circle", { class: "tick", cx: x, cy: y, r: 9 }));
+  const ty = side === "t" ? y - 26 : y + 38;
+  const anchor = x < 60 ? "start" : x > 1100 ? "end" : "middle";
+  const tx = x < 60 ? x - 12 : x > 1100 ? x + 12 : x;
+  const t = mk("text", { class: "slabel", x: tx, y: ty, "text-anchor": anchor }); t.textContent = label; labels.appendChild(t);
+  const b = document.createElement("button");
+  b.className = "stn"; b.style.left = (x / 1180 * 100) + "%"; b.style.top = (y / 400 * 100) + "%";
+  b.setAttribute("aria-label", label + ": " + desc);
+  const show = () => {
+    document.getElementById("popT").innerHTML = `<span class="sym ci" style="background:var(--plate);outline:2px solid var(--ink)"></span>${label}`;
+    document.getElementById("popD").textContent = desc;
+    document.getElementById("popP").innerHTML = (pin ? `<span>Vào: </span>${symHtml(pin)}` : "") + (pout ? `<span>Ra: </span>${symHtml(pout)}` : "");
+    const wrap = layer.parentElement.getBoundingClientRect();
+    let left = x / 1180 * wrap.width - 150; left = Math.max(0, Math.min(left, wrap.width - 300));
+    const top = y / 400 * wrap.height + (side === "t" ? 24 : -24 - 150);
+    pop.style.left = left + "px"; pop.style.top = top + "px"; pop.classList.add("on");
+  };
+  const hide = () => pop.classList.remove("on");
+  b.addEventListener("mouseenter", show); b.addEventListener("focus", show);
+  b.addEventListener("mouseleave", hide); b.addEventListener("blur", hide);
+  layer.appendChild(b);
+}
+/* train: runs the model line, stopping at each station */
+const train = document.getElementById("train");
+const stops = [40, 450, 720, 840, 960, 1130];
+if (reduce) { train.setAttribute("cx", 1130); }
+else if (view === "landing") {
+  let i = 0;
+  const hop = () => {
+    const a = stops[i], b = stops[(i + 1) % stops.length];
+    if (b < a) { i = 0; train.setAttribute("cx", stops[0]); setTimeout(hop, 900); return; }
+    const t0 = performance.now(), dur = 520 + (b - a) * 1.6;
+    const step = now => { const k = Math.min(1, (now - t0) / dur); const e = 1 - Math.pow(1 - k, 3); train.setAttribute("cx", a + (b - a) * e); if (k < 1) requestAnimationFrame(step); else { i++; setTimeout(hop, i === stops.length - 1 ? 1800 : 650); } };
+    requestAnimationFrame(step);
+  };
+  setTimeout(hop, 700);
+}
+
+/* ---------- dashboard canvas ---------- */
+if (view === "dashboard") {
+  const N = [
+    // id, lane(0-6), y, num, title, value, state, in ports, out ports
+    ["d", 0, 96, 1, "Dataset Hugging Face", "cord-v2 · 800 mẫu", "ok", [], ["sq"]],
+    ["m", 0, 330, 2, "Chọn model gốc", "Nemotron-Parse v1.1", "ok", [], ["ci"]],
+    ["s", 1, 96, 3, "Chia dữ liệu", "Kiểm tra 10%", "ok", ["sq"], ["sq"]],
+    ["f", 2, 210, 4, "Fine-tune toàn bộ", "3 lượt · An toàn", "run", ["sq", "ci"], ["ci"]],
+    ["t", 3, 96, 5, "Bật model chạy thử", "vLLM", "wait", ["ci"], ["tr"]],
+    ["q", 4, 330, 6, "Nén model", "FP8", "wait", ["ci"], ["ci"]],
+    ["e", 5, 96, 7, "Đo điểm benchmark", "CORD-v2", "wait", ["ci"], ["di"]],
+    ["x", 6, 330, 8, "Lưu model", "Hugging Face", "wait", ["ci"], ["ci"]],
+  ];
+  const cv = document.querySelector(".cv"), host = document.getElementById("nodes"), W = cv.clientWidth, laneW = W / 7;
+  const pos = {};
+  for (const [id, lane, y, num, title, val, st, ins, outs] of N) {
+    const x = lane * laneW + (laneW - 146) / 2;
+    pos[id] = { x, y, ins, outs };
+    const el = document.createElement("div");
+    el.className = "n" + (id === "f" ? " sel running" : "");
+    el.style.left = x + "px"; el.style.top = y + "px";
+    const foot = st === "ok" ? `<div class="f ok">✓ Xong · 0:42</div>` : st === "run" ? `<div class="f going">◐ Đang chạy 42%<span class="pg" style="width:42%"></span></div>` : `<div class="f">⧗ Đang chờ</div>`;
+    el.innerHTML = `<div class="h"><span class="num">${num}</span>${title}</div><div class="v">${val}</div>${foot}` +
+      ins.map((p, k) => `<span class="p in ${p}" style="top:${30 + k * 22}px"></span>`).join("") +
+      outs.map(p => `<span class="p out ${p}" style="top:30px"></span>`).join("");
+    host.appendChild(el);
+  }
+  const svg = document.getElementById("wires");
+  const portY = (id, k) => pos[id].y + 30 + 6 + k * 22;
+  const wire = (a, b, kIn, col, cls) => {
+    const x1 = pos[a].x + 146 + 6, y1 = portY(a, 0), x2 = pos[b].x - 6, y2 = portY(b, kIn);
+    const dy = y2 - y1, mid = x2 - 24 - Math.abs(dy);
+    const d = dy === 0 ? `M${x1} ${y1} H${x2}` : `M${x1} ${y1} H${Math.max(x1 + 18, mid)} L${Math.max(x1 + 18, mid) + Math.abs(dy)} ${y2} H${x2}`;
+    svg.appendChild(mk("path", { class: "w " + (cls || ""), stroke: col, d }));
+  };
+  wire("d", "s", 0, "var(--l-data)", "done");
+  wire("s", "f", 0, "var(--l-data)", "done flow");
+  wire("m", "f", 1, "var(--l-model)", "done flow");
+  wire("f", "t", 0, "var(--l-model)");
+  wire("f", "q", 0, "var(--l-model)");
+  wire("t", "e", 0, "var(--l-endpoint)");
+  wire("q", "x", 0, "var(--l-model)");
+}
+</script>
+</body>
+</html>
