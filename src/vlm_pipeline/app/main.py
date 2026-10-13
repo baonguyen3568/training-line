@@ -210,6 +210,19 @@ def _register_storage(app: FastAPI, services: Services) -> None:
     storage.register_storage_routes(app, api)
 
 
+def _register_uploads(app: FastAPI, services: Services) -> None:
+    """Trial-node images + result (app/uploads.py); errors render like validate issues."""
+    root, state_dir = getattr(services, "root", None), getattr(services, "_state_dir", None)
+    if root is None or state_dir is None:
+        return  # test doubles without a project root
+    from vlm_pipeline.app.uploads import register_upload_routes
+
+    def render(code: str, params: dict[str, Any], locale: str) -> dict[str, Any]:
+        return _render_issue({"code": code, "params": params}, locale if locale in ("vi", "en") else "vi")
+
+    register_upload_routes(app, root, state_dir, render)
+
+
 def _register_spa(app: FastAPI, static_dir: Path) -> None:
     """Serve the built frontend on the same origin (D13: no CORS); unknown paths fall back to index.html."""
     root = static_dir.resolve()
@@ -269,6 +282,7 @@ def create_app(
         return JSONResponse(status_code=400, content={"code": exc.code, "params": exc.params})
 
     _register_storage(app, services)
+    _register_uploads(app, services)
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
     _register_template_routes(app, services)

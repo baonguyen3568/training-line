@@ -333,6 +333,17 @@ assets:
     scope: [serve]
     reviewer: bao-security  # uv.lock (ec726ac) pypi.org only, upload >= 7 days, OSV none 2026-10-12
     date: 2026-10-12
+  - repo_id: pypi:pillow
+    kind: code
+    version: 12.3.0
+    license: MIT-CMU
+    license_url: https://pypi.org/project/pillow/12.3.0/
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "keep copyright + license text (HPND / MIT-CMU) in THIRD_PARTY_LICENSES"
+    scope: [serve]
+    reviewer: bao-security  # same version as vlm-automodel:26.08-6; fixes GHSA-phj9-mv4w-65pm (CVE-2026-55380) + CVE-2026-54059/54060/55379; open() always with formats=[PNG,JPEG,WEBP]
+    date: 2026-10-13
   - repo_id: pypi:uvicorn
     kind: code
     version: 0.54.0

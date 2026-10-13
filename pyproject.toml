@@ -9,6 +9,7 @@ requires-python = ">=3.12,<3.13"
 # live in the NGC container images (docker/IMAGES.lock), never here (ADR-004 D1).
 dependencies = [
     "fastapi>=0.142.2,<0.143",
+    "pillow==12.3.0",
     "pydantic>=2.13,<3",
     "pyyaml>=6.0,<7",
     "uvicorn>=0.54.0,<0.55",

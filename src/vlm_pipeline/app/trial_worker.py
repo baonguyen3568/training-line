@@ -17,6 +17,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from vlm_pipeline.app.uploads import UPLOADS_DIR, upload_path
 from vlm_pipeline.common.catalog import CatalogEntry
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.jobrun import ContainerJob, MemoryPreemptedBeforeStartError, run_job
@@ -29,18 +30,11 @@ from vlm_pipeline.serve.trial import MAX_IMAGE_BYTES, TrialRequest
 if TYPE_CHECKING:
     from vlm_pipeline.app.workers import RealWorker
 
-UPLOADS_DIR = "uploads"
-
 
 class TrialImageError(VlmPipelineError):
     """The trial image is missing or unusable (reason: missing, not_a_file, too_large, too_many_pixels, unreadable)."""
 
     code: ClassVar[str] = "DATA-005"
-
-
-def upload_path(root: Path, upload_id: str) -> Path:
-    """Where ``POST /api/uploads`` stored ``upload_id`` (uuid hex, validated by InferenceParams)."""
-    return root / UPLOADS_DIR / f"{upload_id}.png"
 
 
 def check_image(root: Path, node_id: str, upload_id: str) -> Path:
