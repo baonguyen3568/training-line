@@ -111,7 +111,7 @@ def _node_types(services: Services, locale: str) -> dict[str, Any]:
 
 def _start_graph_run(services: Services, bus: EventBus, workflow: dict[str, Any]) -> str:
     graph_run_id = f"g-{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(3)}"
-    bus.open(graph_run_id)
+    bus.open(graph_run_id, context=workflow)  # error cards render step names from it (WS ?locale=)
 
     def emit(event: dict[str, Any]) -> None:
         bus.publish(graph_run_id, {"graph_run_id": graph_run_id, "ts": time.time(), **event})
@@ -292,9 +292,24 @@ def _register_advanced_routes(app: FastAPI, services: Services) -> None:
         return {"options": options}
 
 
-def _register_ws(app: FastAPI, bus: EventBus, ws_auth: Callable[[WebSocket], Awaitable[None]] | None) -> None:
+def _rendered_event(event: dict[str, Any], locale: str, labels: Labels | None) -> dict[str, Any]:
+    """``event`` with its ``error`` (if any) carrying title / what / why in ``locale``, as validate issues do."""
+    error = event.get("error")
+    if not isinstance(error, dict) or "code" not in error:
+        return event
+    issue = {"code": error["code"], "params": error.get("params") or {}, "node_id": event.get("node_id")}
+    text = _render_issue(issue, locale, labels)
+    return {**event, "error": {**error, **{k: text.get(k) for k in ("title", "what", "why", "title_key")}}}
+
+
+def _register_ws(
+    app: FastAPI,
+    bus: EventBus,
+    ws_auth: Callable[[WebSocket], Awaitable[None]] | None,
+    registry: Any = None,
+) -> None:
     @app.websocket("/api/runs/{graph_run_id}/events")
-    async def events(websocket: WebSocket, graph_run_id: str) -> None:
+    async def events(websocket: WebSocket, graph_run_id: str, locale: str | None = None) -> None:
         if ws_auth is not None:
             try:
                 await ws_auth(websocket)  # accepts, then requires the auth message; closes 4401 on failure
@@ -306,9 +321,12 @@ def _register_ws(app: FastAPI, bus: EventBus, ws_auth: Callable[[WebSocket], Awa
             await websocket.send_json({"type": "run_not_found", "graph_run_id": graph_run_id})
             await websocket.close(code=4404)
             return
+        loc = locale if locale in i18n.LOCALES else None  # no locale: raw events, as before
+        workflow = bus.context(graph_run_id)
+        labels = _labels(workflow, registry, loc) if loc and isinstance(workflow, Mapping) and registry else None
         try:
             async for event in bus.follow(graph_run_id):
-                await websocket.send_json(event)
+                await websocket.send_json(_rendered_event(event, loc, labels) if loc else event)
             await websocket.close(code=1000)
         except WebSocketDisconnect:
             return
@@ -441,7 +459,7 @@ def create_app(
     _register_info_routes(app, services, bus)
     _register_advanced_routes(app, services)
     _register_template_routes(app, services)
-    _register_ws(app, bus, ws_auth)
+    _register_ws(app, bus, ws_auth, services.registry)
     if static_dir is None and getattr(services, "root", None) is not None:
         static_dir = services.root / "frontend" / "dist"  # type: ignore[attr-defined]
     if static_dir is not None and (static_dir / "index.html").is_file():

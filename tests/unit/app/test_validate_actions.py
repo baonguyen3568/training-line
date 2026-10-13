@@ -43,3 +43,24 @@ def test_advanced_options_are_listed_per_train_node_and_model(tmp_path: Path) ->
     assert all("nemotron-parse-v1.1" in o["templates"] for o in parse["options"])
     assert client.get("/api/node-types/data.filter/advanced").status_code == 404  # no advanced param
     assert client.get("/api/node-types/nope/advanced").status_code == 404
+
+
+def test_ws_error_events_are_rendered_in_the_readers_locale(tmp_path: Path) -> None:
+    """frontend (1.0): a failed node's card needs title / what / why as the server renders validate issues."""
+    app = create_app(DefaultServices(registry=REGISTRY, root=tmp_path), secure=False)
+    workflow = {"nodes": [_n("t", "train.lora_vlm")], "edges": []}
+    bus = app.state.bus
+    bus.open("g-1", context=workflow)
+    error = {"code": "CFG-010", "params": {"node": "t", "model": "Parse", "supported": "train.sft_vlm"}}
+    bus.publish("g-1", {"type": "node_status", "node_id": "t", "status": "failed", "error": error})
+    bus.close("g-1")
+    client = TestClient(app)
+    with client.websocket_connect("/api/runs/g-1/events?locale=en") as ws:
+        event = ws.receive_json()
+    assert event["error"]["code"] == "CFG-010"
+    assert event["error"]["params"] == error["params"]  # raw params stay for the client's own logic
+    assert event["error"]["title"]
+    assert "Parse" in event["error"]["what"]
+    assert '"t"' not in event["error"]["what"]  # the step's name, not its raw id
+    with client.websocket_connect("/api/runs/g-1/events") as ws:  # no locale: raw, as older clients expect
+        assert "title" not in ws.receive_json()["error"]

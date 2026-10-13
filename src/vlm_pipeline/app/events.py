@@ -27,6 +27,7 @@ class _RunLog:
         self.dropped = 0
         self.closed = False
         self.waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Queue[Event]]] = []
+        self.context: object = None  # what renders this run's events for a reader (the workflow), freed with it
 
     def add(self, seq: int, event: Event) -> None:
         if event.get("type") in STATE_EVENTS:
@@ -51,9 +52,17 @@ class EventBus:
         self._max_other = max_other_events_per_run
         self._keep_closed = keep_closed_runs
 
-    def open(self, run_id: str) -> None:
+    def open(self, run_id: str, context: object = None) -> None:
         with self._lock:
-            self._runs.setdefault(run_id, _RunLog(self._max_other))
+            log = self._runs.setdefault(run_id, _RunLog(self._max_other))
+            if context is not None:
+                log.context = context
+
+    def context(self, run_id: str) -> object:
+        """What ``open`` was given for ``run_id`` (None when unknown or forgotten)."""
+        with self._lock:
+            log = self._runs.get(run_id)
+            return log.context if log else None
 
     def known(self, run_id: str) -> bool:
         with self._lock:
