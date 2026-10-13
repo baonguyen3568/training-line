@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from vlm_pipeline.common.catalog import load_catalog, load_dataset_catalog
+from vlm_pipeline.common.catalog import license_ids_needing_text, load_catalog, load_dataset_catalog
 from vlm_pipeline.common.licenses import LICENSES_DIR, LICENSES_LOCK, license_text
 from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.common.runinfo import RunManifest, write_manifest
@@ -104,7 +104,7 @@ def test_licence_text_must_match_the_lock(tmp_path: Path) -> None:
 def test_every_catalog_licence_has_an_approved_vendored_text() -> None:
     """The real configs/licenses: an export of any catalog model or dataset can be written."""
     root = project_root()
-    ids = {m.license for m in load_catalog().models} | {d.license for d in load_dataset_catalog().datasets}
+    ids = license_ids_needing_text(load_catalog(), load_dataset_catalog())  # same set as test_catalog
     assert {i for i in ids if license_text(root, i) is None} == set()
 
 
