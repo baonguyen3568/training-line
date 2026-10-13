@@ -1,0 +1,868 @@
+{
+ "engine": "nemo_automodel",
+ "engine_version": "0.5.0",
+ "image": "vlm-automodel:26.08-6",
+ "keys": [
+  {
+   "choices": null,
+   "default": false,
+   "key": "dataloader.collate_fn.drop_overlong",
+   "templates": [
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "dataloader.collate_fn.max_length",
+   "max": 32768,
+   "min": 128,
+   "templates": [
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "dataloader.drop_last",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "dataloader.in_order",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": 0,
+   "key": "dataloader.num_workers",
+   "max": 8,
+   "min": 0,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "dataloader.persistent_workers",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "dataloader.pin_memory",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "dataloader.prefetch_factor",
+   "max": 8,
+   "min": 1,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "dataloader.shuffle",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": 1,
+   "key": "dataloader.snapshot_every_n_steps",
+   "max": 100000,
+   "min": 1,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": 0,
+   "key": "dataloader.timeout",
+   "max": 600,
+   "min": 0,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "float"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "dist_env.timeout_minutes",
+   "max": 120,
+   "min": 1,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "loss_fn.fp32_upcast",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": -100,
+   "key": "loss_fn.ignore_index",
+   "max": -100,
+   "min": -100,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": [
+    "te",
+    "sdpa",
+    "flex",
+    "eager",
+    "tilelang"
+   ],
+   "default": "sdpa",
+   "key": "model.backend.attn",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "enum"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "model.backend.compile_attn",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "model.backend.enable_fsdp_optimizations",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "model.backend.enable_hf_state_dict_adapter",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": [
+    "torch",
+    "te",
+    "gmm",
+    "torch_mm",
+    "torch_mm_mxfp8"
+   ],
+   "default": "torch",
+   "key": "model.backend.experts",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "enum"
+  },
+  {
+   "choices": [
+    "torch",
+    "te",
+    "quack"
+   ],
+   "default": "torch",
+   "key": "model.backend.linear",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "enum"
+  },
+  {
+   "choices": [
+    "torch",
+    "torch_fp32",
+    "te",
+    "quack"
+   ],
+   "default": "torch_fp32",
+   "key": "model.backend.rms_norm",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "enum"
+  },
+  {
+   "choices": [
+    "torch",
+    "quack"
+   ],
+   "default": "torch",
+   "key": "model.backend.rope",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "enum"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "model.backend.rope_fusion",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "model.force_hf",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "model.text_config.use_cache",
+   "templates": [
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "model.use_liger_kernel",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "model.use_sdpa_patching",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "optimizer.adam_w_mode",
+   "templates": [
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "optimizer.amsgrad",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "optimizer.bias_correction",
+   "templates": [
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "optimizer.capturable",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "optimizer.differentiable",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": 1e-08,
+   "key": "optimizer.eps",
+   "max": 0.001,
+   "min": 1e-12,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "float"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "optimizer.foreach",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "optimizer.fused",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "optimizer.maximize",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "optimizer.store_param_remainders",
+   "templates": [
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "optimizer.use_decoupled_grad",
+   "templates": [
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "rng.ranked",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "validation_dataloader.drop_last",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": true,
+   "key": "validation_dataloader.in_order",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": 0,
+   "key": "validation_dataloader.num_workers",
+   "max": 8,
+   "min": 0,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "validation_dataloader.persistent_workers",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": false,
+   "key": "validation_dataloader.pin_memory",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "validation_dataloader.prefetch_factor",
+   "max": 8,
+   "min": 1,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": null,
+   "key": "validation_dataloader.shuffle",
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "bool"
+  },
+  {
+   "choices": null,
+   "default": 1,
+   "key": "validation_dataloader.snapshot_every_n_steps",
+   "max": 100000,
+   "min": 1,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "int"
+  },
+  {
+   "choices": null,
+   "default": 0,
+   "key": "validation_dataloader.timeout",
+   "max": 600,
+   "min": 0,
+   "templates": [
+    "cosmos-reason2-2b",
+    "cosmos-reason2-8b",
+    "gemma-4-e2b-it",
+    "gemma-4-e4b-it",
+    "nemotron-parse-2.0",
+    "nemotron-parse-v1.1",
+    "qwen3-vl-2b-instruct",
+    "qwen3.5-0.8b",
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b"
+   ],
+   "type": "float"
+  }
+ ]
+}
