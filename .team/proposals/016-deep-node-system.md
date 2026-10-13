@@ -31,6 +31,12 @@
   never raises it, and a collapsed group containing an unverified/plugin node shows that badge. Param defaults are
   allowed (validated after expansion like any node).
 - `available=False` nodes: greyed with a lock in the library, can be placed, validation reports CFG-011 (design).
+- Shared convention (frontend): run events and `run_status.nodes` use the flat ids `<group>/<inner>` in flat order; the
+  UI folds status into the group by the prefix before the first `/`, recursively. User node ids can never contain `/`
+  (already enforced: `^[A-Za-z0-9_-]{1,64}$`). The workflow file gains a top-level `groups` key: `graph/workflow.py`
+  (validation) and frontend `workflowFile.ts` change in the SAME commit (frontend is told first).
+- Registry snapshot (`/api/node-types`) adds `available` + `unavailable_reason` per node, and `trust_min` per group
+  (lowest trust of its inner node types), computed by the server.
 - The "big" beginner nodes (`train.lora_vlm`…) can become first-party groups later **without changing saved workflows**:
   the type id stays and resolves to a group.
 
@@ -51,11 +57,14 @@
 - Each node's `params_model` gets `advanced: AdvancedOverrides` built from that file: `extra="forbid"`, types bool/int/
   float/enum/short scalar lists, any remaining str field with a strict pattern, **any value containing `${` or `oc.` is
   refused** (OmegaConf resolvers such as `${oc.env:HF_TOKEN}` would leak secrets; tested). `x-ui.advanced=true`.
+- Served lazily (frontend): `GET /api/node-types/{type_id}/advanced` only when the Advanced section opens (thousands
+  of keys must not bloat `/api/node-types`); each key carries `x-ui.group` = its prefix; search and "changed only" are
+  client-side.
 - UI (design): label = dotted key, tree grouped by key prefix, `?` = engine doc (not translated: Advanced is for
   technical users; Simple params keep full i18n), "changed only" filter + per-key reset from `default`.
 - A test ties the file to the image tag in `IMAGES.lock`; an image bump regenerates it and the diff shows which knobs changed.
 
 ## 4. Open questions
-1. backend: does `expand()` belong in `graph/` (my proposal) or in the app before `validate()`?
+1. backend: does `expand()` belong in `graph/` (my proposal) or in the app before `validate()`? (frontend: `graph/`, so CLI and app share it.)
 2. ~~design: is `inner_path` enough?~~ Yes (array + inner port/param); display spec goes to P4-4 (design).
 3. ~~security: user group param defaults?~~ Yes, validated after expansion; rules folded into §2/§3 above.
