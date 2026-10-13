@@ -31,6 +31,33 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | P1-9 | Spike NVIDIA containers trên GB10 (AutoModel 26.08 VLM, ModelOpt, vLLM) + Proposal 008: backend runtime (host orchestrator ↔ container worker, job runner, GPU lock/memguard, RunManifest) | bao-backend | PAUSED (RESET: spike hoãn; P008 giữ hướng, chờ ghép vào P009) |
 | P1-7 | PM tổng hợp → ADR-001..00N, chốt với user | bao-pm | TODO |
 
+## 🎨 MILESTONE M2 — SaaS site + Dashboard kiểu Unreal (user yêu cầu 2026-10-13)
+Dùng skill `impeccable` (~/.claude/skills/impeccable/SKILL.md). Session nào chưa thấy skill thì Read trực tiếp SKILL.md + reference/ và chạy
+`~/.claude/skills/impeccable/scripts/impeccable context`. Mode: landing/PR = Persuade; docs/giới thiệu/chính sách = Read; dashboard = Operate.
+YÊU CẦU CỦA USER:
+- Site SaaS chuẩn doanh nghiệp, 20–30 trang: landing page (PR, quảng bá dịch vụ, animation bắt mắt), giới thiệu, tính năng, use case, template,
+  docs (nhiều trang), chính sách (bảo mật, điều khoản, cookie, giấy phép/ghi công), liên hệ, changelog, roadmap, FAQ, 404…
+- Tiếng Việt CÓ DẤU, rõ ràng, đầy đủ. Không nhồi chữ rác ngoài nội dung chính: phần giải thích phụ → icon "?" + popover.
+- Trang ngoài (landing/docs/giới thiệu) được dài; landing có animation để PR.
+- Dashboard (editor) đẹp, clean như Unreal Engine: thấy TOÀN BỘ thanh công cụ trong 1 màn hình, icon-first + tooltip/popover,
+  KHÔNG chữ nếu không thật cần, không ghi chú nhỏ thừa. Chuẩn doanh nghiệp.
+RÀNG BUỘC CỨNG (PM):
+- KHÔNG bịa: không testimonial/logo khách hàng/số liệu giả; mọi con số lấy từ benchmark/ADR thật. Không giả danh NVIDIA: chỉ "Built on NVIDIA …"
+  theo license; không dùng logo NVIDIA trái hướng dẫn thương hiệu (security kiểm).
+- Sản phẩm miễn phí, mã nguồn Apache-2.0 (ADR-003) → trang "Bảng giá" = "Miễn phí & mã nguồn mở", không bịa gói trả phí.
+- Không tracker/analytics/CDN bên thứ 3; font self-host (security).
+- Không đổi dist 7870 khi user đang thử app; build dashboard mới ở nhánh/route riêng tới khi user duyệt.
+| ID | Task | Owner | Status |
+|----|------|-------|--------|
+| M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | TODO |
+| M2-2 | Sitemap 20–30 trang + IA + copy tiếng Việt (nguồn sự thật: ADR, P001/P002, benchmarks) | bao-design (copy) + bao-research (nội dung kỹ thuật docs) + bao-cleanup (docs vận hành/lưu trữ) | TODO |
+| M2-3 | Chọn stack site tĩnh (đề xuất: Astro + MDX, docs Starlight; MIT) trong `site/`, chung design tokens với app | bao-frontend + bao-cleancode | TODO |
+| M2-4 | Build landing + trang marketing + animation (prefers-reduced-motion) | bao-frontend (+ bao-fixcode hỗ trợ dựng trang) | TODO |
+| M2-5 | Build docs + chính sách + trang phụ | bao-cleancode (dựng) + bao-design (review) | TODO |
+| M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | TODO |
+| M2-7 | QA: link checker, a11y (WCAG AA), visual regression 3 viewport, Lighthouse, kiểm "không bịa số" | bao-tester | TODO |
+| M2-8 | Security: CSP, không tracker, license ảnh/font/icon, trademark NVIDIA, trang chính sách đúng thực tế | bao-security | TODO |
+
 ## 🎯 MILESTONE M1 — "Kéo thả → nối → Chạy thật" (ƯU TIÊN SỐ 1, user phản hồi 2026-10-12: app còn thô, chưa tạo/nối pipeline được)
 Definition of Done: user mở app → tạo workflow TRỐNG → kéo node từ thư viện vào canvas → nối dây → bấm Chạy →
 backend thật thực thi graph (FakeWorker cho node nhanh, job container thật cho 1 node train nhỏ) → thấy tiến độ/kết quả
