@@ -21,6 +21,7 @@ PATHS = HostPaths(P("/app"), P("/home/u/Trainning-model"), P("/srv/ntc-data"))
         ("/app/outputs/runs/r1", "/srv/ntc-data/outputs/runs/r1"),
         ("/app/.cache/hf/hub", "/srv/ntc-data/.cache/hf/hub"),
         ("/app/data/uploads/u1", "/srv/ntc-data/data/uploads/u1"),
+        ("/app/uploads/" + "a" * 32 + ".png", "/srv/ntc-data/uploads/" + "a" * 32 + ".png"),
         ("/app/outputs", "/srv/ntc-data/outputs"),
         ("/app/src/vlm_pipeline", "/home/u/Trainning-model/src/vlm_pipeline"),
         ("/app/configs/train/x.yaml", "/home/u/Trainning-model/configs/train/x.yaml"),

@@ -145,7 +145,7 @@ name = "Layered architecture (ADR-004 A3)"
 type = "layers"
 containers = ["vlm_pipeline"]
 layers = [
-    "(app) | (cli)",
+    "(app) | (cli) | (runner)",
     "graph",
     "nodes",
     "data | train | quantize | eval | serve | export | artifacts | plugin_api",

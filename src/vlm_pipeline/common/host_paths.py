@@ -14,7 +14,7 @@ import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-DATA_DIRS = frozenset({".cache", "outputs", "data"})
+DATA_DIRS = frozenset({".cache", "outputs", "data", "uploads"})
 
 
 class PathOutsideRootError(ValueError):
