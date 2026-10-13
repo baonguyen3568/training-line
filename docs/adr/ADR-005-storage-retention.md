@@ -42,3 +42,4 @@ User: "cứ chơi đi, không quá 80% VRAM". Team dùng GPU tự do (bỏ cơ c
   - Preflight: `est_peak ≤ max_free_frac × MemAvailable_now` (mặc định 0.80, chỉ chỉnh chặt hơn), cộng thêm SwapFree ≥ 2GB. Thiếu ngân sách → xếp hàng chờ (SYS-002 nếu quá lâu).
   - Runtime: gọi A0 = MemAvailable lúc job bắt đầu. Warn khi MemAvailable < 0.25 × A0; abort có kiểm soát khi MemAvailable < 0.20 × A0 (đã tiêu > 80% phần còn lại), hoặc khi fast-fall dự báo chạm mức đó trong 5s.
   - Sàn tuyệt đối vẫn giữ (cái nào chặt hơn thắng): abort khi < 8GB, emergency kill khi < 4GB.
+  - Triển khai (34d4f7e): preflight `est_peak ≤ 0.8 × MemAvailable` VÀ `est_peak + 8GB ≤ MemAvailable`; cgroup là ngân sách thứ 2. Margin 10GB và sàn 20GB cũ đã BỎ. Runtime: warn < max(14GB, 0.25·A0), stop < max(8GB, 0.2·A0), emergency 4GB.
