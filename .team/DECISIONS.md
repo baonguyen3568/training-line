@@ -56,3 +56,4 @@
 - 2026-10-13 USER: tên sản phẩm chính thức = "NTC-Training" (hiển thị "NTC Training" được; slug ntc-training). HF token giữ nguyên quyền hiện tại (user chấp nhận rủi ro) — team phải đảm bảo token không bao giờ lộ: chỉ node download first-party, không vào job khác/log/UI.
 - 2026-10-13 USER: template 2 = Qwen3.5-2B/4B LoRA (ảnh/video); Cosmos-Reason2 → pipeline tham chiếu; Cosmos 3 Edge → R&D inference. ADR-015 compose/runner/secrets/config ACCEPTED (app id ntc-training, .env.local ở gốc dự án).
 - 2026-10-13 USER: 'cứ chơi đi, không quá 80% VRAM' → team dùng GPU tự do, trần tổng bộ nhớ thiết bị 80% (ADR-005 A1). ADR-001 amendment 2 (template 2 Qwen3.5-2B) ACCEPTED.
+- 2026-10-13 USER sửa: trần = job không dùng quá 80% phần RAM/VRAM CÒN TRỐNG lúc bắt đầu (chừa 20%), không phải 80% tổng máy. ADR-005 A1 cập nhật.

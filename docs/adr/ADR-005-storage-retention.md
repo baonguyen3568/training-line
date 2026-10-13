@@ -37,3 +37,8 @@ User: "cứ chơi đi, không quá 80% VRAM". Team dùng GPU tự do (bỏ cơ c
   - Preflight: `MemAvailable ≥ max(est_peak + max(10GB, 20%×est_peak), 20GB, est_peak + (1−max_used_frac)×MemTotal)`; SwapFree ≥ 2GB. Từ chối → MEM-001.
   - Runtime: warn > 75% (~30.4GB available), abort > 80% (~24.3GB), grace 60s / 300s khi đang save; fast-fall dự báo chạm 80% trong 5s → kill ngay; emergency < 4GB kill ngay. run.json ghi `memguard_abort_gb`.
   - Job không đủ ngân sách thì **xếp hàng chờ** RAM (không fail ngay); quá lâu → SYS-002 cho user biết.
+- **SỬA LẠI theo user (2026-10-13, thay cho cách hiểu "tổng cả máy" ở trên):** "đừng quá 80% phần VRAM CÒN LẠI".
+  - Ngân sách job = `0.80 × MemAvailable` đo lúc preflight (GPU rời: 0.80 × VRAM trống). Chừa 20% phần còn trống làm đệm cho máy dùng chung.
+  - Preflight: `est_peak ≤ max_free_frac × MemAvailable_now` (mặc định 0.80, chỉ chỉnh chặt hơn), cộng thêm SwapFree ≥ 2GB. Thiếu ngân sách → xếp hàng chờ (SYS-002 nếu quá lâu).
+  - Runtime: gọi A0 = MemAvailable lúc job bắt đầu. Warn khi MemAvailable < 0.25 × A0; abort có kiểm soát khi MemAvailable < 0.20 × A0 (đã tiêu > 80% phần còn lại), hoặc khi fast-fall dự báo chạm mức đó trong 5s.
+  - Sàn tuyệt đối vẫn giữ (cái nào chặt hơn thắng): abort khi < 8GB, emergency kill khi < 4GB.
