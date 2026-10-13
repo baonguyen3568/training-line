@@ -87,6 +87,7 @@ RÀNG BUỘC CỨNG (PM):
 |----|------|-------|--------|
 | G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | DONE cf93eaf (security + design + cleanup review; còn copy 3 skip_reason mới) |
 | G-2 | GAP: retention chạy theo lịch trong app (hiện chỉ CLI) | bao-cleanup + bao-backend | scheduler DONE (3f6c1bd); còn wiring app + policy loader (backend) |
+| G-4 | Nút "Đặt lại bước" (xoá mọi attempt của 1 node, dry-run + xác nhận, PERMANENT_LOSS nếu có ckpt) trong panel Dung lượng / menu node | bao-cleanup (API) + bao-frontend (UI) + bao-design (copy) | TODO |
 | G-3 | GAP: nút "Sửa nhanh" theo error_catalog actions trên UI | bao-frontend + bao-fixcode | TODO |
 | M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | DONE: user chọn D4; DESIGN.md 13a5729, mock design/m2/directions/chuan |
 | M2-2 | Sitemap 20–30 trang + IA + copy tiếng Việt (nguồn sự thật: ADR, P001/P002, benchmarks) | bao-design (copy) + bao-research (nội dung kỹ thuật docs) + bao-cleanup (docs vận hành/lưu trữ) | TODO |
@@ -129,6 +130,9 @@ S-9 (patch 26.08-2 → P-1/P-2) chạy song song, không chặn M1.
 | S-9 | Tự vá AutoModel (normalize + tied emb) → image 26.08-2 + regression test; so Parse v1.1 vs 2.0 | bao-fixcode + bao-backend + bao-tester + bao-research | DOING (patch 0001-0004 + 0003 v2 3a768ca → image 26.08-5; golden gate (b) PASS, BUG-001 CLOSED): critical path cho template mặc định (patch → 26.08-2 → parity → P-1 → P-2) |
 | S-10 | FastAPI app/: POST /api/runs + FakeWorker (cho T1 usability + frontend bỏ mock) — sau critical path S-9 | bao-backend | TODO |
 | TD-2 | Provenance dataset cho data.local_folder / data.split khi nối vào RealWorker: hash hiện không có @<sha40> → gap `dataset_revision` (9457abf) sẽ chặn gate. Chọn: split giữ `repo@rev#split=…`, local folder dùng content digest `sha256:<64hex>` được reproducibility_gaps chấp nhận | bao-backend | TODO (cleancode nêu khi review 9457abf) |
+| TD-3 | Worktree + reproducibility gate dùng chung (đưa `--worktree <COMMIT>` / `--gate` từ train/smoke.py lên common; jobrun_cli + eval/bench/quantize worker ghi git_commit/git_dirty của code đã chạy) | bao-backend | TODO (tester/research nêu 2026-10-13; sau M3 mounts + claim) |
+| M3-W | Nối run_claims vào run_job/launcher: attempt dir cho retry graph, bench mỗi scenario 1 run dir, resume = run_id mới + ckpt ro (danh sách call site đã rà) | bao-backend | TODO (sau E2E smoke; security review) |
+| QNT-W | quantize_worker đọc report.parity (QNT-001 fail / QNT-002 warn, cap 1MB) + export NOTICE "chưa đo điểm sau nén" | bao-backend | TODO (chờ catalog QNT + ptq.py của research) |
 | TD-1 | Tech debt: KV cache for the Parse decoder (0003 tắt cache → generate O(n²)); trước tiên backend ghi thời gian generate đo ở golden gate (b) 26.08-4 vào VENDORED §0003, rồi quyết định có cần làm/đẩy upstream không | bao-fixcode | DEFERRED (đo: 1024 tok = 24 s, RAM phẳng 2.21 GiB → giữ no-cache cho eval v1; mở lại khi trang >~2k token hoặc eval vượt ngân sách) |
 | S-8 | Gom test xfail hiện có vào tests/ theo layout ADR-004 | bao-tester | DONE (cleancode APPROVE sau fix; 103 passed, 217 xfailed) |
 
