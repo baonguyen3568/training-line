@@ -285,3 +285,32 @@ def test_check_support_sees_template_overrides_without_running(root: Path) -> No
     _template(root, "decode_overrides:\n  num_beams: 2\n")
     with pytest.raises(nw.EvalSuiteUnsupportedError, match="num_beams"):
         nw.check_support("eval", EvalParams(), _parse(), {"model": "model"}, root=root)
+
+
+def test_the_base_cache_is_named_after_the_dataset_and_old_bare_entries_still_hit(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Storage names cache entries without guessing ("cord-v2-<key>", like "ocrbench-<key>", research 2026-10-13)."""
+    jobs = FakeJobs({"finetuned": GOOD, "base": HALF})
+    monkeypatch.setattr(nw, "run_job", jobs)
+    nw.run_eval_benchmarks(_request(root))
+    caches = root / "outputs" / "eval-cache"
+    (entry,) = [p for p in caches.iterdir() if p.is_dir()]
+    assert entry.name.startswith("cord-v2-")
+    assert len(entry.name) == len("cord-v2-") + 24
+    entry.rename(caches / entry.name.removeprefix("cord-v2-"))  # an entry written before the prefix
+    nw.run_eval_benchmarks(_request(root))
+    assert [Path(a[a.index("--model") + 1]).name for a in jobs.jobs].count("base") == 1  # still a hit
+
+
+def test_a_linked_cached_prediction_file_is_a_miss_not_followed(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    jobs = FakeJobs({"finetuned": GOOD, "base": HALF})
+    monkeypatch.setattr(nw, "run_job", jobs)
+    nw.run_eval_benchmarks(_request(root))
+    (entry,) = [p for p in (root / "outputs" / "eval-cache").iterdir() if p.is_dir()]
+    real = entry / "pred.jsonl"
+    (root / "elsewhere.jsonl").write_bytes(real.read_bytes())
+    real.unlink()
+    real.symlink_to(root / "elsewhere.jsonl")
+    nw.run_eval_benchmarks(_request(root))
+    assert [Path(a[a.index("--model") + 1]).name for a in jobs.jobs].count("base") == 2  # recomputed

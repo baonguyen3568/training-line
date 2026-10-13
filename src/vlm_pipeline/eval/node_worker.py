@@ -19,6 +19,7 @@ import json
 import os
 import random
 import secrets
+import stat
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -293,9 +294,13 @@ def _generate(request: EvalRequest, model: ModelRef, ids: Sequence[int], run_dir
 
 def _cache_hit(cache_dir: Path, n: int) -> Path | None:
     pred = cache_dir / "pred.jsonl"
-    complete = pred.is_file() and (cache_dir / "run.json").is_file()
-    if complete and read_manifest(cache_dir).status == RunStatus.COMPLETED and len(_load(pred)) == n:
-        return pred
+    if cache_dir.is_symlink() or not pred.is_file() or not (cache_dir / "run.json").is_file():
+        return None
+    try:
+        if read_manifest(cache_dir).status == RunStatus.COMPLETED and len(_load(pred)) == n:
+            return pred
+    except (OSError, ValueError):  # unreadable / linked / oversized / malformed: a miss, recomputed
+        return None
     return None
 
 
@@ -307,14 +312,17 @@ def _cached_base(request: EvalRequest, ids: Sequence[int]) -> Path:
     """
     worker_sha = _sha256(request.root / CORD_WORKER)
     key = base_cache_key(request.base.hash, ids, decoding_of(request), worker_sha, image_digest(request.image) or "")
-    cache_dir = request.root / "outputs" / "eval-cache" / key
-    hit = _cache_hit(cache_dir, len(ids))
-    if hit is not None:
-        return hit
-    tmp = cache_dir.with_name(f"{key}.tmp-{os.getpid()}-{secrets.token_hex(3)}")
+    caches = request.root / "outputs" / "eval-cache"
+    named = f"{CORD_DATASET_ID}-{key}"  # "<catalog id>-<key>", like ocrbench-<key> (storage names it without guessing)
+    cache_dir = caches / named
+    for candidate in (cache_dir, caches / key):  # entries written before the prefix (bare key) are still read
+        hit = _cache_hit(candidate, len(ids))
+        if hit is not None:
+            return hit
+    tmp = cache_dir.with_name(f"{named}.tmp-{os.getpid()}-{secrets.token_hex(3)}")
     pred = _generate(request, request.base, ids, tmp, f"eval-base-{key[:12]}")
     if cache_dir.exists() and _cache_hit(cache_dir, len(ids)) is None:
-        cache_dir.rename(cache_dir.with_name(f"{key}.stale-{time.strftime('%Y%m%d-%H%M%S')}"))
+        cache_dir.rename(cache_dir.with_name(f"{named}.stale-{time.strftime('%Y%m%d-%H%M%S')}"))
     try:
         tmp.rename(cache_dir)  # atomic on the same filesystem; fails if another node got there first
     except OSError:
@@ -323,9 +331,19 @@ def _cached_base(request: EvalRequest, ids: Sequence[int]) -> Path:
 
 
 # ---------------------------------------------------------------------------------------------- score
+PRED_MAX_BYTES = 64 * 1024 * 1024
+
+
 def _load(pred: Path) -> dict[int, dict[str, Any]]:
+    """Rows of a job-written pred.jsonl: never through a link, a regular file of bounded size (B1)."""
+    fd = os.open(pred, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with os.fdopen(fd, "rb") as fh:
+        st = os.fstat(fh.fileno())
+        if not stat.S_ISREG(st.st_mode) or st.st_size > PRED_MAX_BYTES:
+            raise ValueError(f"{pred.name}: not a bounded regular file")
+        text = fh.read(PRED_MAX_BYTES + 1).decode("utf-8")
     rows: dict[int, dict[str, Any]] = {}
-    for line in pred.read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         row = json.loads(line)
         rows[int(row["index"])] = row
     return rows
