@@ -14,6 +14,7 @@ one function: there is no path that starts a job without a claim.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -46,10 +47,8 @@ def claim_run(data_root: Path, run_id: str, *, by: str) -> Path:
     claims = data_root
     for part in CLAIMS_REL.parts:  # one level at a time, checked before going deeper: never mkdir through a symlink
         claims = claims / part
-        try:
-            claims.mkdir(mode=0o700)  # mkdir does not follow a symlink at the last component: it fails instead
-        except FileExistsError:
-            pass
+        with contextlib.suppress(FileExistsError):  # mkdir never follows a symlink at the last component
+            claims.mkdir(mode=0o700)
         try:
             check_mount_source(data_root, claims, directory=True)  # no symlink anywhere from the data root down
         except UnsafeMountSourceError as exc:
