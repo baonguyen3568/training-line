@@ -142,16 +142,30 @@ def field_f1(preds: Sequence[Any], answers: Sequence[Any]) -> float:
     """
     if len(preds) != len(answers):
         raise ValueError(f"length mismatch: {len(preds)} predictions vs {len(answers)} answers")
+    counts = [field_f1_counts(pred, answer) for pred, answer in zip(preds, answers, strict=True)]
+    return f1_from_counts(counts)
+
+
+def field_f1_counts(pred: Any, answer: Any) -> tuple[int, int]:
+    """``(true positives, errors)`` of one sample; micro F1 of a set is computed from the summed counts.
+
+    Per-sample counts let a bootstrap resample images without re-matching fields (``f1_from_counts``).
+    """
     tp = errors = 0
-    for pred, answer in zip(preds, answers, strict=True):
-        remaining = flatten(normalize(answer))
-        for pair in flatten(normalize(pred)):
-            if pair in remaining:
-                tp += 1
-                remaining.remove(pair)
-            else:
-                errors += 1
-        errors += len(remaining)
+    remaining = flatten(normalize(answer))
+    for pair in flatten(normalize(pred)):
+        if pair in remaining:
+            tp += 1
+            remaining.remove(pair)
+        else:
+            errors += 1
+    return tp, errors + len(remaining)
+
+
+def f1_from_counts(counts: Sequence[tuple[int, int]]) -> float:
+    """Micro F1 (0-1) from per-sample ``field_f1_counts``."""
+    tp = sum(c[0] for c in counts)
+    errors = sum(c[1] for c in counts)
     if tp + errors == 0:
         return 1.0
     return tp / (tp + errors / 2)
