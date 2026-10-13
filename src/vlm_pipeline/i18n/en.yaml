@@ -245,6 +245,14 @@ error:
       not_cached: '"{repo}" has not been downloaded to this machine. Steps run offline, so it must be here first; click "Download" and run again.'
       not_prepared: '"{repo}" is downloaded but not prepared yet; this model needs an extra preparation step. Click "Download": the app finishes that step without downloading again.'
       not_pinned: 'Dataset "{repo}" is not in the app''s checked catalog, so the app will not download it. Pick another dataset from the catalog.'
+  NET-003:
+    title: "Downloaded file doesn't match the original"
+    what:
+      mismatch: 'A file of "{name}" does not match the signature of the checked version, so the app discarded it and installed nothing. Download again; if it still fails, send a report.'
+      cached_differs: 'The copy of "{name}" already in the cache differs from the original at the same version, so the app neither uses nor overwrites it. Remove it in Storage, then download again.'
+  NET-004:
+    title: "Over this machine's download limit"
+    what: 'This download needs {size_gb} GB, over the {quota_gb} GB limit set by the admin. Ask the admin to raise it, or pick a smaller model.'
   CFG-001:
     title: These two steps can't connect
     what: '"{a}" outputs {type_a} but "{b}" needs {type_b}.'

@@ -425,6 +425,34 @@ NET-002:
     - {id: download, kind: navigate, target: download_asset, confirm: false, when: {reason: [not_cached, not_prepared]}}
     - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
 
+NET-003:
+  slug: DOWNLOAD_INTEGRITY
+  severity: error
+  prevent_in_preflight: false
+  # download/install.py: a staged file does not match the hub's LFS sha256, the security pin (remote code) or the
+  # job's own plan (extra, missing, a link, a disallowed type). Nothing is installed; name = the asset's display name.
+  # cached_differs: the snapshot already in the cache differs from the hub at the same revision (security D3): it is
+  # neither used nor overwritten; the user removes it from the Storage panel.
+  params: [name, {name: reason, type: enum, values: [mismatch, cached_differs]}]
+  variant_by: reason
+  match:
+    - {kind: executor, value: "download/install.py DownloadIntegrityError"}
+  actions:
+    - {id: download, kind: navigate, target: download_asset, confirm: false}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+NET-004:
+  slug: DOWNLOAD_QUOTA
+  severity: error
+  prevent_in_preflight: true
+  # The planned size is over the download limit (Settings quota, admin policy [download] max_gb). size_gb / quota_gb
+  # in GB, one decimal. Checked before the job starts (catalog size) and on the job's plan (security download §5).
+  params: [size_gb, quota_gb]
+  match:
+    - {kind: executor, value: "download quota check before the job and on its plan"}
+  actions:
+    - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
+
 CFG-001:
   slug: GRAPH_PORT_TYPE_MISMATCH
   severity: error

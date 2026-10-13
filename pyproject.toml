@@ -148,6 +148,6 @@ layers = [
     "(app) | (cli) | (runner)",
     "graph",
     "nodes",
-    "data | train | quantize | eval | serve | export | artifacts | plugin_api",
+    "data | train | quantize | eval | serve | export | artifacts | plugin_api | download",
     "common | (i18n)",
 ]

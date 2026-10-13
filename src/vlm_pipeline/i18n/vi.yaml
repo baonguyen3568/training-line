@@ -245,6 +245,14 @@ error:
       not_cached: '"{repo}" chưa được tải về máy này. Bước chạy không dùng mạng nên cần có sẵn; bấm "Tải về máy" rồi chạy lại.'
       not_prepared: '"{repo}" đã tải về nhưng chưa được chuẩn bị để chạy, vì model này cần thêm một bước chuẩn bị. Bấm "Tải về máy": app làm nốt bước đó, không tải lại phần đã có.'
       not_pinned: 'Bộ dữ liệu "{repo}" chưa có trong danh mục đã kiểm tra của app, nên app không tải nó. Hãy chọn một bộ dữ liệu khác trong danh mục.'
+  NET-003:
+    title: "Tệp tải về không khớp bản gốc"
+    what:
+      mismatch: 'Một tệp của "{name}" không khớp chữ ký của bản đã kiểm tra, nên app đã bỏ tệp đó và không cài. Hãy tải lại; nếu vẫn lỗi, hãy gửi báo cáo.'
+      cached_differs: 'Bản "{name}" đang có trong bộ nhớ đệm khác bản gốc ở cùng phiên bản, nên app không dùng và không ghi đè. Hãy xoá bản đó trong mục Dung lượng rồi tải lại.'
+  NET-004:
+    title: "Vượt hạn mức tải của máy"
+    what: 'Lần tải này cần {size_gb} GB, vượt hạn mức tải {quota_gb} GB do quản trị viên đặt. Hãy nhờ quản trị viên nới hạn mức, hoặc chọn model nhỏ hơn.'
   CFG-001:
     title: Hai bước này không nối được với nhau
     what: Đầu ra của "{a}" là {type_a} nhưng "{b}" cần {type_b}.
