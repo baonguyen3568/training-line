@@ -271,6 +271,7 @@ def test_plan_merges_checkpoint_and_set_aside_items_by_section(
     }
     assert items[aside_id]["protected_reason"] == "TRAINED_MODEL"
     assert items["r-keep/checkpoints/epoch_0_step_10"]["lock_reason"] == "PINNED_OR_KEEP"
+    assert items["r-keep/checkpoints/epoch_0_step_10"]["size_gb"] == round(8 * KB / GIB, 3)  # kept items show size
 
 
 def test_apply_retention_items_needs_typed_confirmation_for_permanent_loss(
@@ -545,3 +546,20 @@ def test_policy_in_a_group_writable_dir_is_ignored(monkeypatch: pytest.MonkeyPat
     assert mode_from_env(policy) == "dry_run"
     tmp_path.chmod(0o755)
     assert mode_from_env(policy) == "apply"
+
+
+def test_kept_size_is_zero_for_a_path_outside_its_runs_root(tmp_path: Path) -> None:
+    from vlm_pipeline.artifacts.retention import PlanItem
+
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
+    api = StorageApi(tmp_path, ArtifactIndex(tmp_path / "outputs" / "graph" / "app.db"), StorageSettings())
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (outside / "big").write_bytes(b"x" * 4 * KB)
+    run = tmp_path / "outputs" / "runs" / "r1" / "checkpoints"
+    run.mkdir(parents=True)
+    (run / "epoch_0_step_1").symlink_to(outside)
+    item = PlanItem(
+        "r1", "checkpoints/epoch_0_step_1", "checkpoint", (), "keep", 0, "D7.blocked", "x", "PINNED_OR_KEEP"
+    )
+    assert api._kept_bytes(item) == 0

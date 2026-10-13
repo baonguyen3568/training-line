@@ -31,6 +31,7 @@ from fastapi.responses import JSONResponse
 from vlm_pipeline import i18n
 from vlm_pipeline.artifacts import cache_retention, retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
+from vlm_pipeline.artifacts.storage import du_bytes
 from vlm_pipeline.common.diskguard import read_disk
 from vlm_pipeline.common.gpu_lock import PATH_ENV as GPU_LOCK_PATH_ENV
 from vlm_pipeline.common.paths import GIB
@@ -160,7 +161,8 @@ def _needs_confirm(item: retention.PlanItem) -> bool:
     return item.blocked_by == retention.CONFIRM_REASON or item.consequence_code == PERMANENT_LOSS
 
 
-def _retention_item(item: retention.PlanItem, section: str) -> dict[str, Any]:
+def _retention_item(item: retention.PlanItem, section: str, kept_bytes: int = 0) -> dict[str, Any]:
+    """``kept_bytes``: on-disk size of a kept item, so the panel shows where space is held (KEEP, running...)."""
     ckpt = item.path.removeprefix("checkpoints/")
     confirm = section == "manual" and _needs_confirm(item)
     kept = section == "kept"
@@ -175,7 +177,7 @@ def _retention_item(item: retention.PlanItem, section: str) -> dict[str, Any]:
         if item.kind == "set_aside"
         else "storage.item.checkpoint_of_run",
         "display_params": {"run_name": item.run_id, "checkpoint": ckpt},
-        "size_gb": None if kept else round(item.reclaim_bytes / GIB, 3),
+        "size_gb": round((kept_bytes if kept else item.reclaim_bytes) / GIB, 3),
         "run_id": item.run_id,
         "action": item.action,
         "protected_reason": retention.CONFIRM_REASON if item.blocked_by == retention.CONFIRM_REASON else None,
@@ -204,6 +206,13 @@ class StorageApi:
         override = os.environ.get(GPU_LOCK_PATH_ENV)
         return Path(override) if override else self.root / ".team" / "GPU_LOCK"
 
+    def _kept_bytes(self, item: retention.PlanItem) -> int:
+        """On-disk size of a kept item; 0 when its path is not a plain path inside its runs root."""
+        try:
+            return du_bytes(retention.item_path(self.root, item))
+        except ValueError:
+            return 0
+
     def _retention_items(self) -> list[tuple[retention.PlanItem, str]]:
         fresh = retention.plan(self.root, lock_path=self._lock_path())
         found = [(i, _retention_section(i)) for r in fresh.runs for i in r.items]
@@ -221,7 +230,10 @@ class StorageApi:
             for item, reason in cache_retention.list_cache(self.root, self.index)
             if item.reclaim_bytes > 0
         ]
-        items += [_retention_item(item, section) for item, section in self._retention_items()]
+        items += [
+            _retention_item(item, section, self._kept_bytes(item) if section == "kept" else 0)
+            for item, section in self._retention_items()
+        ]
         plan_id, expires = self.plans.add({i["item_id"]: i["source"] for i in items if i["section"] != "kept"})
         threshold = self.settings.approval_threshold_gb if self.settings.approval_policy == "threshold" else None
         body: dict[str, Any] = {

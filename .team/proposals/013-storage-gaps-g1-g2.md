@@ -68,7 +68,7 @@
 - Mỗi item có thêm `section`:
   - `auto`: scheduler sẽ tự làm;
   - `manual`: cần người chọn, gõ xác nhận khi `confirm_required`;
-  - `kept`: chỉ hiển thị, kèm `lock_reason` + `lock_params`, `size_gb=null`, không nằm trong `plan_id`.
+  - `kept`: chỉ hiển thị, kèm `lock_reason` + `lock_params` và `size_gb` (dung lượng đang bị giữ, đo bằng du), không nằm trong `plan_id`.
 
 Frontend tự nhóm theo `section`. Ví dụ thật lấy từ code: `013-annex-storage-plan.v3.sample.json`.
 

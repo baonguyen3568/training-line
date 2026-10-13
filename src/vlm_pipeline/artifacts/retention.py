@@ -443,7 +443,12 @@ def plan(
     return Plan(ts=ts, runs=tuple(runs), policy=policy, lock=lock)
 
 
-def _safe_target(root: Path, item: PlanItem) -> Path:
+def item_path(root: Path, item: PlanItem) -> Path:
+    """Absolute path of a plan item; the one place that knows the run dir layout.
+
+    Raises:
+        ValueError: unknown runs root, a symlink, or a path that resolves outside its runs root.
+    """
     if item.runs_rel not in (RUNS_REL.as_posix(), GRAPH_RUNS_REL.as_posix()):
         raise ValueError(f"unknown runs root: {item.runs_rel}")
     runs_dir = (root / item.runs_rel).resolve()
@@ -538,7 +543,7 @@ def apply(
                 f"{policy.approval_window_s / 3600:g} h) > {policy.approval_threshold_gb:g} GiB needs --approved-by"
             )
     for item in selected:
-        target = _safe_target(root, item)
+        target = item_path(root, item)
         if item.action == "delete" and target.is_dir():
             shutil.rmtree(target)
         elif item.action == "delete":
@@ -575,6 +580,7 @@ __all__ = [
     "RunPlan",
     "apply",
     "cleanup_lock",
+    "item_path",
     "plan",
     "unapproved_bytes_since",
 ]
