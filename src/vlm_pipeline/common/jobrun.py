@@ -438,6 +438,12 @@ def _wait_for_memory(
     return final
 
 
+def _relative(run_dir: Path, project_root: Path) -> str | None:
+    """``run_dir`` relative to the project (for the GPU lock), None when it lives elsewhere."""
+    root, path = project_root.resolve(), run_dir.resolve()
+    return path.relative_to(root).as_posix() if path.is_relative_to(root) else None
+
+
 def _checks_before_queueing(
     job: ContainerJob, manifest: RunManifest, project_root: Path, *, gate: bool, require_approved: bool
 ) -> str | None:
@@ -499,7 +505,14 @@ def run_job(
     if not verdict.ok:
         raise RuntimeError(f"preflight refused: {verdict.to_json()}")
     path = lock_path or gpu_lock.default_lock_path()
-    handle = gpu_lock.acquire(path, who=who, job=manifest.name, run_id=manifest.run_id, host_pid=os.getpid())
+    handle = gpu_lock.acquire(
+        path,
+        who=who,
+        job=manifest.name,
+        run_id=manifest.run_id,
+        host_pid=os.getpid(),
+        run_dir=_relative(run_dir, project_root),
+    )
     container = f"vlm-{job.name}"
     try:
         # One job per run dir, ever (P017): the atomic claim is the real gate (the early check above only avoids

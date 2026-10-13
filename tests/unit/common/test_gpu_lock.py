@@ -159,3 +159,45 @@ def test_newer_schema_version_is_rejected_as_corrupt(tmp_path: Path) -> None:
     with pytest.raises(GpuLockError) as ei:
         gpu_lock.read_lock(lock)
     assert ei.value.params["state"] == "corrupt"
+
+
+@pytest.mark.parametrize(
+    ("given", "kept"),
+    [
+        ("outputs/graph/runs/n4-0123456789abcdef", "outputs/graph/runs/n4-0123456789abcdef"),
+        ("/etc/passwd", None),
+        ("outputs/../.env", None),
+        ("data/x", None),  # only under outputs/
+        (None, None),
+        (5, None),
+    ],
+)
+def test_the_lock_names_the_run_dir_only_when_it_is_safe(tmp_path: Path, given: object, kept: str | None) -> None:
+    """tester: tools read the holder's run dir from the lock instead of searching; garbage is never trusted."""
+    import json
+
+    from vlm_pipeline.common import gpu_lock
+
+    path = tmp_path / "GPU_LOCK"
+    gpu_lock.acquire(path, who="t", job="j", run_id="r", run_dir=given if isinstance(given, str) else None)
+    raw = json.loads(path.read_text())
+    raw["run_dir"] = given  # also what a hand-edited lock could hold
+    path.write_text(json.dumps(raw))
+    info = gpu_lock.read_lock(path)
+    assert info is not None
+    assert info.run_dir == kept
+
+
+def test_an_old_lock_without_run_dir_still_reads(tmp_path: Path) -> None:
+    import json
+
+    from vlm_pipeline.common import gpu_lock
+
+    path = tmp_path / "GPU_LOCK"
+    gpu_lock.acquire(path, who="t", job="j", run_id="r")
+    raw = json.loads(path.read_text())
+    raw.pop("run_dir")
+    path.write_text(json.dumps(raw))
+    info = gpu_lock.read_lock(path)
+    assert info is not None
+    assert info.run_dir is None

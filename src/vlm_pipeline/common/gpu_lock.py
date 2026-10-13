@@ -17,7 +17,7 @@ import secrets
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
 from vlm_pipeline.common.errors import VlmPipelineError
@@ -50,6 +50,9 @@ class LockInfo:
     started_at: str
     token: str
     schema_version: int = LOCK_SCHEMA_VERSION
+    # The job's run dir relative to the project/data root ("outputs/graph/runs/<id>"), so tools (E2E preflight,
+    # watchdog, dashboard) need not search for it (tester 2026-10-13). Optional: older locks and manual locks have none.
+    run_dir: str | None = None
 
     def public(self) -> dict[str, object]:
         """Lock content safe to show or log (without the token)."""
@@ -103,7 +106,18 @@ def _parse(raw: str) -> LockInfo:
         started_at=str(data["started_at"]),
         token=str(data["token"]),
         schema_version=schema_version,
+        run_dir=_run_dir(data.get("run_dir")),
     )
+
+
+def _run_dir(value: object) -> str | None:
+    """A relative path under outputs/ without '..' or None (anything else in the file is ignored, never trusted)."""
+    if not isinstance(value, str) or len(value) > 512:
+        return None
+    parts = PurePosixPath(value).parts
+    if value.startswith("/") or ".." in parts or not parts or parts[0] != "outputs" or "\\" in value:
+        return None
+    return value
 
 
 # SYS-001 params (error catalog): {who, job, since, state}. No paths/tokens: params reach the UI.
@@ -150,6 +164,7 @@ def acquire(
     job: str,
     run_id: str,
     host_pid: int | None = None,
+    run_dir: str | None = None,
     now: Callable[[], str] = lambda: time.strftime("%Y-%m-%dT%H:%M:%S%z"),
 ) -> LockHandle:
     """Create the lock atomically or raise ``GpuLockError`` (with the holder's public info) if it already exists."""
@@ -160,6 +175,7 @@ def acquire(
         host_pid=host_pid if host_pid is not None else os.getpid(),
         started_at=now(),
         token=secrets.token_hex(16),
+        run_dir=_run_dir(run_dir),
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
