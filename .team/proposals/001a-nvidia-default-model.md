@@ -386,3 +386,22 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
 - **Kết luận MEM-002 của smoke validation LoRA (Qwen3.5-0.8B, 2026-10-13):** đỉnh 31.3 GB lần đầu (fast-fall) **không do validation**. Chạy lại với Triton cache đã ấm và ảnh 200k–400k px thì PASS: run 20261013-1012-val-a-qwen35-08b-493f, peak 11.9 GB, val_loss ghi ở step 3/7.
   - Lần lạnh, step 0 mất 88 s, so với 12 s khi cache đã ấm ⇒ thủ phạm chính là **JIT compile lúc cache lạnh** (Triton; ninja/nvcc với extension), cộng ảnh to.
   - Hệ quả cho preflight: est_peak của một model/image **lần chạy đầu** phải tính cả đỉnh compile lạnh. Giải pháp gốc là persist cache theo image id + `MAX_JOBS=2` (backend đồng ý, BASE_ENV).
+
+### 10.10 Kết quả P-3b đầy đủ: chốt preset thời lượng và decoding (research, 2026-10-13 13:10)
+Run `20261013-1015-p3b-full-parse-c4f6` (26.08-6, FusedAdam fp32 master, 300 step, GBS 8, lr 1e-5 hằng số vì không có lr_scheduler). val_loss 0.083 → 0.060 → 0.052, peak 23.7 GB (run.json). Chấm greedy, batch 1, **20 ảnh CORD validation** (cùng tập gate P-3b-A), scorer `scripts/qa/score_cord_runs.py`, bootstrap paired 1000 lần, seed 0:
+
+| Ckpt | field F1 | json_exact | nTED | truncated | parse_fail | teacher-forced acc (val 0–9) |
+|---|---|---|---|---|---|---|
+| step 99 (1 epoch) | 59.9 | 5.0 | 53.4 | 5% | 0% | 96.9% |
+| step 199 (2 epoch) | 70.8 | 25.0 | 75.0 | 0% | 0% | 97.7% |
+| step 299 (3 epoch) | **74.4** | 25.0 | 76.4 | 0% | 0% | 98.2% |
+| step 299, penalty 1.1 | 70.6 | 15.0 | 69.5 | 0% | 0% | n/a |
+
+Hiệu paired: s299 − s99 = **+14.4**, CI95 [6.9, 22.3]; s299 − s199 = +3.5, CI95 [−1.6, 8.5]; pen1.1 − pen1.0 (s299) = **−3.7**, CI95 [−9.2, 1.4].
+
+- **Preset (quy tắc §10.1):** 1 epoch = 59.9 / 74.4 = **80.6% < 90%** và kém có ý nghĩa ⇒ 1 epoch **không** được làm mặc định. Mặc định template giữ **3 epoch** (đúng như hiện tại, ~270 step trên phần train sau khi tách 10% val). 2 epoch = 95.3% của 3 epoch, CI chứa 0.
+  - Đề xuất preset cho UI: **Tiêu chuẩn (mặc định) = 3 epoch**; **Nhanh = 2 epoch** (~2/3 thời gian, điểm ~95% trên 20 ảnh); **Thử nhanh = 1 epoch**, ghi rõ "xem pipeline chạy, chất lượng còn thấp". Vì LR hằng số, ckpt 199 là đại diện hợp lệ cho một run 2 epoch (cùng thứ tự dữ liệu).
+  - Cả 3 ckpt đều qua ngưỡng structured_output của `configs/eval/gates.yaml` (truncated ≤ 10%, parse_fail ≤ 5%), nên không preset nào cho FAIL do định dạng.
+- **Decoding (§10.7):** penalty 1.1 **kém hơn** 3.7 điểm (ngoại lệ cần "hơn ≥ 2") ⇒ **giữ repetition_penalty 1.0** (`decode_overrides`, 473c94f), đóng câu hỏi. Ghi chú: A/B làm trên 20 ảnh, không phải 100 ảnh như kế hoạch, nhưng hướng hiệu khớp so sánh 6 ảnh ban đầu.
+- Giới hạn: n = 20 ⇒ CI rộng (±8 điểm). Số chỉ dùng để chọn, chưa phải số công bố; số công bố là CORD test của ckpt 299 (chưa chạy). Cũng chưa so với số NVIDIA công bố (recipe upstream ~20 epoch, khác ngân sách).
+- Checkpoint giữ: **step 299** (dùng cho số test và docs). s99/s199 hết cần sau khi số này được ghi.
