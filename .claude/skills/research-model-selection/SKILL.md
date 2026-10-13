@@ -67,3 +67,6 @@ Write comparison table + decision + risks into `.team/proposals/001-*.md`; send 
   lost). Use TE `FusedAdam` with `master_weights: true, store_param_remainders: true` (upstream pattern). Check
   "fraction of trainable elements changed vs base" after any run whose quality looks wrong - val_loss alone hides it.
 - Budget sanity: compare samples seen (GBS × steps) with the upstream recipe before setting presets (P-3 = 15% of it).
+- Memory numbers on GB10 (UMA): the peak is ALWAYS `run.json` `peak_mem_gb` (jobrun memguard, host-wide), never
+  `torch.cuda.max_memory_allocated` (allocator only: B-4 probe showed 6.3 GB torch vs 16.6 GB real). Label any torch
+  number `torch_alloc_peak_gb`. The "no invented numbers" site gate checks a number exists in a source, not its meaning.
