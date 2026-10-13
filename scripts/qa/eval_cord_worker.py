@@ -265,4 +265,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # GB10: create the CUDA context before the checkpoint is loaded on the CPU (fixcode 2026-10-13, common.cuda_init)
+    from vlm_pipeline.common.cuda_init import ensure_cuda_context
+
+    ensure_cuda_context()
     raise SystemExit(main())
