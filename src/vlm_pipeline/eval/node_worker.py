@@ -39,12 +39,13 @@ from vlm_pipeline.common.jobrun import (
     image_digest,
     run_job,
 )
+from vlm_pipeline.common.local_cache import eval_data_dir
 from vlm_pipeline.common.paths import configs_root, project_root
 from vlm_pipeline.common.run_log import log_tail
-from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest
-from vlm_pipeline.eval import cord
+from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest, read_small_json
+from vlm_pipeline.eval import cord, ocrbench
 from vlm_pipeline.eval.config import EvalParams
-from vlm_pipeline.eval.gate import BenchmarkResult, finetune_gate
+from vlm_pipeline.eval.gate import BenchmarkResult, finetune_gate, quant_gate
 
 REPORT_SCHEMA_VERSION = 1
 CORD_DATASET_ID = "cord-v2"
@@ -56,12 +57,24 @@ BOOTSTRAP_SEED = 0
 FIXED_DECODING = {"batch_size": 1, "use_cache": True}
 TEMPLATE_DIR = Path("configs") / "train" / "templates"
 SUPPORTED_OVERRIDES = frozenset({"repetition_penalty", "max_new_tokens"})  # what eval_cord_worker can apply
+# Chat models whose bf16 and FP8 exports vLLM 0.31 loads and answers (R3 gate 2026-10-13; parity smoke 0.8B): suite
+# "ocrbench" (documents) runs on the vLLM batch. Others are refused at validate until measured.
+OCRBENCH_VLLM_MODELS = frozenset({"qwen3.5-0.8b", "qwen3.5-2b"})
+OCRBENCH_CATALOG_ID = "ocrbench"
+# Quantized artifact hash "<run_id>:<parent hash>:<format>" (app/quantize_worker): format -> gates.yaml precision key.
+QUANT_PRECISION = {"fp8": "fp8", "nvfp4": "nvfp4"}
 
 
 class EvalSuiteUnsupportedError(VlmPipelineError):
     """The requested suite / model has no evaluation engine yet (only CORD on Nemotron-Parse so far)."""
 
     code: ClassVar[str] = "CFG-011"
+
+
+class EvalDataNotDownloadedError(VlmPipelineError):
+    """The benchmark's eval-only data is not on this machine (or not extracted): download it first (G-5)."""
+
+    code: ClassVar[str] = "NET-002"
 
 
 class EvalJobFailed(VlmPipelineError):  # noqa: N818 - mirrors graph.errors.ContainerExit, which the app raises
@@ -103,6 +116,8 @@ class EvalRequest:
     image: str
     who: str
     cancel: threading.Event | None = None
+    # serve.vllm_runner.run_vllm_batch, injected by the app (eval may not import serve: ADR-004 A3 layers).
+    vllm_batch: Callable[..., Any] | None = None
     # "Waiting for free memory" callback of the executor (run_job queues a job that does not fit yet), shown on the UI.
     on_wait: Callable[[dict[str, float]], None] | None = None
 
@@ -130,20 +145,39 @@ def check_support(
 
     ``inputs``: wired ports -> "dataset:hub" | "dataset:local" | "model" | "other". Raises CFG-011 when unsupported.
     """
-    del inputs  # cord_test always reads CORD-v2 test (heldout); a wired dataset matters once suite my_val exists
+    # cord_test / ocrbench read their own heldout data; a wired dataset matters once suite my_val exists. The model
+    # port's kind is "model:<artifact type>": vLLM (ocrbench) loads full weights only, never a LoRA adapter.
+    model_kind = inputs.get("model", "")
     if model is None:  # no model wired: CFG-003 from validate, nothing to say about support
         return
 
     def refuse(why: str) -> EvalSuiteUnsupportedError:
         return EvalSuiteUnsupportedError(why, params={"node": node_id, "node_type": "eval.benchmarks"})
 
-    if params.suite not in ("auto", "cord_test") or model.loss != "nemotron_parse":
+    suite = suite_of(params, model)
+    if suite is None:
         raise refuse(f"suite {params.suite!r} is not available for {model.id} yet")
     if params.thinking:
-        raise refuse("thinking mode does not apply to Nemotron-Parse")
-    unsupported = set(template_overrides(root or project_root(), model)) - SUPPORTED_OVERRIDES
-    if unsupported:  # never evaluate with a decoding other than the one "Chạy thử" uses
-        raise refuse(f"decode_overrides {sorted(unsupported)} not supported by the CORD eval worker")
+        raise refuse("thinking mode is not evaluated yet (answers are scored without a reasoning block)")
+    # Defensive: an Adapter port does not type-check into eval.model on the canvas, so this is a second line only.
+    if suite == "ocrbench" and model_kind == "model:Adapter":
+        raise refuse("a LoRA adapter is scored after merging it: wire it through train.merge_lora first")
+    if suite == "cord_test":
+        unsupported = set(template_overrides(root or project_root(), model)) - SUPPORTED_OVERRIDES
+        if unsupported:  # never evaluate with a decoding other than the one "Chạy thử" uses
+            raise refuse(f"decode_overrides {sorted(unsupported)} not supported by the CORD eval worker")
+
+
+def suite_of(params: EvalParams, model: CatalogEntry) -> str | None:
+    """The suite this node runs for ``model`` (None = not available).
+
+    CORD test for Nemotron-Parse; OCRBench (documents) on the vLLM batch for the chat models vLLM is proven on.
+    """
+    if model.loss == "nemotron_parse":
+        return "cord_test" if params.suite in ("auto", "cord_test") else None
+    if model.id in OCRBENCH_VLLM_MODELS and params.suite in ("auto", "documents"):
+        return "ocrbench"
+    return None
 
 
 def _cord_snapshot(root: Path) -> tuple[Path, str]:
@@ -363,6 +397,8 @@ def _records(m: dict[str, float], *, variant: str, n: int, common: dict[str, Any
 # ------------------------------------------------------------------------------------------------ run
 def run_eval_benchmarks(request: EvalRequest) -> EvalOutcome:
     check_support(request.node_id, request.params, request.entry, {}, root=request.root)  # backstop of validate
+    if suite_of(request.params, request.entry) == "ocrbench":
+        return run_ocrbench(request)
     ids = list(range(LEVEL_SAMPLES[request.params.level]))
     model_rows = _load(
         _generate(
@@ -424,6 +460,173 @@ def run_eval_benchmarks(request: EvalRequest) -> EvalOutcome:
         "gate": gate.to_json(),
         "samples_path": str(request.run_dir / "jobs" / "model" / "pred.jsonl"),
     }
+    path = request.run_dir / "report.json"
+    text = json.dumps(report, indent=1, ensure_ascii=False) + "\n"
+    path.write_text(text, encoding="utf-8")
+    return EvalOutcome(path, hashlib.sha256(text.encode()).hexdigest(), gate.status.name)
+
+
+# ------------------------------------------------------------------------------------- OCRBench (vLLM)
+def _template_pixels(root: Path, entry: CatalogEntry) -> tuple[int, int]:
+    """min/max pixels of the model's training template (processor), so eval sees images as training did."""
+    path = configs_root(root) / TEMPLATE_DIR / f"{entry.id}.yaml"
+    proc = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("processor", {}) if path.is_file() else {}
+    return int(proc.get("min_pixels", 0) or 0), int(proc.get("max_pixels", 0) or 0)
+
+
+def quantization_of(model: ModelRef) -> tuple[str, str] | None:
+    """(precision, parent hash) of a quantized artifact ("<run_id>:<parent hash>:<format>"), else None."""
+    parts = model.hash.split(":")
+    if len(parts) == 3 and parts[2] in QUANT_PRECISION:
+        return QUANT_PRECISION[parts[2]], parts[1]
+    return None
+
+
+def _ocrbench_data(root: Path) -> tuple[Path, str, str]:
+    """(extracted copy, its manifest sha256, dataset revision[:8]); NET-002 when missing or not THE pinned copy."""
+    entry = load_dataset_catalog().get(OCRBENCH_CATALOG_ID)
+    params: dict[str, Any] = {"catalog_id": OCRBENCH_CATALOG_ID, "kind": "dataset"}
+    if entry is None or entry.extracted_manifest_sha256 is None:  # fail closed: only THE pinned copy is scored
+        raise EvalDataNotDownloadedError("OCRBench has no pinned copy", params={**params, "reason": "not_pinned"})
+    params.update(repo=entry.repo, name=entry.display_name, license=entry.license)
+    data = eval_data_dir(root, entry)
+    if data.is_symlink() or not data.is_dir():
+        raise EvalDataNotDownloadedError("OCRBench is not on this machine", params={**params, "reason": "not_cached"})
+    try:
+        return data, ocrbench.verify_manifest(data, entry.extracted_manifest_sha256), entry.revision[:8]
+    except ocrbench.OcrBenchDataError as exc:
+        raise EvalDataNotDownloadedError(str(exc), params={**params, "reason": "not_prepared"}) from exc
+
+
+def _vllm_run(request: EvalRequest, model: ModelRef, rows: Sequence[dict[str, Any]], data: Path, *,
+              quantized: bool, run_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:  # fmt: skip
+    """One vLLM batch (model or base) -> (per-question scores, engine facts); EvalJobFailed if it does not complete."""
+    runner = request.vllm_batch
+    if runner is None:
+        raise EvalSuiteUnsupportedError("the vLLM runner is not available here", params={"node": request.node_id})
+    lo, hi = _template_pixels(request.root, request.entry)
+    res = runner(
+        request.root, model.path, ocrbench.batch_requests(rows, data, ocrbench.MAX_TOKENS), who=request.who,
+        tag=f"ocrbench-{run_dir.name}", quantization="modelopt" if quantized else None, min_pixels=lo,
+        max_pixels=hi, enable_thinking=False, kv_cache_gb=ocrbench.KV_CACHE_GB, cancel=request.cancel,
+        on_wait=request.on_wait, run_dir=run_dir,
+    )  # fmt: skip
+    if not res.ok:
+        raise EvalJobFailed(read_manifest(res.run_dir), log_tail(res.run_dir))
+    return ocrbench.score_batch(rows, res.rows()), res.engine()
+
+
+def _ocrbench_base(request: EvalRequest, rows: Sequence[dict[str, Any]], data: Path, manifest_sha: str,
+                   model_engine: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:  # fmt: skip
+    """Base / bf16 parent scores from the shared cache, keyed on everything that determines them.
+
+    A cached run whose engine differs from the model's (e.g. another vLLM image) is not reused.
+    """
+    lo, hi = _template_pixels(request.root, request.entry)
+    material = json.dumps(
+        {"base": request.base.hash, "data": manifest_sha, "rows": [r["row"] for r in rows], "pixels": [lo, hi],
+         "max_tokens": ocrbench.MAX_TOKENS, "kv": ocrbench.KV_CACHE_GB, "thinking": False,
+         "scorer": _sha256(Path(ocrbench.__file__))},
+        sort_keys=True,
+    )  # fmt: skip
+    key = "ocrbench-" + hashlib.sha256(material.encode()).hexdigest()[:24]
+    # The cached scores live in a HOST-owned file next to (never inside) the job's run dir: the job could plant a
+    # link in its own dir (B1), and its outputs are only read through BatchResult.
+    cache_file = request.root / "outputs" / "eval-cache" / f"{key}.json"
+    cached = _read_cache(cache_file)
+    if cached is not None and not ocrbench.engine_mismatch(cached[1], model_engine):
+        return cached
+    run_dir = cache_file.with_name(f"{key}.run-{os.getpid()}-{secrets.token_hex(3)}")
+    scored, engine = _vllm_run(request, request.base, rows, data, quantized=False, run_dir=run_dir)
+    _write_cache(cache_file, {"scored": scored, "engine": engine})
+    return scored, engine
+
+
+def _read_cache(path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]] | None:
+    """(scores, engine) from a cache file, or None for anything missing, linked, oversized or malformed."""
+    try:
+        data = read_small_json(path, max_bytes=8 * 1024 * 1024)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    scored, engine = data.get("scored"), data.get("engine")
+    if not isinstance(scored, list) or not isinstance(engine, dict):
+        return None
+    if not all(isinstance(r, dict) and r.get("score") in (0, 1) and isinstance(r.get("row"), int) for r in scored):
+        return None
+    return scored, engine
+
+
+def _write_cache(path: Path, payload: dict[str, Any]) -> None:
+    """Atomic write of a host-owned cache file: a fresh name (O_EXCL | O_NOFOLLOW), then rename over the old one."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(4)}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o644)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+    tmp.replace(path)
+
+
+def run_ocrbench(request: EvalRequest) -> EvalOutcome:
+    """OCRBench on the vLLM batch: the model and its base (bf16 parent when quantized), paired by question.
+
+    Quantized -> quant_gate; else finetune_gate with OCRBench as a general benchmark (forgetting check).
+    """
+    data, manifest_sha, revision = _ocrbench_data(request.root)
+    rows = ocrbench.questions(data, subset=request.params.level == "quick")
+    quant = quantization_of(request.model)
+    if quant is not None and quant[1] != request.base.hash:
+        raise EvalSuiteUnsupportedError(
+            "comparing a quantized fine-tuned model with its parent is not available yet",
+            params={"node": request.node_id, "node_type": "eval.benchmarks"},
+        )
+    scored, engine = _vllm_run(request, request.model, rows, data, quantized=quant is not None,
+                               run_dir=request.run_dir / "jobs" / "model")  # fmt: skip
+    compare = quant is not None or (request.params.compare_with == "base" and request.base.hash != request.model.hash)
+    base_scored, base_engine, comparison = None, None, None
+    if compare:
+        base_scored, base_engine = _ocrbench_base(request, rows, data, manifest_sha, engine)
+        if mismatch := ocrbench.engine_mismatch(engine, base_engine):
+            raise EvalSuiteUnsupportedError(f"base and model ran on different engines: {mismatch}",
+                                            params={"node": request.node_id})  # fmt: skip
+        pa = ocrbench.paired_accuracy([s["score"] for s in scored], [s["score"] for s in base_scored])
+        comparison = {"compare_to": "parent" if quant else "base", "metric": "accuracy", **pa}
+    summ = ocrbench.summary(scored)
+    common = {
+        "schema_version": REPORT_SCHEMA_VERSION, "benchmark": "ocrbench",
+        "split": "regression_500" if request.params.level == "quick" else "test", "dataset_revision": revision,
+        "data_manifest_sha256": manifest_sha, "harness": "vllm_batch", "eval_path": "vllm",
+        "answer_extractor": "substring", "max_new_tokens": ocrbench.MAX_TOKENS, "thinking": False,
+        "judge_model": None, "container_image": engine.get("image"), "container_digest": engine.get("container_digest"),
+        "source": "measured", "citation": ocrbench.CITATION,
+    }  # fmt: skip
+
+    def recs(s: dict[str, float], variant: str) -> list[dict[str, Any]]:
+        higher = {"accuracy": True, "truncated_rate": False, "error_rate": False}
+        return [{**common, "variant": variant, "metric": k, "value": s[k], "scale": "percent",
+                 "higher_is_better": higher[k], "n_samples": len(rows)} for k in higher]  # fmt: skip
+
+    records = recs(summ, "model")
+    if base_scored is not None:
+        records += recs(ocrbench.summary(base_scored), "parent" if quant else "base")
+    result = BenchmarkResult(
+        benchmark="ocrbench", n=len(rows), truncated_pct=summ["truncated_rate"],
+        delta=comparison["delta"] if comparison else None,
+        delta_ci95=tuple(comparison["ci95"]) if comparison else None, general=quant is None,
+    )  # fmt: skip
+    gate = quant_gate([result], quant[0]) if quant else finetune_gate([result])
+    report = {
+        "schema_version": REPORT_SCHEMA_VERSION, "kind": "eval_report", "suite": "ocrbench",
+        "level": request.params.level, "model": {"path": str(request.model.path), "hash": request.model.hash},
+        "base": {"path": str(request.base.path), "hash": request.base.hash},
+        "quantization": None if quant is None else {"precision": quant[0], "parent": quant[1]},
+        "decoding": {"sampling": engine.get("sampling"), "max_new_tokens": ocrbench.MAX_TOKENS, "thinking": False},
+        "engine": {"model": engine, "base": base_engine}, "records": records, "comparison": comparison,
+        "gate": gate.to_json(), "rows": [s["row"] for s in scored],
+        "samples_path": str(request.run_dir / "jobs" / "model" / "out.jsonl"),
+        "publish": "aggregate scores only (OCRBench eval_only, security 2026-10-13)",
+    }  # fmt: skip
     path = request.run_dir / "report.json"
     text = json.dumps(report, indent=1, ensure_ascii=False) + "\n"
     path.write_text(text, encoding="utf-8")

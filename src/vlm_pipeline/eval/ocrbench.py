@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
+import stat
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -146,3 +149,117 @@ def paired_accuracy(
         "resamples": resamples,
         "seed": seed,
     }
+
+
+# ------------------------------------------------------------------ extracted copy + vLLM batch (R3 gate, node)
+MANIFEST = "MANIFEST.sha256"
+MAX_TOKENS = 256  # answers are short; truncation is reported
+KV_CACHE_GB = 8.0  # pinned, the same for both runs of a pair (KV size changes vLLM scheduling, hence numerics)
+# Engine settings two runs must share to be paired (only the quantization may differ).
+SAME_ENGINE = (
+    "vllm", "dtype", "max_model_len", "enforce_eager", "seed", "sampling", "max_num_seqs",
+    "max_num_batched_tokens", "enable_chunked_prefill", "chunk", "kv_cache_gb", "chat_template_kwargs",
+    "mm_processor_kwargs", "container_digest",
+)  # fmt: skip
+
+
+class OcrBenchDataError(ValueError):
+    """The extracted copy is missing or differs from its manifest."""
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+_MANIFEST_LINE = re.compile(r"([0-9a-f]{64})  (images/\d+\.(?:jpg|png|webp)|questions\.jsonl)")
+_MANIFEST_MAX_BYTES = 4 * 1024 * 1024
+
+
+def _regular(path: Path) -> bool:
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except OSError:
+        return False
+
+
+def verify_manifest(data: Path, pinned_sha256: str | None = None) -> str:
+    """Check the extracted copy is THE known one; returns its manifest's sha256.
+
+    The manifest (a small regular file, hashing to the catalog's pin when given) lists only allowed names, each a
+    regular file with that sha256.
+
+    Any problem (missing file, link, malformed line, ``..``, other hash) is OcrBenchDataError, never a crash.
+    """
+    manifest = data / MANIFEST
+    if not _regular(manifest) or manifest.stat().st_size > _MANIFEST_MAX_BYTES:
+        raise OcrBenchDataError(f"{data}: no {MANIFEST} (not extracted)")
+    own = _sha256_file(manifest)
+    if pinned_sha256 is not None and own != pinned_sha256:
+        raise OcrBenchDataError(f"{data}: {MANIFEST} is not the catalog's")
+    try:
+        lines = manifest.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise OcrBenchDataError(f"{data}: unreadable {MANIFEST}") from exc
+    for line in lines:
+        match = _MANIFEST_LINE.fullmatch(line)
+        if match is None:
+            raise OcrBenchDataError(f"{data}: malformed {MANIFEST} line")
+        target = data / match[2]
+        if not _regular(target) or _sha256_file(target) != match[1]:
+            raise OcrBenchDataError(f"{target}: differs from {MANIFEST}")
+    return own
+
+
+def questions(data: Path, *, subset: bool = True) -> list[dict[str, Any]]:
+    """Rows of questions.jsonl: the committed regression_500 subset (q_sha256 checked), or all 1000."""
+    rows = [json.loads(line) for line in (data / "questions.jsonl").read_text(encoding="utf-8").splitlines()]
+    if not subset:
+        return rows
+    return [rows[i] for i in load_subset([r["question"] for r in rows])]
+
+
+def batch_requests(rows: Sequence[dict[str, Any]], data: Path, max_tokens: int = MAX_TOKENS) -> list[dict[str, Any]]:
+    """Batch items for the vLLM runner: the question verbatim (VLMEvalKit protocol), one image."""
+    return [
+        {"id": str(r["row"]), "image": str(data / r["image"]), "prompt": r["question"], "max_tokens": max_tokens}
+        for r in rows
+    ]
+
+
+def score_batch(rows: Sequence[dict[str, Any]], outputs: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-question 0/1 scores of a batch's outputs (matched by id; an image error scores 0 and is kept)."""
+    by_id = {str(o["id"]): o for o in outputs}
+    scored = []
+    for r in rows:
+        out = by_id.get(str(r["row"]), {"error": "missing"})  # an answer the batch did not return scores 0
+        scored.append(
+            {
+                "row": r["row"],
+                "question_type": r["question_type"],
+                "dataset": r["dataset"],
+                "score": 0 if "error" in out else score_one(out.get("text", ""), r["answers"], r["dataset"]),
+                "error": out.get("error"),
+                "finish_reason": out.get("finish_reason"),
+                "gen_tokens": out.get("gen_tokens"),
+            }
+        )
+    return scored
+
+
+def summary(scored: Sequence[dict[str, Any]]) -> dict[str, float]:
+    n = len(scored)
+    return {
+        "accuracy": round(100 * sum(s["score"] for s in scored) / n, 2),
+        "truncated_rate": round(100 * sum(s["finish_reason"] == "length" for s in scored) / n, 2),
+        "error_rate": round(100 * sum(s["error"] is not None for s in scored) / n, 2),
+        "gen_tokens_mean": round(sum(s["gen_tokens"] or 0 for s in scored) / n, 1),
+    }
+
+
+def engine_mismatch(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
+    """Engine settings (``SAME_ENGINE``) on which two runs differ: such runs are never paired."""
+    return [f"{k}: {a.get(k)!r} != {b.get(k)!r}" for k in SAME_ENGINE if a.get(k) != b.get(k)]

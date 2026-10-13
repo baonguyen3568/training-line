@@ -152,7 +152,7 @@ def test_clean_validate_means_no_support_refusal_at_run(tmp_path: Path, name: st
     ("case", "code", "node"),
     [
         ("nemotron-parse-v1.1/train.lora_vlm/export", "CFG-010", "t"),  # rule-level (before this change too)
-        ("qwen3.5-0.8b/train.lora_vlm/eval-auto", "CFG-011", "ev"),  # eval engine: Parse only today
+        ("cosmos-reason2-2b/train.lora_vlm/eval-auto", "CFG-011", "ev"),  # eval: Parse (CORD) + Qwen3.5 (OCRBench) only
         ("qwen3.5-0.8b/quant-data.hf_load-vFalse-kvnone/bench-single_user", "CFG-011", "b"),  # bench: Parse only
         ("nemotron-parse-v1.1/trial-imgFalse", "DATA-005", "s"),  # "Chạy thử" without an image
     ],

@@ -271,10 +271,13 @@ def test_check_support_is_what_the_worker_enforces(
         assert (at_validate.value.code, at_validate.value.params) == (at_run.value.code, at_run.value.params)
 
 
-def test_check_support_refuses_chat_models_and_ignores_unwired_model(root: Path) -> None:
+def test_check_support_refuses_unmeasured_chat_models_and_ignores_unwired_model(root: Path) -> None:
+    cosmos = load_catalog().get("cosmos-reason2-2b")  # vLLM not proven on it: refused at validate
+    with pytest.raises(nw.EvalSuiteUnsupportedError):
+        nw.check_support("eval", EvalParams(), cosmos, {"model": "model:Model"}, root=root)
     qwen = load_catalog().get("qwen3.5-0.8b")
     with pytest.raises(nw.EvalSuiteUnsupportedError):
-        nw.check_support("eval", EvalParams(), qwen, {"model": "model"}, root=root)
+        nw.check_support("eval", EvalParams(suite="charts"), qwen, {"model": "model:Model"}, root=root)
     nw.check_support("eval", EvalParams(suite="documents"), None, {}, root=root)  # CFG-003 is validate's job
 
 
