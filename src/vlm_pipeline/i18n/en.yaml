@@ -1413,7 +1413,7 @@ bug_report:
     ref_code: Reference code
   not_included: Logs, folder paths, tokens and your data are not copied.
   ref_code_help: A short code the team can ask you about; your run and step names are not copied.
-  reminder: Don't paste logs, paths or tokens. Report security issues privately as described in SECURITY.md, not as a public issue.
+  reminder: Don't paste logs, paths or tokens. Report security issues privately as described at {security_url}, not as a public issue.
   needs_account: You need a GitHub account to open an issue.
   copy_open: Copy and open GitHub
   copied: Copied. Paste it into the description on the GitHub page that just opened.
