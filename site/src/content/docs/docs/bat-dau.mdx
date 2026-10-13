@@ -1,6 +1,6 @@
 ---
 title: Bắt đầu với mẫu "Đọc hoá đơn → JSON"
-description: "Ba bước để chạy workflow đầu tiên: mở mẫu, xem phần kiểm tra trước khi chạy, rồi bấm Chạy."
+description: "Bốn bước để chạy workflow đầu tiên: mở mẫu, tải model và dữ liệu về máy, xem phần kiểm tra trước khi chạy, rồi bấm Chạy."
 sidebar:
   order: 0
 sources:
@@ -11,28 +11,36 @@ sources:
 ---
 import Hint from '~/components/Hint.astro';
 
-Cách nhanh nhất để hiểu app là chạy mẫu **Đọc hoá đơn → JSON**. Mẫu này dạy model đọc ảnh hoá đơn và trả về các trường (cửa hàng, món, tổng tiền…) dạng JSON. Mẫu có sẵn dữ liệu và không cần tài khoản.
+Cách nhanh nhất để hiểu app là chạy mẫu **Đọc hoá đơn → JSON**. Mẫu này dạy model đọc ảnh hoá đơn và trả về các trường (cửa hàng, món, tổng tiền…) dạng JSON. Mẫu dùng bộ dữ liệu mẫu công khai và không cần tài khoản.
 
 ## 1. Mở mẫu
 
-Ở màn hình **Bắt đầu nhanh**, chọn **Đọc hoá đơn → JSON** rồi bấm **Dùng mẫu này**. Bảng vẽ hiện ra các bước đã nối sẵn.
+Ở màn hình **Pipeline tham chiếu**, tìm thẻ **Đọc hoá đơn → JSON** rồi bấm **Mở**. Bảng vẽ hiện ra các bước đã nối sẵn.
 
 <Hint title="Node là gì?">
 Mỗi bước của workflow là một node; nối dây giữa các node để tạo workflow. [Đọc thêm](/docs/node-va-cong/).
 </Hint>
 
-## 2. Xem phần kiểm tra trước khi chạy
+## 2. Tải model và dữ liệu về máy
+
+Các bước chạy không dùng mạng, nên model và dữ liệu phải có sẵn trên máy. Lần đầu mở mẫu, bước **Chọn model gốc** và bước **Dataset Hugging Face** báo **chưa tải về máy**. Bấm **Tải về máy** trên từng bước: app cho bạn xem giấy phép trước, bạn đồng ý thì app tải và hiện tiến trình.
+
+<Hint title="Đã cài bằng install.sh?">
+Nếu bạn cài bằng `scripts/install.sh`, model và dữ liệu của mẫu này đã được tải sẵn trong lúc cài, nên bạn bỏ qua được bước này.
+</Hint>
+
+## 3. Xem phần kiểm tra trước khi chạy
 
 Thanh **Kiểm tra trước khi chạy** cho biết workflow đã sẵn sàng chưa, kèm dự kiến thời gian, bộ nhớ và ổ đĩa. Nếu có lỗi, bấm **Chỉ cho tôi** để tới đúng bước cần sửa.
 
-## 3. Bấm Chạy
+## 4. Bấm Chạy
 
 Bấm **Chạy**. Nếu máy đang bận với tác vụ khác, workflow tự xếp hàng và chạy khi máy rảnh. Khi xong, bấm **Xem kết quả**.
 
 ## Tiếp theo
 
 - Thay dữ liệu mẫu bằng ảnh hoá đơn của bạn.
-- Xem [mẫu này dùng model và dữ liệu nào](/mau/).
+- Xem [mẫu này dùng model và dữ liệu nào](/template/).
 - Đọc [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/) để hiểu vì sao app có thể yêu cầu chờ.
 
 <Hint title="Model và dữ liệu của mẫu">
