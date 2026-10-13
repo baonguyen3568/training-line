@@ -85,7 +85,7 @@ function EditorInner() {
     undo,
     redo,
   } = useWorkflow.getState();
-  const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
+  const { screenToFlowPosition, fitView, getViewport, getInternalNode } = useReactFlow();
   const [flashId, setFlashId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLElement>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -332,16 +332,19 @@ function EditorInner() {
         left + 240 * vp.zoom <= rect.width &&
         top + 120 * vp.zoom <= rect.height;
       // Off-screen: fit ALL nodes (zoom ≤ 1, ≥ 0.6) instead of centering the new one, so earlier nodes
-      // stay on screen too. Deferred one frame so React Flow has measured the new node.
-      if (!visible)
-        setTimeout(
-          () => void fitView({ maxZoom: 1, minZoom: 0.6, duration: 250, padding: 0.1 }),
-          30,
-        );
+      // stay on screen too. Wait until React Flow has measured the new node (ResizeObserver), else it is left
+      // out of the bounds. No animation: a 250 ms pan moved the handles under a wire the user had already
+      // started dragging (lost-wire flake).
+      const fitWhenMeasured = (framesLeft: number) => {
+        if (getInternalNode(id)?.measured.width || framesLeft === 0)
+          void fitView({ maxZoom: 1, minZoom: 0.6, padding: 0.1 });
+        else requestAnimationFrame(() => fitWhenMeasured(framesLeft - 1));
+      };
+      if (!visible) requestAnimationFrame(() => fitWhenMeasured(10));
       setFlashId(id);
       setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1200);
     },
-    [placeInLane, fitView, getViewport],
+    [placeInLane, fitView, getViewport, getInternalNode],
   );
 
   if (!workflow) return null;

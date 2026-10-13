@@ -70,7 +70,8 @@ async function addFromLibrary(page: Page, typeId: string, how: "drag" | "dblclic
     await item.dblclick();
   }
   await search.fill("");
-  await expect(node(page, typeId)).toBeVisible();
+  // toBeVisible passes for a node outside the canvas viewport; the user must actually see the node they added.
+  await expect(node(page, typeId)).toBeInViewport();
 }
 
 async function buildGraph(page: Page): Promise<void> {
@@ -200,4 +201,35 @@ test("narrow screens can open a template and see the canvas @narrow", async ({ p
   await expect(page.locator(".react-flow")).toBeVisible();
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
   await expect(page.getByTestId("check-bar")).toBeVisible();
+});
+
+test("handles do not move when validation results arrive (no layout shift)", async ({ page }) => {
+  // Root cause of a lost-wire flake (bao-frontend, 2026-10-12): validation inserted a hint inside the node and
+  // thickened its border, pushing handles down mid-drag. Guard: the target handle keeps its position.
+  await page.goto("/");
+  await page.getByRole("button", { name: tr("gallery.blank_workflow") }).click();
+  await addFromLibrary(page, NODES[2], "dblclick");
+  const handle = page.locator(".react-flow__handle.target[data-handleid='base_model']");
+  const before = await handle.boundingBox();
+  // Validation (CFG-003: inputs missing) has landed on the node itself: the handle is marked needs-wire, the
+  // render that used to shift it. ([data-code] in the check bar only renders once "details" is expanded.)
+  await expect(handle).toHaveClass(/\bneeds-wire\b/);
+  const after = await handle.boundingBox();
+  // <= 0.5 px tolerates subpixel rounding; a real shift was ~7 px (half a hint line).
+  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThanOrEqual(0.5);
+  expect(Math.abs((after?.x ?? 0) - (before?.x ?? 0))).toBeLessThanOrEqual(0.5);
+});
+
+test("a wire dragged right after adding the nodes connects (no waiting)", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: tr("gallery.blank_workflow") }).click();
+  await addFromLibrary(page, NODES[0], "dblclick");
+  await addFromLibrary(page, NODES[2], "dblclick");
+  const [model, train] = await Promise.all([nodeId(page, NODES[0]), nodeId(page, NODES[2])]);
+  await dragHandle(
+    page,
+    page.locator(`[data-id="${model}"] .react-flow__handle.source[data-handleid="model"]`),
+    page.locator(`[data-id="${train}"] .react-flow__handle.target[data-handleid="base_model"]`),
+  );
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 });
