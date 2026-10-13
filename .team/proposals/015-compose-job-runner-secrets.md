@@ -99,8 +99,8 @@ Memguard của fixcode chạy trong runner hoặc trên host như hiện tại: 
 | job `download` | runner mount riêng file `/run/secrets/hf_token` ro + `HF_TOKEN_PATH=/run/secrets/hf_token`. Không truyền `-e HF_TOKEN=` |
 | mọi job khác | không có (giữ `_SECRET_NAME` deny hiện tại) |
 
-Token phải là **Read** (U3, D12): runner gọi `whoami-v2` của HF lúc khởi động. Token có quyền write thì log cảnh báo
-và từ chối job download (fail-closed, giống D12 Simple mode).
+Token nên là **Read** (D12): runner gọi `whoami-v2` của HF lúc khởi động. Token có quyền write thì CẢNH BÁO + audit
+`warning:write_scope`, vẫn cho job download chạy (PM 2026-10-13: user giữ token write, U3 đóng; bù bằng §6.1).
 
 ### 4.4 Log
 - App và runner không bao giờ log `os.environ`, nội dung `/run/secrets`, hay header Authorization.
@@ -122,8 +122,9 @@ Config phân tầng: mặc định → `.env.local` → DB (`outputs/app.db`, b�
   - Mất khoá thì secret không đọc được: UI báo "nhập lại token", không crash.
 - **Chỉ ghi, không đọc lại**: GET settings trả `{"set": true, "updated_at": …, "last4": "…ab12"}` (tối đa 4 ký tự cuối)
   cho field secret, không bao giờ trả giá trị. PUT nhận giá trị mới; DELETE xoá. Không có endpoint "reveal".
-- **Kiểm token khi ghi**: HF token phải là Read (`whoami-v2`). Token write/fine-grained có quyền ghi thì từ chối kèm
-  thông báo dễ hiểu (D12). Lời gọi kiểm này do runner thực hiện, vì app không có egress.
+- **Kiểm token khi ghi**: gọi `whoami-v2`. Token write (hoặc fine-grained có quyền ghi) thì cảnh báo một lần lúc lưu
+  (icon ⚠ + popover), audit `warning:write_scope`, vẫn lưu (D12 sửa 2026-10-13). Lời gọi kiểm này do runner thực
+  hiện, vì app không có egress; khi chưa có runner thì hiện "chưa kiểm được quyền token".
 - **Ai giải mã**: chỉ runner (job `download`) cần plaintext. Đề xuất: app lưu ciphertext, runner giữ khoá và giải mã lúc
   submit download. App **không** có khoá, nên app bị chiếm cũng không đọc được token. Nếu backend thấy quá phức tạp cho
   v1: app có khoá nhưng plaintext chỉ tồn tại trong bộ nhớ lúc chuyển cho runner, không log, không cache.
