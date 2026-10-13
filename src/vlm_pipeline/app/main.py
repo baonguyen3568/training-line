@@ -255,6 +255,25 @@ def _register_settings(app: FastAPI, services: Services, key_file: Path | None) 
     register_settings_routes(app, store)
 
 
+def _reconcile_stale_runs(services: Services) -> None:
+    """Runs left "running" by a process that is gone become interrupted (PM): once at start-up, in the background.
+
+    The storage scheduler repeats it every pass. Demo (fake worker) runs are not real jobs: skipped.
+    """
+    root = getattr(services, "root", None)
+    if root is None or getattr(services, "worker", "fake") == "fake":
+        return
+    from vlm_pipeline.artifacts.stale_runs import reconcile
+
+    def run() -> None:
+        try:
+            reconcile(root)
+        except Exception:  # noqa: BLE001 - a start-up chore must never take the app down (logged)
+            _log.exception("stale-run check failed")
+
+    threading.Thread(target=run, name="stale-runs", daemon=True).start()
+
+
 def _register_uploads(app: FastAPI, services: Services) -> None:
     """Trial-node images + result (app/uploads.py); errors render like validate issues."""
     root, state_dir = getattr(services, "root", None), getattr(services, "_state_dir", None)
@@ -333,6 +352,7 @@ def create_app(
     _register_storage(app, services)
     _register_uploads(app, services)
     _register_settings(app, services, secret_key_file)
+    _reconcile_stale_runs(services)
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
     _register_template_routes(app, services)
