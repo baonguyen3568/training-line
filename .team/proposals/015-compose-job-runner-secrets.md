@@ -1,0 +1,162 @@
+# Proposal 015 — Compose: app tạo job container an toàn + secrets `.env.local` (M3 D-1/D-3, phần security)
+
+Tác giả: bao-security · 2026-10-13 · Trạng thái: DRAFT, chờ bao-backend (đồng tác giả D-1/D-3) và PM chốt ADR
+Liên quan: P003 D1/D4/D13/D16/D17, ADR-005, `src/vlm_pipeline/common/jobrun.py`
+
+## 1. Vấn đề
+Khi app chạy trong container, nó vẫn phải tạo job container (train/eval/quantize/serve). Mount `/var/run/docker.sock`
+vào app tương đương **root trên host**, trong khi máy đang chạy kafka, elastic, banking-rag, comfy-ui. App là thành phần
+có bề mặt tấn công lớn nhất của dự án: web UI, upload ảnh, workflow file từ người khác, plugin, chuỗi tokenizer…
+Chỉ một lỗi RCE trong app là đủ chiếm cả máy.
+
+## 2. Các phương án
+
+| | A. socket-proxy lọc endpoint (tecnativa/docker-socket-proxy) | B. socket-proxy lọc **body** (tự viết hoặc authz plugin) | **C. job-runner sidecar với API kiểu hoá (đề xuất)** |
+|---|---|---|---|
+| Cách làm | HAProxy chỉ mở `CONTAINERS`, `POST` | Proxy parse JSON `POST /containers/create`, chặn field nguy hiểm | App gửi `JobSpec` (kiểu hoá, đóng) qua unix socket. Runner tự dựng `docker run` bằng code sẵn có (`docker_args`) |
+| Chặn `Privileged`, `Binds: ["/:/host"]`, `PidMode: host` | **Không**: lọc theo URL, không theo body. `POST /containers/create` vẫn có privileged → vẫn root | Có, nếu liệt kê đủ. Docker API có hàng chục field nguy hiểm (`Binds`, `Mounts`, `VolumesFrom`, `Devices`, `DeviceCgroupRules`, `CapAdd`, `SecurityOpt`, `UsernsMode`, `CgroupnsMode`, `Sysctls`, `Runtime`, `CgroupParent`…) và mỗi version API lại thêm → denylist dễ sót | App **không có** đường nào chạm vào Docker API. Bề mặt chỉ là schema của ta |
+| `exec` vào container khác (banking-rag) | Chặn nếu tắt `EXEC`, nhưng `CONTAINERS=1` vẫn cho stop/kill/rm **mọi** container | Phải tự lọc thêm theo tên/label | Runner chỉ thao tác container có label `project=vlm-training` + `vlm.owner=app`, tên `vlm-job-<run_id>` |
+| Sửa daemon / sudo | Không | Authz plugin cần sửa `daemon.json` → **cấm** (ảnh hưởng mọi service) | Không |
+| Công sức | Thấp | Cao, dễ sai | Vừa: tái dùng `jobrun.docker_args` (đã có kiểm env secret, `--network none`, `--cap-drop ALL`, image pin SEC-004) |
+
+**Kết luận:** chọn **C**. A **không đạt** yêu cầu (vẫn tạo được privileged container). B là denylist trên một API lớn và đổi theo
+version. C biến bài toán thành allowlist trên schema của chính ta.
+
+## 3. Thiết kế C
+
+```
+ browser ──127.0.0.1:7870──▶ [vlm-app]  (non-root, read_only, cap_drop ALL, KHÔNG có docker.sock, KHÔNG có secrets)
+                                 │ unix socket /run/vlm-runner/runner.sock (volume chung, 0660, gid riêng)
+                                 ▼
+                            [vlm-runner] (stdlib Python, ~vài trăm dòng, KHÔNG có port, KHÔNG có network ngoài)
+                                 │ /var/run/docker.sock (chỉ runner có)
+                                 ▼
+                           docker daemon ──▶ vlm-job-<run_id>  (--network none, non-root, cap_drop ALL, mem limit)
+```
+
+### 3.1 API của runner (đóng, JSON, giới hạn 64 KB/request)
+| Lệnh | Tham số app được gửi | Runner tự quyết |
+|---|---|---|
+| `submit` | `run_id` (`^[0-9]{8}-[0-9]{4}-[a-z0-9-]{1,48}$`), `job_kind` (enum: train / eval / quantize / probe / download / serve), `image_tag` (phải có trong IMAGES.lock, `is_security_approved`, image id khớp — SEC-004), `argv` (danh sách module/args theo allowlist của `job_kind`), `gpu: bool`, `memory_gb` (≤ trần cấu hình), `lock_token` | name `vlm-job-<run_id>`, labels, user, mounts, network, cap, env, GPU device |
+| `stop` / `kill` | `run_id` | chỉ khi container tồn tại **và** có đủ 2 label của ta |
+| `status` | `run_id` | `docker inspect` State (đã lọc field) |
+| `logs` | `run_id`, `since`, `tail` ≤ 10 000 | stream stdout/stderr, đã redact token (§4.4) |
+| `remove` | `run_id` | chỉ container đã exit và có label của ta |
+
+Không có lệnh nào nhận path, mount, cờ docker, tên image tự do, biến env tự do, hay tên container tuỳ ý.
+**Không** có `exec`, `pull`, `build`, `image rm`, `volume`, `network`. Pull image chỉ làm tay (PM/user) theo D1.
+
+### 3.2 Mount do runner tính (thu hẹp so với hiện tại)
+Hiện `docker_args` mount **cả project root** vào job (rw khi `read_only_project=False`). Với compose, như vậy job (kể cả
+plugin chưa duyệt) đọc được `.env.local` nếu file nằm trong project root, và ghi được vào code của app. Đề xuất:
+- `outputs/runs/<run_id>/` hoặc `outputs/graph/runs/<node_dir>/` → **rw** (chỉ thư mục của job đó);
+- `data/` + `.cache/prepared/` + HF hub cache → **ro**;
+- code `src/` → **ro** (overlay như hiện tại);
+- **không bao giờ** mount: `.env*`, `.team/`, `~/.config/vlm-app/`, `/var/run/docker.sock`, `$HOME`.
+- Đường dẫn nguồn là **host path**. Runner nhận `VLM_HOST_PROJECT_ROOT` từ `.env.local` (cấu hình triển khai, không lấy
+  từ app). Runner resolve, đối chiếu dưới root đó, từ chối symlink ra ngoài.
+- `download` là job_kind duy nhất có mạng (network `vlm-egress`, không có port) và là job duy nhất nhận token (§4.3).
+
+### 3.3 Cứng hoá runner (vì runner = root-equivalent)
+- Chỉ dùng stdlib (không FastAPI, không pydantic), có test riêng, review bắt buộc bởi security cho mọi thay đổi.
+- Image runner build từ cùng base pin digest, `USER` non-root + `group_add: [<gid của docker.sock>]`, `read_only: true`,
+  `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `mem_limit: 256m`, **không** `ports`, network `none`
+  (unix socket không cần network).
+- Socket `runner.sock` 0660 với một gid riêng `vlm-runner`. Chỉ app được `group_add` gid đó.
+- Defense in depth (khuyến nghị, không bắt buộc v1): runner nói chuyện với docker qua `tecnativa/docker-socket-proxy`
+  (`CONTAINERS=1 POST=1 EXEC=0 BUILD=0 IMAGES=0 VOLUMES=0 NETWORKS=0 SWARM=0 …`). Nếu runner bị chiếm thì vẫn không có
+  `exec`/`build`. Proxy này phải pin digest và qua review image như mọi image.
+- Mọi request ghi audit `outputs/system/runner.jsonl` (lệnh, run_id, image id, kết quả; không ghi env).
+
+### 3.4 GPU lock, memguard
+Giữ nguyên `.team/GPU_LOCK` (file). Runner kiểm `lock_token` khớp lock hiện tại trước khi `submit` một job có `gpu=true`.
+Memguard của fixcode chạy trong runner hoặc trên host như hiện tại: D-4 quyết.
+
+## 4. Secrets — `.env.local` (D-3)
+### 4.1 Vị trí và quyền
+- Một file `.env.local` ở **thư mục deploy** (cạnh `compose.yaml`), quyền 0600. Hiện thư mục deploy = project root, nên
+  chỉ an toàn khi §3.2 đã bỏ mount cả project root. **Điều kiện tiên quyết**: không job nào được mount thư mục chứa `.env.local`.
+- `.env.local.example` được commit: đủ key, value rỗng hoặc mặc định an toàn, comment tiếng Việt. Không có giá trị thật.
+- `.gitignore` có `.env.*` (PM đã thêm) nhưng phải **un-ignore** `!.env.local.example`. `.dockerignore` của MỌI image
+  phải có `.env*`, `**/.env*`, `.git`, `outputs/`, `data/`, `.cache/`.
+
+### 4.2 Không vào image / layer
+- Dockerfile không có `ARG`/`ENV` chứa `*TOKEN*|*KEY*|*SECRET*|*PASSWORD*` (gate trong security-pr-review §2, thêm grep
+  vào `scripts/check.sh`).
+- Build không cần secret. Nếu sau này cần thì dùng `RUN --mount=type=secret`.
+- Kiểm sau build: `docker history --no-trunc` + `docker image inspect` không chứa giá trị token. Dùng `dive` hoặc tar
+  layer + grep `hf_` khi review image.
+
+### 4.3 Runtime: token chỉ tới đúng chỗ cần
+| Service | Nhận gì |
+|---|---|
+| vlm-app | **không** token nào. Cấu hình không-bí-mật (port, profile, quota) qua `environment:` |
+| vlm-runner | `HF_TOKEN`, `NGC_API_KEY` qua compose `secrets:` (nguồn `environment:` từ `.env.local`), mount `/run/secrets/*` 0400. **Không** qua `environment:` (sẽ lộ trong `docker inspect` và `/proc/1/environ`) |
+| job `download` | runner mount riêng file `/run/secrets/hf_token` ro + `HF_TOKEN_PATH=/run/secrets/hf_token`. Không truyền `-e HF_TOKEN=` |
+| mọi job khác | không có (giữ `_SECRET_NAME` deny hiện tại) |
+
+Token phải là **Read** (U3, D12): runner gọi `whoami-v2` của HF lúc khởi động. Token có quyền write thì log cảnh báo
+và từ chối job download (fail-closed, giống D12 Simple mode).
+
+### 4.4 Log
+- App và runner không bao giờ log `os.environ`, nội dung `/run/secrets`, hay header Authorization.
+- Runner redact trong stream log: `hf_[A-Za-z0-9]{30,}`, `nvapi-[A-Za-z0-9_-]{20,}`, và giá trị chính xác của token
+  đang nạp → `***`.
+- `docker compose config` in ra env: hướng dẫn trong README cấm dán output đó vào issue/chat.
+
+### 4.5 Secrets chỉnh qua trang Cài đặt (D-7, PM 2026-10-13)
+Config phân tầng: mặc định → `.env.local` → DB (`outputs/app.db`, bảng settings), chỉnh qua UI. Yêu cầu security:
+- **Phân loại field** ngay trong schema settings: `public` (port, ngôn ngữ, quota cá nhân…), `secret` (HF_TOKEN, NGC_API_KEY,
+  WANDB_API_KEY), `admin_policy` (`deployment.profile`, approval policy/threshold, plugin allowlist, schedule apply).
+  - `admin_policy` **không có** API ghi và không hiện như ô sửa trong UI. Chỉ đọc từ `~/.config/vlm-app/policy.toml`
+    (D17). Env/DB chỉ được siết. API nhận key `admin_policy` thì 403, không lưu gì.
+- **Secret trong DB phải mã hoá**: AEAD (AES-256-GCM, `cryptography` đã qua review dep, hoặc libsodium secretbox),
+  nonce ngẫu nhiên mỗi lần ghi, AAD = tên field (chống tráo ô).
+  - Khoá 32 byte lấy từ `VLM_SECRETS_KEY_FILE` (file 0600, mặc định `~/.config/vlm-app/secrets.key`, sinh lần đầu bằng
+    `secrets.token_bytes`), hoặc `VLM_SECRETS_KEY` trong `.env.local`.
+  - Khoá **không** nằm trong DB, image hay thư mục mà job mount.
+  - Mất khoá thì secret không đọc được: UI báo "nhập lại token", không crash.
+- **Chỉ ghi, không đọc lại**: GET settings trả `{"set": true, "updated_at": …, "last4": "…ab12"}` (tối đa 4 ký tự cuối)
+  cho field secret, không bao giờ trả giá trị. PUT nhận giá trị mới; DELETE xoá. Không có endpoint "reveal".
+- **Kiểm token khi ghi**: HF token phải là Read (`whoami-v2`). Token write/fine-grained có quyền ghi thì từ chối kèm
+  thông báo dễ hiểu (D12). Lời gọi kiểm này do runner thực hiện, vì app không có egress.
+- **Ai giải mã**: chỉ runner (job `download`) cần plaintext. Đề xuất: app lưu ciphertext, runner giữ khoá và giải mã lúc
+  submit download. App **không** có khoá, nên app bị chiếm cũng không đọc được token. Nếu backend thấy quá phức tạp cho
+  v1: app có khoá nhưng plaintext chỉ tồn tại trong bộ nhớ lúc chuyển cho runner, không log, không cache.
+- **Audit log** `outputs/system/settings_audit.jsonl`, append-only: `ts, field, action (set|delete|rejected), actor
+  (session id rút gọn), client (127.0.0.1)`. Không ghi giá trị cũ hay mới của secret, chỉ ghi `last4` mới. Field public
+  thì ghi giá trị cũ → mới.
+- **Auth**: settings API nằm sau `SecurityMiddleware` (D13: Host/Origin, cookie session, CSRF cho PUT/DELETE). Không có
+  ngoại lệ, không CORS. Body ≤ 16 KB. Key lạ thì 422 (schema đóng).
+- **Test bắt buộc**: GET không bao giờ chứa giá trị secret (property test với token ngẫu nhiên); DB dump (`sqlite3 .dump`)
+  không chứa plaintext; PUT `deployment.profile` → 403; PUT không có CSRF → 403; audit có dòng cho mỗi lần đổi.
+
+## 5. Compose (D-1, phần security)
+- `ports: ["127.0.0.1:${VLM_PORT:-7870}:7870"]` cho app; site/docs tĩnh cũng `127.0.0.1`. Không service nào bind `0.0.0.0`.
+  Có test: `docker compose config` → mọi `published` có `host_ip: 127.0.0.1`.
+- Không `network_mode: host`, `pid: host`, `ipc: host`, `privileged`. Có `cap_drop: [ALL]` + `no-new-privileges` cho
+  mọi service, `read_only: true` + `tmpfs: /tmp` cho app/runner.
+- Tên `vlm-*`, label `project=vlm-training`; `name: vlm` cho project compose. `docker compose down` không đụng service khác.
+- File admin `~/.config/vlm-app/policy.toml` (D17) được mount **ro** từ host vào home của user trong container app và runner. App không bao giờ ghi file này. Reader lấy home bằng `pwd.getpwuid(os.getuid())`, không dùng `$HOME`.
+- vLLM serve là một `job_kind=serve` của runner (port publish `127.0.0.1` + `--api-key` sinh mỗi lần, app giữ trong
+  bộ nhớ), không phải service compose thường trực (tránh giữ ~GB RAM trên UMA).
+- `deploy.resources` / `mem_limit` cho mọi service (UMA dùng chung với service khác).
+- amd64/arm64: không ảnh hưởng thiết kế. Mọi image pin bằng **manifest list digest** + ghi digest từng arch trong
+  IMAGES.lock. Chưa kiểm được artifact arch nào thì ghi `UNVERIFIED <arch>`.
+
+## 6. Test bắt buộc (security gate cho D-1/D-3)
+1. Runner từ chối: `run_id` sai regex; image không APPROVED; image id lệch; `job_kind` lạ; argv ngoài allowlist; request > 64 KB;
+   stop/kill/remove container không có label của ta (tạo 1 container `vlm-test-foreign` không label trong test integration).
+2. `docker inspect vlm-job-*`: `Privileged=false`, `NetworkMode=none` (trừ download), `CapDrop=[ALL]`,
+   không có Binds nào ngoài allowlist, không có `.env.local`.
+3. App container: không có `/var/run/docker.sock`, không có `/run/secrets`, `env` không có `*TOKEN*`.
+4. Job thường: `cat /proc/1/environ` không có token; `ls /workspace/.env.local` → không tồn tại.
+5. `docker history` của mọi image không chứa giá trị token (chạy với token giả `hf_TESTTOKEN…` đặt trong `.env.local`
+   lúc build).
+6. Compose: mọi port `127.0.0.1`; gitleaks chạy trên repo (đã có) + `.env.local.example` không có value thật.
+
+## 7. Câu hỏi mở cho backend / PM
+- Q1: Runner viết bằng Python stdlib (tái dùng `jobrun.docker_args`) hay Go nhỏ? Mình nghiêng Python vì tái dùng code đã review.
+- Q2: Chế độ dev hiện tại (app chạy trên host, gọi `docker` trực tiếp) giữ lại song song? Đề xuất: giữ cho dev, nhưng app
+  trên host cũng chuyển dần sang gọi runner để chỉ còn 1 đường tạo container.
+- Q3: Nơi đặt `.env.local` khi user cài đặt thật (ngoài repo, vd `~/.local/share/vlm-app/`)? Ảnh hưởng §3.2.
