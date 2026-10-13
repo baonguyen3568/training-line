@@ -103,7 +103,7 @@ def test_train_support_check_refuses_a_key_the_model_template_lacks() -> None:
     wrong = LoraParams(advanced={"optimizer.adam_w_mode": True})
     with pytest.raises(AdvancedNotForModelError) as info:
         _check_train(SupportQuery("t", spec, wrong, model, {}))
-    assert (info.value.code, info.value.params["value"], info.value.params["rule"]) == (
+    assert (info.value.code, info.value.params["key"], info.value.params["rule"]) == (
         "CFG-005",
         "optimizer.adam_w_mode",
         "not_for_model",

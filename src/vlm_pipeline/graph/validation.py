@@ -61,6 +61,10 @@ def _decode(path: str) -> str:
     return unicodedata.normalize("NFKC", path).replace("\\", "/")
 
 
+# train.advanced.ERROR_TYPE: ctx["problems"] = [{"key", "rule"}] (a literal: graph never imports train)
+ADVANCED_ERROR_TYPE = "advanced_options"
+
+
 def path_escapes_workspace(raw: str, workspace: Path | None) -> bool:
     """True if ``raw`` is absolute, climbs out with ``..``, or (with a workspace) resolves outside it via symlinks."""
     path = _decode(raw)
@@ -149,6 +153,14 @@ def _check_node(raw: Mapping[str, Any], registry: Registry, workspace: Path | No
             param = str(e["loc"][0]) if e.get("loc") else None
             if param in path_params:
                 escaping.add(param)  # LocalPath itself rejects absolute/".." paths: report it as SEC-001
+                continue
+            ctx = e.get("ctx")
+            if e["type"] == ADVANCED_ERROR_TYPE and isinstance(ctx, Mapping):  # one issue per bad engine option
+                for problem in ctx.get("problems") or ():
+                    if isinstance(problem, Mapping):
+                        key, why = str(problem.get("key", "")), str(problem.get("rule", ""))
+                        params = {"node": node_id, "param": param, "key": key, "rule": why}
+                        issues.append(Issue("CFG-005", node_id=node_id, param=param, params=params))
                 continue
             # The offending value is not echoed (it may be a secret); the rule is the pydantic error type.
             rule = {"node": node_id, "param": param, "rule": e["type"]}

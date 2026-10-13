@@ -650,7 +650,7 @@ def _check_train(q: SupportQuery) -> None:
     if q.model is not None and (wrong := keys_not_for(q.model.id, advanced)):  # P016 §3: optimizers differ per model
         raise AdvancedNotForModelError(
             "advanced option not in this model's template",
-            params={"node": q.node_id, "param": "advanced", "value": wrong[0], "rule": "not_for_model"},
+            params={"node": q.node_id, "param": "advanced", "key": wrong[0], "rule": "not_for_model"},
         )
     if getattr(q.params, "quantize_base", "none") != "none":  # QLoRA: offered disabled until smoke-tested on GB10
         raise NodeNotRunnableError(
