@@ -143,8 +143,21 @@ describe("StoragePanel", () => {
       protected_reason: null,
       action: "delete" as const,
     };
-    vi.spyOn(api, "storagePlan").mockResolvedValue({ ...real, items: [...real.items, evalItem] });
+    const cacheItem = {
+      ...evalItem,
+      item_id: "evalcache:ocrbench",
+      source: "eval_cache" as const,
+      group: "temp_result",
+      display_key: "storage.item.eval_cache_leftover",
+    };
+    vi.spyOn(api, "storagePlan").mockResolvedValue({
+      ...real,
+      items: [...real.items, evalItem, cacheItem],
+    });
     const { container } = await setup();
+    const c = row(container, "evalcache:ocrbench"); // outputs/eval-cache leftovers, a temporary result
+    expect(c.textContent).toContain("OCRBench");
+    expect(c.textContent).not.toContain("evalcache:");
     const r = row(container, "eval:ocrbench");
     expect(r).toBeTruthy();
     expect(r.querySelector("input[type=checkbox]")).not.toBeNull(); // regenerable, no typed confirmation

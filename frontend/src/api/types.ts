@@ -485,8 +485,9 @@ export interface StorageItem {
   item_id: string;
   /** G-4: the graph node this item belongs to ("<nid>-<key16>", every generation/attempt), null for CLI runs. */
   node_base?: string | null;
-  /** eval_data (G-5, plan v3): a broken or half-installed eval dataset under data/eval, regenerable. */
-  source: "node_cache" | "checkpoint" | "set_aside" | "eval_data";
+  /** eval_data (G-5, plan v3): a broken or half-installed eval dataset under data/eval; eval_cache: leftovers in
+   *  outputs/eval-cache. Both regenerable. */
+  source: "node_cache" | "checkpoint" | "set_aside" | "eval_data" | "eval_cache";
   section: StorageSection;
   auto: boolean;
   group: string;
