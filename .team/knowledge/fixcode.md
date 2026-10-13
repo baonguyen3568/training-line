@@ -184,6 +184,9 @@ EOF
     (22:02–22:06). Dù vậy 6/6 lần OOM thật đều là job start ≤ 2 s sau một job GPU của ta, và process của B không bao
     giờ hiện trong nvidia-smi dù MemFree > 30 GB (lần 21:53). Khác biệt duy nhất còn lại là đường chạy run_job/jobrun_cli
     (memguard, --user, mount, BASE_ENV, inspect/rm).
+  - Đi qua jobrun_cli (vlm-automodel 26.08-6, memguard bật, A làm matmul 180 s, khoảng nghỉ 0–1 s): 6/6 OK (22:12–22:25).
+    Tổng 36 lần chuyển job sát nhau, 0 OOM. Đặc điểm chung duy nhất còn lại của 6 lần OOM thật: job B đều là
+    Nemotron-Parse (HF remote code, AutoModel 26.08). Bước tiếp: dùng chính job Parse làm B ngay sau một job GPU.
 - Đang có: 2 VLLM::EngineCore ngoài dự án (khoảng 58 GB) và stack vss-* chạy song song (đã báo PM để hỏi user).
 - Biện pháp hiện tại:
   - log CUDA OOM → MEM-003 (d83e0db);
