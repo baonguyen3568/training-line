@@ -78,6 +78,10 @@ class RunManifest(BaseModel):
     # When the job's container started (after waiting for memory and the GPU lock): durations measured from here
     # exclude queueing (train.estimate). None for host jobs and runs recorded before this field.
     container_started_at: float | None = None
+    # P017 C6: the earlier attempt's checkpoint this run resumed from, as names only (same runs root as this run):
+    # {"run": "<run dir name>", "checkpoint": "epoch_<E>_step_<S>"}. Retention keeps that run dir while this one may
+    # still need it. None: not a resume.
+    resumed_from: dict[str, str] | None = None
     peak_mem_gb: float | None = None  # host MemAvailable drop during the job (UMA: includes CUDA)
     host_min_available_gb: float | None = None
     trainable_pct: float | None = None  # "Trainable parameters percentage" from the engine log

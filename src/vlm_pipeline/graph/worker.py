@@ -7,7 +7,9 @@ from the exception: ``<run_dir>/checkpoints/LATEST`` (see ``read_checkpoint_step
 
 from __future__ import annotations
 
+import os
 import re
+import stat
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -47,6 +49,9 @@ class NodeJob:
     resume_from_step: int | None = None  # set when resuming an interrupted node from its checkpoint
     # Called while a job waits for free memory (``jobrun.run_job(on_wait=...)``): {need_gb, avail_gb, waited_s, since}.
     on_wait: Callable[[dict[str, float]], None] | None = None
+    # Host path of the checkpoint step dir of an EARLIER attempt to resume from (P017: a retry runs in a new attempt
+    # dir; the old checkpoint is a read-only input). None: start fresh, or (fake/host workers) resume in ``run_dir``.
+    resume_from: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -140,14 +145,67 @@ def read_checkpoint_step(run_dir: Path) -> int | None:
         return None
 
 
+MAX_ATTEMPTS = 10  # PM 2026-10-13: an 11th try of the same node is a configuration problem, not bad luck
+
+
+def attempt_dirs(base: Path) -> list[Path]:
+    """``<nid>-<key16>``, then ``-a2`` .. ``-a10``: one run dir per job attempt of a node (P017)."""
+    return [base, *(base.with_name(f"{base.name}-a{n}") for n in range(2, MAX_ATTEMPTS + 1))]
+
+
+def checkpoint_dirs(run_dir: Path) -> list[tuple[int, Path]]:
+    """Complete AutoModel checkpoint step dirs of ``run_dir`` as (step, path), newest last (P017 C2).
+
+    Chosen by the HOST: real directories whose name matches ``epoch_<E>_step_<S>`` (lstat, never a symlink), without
+    ``.incomplete``; ``LATEST`` and any other pointer the job wrote are never followed. The step is the int in the name.
+    """
+    root = run_dir / "checkpoints"
+    if root.is_symlink() or not root.is_dir():
+        return []
+    found = []
+    for entry in root.iterdir():
+        match = _AUTOMODEL_CKPT.match(entry.name)
+        if match is None or entry.is_symlink() or not entry.is_dir() or os.path.lexists(entry / ".incomplete"):
+            continue
+        found.append((int(match.group(2)), entry))
+    return sorted(found)
+
+
+def checkpoint_tree_problem(ckpt: Path) -> str | None:
+    """The first entry of a checkpoint tree that is not a plain dir/file (symlink, fifo...), or None (P017 C3).
+
+    A container follows a symlink INSIDE a read-only mount: one pointing at /run/secrets or /workspace must never be
+    handed to the next job.
+    """
+    unreadable: list[str] = []
+
+    def failed(err: OSError) -> None:  # a dir that cannot be listed cannot be verified: fail closed
+        unreadable.append(str(err.filename))
+
+    try:
+        for dirpath, dirnames, filenames in os.walk(ckpt, followlinks=False, onerror=failed):
+            for name in (*dirnames, *filenames):
+                entry = Path(dirpath) / name
+                mode = entry.lstat().st_mode
+                if not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
+                    return entry.relative_to(ckpt).as_posix()
+    except OSError as exc:  # an entry vanished or cannot be read while walking: not a checkpoint to trust
+        return f"unreadable: {exc.strerror}"
+    return f"unreadable: {unreadable[0]}" if unreadable else None
+
+
 __all__ = [
     "CHECKPOINT_MARKER",
+    "MAX_ATTEMPTS",
     "NOT_RESUMABLE_MARKER",
     "ArtifactRef",
     "NodeJob",
     "NodeResult",
     "SupportQuery",
     "Worker",
+    "attempt_dirs",
+    "checkpoint_dirs",
+    "checkpoint_tree_problem",
     "read_checkpoint_step",
     "worker_identity",
     "worker_support_problem",

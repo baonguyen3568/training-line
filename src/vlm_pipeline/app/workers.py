@@ -387,10 +387,14 @@ class RealWorker:
             run_dir=self.container_path(run_dir),
             class_token_start_idx=class_token,
         )
+        if job.resume_from is not None and entry.id not in RESUME_UNSUPPORTED:
+            # P017: the earlier attempt's checkpoint (chosen and checked by the executor, C1-C3) is read through the
+            # project mount; weights + optimizer + dataloader state continue, new checkpoints go to this attempt.
+            recipe["checkpoint"]["restore_from"] = self.container_path(job.resume_from)  # build_recipe made it
         text = render_recipe(recipe)
         (run_dir / "config.yaml").write_text(text, encoding="utf-8")
         config_hash = hashlib.sha256(text.encode()).hexdigest()[:16]
-        run_id = run_dir.name[:120]  # executor run dir = <node>-<cache key prefix>: unique, stable on resume
+        run_id = run_dir.name[:120]  # executor run dir = <node>-<cache key prefix>[-a<N>]: one per job attempt
         manifest = RunManifest(
             run_id=run_id,
             name=f"{job.spec.type_id} {entry.display_name}",
@@ -398,6 +402,11 @@ class RealWorker:
             task="lora" if isinstance(params, LoraParams) else "sft",
             base_model=entry.repo,
             base_model_revision=entry.revision,
+            resumed_from=(
+                {"run": job.resume_from.parent.parent.name, "checkpoint": job.resume_from.name}
+                if job.resume_from is not None and entry.id not in RESUME_UNSUPPORTED
+                else None
+            ),
             dataset=data.hash,
             config_path=self.container_path(run_dir / "config.yaml"),
             config_hash=config_hash,

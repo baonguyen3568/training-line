@@ -313,3 +313,59 @@ def test_a_read_only_job_never_gets_a_triton_cache_in_the_read_only_project(tmp_
         triton = {**BASE_ENV, **compile_cache_env(job, tmp_path, image)}["TRITON_CACHE_DIR"]
         assert triton.startswith(("/workspace/outputs/", "/tmp/")), triton  # noqa: S108
     assert "TRITON_CACHE_DIR" not in compile_cache_env(_job(), tmp_path, "sha256:" + "ab" * 32)  # writable: unchanged
+
+
+def test_a_run_id_gets_its_job_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """P017: run_job claims the run id right before the container; the same id never gets a second job."""
+    import threading
+    from types import SimpleNamespace
+
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.jobrun import ExitInfo
+    from vlm_pipeline.common.run_claims import RunDirClaimedError, is_claimed
+    from vlm_pipeline.common.runinfo import RunManifest, RunStatus
+
+    root = _probe_root(tmp_path, "bao-security APPROVED 2026-10-13")
+    monkeypatch.setattr(jobrun, "image_digest", lambda _image: f"sha256:{'a' * 64}")
+    monkeypatch.setattr("vlm_pipeline.common.preflight.preflight", lambda *a, **k: SimpleNamespace(ok=True))
+    monkeypatch.setattr(jobrun, "_wait_for_memory", lambda *a, **k: None)
+    monkeypatch.setattr(jobrun, "git_state", lambda _root: ("c0ffee", False))
+    monkeypatch.setattr(jobrun, "read_meminfo", lambda: SimpleNamespace(mem_available_gb=40.0))
+    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=30.0, fast_fall_killed=False,
+                            thresholds=SimpleNamespace(abort_gb=8.0))  # fmt: skip
+    started: list[str] = []
+    monkeypatch.setattr(jobrun, "run_guarded", lambda launch, *a, **k: (launch(), guard))
+
+    class Launcher:
+        def run(self, job: ContainerJob, *a: object, **k: object) -> int:
+            started.append(job.name)
+            return 0
+
+        def state(self, name: str) -> ExitInfo:
+            return ExitInfo(exit_code=0, oom_killed=False)
+
+        def stop(self, *a: object) -> None: ...
+
+        def kill(self, *a: object) -> None: ...
+
+        def remove(self, *a: object) -> None: ...
+
+    def run() -> RunManifest:
+        return jobrun.run_job(
+            ContainerJob(name="n4-0123456789abcdef", image="vlm-x:1", argv=("true",)),
+            RunManifest(run_id="n4-0123456789abcdef", name="t", stage="train", task="sft"),
+            root / "outputs" / "graph" / "runs" / "n4-0123456789abcdef", project_root=root, who="t", est_peak_gb=1,
+            lock_path=tmp_path / "GPU_LOCK", launcher=Launcher(),  # type: ignore[arg-type]
+        )  # fmt: skip
+
+    assert run().status == RunStatus.COMPLETED
+    assert is_claimed(root, "n4-0123456789abcdef")
+    run_json = root / "outputs" / "graph" / "runs" / "n4-0123456789abcdef" / "run.json"
+    before = run_json.read_bytes()
+    with pytest.raises(RunDirClaimedError):  # B1: refused before anything is written
+        run()
+    monkeypatch.setattr(jobrun, "is_claimed", lambda *_a: False)  # lost race: only the atomic claim catches it
+    with pytest.raises(RunDirClaimedError):
+        run()
+    assert run_json.read_bytes() == before  # the first job's history is never rewritten
+    assert started == ["n4-0123456789abcdef"]  # no second job reached the container

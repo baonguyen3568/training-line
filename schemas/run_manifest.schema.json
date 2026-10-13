@@ -309,6 +309,21 @@
       "title": "Post Steps",
       "type": "array"
     },
+    "resumed_from": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resumed From"
+    },
     "run_id": {
       "title": "Run Id",
       "type": "string"

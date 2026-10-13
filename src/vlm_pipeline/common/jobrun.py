@@ -26,6 +26,7 @@ from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 from vlm_pipeline.common.images import check_pinned_image
 from vlm_pipeline.common.launcher import JobLauncher, LocalDockerLauncher
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
+from vlm_pipeline.common.run_claims import RunDirClaimedError, claim_run, is_claimed
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
 CONTAINER_ROOT = "/workspace"
@@ -437,6 +438,21 @@ def _wait_for_memory(
     return final
 
 
+def _checks_before_queueing(
+    job: ContainerJob, manifest: RunManifest, project_root: Path, *, gate: bool, require_approved: bool
+) -> str | None:
+    """Cheap refusals with no side effect, before the memory wait: returns the pinned image id."""
+    # P017 B1 (bao-security): a run id that already had its job is refused before ANYTHING is written to its run dir
+    # (the memory wait and run_job's failure path both write run.json): its history is never rewritten.
+    if is_claimed(project_root, manifest.run_id):
+        raise RunDirClaimedError(manifest.run_id)
+    if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
+        _check_gate(job, manifest, project_root)
+    pinned_id = image_digest(job.image)  # the id the gate approves is the id that runs (no retag window)
+    check_pinned_image(project_root, job.image, pinned_id, require_approved=require_approved)
+    return pinned_id
+
+
 def run_job(
     job: ContainerJob,
     manifest: RunManifest,
@@ -467,13 +483,7 @@ def run_job(
     from vlm_pipeline.common.preflight import preflight
 
     launcher = launcher or LocalDockerLauncher()
-
-    if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
-        _check_gate(job, manifest, project_root)
-    pinned_id = image_digest(job.image)  # the id the gate approves is the id that runs (no retag window)
-    check_pinned_image(  # before preflight/lock: cheap, no side effects
-        project_root, job.image, pinned_id, require_approved=require_approved_image
-    )
+    pinned_id = _checks_before_queueing(job, manifest, project_root, gate=gate, require_approved=require_approved_image)
     waited = _wait_for_memory(
         manifest,
         run_dir,
@@ -492,6 +502,9 @@ def run_job(
     handle = gpu_lock.acquire(path, who=who, job=manifest.name, run_id=manifest.run_id, host_pid=os.getpid())
     container = f"vlm-{job.name}"
     try:
+        # One job per run dir, ever (P017): the atomic claim is the real gate (the early check above only avoids
+        # writes); taken under the lock, before the manifest says RUNNING, so a lost race writes nothing here.
+        claim_run(project_root, manifest.run_id, by=who)
         commit, dirty = git_state(job.code_root or project_root)
         manifest = manifest.model_copy(
             update={
@@ -564,6 +577,8 @@ def run_job(
         write_manifest(run_dir, manifest)
         return manifest
     except BaseException as exc:
+        if isinstance(exc, RunDirClaimedError):
+            raise  # that run dir belongs to the job that claimed it: never write its run.json
         if not manifest.status.is_terminal:  # runner itself failed: never leave "running" behind
             # Not launched because memory was already below abort -> MEM-001 (insufficient), not an unknown error.
             code = "MEM-001" if isinstance(exc, MemoryPreemptedBeforeStartError) else "SYS-000"

@@ -83,6 +83,10 @@ error:
     title: Kết quả cũ bị hỏng, sẽ chạy lại
     what: Kết quả đã lưu của bước "{node}" (lúc {saved_at}) không đọc được nên app sẽ chạy lại bước này, mất khoảng {est_minutes} phút.
     what_no_estimate: Kết quả đã lưu của bước "{node}" (lúc {saved_at}) không đọc được nên app sẽ chạy lại bước này.
+  SYS-005:
+    title: Bước này hỏng nhiều lần, app đã ngừng thử lại
+    what: "Bước \"{node}\" đã chạy {attempt_count} lần mà lần nào cũng hỏng, nên app ngừng tự chạy lại bước này. Hãy xem lỗi của lần chạy gần nhất (đổi thiết lập của bước thì app sẽ chạy lại từ đầu); nếu chưa rõ nguyên nhân, hãy gửi báo cáo lỗi."
+    why: Hỏng liên tiếp nhiều lần như vậy thường do thiết lập hoặc do máy, không phải lỗi ngẫu nhiên.
   SYS-003:
     title: Bước này dừng đột ngột
     what: Bước này dừng giữa chừng mà không báo lý do (có thể do máy khởi động lại hoặc tiến trình bị tắt). Tiến độ đến {checkpoint_step} đã được lưu nếu có.

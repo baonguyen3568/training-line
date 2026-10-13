@@ -503,3 +503,29 @@ def test_the_lock_owner_says_who_runs(tmp_path: Path) -> None:
     script = RealWorker(_root(tmp_path / "b")).who
     assert script.startswith("script:")
     assert script.endswith(f"/{os.getpid()}")
+
+
+def test_a_retry_resumes_from_the_earlier_attempt_checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """P017: the new attempt's recipe restores from the executor-chosen checkpoint of the earlier attempt."""
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    seen: list[RunManifest] = []
+
+    def fake_run_job(job: Any, manifest: RunManifest, run_dir: Path, **kw: Any) -> RunManifest:
+        seen.append(manifest)
+        return manifest.model_copy(update={"status": RunStatus.FAILED, "exit_code": 1})
+
+    monkeypatch.setattr(workers, "run_job", fake_run_job)
+    earlier = root / "outputs" / "graph" / "runs" / "t-0123456789abcdef" / "checkpoints" / "epoch_0_step_9"
+    earlier.mkdir(parents=True)
+    spec = REGISTRY.get("train.lora_vlm")
+    assert spec is not None
+    run_dir = root / "outputs" / "graph" / "runs" / "t-0123456789abcdef-a2"
+    job = NodeJob("t", spec, spec.validate_params({"epochs": 1}), _train_inputs(w), run_dir, resume_from_step=9,
+                  resume_from=earlier)  # fmt: skip
+    with pytest.raises(ContainerExit):
+        w.run(job)
+    cfg = (run_dir / "config.yaml").read_text()
+    assert "restore_from: /workspace/outputs/graph/runs/t-0123456789abcdef/checkpoints/epoch_0_step_9" in cfg
+    assert "checkpoint_dir: /workspace/outputs/graph/runs/t-0123456789abcdef-a2/checkpoints" in cfg
+    assert seen[0].resumed_from == {"run": "t-0123456789abcdef", "checkpoint": "epoch_0_step_9"}  # C6 lease key

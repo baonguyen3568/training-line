@@ -18,21 +18,27 @@ from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
 from vlm_pipeline.artifacts.index import ArtifactIndex, CacheEntry, OutputRef
+from vlm_pipeline.common.errors import VlmPipelineError
+from vlm_pipeline.common.run_claims import node_dir_used
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, Stage, read_manifest, write_manifest
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
 from vlm_pipeline.graph.validation import Issue, validate
 from vlm_pipeline.graph.worker import (
     CHECKPOINT_MARKER,
+    MAX_ATTEMPTS,
     NOT_RESUMABLE_MARKER,
     ArtifactRef,
     NodeJob,
     Worker,
+    attempt_dirs,
+    checkpoint_dirs,
+    checkpoint_tree_problem,
     read_checkpoint_step,
     worker_identity,
     worker_support_problem,
@@ -78,6 +84,19 @@ def check_output_paths(outputs: Mapping[str, ArtifactRef], run_dir: Path) -> Non
         resolved = path.resolve()
         if resolved != root and root not in resolved.parents:
             raise NonHostOutputError(f"output {port!r}: outside the node run dir")
+
+
+class AttemptsExhaustedError(VlmPipelineError):
+    """Every attempt dir of a node is used (P017, PM: max 10): a setup problem, not bad luck."""
+
+    code: ClassVar[str] = "SYS-005"
+
+
+def _manifest_digest(run_dir: Path) -> str | None:
+    try:
+        return read_manifest(run_dir).container_digest
+    except (OSError, ValueError):
+        return None
 
 
 def _write_node_manifest(
@@ -298,6 +317,46 @@ class Executor:
         with key_lock:
             self._compute(run, node, key=key, inputs=inputs, upstream=upstream, keys=keys, cancel=cancel)
 
+    def _used(self, run_dir: Path) -> bool:
+        """A container job ran here or under it (run_claims), or a dir from before claims existed (it has job logs)."""
+        if self.workspace is None:  # tests / demo without a project: nothing is ever claimed
+            return False
+        return node_dir_used(self.workspace, run_dir.name) or os.path.lexists(run_dir / "logs")
+
+    def _attempt(self, node: _Node, base: Path) -> tuple[Path, Path | None, int | None]:
+        """(run dir, checkpoint to resume from, its step) for this try of ``node`` (P017).
+
+        A dir a container job already wrote is never handed out read-write again: the first unused attempt dir is
+        taken. A resume reads the newest complete checkpoint of the newest earlier attempt that saved one (an attempt
+        that failed before its first save is skipped), chosen by the host (C2:
+        dir names, never LATEST), only when that attempt ran the same image (C1: the image is part of the cache key,
+        re-checked against the host-written run.json) and its tree holds plain files only (C3).
+        """
+        attempts = attempt_dirs(base)
+        free = next((d for d in attempts if not self._used(d)), None)
+        if free is None:
+            raise AttemptsExhaustedError(
+                f"node {node.node_id}: {MAX_ATTEMPTS} attempts used",
+                params={"node": node.node_id, "attempt_count": MAX_ATTEMPTS},
+            )
+        identity = worker_identity(self.worker, node.spec)
+        for prev in reversed(attempts[: attempts.index(free)]):  # newest earlier attempt with a usable checkpoint
+            if (prev / NOT_RESUMABLE_MARKER).exists():
+                return free, None, None  # that attempt said its checkpoints cannot be resumed: start over
+            ckpts = checkpoint_dirs(prev)
+            if not ckpts:
+                continue  # e.g. it failed before its first save: fall back to the attempt before it
+            step, ckpt = ckpts[-1]
+            problem = checkpoint_tree_problem(ckpt)
+            if problem is not None:
+                logger.warning("not resuming %s from %s: %s is not a plain file or dir", node.node_id, ckpt, problem)
+                return free, None, None
+            if "@" in identity and _manifest_digest(prev) != identity.rsplit("@", 1)[1]:  # missing = unverifiable
+                logger.warning("not resuming %s: the earlier attempt's image cannot be confirmed", node.node_id)
+                return free, None, None
+            return free, ckpt, step
+        return free, None, None
+
     def _compute(
         self,
         run: GraphRun,
@@ -313,7 +372,16 @@ class Executor:
         if node.spec.cacheable and self._try_cache(run, nid, key):
             return
 
-        run_dir = self.state_dir / "runs" / f"{nid}-{key.split('-', 1)[1][:16]}"
+        try:
+            run_dir, resume_from, resume_step = self._attempt(
+                node, self.state_dir / "runs" / f"{nid}-{key.split('-', 1)[1][:16]}"
+            )
+        except AttemptsExhaustedError as exc:
+            error = classify(exc, cancelled=False, checkpoint_step=None).error
+            assert error is not None  # noqa: S101 - a catalog error, never "cancelled"
+            run.errors[nid] = error
+            self._set(run, nid, "failed", error=_error_dict(error))
+            return
         run_dir.mkdir(parents=True, exist_ok=True)
         if (run_dir / NOT_RESUMABLE_MARKER).exists() and os.path.lexists(run_dir / CHECKPOINT_MARKER):
             # The worker will start over: tell the user instead of silently redoing the steps (CACHE-001 text:
@@ -327,7 +395,8 @@ class Executor:
             extra: dict[str, Any] = {k: info[k] for k in ("need_gb", "avail_gb", "since") if k in info}
             self._emit(run.graph_run_id, {"type": "node_state", "node_id": nid, "state": "waiting_memory", **extra})
 
-        job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, read_checkpoint_step(run_dir), waiting)
+        step = resume_step if resume_from is not None else read_checkpoint_step(run_dir)
+        job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, step, waiting, resume_from=resume_from)
         self._set(run, nid, "running", cache_key=key, resume_from_step=job.resume_from_step)
         started = time.time()
         try:
@@ -337,7 +406,9 @@ class Executor:
                 raise RuntimeError(f"worker returned no output for ports {sorted(missing)}")
             check_output_paths(result.outputs, run_dir)
         except Exception as exc:  # noqa: BLE001 - every worker failure becomes a catalog error, never a crash
-            outcome = classify(exc, cancelled=cancel.is_set(), checkpoint_step=read_checkpoint_step(run_dir))
+            # A try that failed before saving keeps the earlier attempt's checkpoint as its resume point.
+            saved = read_checkpoint_step(run_dir) if resume_from is None else (read_checkpoint_step(run_dir) or step)
+            outcome = classify(exc, cancelled=cancel.is_set(), checkpoint_step=saved)
             if outcome.error is not None:
                 run.errors[nid] = outcome.error
             logger.info("node %s %s: %s", nid, outcome.status, outcome.error.code if outcome.error else "cancelled")

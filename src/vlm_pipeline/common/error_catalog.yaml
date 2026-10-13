@@ -629,6 +629,18 @@ SYS-003:
     - {id: rerun_step, kind: resume, confirm: true}
     - {id: send_report, kind: navigate, target: bug_report, confirm: false}
 
+SYS-005:
+  slug: ATTEMPTS_EXHAUSTED
+  severity: error
+  prevent_in_preflight: false
+  # P017 (PM 2026-10-13): each try of a node gets its own run dir, at most 10; an 11th failing try is a setup or system
+  # problem, not bad luck. A "reset this step" action comes with the Storage panel feature (not offered before it exists).
+  params: [node, attempt_count]
+  match:
+    - {kind: executor, value: attempts_exhausted}
+  actions:
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
 SYS-000:
   slug: UNKNOWN_ERROR
   severity: error

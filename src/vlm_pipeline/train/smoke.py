@@ -22,6 +22,7 @@ from pathlib import Path
 from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
 from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job, tightened_thresholds
 from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.run_claims import run_tag
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest, write_manifest
 
 
@@ -162,7 +163,7 @@ def _restored_tags(root: Path, restore_from: Path | None) -> list[str]:
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m vlm_pipeline.train.smoke")
     p.add_argument("--config", type=Path, required=True)
-    p.add_argument("--tag", required=True, help="short run name, e.g. lora-parse-v1.1")
+    p.add_argument("--tag", required=True, type=run_tag, help="short run name, e.g. lora-parse-v1.1")
     p.add_argument("--est-peak-gb", type=float, required=True)
     p.add_argument("--ckpt-gb", type=float, default=1.0)
     p.add_argument("--prepared", type=Path, help="prepared model dir (contains model/) for PREPARED_MODEL_DIR")

@@ -24,8 +24,14 @@ from pathlib import Path
 from vlm_pipeline.common.host_paths import UnsafeMountSourceError, check_mount_source
 
 CLAIMS_REL = Path("outputs") / "system" / "runner_claims"
-# A CLI/train run (``20261013-1015-p3b-full-parse-c4f6``) or a graph node run dir (``<node id>-<16 hex>``, executor).
-RUN_ID = re.compile(r"^(?:[0-9]{8}-[0-9]{4}-[a-z0-9-]{1,48}|[A-Za-z0-9][A-Za-z0-9_-]{0,63}-[0-9a-f]{16})$")
+# A CLI/train run (``20261013-1015-p3b-full-parse-c4f6``) or a graph node run dir (``<node id>-<16 hex>``, executor),
+# optionally a later attempt of it (``-a2`` .. ``-a10``, P017) and a job of that node (``-model``/``-base``: eval,
+# bench).
+RUN_ID = re.compile(
+    r"^(?:[0-9]{8}-[0-9]{4}-[a-z0-9._-]{1,64}"
+    r"|[A-Za-z0-9][A-Za-z0-9_-]{0,63}-[0-9a-f]{16}(?:-a[0-9]{1,2})?(?:-[a-z0-9_]{1,32})?)$"
+)
+TAG = re.compile(r"^[a-z0-9][a-z0-9._-]{0,40}$")  # CLI --tag: keeps the CLI run id inside RUN_ID
 
 
 class RunDirClaimedError(RuntimeError):
@@ -38,6 +44,13 @@ class ClaimStoreError(RuntimeError):
     """The claims folder is unsafe (symlink, foreign owner...): no job can be claimed until it is fixed."""
 
     reason = "claim_store_unsafe"
+
+
+def run_tag(value: str) -> str:
+    """Argparse type for CLI ``--tag``: lower-case letters, digits, '.', '_', '-' (the run id stays a claim name)."""
+    if not TAG.fullmatch(value):
+        raise ValueError(f"tag must match {TAG.pattern}")
+    return value
 
 
 def claim_run(data_root: Path, run_id: str, *, by: str) -> Path:
@@ -71,4 +84,27 @@ def is_claimed(data_root: Path, run_id: str) -> bool:
     return RUN_ID.fullmatch(run_id) is not None and os.path.lexists(data_root / CLAIMS_REL / run_id)
 
 
-__all__ = ["CLAIMS_REL", "RUN_ID", "ClaimStoreError", "RunDirClaimedError", "claim_run", "is_claimed"]
+def node_dir_used(data_root: Path, name: str) -> bool:
+    """A job ran for this node run dir: its own claim, or one of its jobs' (``<name>-model``: eval/bench sub-jobs).
+
+    A later attempt (``<name>-a2``) is another dir, not a job of this one.
+    """
+    if is_claimed(data_root, name):
+        return True
+    claims = data_root / CLAIMS_REL
+    if claims.is_symlink() or not claims.is_dir():
+        return False
+    job = re.compile(rf"^{re.escape(name)}-(?!a[0-9]{{1,2}}(?:-|$))[a-z0-9_]{{1,32}}$")
+    return any(job.fullmatch(entry.name) for entry in claims.iterdir())
+
+
+__all__ = [
+    "CLAIMS_REL",
+    "RUN_ID",
+    "TAG",
+    "ClaimStoreError",
+    "RunDirClaimedError",
+    "claim_run",
+    "is_claimed",
+    "node_dir_used",
+]

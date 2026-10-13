@@ -28,6 +28,7 @@ from vlm_pipeline.common.jobrun import (
     validate_rw_dirs,
 )
 from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.run_claims import run_tag
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def build_job(a: argparse.Namespace, root: Path, run_id: str, run_dir: Path, arg
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m vlm_pipeline.common.jobrun_cli")
     p.add_argument("--image", required=True)
-    p.add_argument("--tag", required=True)
+    p.add_argument("--tag", required=True, type=run_tag)
     p.add_argument("--stage", default="eval", choices=["data", "train", "quantize", "eval", "bench", "serve", "export"])
     p.add_argument("--est-peak-gb", type=float, required=True)
     p.add_argument("--abort-gb", type=float)

@@ -42,6 +42,9 @@ export type RunManifest = {
   post_steps?: {
     [extra: string]: unknown;
   }[];
+  resumed_from?: {
+    [extra: string]: string | undefined;
+  } | null;
   run_id: string;
   schema_version?: number;
   seed?: number | null;
