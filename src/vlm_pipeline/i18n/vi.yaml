@@ -47,6 +47,24 @@ storage:
   section:
     auto: App sẽ tự dọn khi cần
     manual: Cần bạn chọn
+    kept: Được giữ lại
+  panel:
+    title: Dung lượng
+    refresh: Kiểm tra lại
+    empty: Không có gì cần dọn.
+    delete_selected: Xoá {item_count} mục đã chọn
+    last_used: Dùng lần cuối {time}
+    freed: Đã giải phóng {gb} GB.
+    skipped_title: "Không xoá được {item_count} mục:"
+    cleanup_in_progress: Đang có một lượt dọn dẹp khác chạy. Thử lại sau ít phút.
+    admin_command: Lệnh cho quản trị viên
+    copy: Sao chép lệnh
+    copied: Đã chép
+  skip_reason:
+    CONFIRM_REQUIRED: Chưa gõ đúng tên để xác nhận.
+    NOT_IN_PLAN: Danh sách đã thay đổi, mục này không còn.
+    NOT_APPLICABLE: Mục này hiện không xoá được.
+    NOT_EVICTABLE: Mục này đang được dùng hoặc đã bị xoá.
 error:
   GPU-001:
     title: Phần mềm không tương thích với GPU của máy
@@ -348,6 +366,7 @@ app:
   retry: Thử lại
   nav_workflows: Workflow
   nav_runs: Lịch sử chạy
+  nav_storage: Dung lượng
   redo: Làm lại
 header:
   gpu_free: GPU · Rảnh

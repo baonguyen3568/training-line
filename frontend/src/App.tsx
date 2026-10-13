@@ -13,8 +13,11 @@ const RunMonitor = lazy(() =>
   import("./components/RunMonitor").then((m) => ({ default: m.RunMonitor })),
 );
 const RunsList = lazy(() => import("./components/RunsList").then((m) => ({ default: m.RunsList })));
+const StoragePanel = lazy(() =>
+  import("./components/StoragePanel").then((m) => ({ default: m.StoragePanel })),
+);
 
-type View = { kind: "home" } | { kind: "runs" } | { kind: "run"; id: string };
+type View = { kind: "home" } | { kind: "runs" } | { kind: "storage" } | { kind: "run"; id: string };
 
 export function App() {
   const workflow = useWorkflow((s) => s.workflow);
@@ -59,7 +62,10 @@ export function App() {
 
   return (
     <div className="app">
-      <Header onNavigate={navigate} active={view.kind === "home" ? "home" : "runs"} />
+      <Header
+        onNavigate={navigate}
+        active={view.kind === "home" ? "home" : view.kind === "storage" ? "storage" : "runs"}
+      />
       {(import.meta.env.VITE_MOCK_API === "1" || worker === "fake") && (
         // Mock API: make it impossible to mistake the FakeWorker for real training (PM request).
         <p className="demo-banner" role="note">
@@ -103,6 +109,7 @@ export function App() {
         )}
         {view.kind === "runs" && <RunsList onOpen={(id) => setView({ kind: "run", id })} />}
         {view.kind === "run" && <RunMonitor runId={view.id} />}
+        {view.kind === "storage" && <StoragePanel />}
       </Suspense>
       {/* First screen is the template gallery, never a blank canvas (P010 §8). */}
       {view.kind === "home" &&

@@ -47,6 +47,24 @@ storage:
   section:
     auto: The app cleans these up when needed
     manual: You decide
+    kept: Kept
+  panel:
+    title: Storage
+    refresh: Check again
+    empty: Nothing to clean up.
+    delete_selected: Delete {item_count} selected
+    last_used: Last used {time}
+    freed: Freed {gb} GB.
+    skipped_title: "Could not delete {item_count}:"
+    cleanup_in_progress: A cleanup is already running. Try again in a few minutes.
+    admin_command: Command for an admin
+    copy: Copy command
+    copied: Copied
+  skip_reason:
+    CONFIRM_REQUIRED: The name was not typed correctly.
+    NOT_IN_PLAN: The list changed and this item is gone.
+    NOT_APPLICABLE: This item cannot be deleted right now.
+    NOT_EVICTABLE: This item is in use or already deleted.
 error:
   GPU-001:
     title: Software doesn't match this GPU
@@ -348,6 +366,7 @@ app:
   retry: Try again
   nav_workflows: Workflows
   nav_runs: Run history
+  nav_storage: Storage
   redo: Redo
 header:
   gpu_free: GPU · Free

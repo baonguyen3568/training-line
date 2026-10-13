@@ -273,3 +273,63 @@ export interface OtherEvent {
   error?: EventError;
 }
 export type RunEvent = NodeStatusEvent | RunStatusEvent | OtherEvent;
+
+/**
+ * Storage panel (bao-cleanup app/storage.py, P013 G-1, plan schema v3). Hand-written: no JSON schema is exported
+ * for it yet. Text for the user comes as i18n keys + params, except `error` which the server renders.
+ */
+export type StorageSection = "auto" | "manual" | "kept";
+export interface StorageItem {
+  item_id: string;
+  source: "node_cache" | "checkpoint" | "set_aside";
+  section: StorageSection;
+  auto: boolean;
+  group: string;
+  display_name: string | null;
+  display_key: string;
+  display_params: Record<string, string | number>;
+  size_gb: number | null;
+  last_used?: number | null;
+  run_id: string;
+  node_type?: string;
+  action: "delete" | "keep";
+  protected_reason: string | null;
+  lock_reason?: string | null;
+  lock_params?: Record<string, string | number>;
+  regenerable: boolean;
+  consequence_code: string | null;
+  consequence_params: Record<string, string | number>;
+  confirm_required: boolean;
+  confirm_text: string | null;
+}
+export interface RenderedError {
+  code: string;
+  params?: Record<string, unknown>;
+  title: string;
+  what: string;
+  why?: string | null;
+}
+export interface StoragePlan {
+  schema_version: number;
+  plan_id: string;
+  expires_at: number;
+  approval_policy: "none" | "threshold";
+  threshold_gb: number | null;
+  cap_gb: number;
+  cache_gb: number;
+  auto_reclaim_gb: number;
+  shortfall_gb: number;
+  items: StorageItem[];
+  error: RenderedError | null;
+}
+export interface StorageApplyRequest {
+  plan_id: string;
+  item_ids: string[];
+  confirm?: Record<string, string>;
+}
+export interface StorageApplyResult {
+  evicted: unknown[];
+  pruned: unknown[];
+  skipped: { item_id: string; reason: string }[];
+  freed_gb: number;
+}

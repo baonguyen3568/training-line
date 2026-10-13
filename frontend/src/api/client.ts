@@ -8,6 +8,9 @@ import type {
   NodeTypesResponse,
   RunEvent,
   RunInfo,
+  StorageApplyRequest,
+  StorageApplyResult,
+  StoragePlan,
   SystemStatus,
   Template,
   TemplateMeta,
@@ -92,6 +95,9 @@ export interface Api {
   cancelRun(id: string): Promise<void>;
   /** Subscribe to run events; returns an unsubscribe function. */
   watchRun(id: string, onEvent: (ev: RunEvent) => void): () => void;
+  storagePlan(locale: string): Promise<StoragePlan>;
+  /** Rejects with ApiError: 409 {code: PLAN_EXPIRED|CLEANUP_IN_PROGRESS}, 403 {error: DISK-002 + admin_command}. */
+  storageApply(body: StorageApplyRequest, locale: string): Promise<StorageApplyResult>;
 }
 
 export const httpApi: Api = {
@@ -114,6 +120,9 @@ export const httpApi: Api = {
     return { run_id: res.graph_run_id };
   },
   cancelRun: (id) => request("POST", `/api/runs/${encodeURIComponent(id)}/cancel`, {}),
+  storagePlan: (locale) => request("GET", `/api/storage/plan?locale=${encodeURIComponent(locale)}`),
+  storageApply: (body, locale) =>
+    request("POST", `/api/storage/apply?locale=${encodeURIComponent(locale)}`, body),
   watchRun: (id, onEvent) => {
     // Browsers cannot set headers on WebSocket: auth = Origin + session cookie at handshake, then the
     // first message carries the CSRF token (P003 D13). Server closes with 4401 if missing/invalid.

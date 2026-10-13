@@ -16,7 +16,7 @@ function shortTime(iso: string | undefined): string {
     : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export type Nav = "home" | "runs";
+export type Nav = "home" | "runs" | "storage";
 
 export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; active: Nav }) {
   const [sys, setSys] = useState<SystemStatus | null>(null);
@@ -74,6 +74,13 @@ export function Header({ onNavigate, active }: { onNavigate: (to: Nav) => void; 
           onClick={() => onNavigate("runs")}
         >
           {t("app.nav_runs")}
+        </button>
+        <button
+          type="button"
+          aria-current={active === "storage" ? "page" : undefined}
+          onClick={() => onNavigate("storage")}
+        >
+          {t("app.nav_storage")}
         </button>
       </nav>
       <div className="segmented mode-toggle">

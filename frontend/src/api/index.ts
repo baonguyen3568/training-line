@@ -10,6 +10,8 @@ function lazyMock(): Api {
     validate: (wf, locale) => load().then((m) => m.validate(wf, locale)),
     system: () => load().then((m) => m.system()),
     runs: () => load().then((m) => m.runs()),
+    storagePlan: (locale) => load().then((m) => m.storagePlan(locale)),
+    storageApply: (body, locale) => load().then((m) => m.storageApply(body, locale)),
     run: (id) => load().then((m) => m.run(id)),
     runMetrics: (id, q) => load().then((m) => m.runMetrics(id, q)),
     startRun: (wf) => load().then((m) => m.startRun(wf)),
