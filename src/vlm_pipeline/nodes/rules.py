@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from vlm_pipeline.common.catalog import load_catalog
+from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR
 from vlm_pipeline.nodes.source import MODEL_HF_PICK
 from vlm_pipeline.nodes.spec import GraphView, Issue, is_compatible
 from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM
@@ -44,4 +45,18 @@ def train_node_matches_model(view: GraphView) -> Iterator[Issue]:
         yield Issue("CFG-010", node_id=node_id, port="base_model", params=params)
 
 
-RULES = (train_node_matches_model,)
+def export_needs_portable_model(view: GraphView) -> Iterator[Issue]:
+    """EXP-002: Export of a model that runs its own code (catalog remote_code) is not portable yet (ADR-012 B3).
+
+    The export worker re-checks the folder's real content (``export.portable``); this rule reports it on the canvas.
+    """
+    catalog = load_catalog()
+    for node_id, spec in view.specs.items():
+        if spec.type_id != EXPORT_HF_DIR.type_id:
+            continue
+        entry = catalog.get(origin_model_id(view, node_id, "model") or "")
+        if entry is not None and entry.remote_code != "none":
+            yield Issue("EXP-002", node_id=node_id, port="model", params={"node": node_id, "model": entry.display_name})
+
+
+RULES = (train_node_matches_model, export_needs_portable_model)

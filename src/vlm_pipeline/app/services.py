@@ -144,7 +144,13 @@ class DefaultServices:
         validate = getattr(graph, "validate", None)
         if validate is None:
             raise NotAvailableError("vlm_pipeline.graph.validate is not implemented yet")
-        return [_issue_to_dict(i) for i in validate(dict(workflow), self.registry, workspace=self.root)]
+        from vlm_pipeline.graph.worker import worker_supports
+
+        worker = self.executor.worker
+        can_run = functools.partial(worker_supports, worker)
+        return [
+            _issue_to_dict(i) for i in validate(dict(workflow), self.registry, workspace=self.root, can_run=can_run)
+        ]
 
     def run_graph(self, workflow: Mapping[str, Any], graph_run_id: str, on_event: EventSink) -> None:
         self.executor.run(dict(workflow), graph_run_id=graph_run_id, on_event=on_event)

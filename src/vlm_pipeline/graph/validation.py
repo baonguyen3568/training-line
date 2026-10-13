@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import re
 import unicodedata
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
@@ -183,15 +183,24 @@ def _find_cycle(nodes: Iterable[str], edges: Iterable[tuple[str, str]]) -> list[
     return left or None
 
 
-def validate(workflow: object, registry: Registry, workspace: Path | None = None) -> list[Issue]:
-    """All problems of ``workflow`` that block a run. Empty list = runnable (as far as static checks go)."""
+CanRun = Callable[[NodeSpec], bool]  # the worker that will run the graph: can it run this node type? (CFG-011)
+
+
+def validate(
+    workflow: object, registry: Registry, workspace: Path | None = None, *, can_run: CanRun | None = None
+) -> list[Issue]:
+    """All problems of ``workflow`` that block a run. Empty list = runnable (as far as static checks go).
+
+    ``can_run`` (from ``graph.worker.worker_supports``): nodes the actual worker cannot run yet are reported before
+    the run (CFG-011) instead of failing halfway through it.
+    """
     try:
-        return _validate(workflow, registry, workspace)
+        return _validate(workflow, registry, workspace, can_run)
     except Exception:  # noqa: BLE001 - contract: never raise on bad input
         return [Issue("CFG-007", params={"field": "workflow"})]
 
 
-def _validate(workflow: object, registry: Registry, workspace: Path | None) -> list[Issue]:
+def _validate(workflow: object, registry: Registry, workspace: Path | None, can_run: CanRun | None) -> list[Issue]:
     if not isinstance(workflow, Mapping):
         return [Issue("CFG-007", params={"field": "workflow"})]
     issues = [Issue("CFG-007", params={"field": str(k)}) for k in sorted(map(str, set(workflow) - _TOP_KEYS))]
@@ -211,6 +220,12 @@ def _validate(workflow: object, registry: Registry, workspace: Path | None) -> l
         for name, port in spec.inputs.items():
             if not port.optional and (node_id, name) not in connected:
                 issues.append(Issue("CFG-003", node_id=node_id, port=name, params={"node": node_id, "port": name}))
+    if can_run is not None:
+        issues += [
+            Issue("CFG-011", node_id=node_id, params={"node": node_id, "node_type": spec.type_id})
+            for node_id, spec in specs.items()
+            if not can_run(spec)
+        ]
     if registry.rules:
         view = GraphView(specs=specs, params=_valid_params(specs, raw_params), sources=sources)
         for rule in registry.rules:

@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
@@ -52,7 +53,13 @@ class TrainModeUnsupportedError(VlmPipelineError):
 
 
 class NodeNotRunnableError(VlmPipelineError):
-    """This worker has no implementation for the node type yet."""
+    """This worker has no implementation for the node type yet (validate reports it first via ``supports``)."""
+
+    code: ClassVar[str] = "CFG-011"
+
+
+class UnknownModelError(VlmPipelineError):
+    """A model reference that is not a catalog model (validated params make this an internal error)."""
 
     code: ClassVar[str] = "SYS-000"
 
@@ -105,25 +112,35 @@ class RealWorker:
         for entry in self.catalog.models:
             if ref.hash == f"{entry.repo}@{entry.revision}":
                 return entry
-        raise NodeNotRunnableError("base model is not a catalog model", params={"hash": ref.hash})
+        raise UnknownModelError("base model is not a catalog model", params={"hash": ref.hash})
 
     # ------------------------------------------------------------------------------------------ nodes
-    def run(self, job: NodeJob) -> NodeResult:
-        handler = {
+    @functools.cached_property
+    def _handlers(self) -> dict[str, Callable[[NodeJob], NodeResult]]:
+        """Node types this worker really runs; every other type is refused at validate time (CFG-011)."""
+        return {
             "model.hf_pick": self._model_pick,
             "data.hf_load": self._hub_dataset,
             "train.lora_vlm": self._train,
             "train.sft_vlm": self._train,
-        }.get(job.spec.type_id)
+        }
+
+    def supports(self, spec: NodeSpec) -> bool:
+        return spec.type_id in self._handlers
+
+    def run(self, job: NodeJob) -> NodeResult:
+        handler = self._handlers.get(job.spec.type_id)
         if handler is None:
-            raise NodeNotRunnableError(f"no worker for {job.spec.type_id}", params={"node_type": job.spec.type_id})
+            raise NodeNotRunnableError(
+                f"no worker for {job.spec.type_id}", params={"node": job.node_id, "node_type": job.spec.type_id}
+            )
         return handler(job)
 
     def _model_pick(self, job: NodeJob) -> NodeResult:
         model_id = str(getattr(job.params, "model"))  # noqa: B009 - dynamic params model (catalog Literal)
         entry = self.catalog.get(model_id)
         if entry is None:
-            raise NodeNotRunnableError("unknown catalog model", params={"model": model_id})
+            raise UnknownModelError("unknown catalog model", params={"model": model_id})
         if entry.remote_code == "pinned_prepared":
             prepared = PREPARED_DIRS.get(entry.id)
             path = self.root / ".cache" / "prepared" / (prepared or "") / "model"
@@ -163,7 +180,9 @@ class RealWorker:
     def _train(self, job: NodeJob) -> NodeResult:
         params = job.params
         if not isinstance(params, LoraParams | FullFinetuneParams):
-            raise NodeNotRunnableError("unexpected params model", params={"node_type": job.spec.type_id})
+            raise NodeNotRunnableError(
+                "unexpected params model", params={"node": job.node_id, "node_type": job.spec.type_id}
+            )
         base, data = job.inputs["base_model"], job.inputs["train_data"]
         entry = self._entry_for(base)
         if not entry.supports_train_node(job.spec.type_id):  # graph validate blocks it first; this is the backstop
@@ -293,4 +312,11 @@ def _tail(path: Path, n: int = 30) -> str:
         return ""
 
 
-__all__ = ["DEFAULT_TRAIN_IMAGE", "NodeNotRunnableError", "NotCachedError", "RealWorker", "TrainModeUnsupportedError"]
+__all__ = [
+    "DEFAULT_TRAIN_IMAGE",
+    "NodeNotRunnableError",
+    "NotCachedError",
+    "RealWorker",
+    "TrainModeUnsupportedError",
+    "UnknownModelError",
+]

@@ -8,6 +8,7 @@ run dir is derived from its cache key.
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import threading
@@ -34,6 +35,7 @@ from vlm_pipeline.graph.worker import (
     Worker,
     read_checkpoint_step,
     worker_identity,
+    worker_supports,
 )
 from vlm_pipeline.nodes.spec import NodeSpec, Registry
 
@@ -222,7 +224,10 @@ class Executor:
                 self._sinks.pop(gid, None)
 
     def _run(self, workflow: Mapping[str, Any], gid: str) -> GraphRun:
-        issues = [i for i in validate(workflow, self.registry, self.workspace) if i.severity == "error"]
+        can_run = functools.partial(worker_supports, self.worker)
+        issues = [
+            i for i in validate(workflow, self.registry, self.workspace, can_run=can_run) if i.severity == "error"
+        ]
         if issues:
             run = GraphRun(gid, {}, issues=issues)
             self._emit(gid, {"type": "run_status", "status": "invalid", "issues": [_issue_dict(i) for i in issues]})

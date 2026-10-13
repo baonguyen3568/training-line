@@ -267,19 +267,19 @@ def _usage(base: CatalogEntry | None) -> list[str]:
     """Load snippet: ``trust_remote_code`` only for models that need it, with a warning (never a default to copy)."""
     if base is None:
         return ["Base model unknown: see the base model's own documentation."]
-    if base.remote_code == "none":
+    if base.auto_class != "AutoModel":  # catalog: AutoModel <=> pinned remote code
         return [
             "```python",
-            "from transformers import AutoModelForImageTextToText, AutoProcessor",
-            'model = AutoModelForImageTextToText.from_pretrained(".")',
+            f"from transformers import {base.auto_class}, AutoProcessor",
+            f'model = {base.auto_class}.from_pretrained(".")',
             'processor = AutoProcessor.from_pretrained(".")',
             "```",
         ]
     return [
         "This model runs Python code shipped in this folder. Only load this folder from a source you trust.",
         "```python",
-        "from transformers import AutoModel, AutoProcessor",
-        'model = AutoModel.from_pretrained(".", trust_remote_code=True)',
+        f"from transformers import {base.auto_class}, AutoProcessor",
+        f'model = {base.auto_class}.from_pretrained(".", trust_remote_code=True)',
         'processor = AutoProcessor.from_pretrained(".", trust_remote_code=True)',
         "```",
     ]

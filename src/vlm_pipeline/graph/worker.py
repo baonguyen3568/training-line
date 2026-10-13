@@ -60,6 +60,15 @@ class Worker(Protocol):
     def run(self, job: NodeJob) -> NodeResult: ...
 
 
+def worker_supports(worker: object, spec: NodeSpec) -> bool:
+    """Whether ``worker`` can run ``spec`` (optional ``supports(spec) -> bool``; workers without it run every node).
+
+    Validation uses it so a node the real worker cannot run yet is refused before the run (CFG-011).
+    """
+    supports = getattr(worker, "supports", None)
+    return bool(supports(spec)) if callable(supports) else True
+
+
 def worker_identity(worker: object, spec: NodeSpec) -> str:
     """What runs ``spec`` on ``worker``; part of the cache key.
 
@@ -105,4 +114,5 @@ __all__ = [
     "Worker",
     "read_checkpoint_step",
     "worker_identity",
+    "worker_supports",
 ]
