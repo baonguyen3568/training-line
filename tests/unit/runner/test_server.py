@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from vlm_pipeline.common import gpu_lock
+from vlm_pipeline.common.job_kinds import NGC_ENTRYPOINT
 from vlm_pipeline.runner.server import Runner, RunnerConfig, RunnerServer
 
 RUN = "n4-0123456789abcdef"
@@ -20,15 +21,18 @@ IMAGE_ID = "sha256:" + "a" * 64
 
 
 class FakeDocker:
-    def __init__(self, labels: dict[str, str] | None = None, image_id: str = IMAGE_ID) -> None:
+    def __init__(
+        self, labels: dict[str, str] | None = None, image_id: str = IMAGE_ID, entrypoint: list[str] | None = None
+    ) -> None:
         self.calls: list[list[str]] = []
         self.labels = labels if labels is not None else {"project": "vlm-training", "vlm.job": RUN}
         self.image_id = image_id
+        self.entrypoint = entrypoint if entrypoint is not None else [NGC_ENTRYPOINT]  # an NGC image by default
 
     def __call__(self, argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
         self.calls.append(list(argv))
         if argv[:2] == ["image", "inspect"]:
-            return subprocess.CompletedProcess(argv, 0, self.image_id + "\n", "")
+            return subprocess.CompletedProcess(argv, 0, f"{self.image_id}|{json.dumps(self.entrypoint)}\n", "")
         if argv[0] == "inspect":
             state = {"Running": False, "ExitCode": 0, "OOMKilled": False}
             return subprocess.CompletedProcess(argv, 0, f"{json.dumps(self.labels)}|{json.dumps(state)}", "")
@@ -274,3 +278,60 @@ def test_image_id_is_a_read_only_query(tmp_path: Path) -> None:
     assert started == []
     bad = runner.handle(json.dumps({"command": "image_id", "image_tag": "x:1 --privileged"}).encode())
     assert bad == {"ok": False, "error": "bad_image_tag"}
+
+
+def _after(argv: list[str], flag: str) -> str:
+    return argv[argv.index(flag) + 1]
+
+
+def test_an_ngc_job_runs_through_nvidias_wrapper_with_its_full_argv(tmp_path: Path) -> None:
+    """security (ADR-015): the entrypoint comes from the job kind, never from the image or the request."""
+    runner, started = _runner(_project(tmp_path), FakeDocker())
+    assert runner.handle(_submit())["ok"] is True
+    argv = started[0]
+    assert _after(argv, "--entrypoint") == NGC_ENTRYPOINT
+    assert argv[argv.index(IMAGE_ID) + 1 :] == ["automodel", f"/workspace/outputs/graph/runs/{RUN}/config.yaml"]
+
+
+def test_the_vllm_batch_runs_python3_not_the_images_vllm_serve(tmp_path: Path) -> None:
+    runner, started = _runner(_project(tmp_path), FakeDocker(entrypoint=["vllm", "serve"]))
+    batch = ["python3", "-m", "vlm_pipeline.serve.vllm_batch", f"/workspace/outputs/graph/runs/{RUN}/batch.json"]
+    assert runner.handle(_submit(job_kind="eval", argv=batch))["ok"] is True
+    argv = started[0]
+    assert _after(argv, "--entrypoint") == "python3"
+    assert argv[argv.index(IMAGE_ID) + 1 :] == batch[1:]
+
+
+def test_an_ngc_argv_on_an_image_without_the_wrapper_is_refused(tmp_path: Path) -> None:
+    runner, started = _runner(_project(tmp_path), FakeDocker(entrypoint=["vllm", "serve"]))
+    assert runner.handle(_submit()) == {"ok": False, "error": "entrypoint_mismatch"}
+    assert started == []
+    assert runner.handle(_submit())["error"] == "entrypoint_mismatch"  # nothing was marked started: retry-safe
+
+
+def test_an_argv_of_another_kind_is_refused(tmp_path: Path) -> None:
+    runner, started = _runner(_project(tmp_path), FakeDocker())
+    batch = ["python3", "-m", "vlm_pipeline.serve.vllm_batch", "x"]
+    assert runner.handle(_submit(job_kind="train", argv=batch)) == {"ok": False, "error": "argv_not_allowed"}
+    assert started == []
+
+
+def test_the_launcher_sends_a_jobs_own_entrypoint_as_argv0(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """vLLM batch jobs set ContainerJob.entrypoint="python3": the request carries it, the runner maps it back."""
+    import contextlib
+
+    from vlm_pipeline.common.jobrun import ContainerJob
+    from vlm_pipeline.common.launcher import RunnerLauncher
+
+    sent: list[dict[str, Any]] = []
+    monkeypatch.setattr(RunnerLauncher, "_call", lambda self, body: sent.append(body) or {"ok": True})
+    monkeypatch.setattr(RunnerLauncher, "_wait", lambda self, *a, **k: 0, raising=False)
+    run_dir = tmp_path / "outputs" / "graph" / "runs" / RUN
+    job = ContainerJob(
+        name=RUN, image="vlm-vllm:0.31.0", argv=("-m", "vlm_pipeline.serve.vllm_batch", "b.json"), entrypoint="python3",
+        narrow=True, rw_dirs=(run_dir,),
+    )  # fmt: skip
+    with contextlib.suppress(Exception):  # only the submit body matters here
+        RunnerLauncher(tmp_path / "r.sock").run(job, tmp_path, lock_token=None, log_path=run_dir / "x", image_id=None)
+    assert sent[0]["job_kind"] == "eval"
+    assert sent[0]["argv"] == ["python3", "-m", "vlm_pipeline.serve.vllm_batch", "b.json"]

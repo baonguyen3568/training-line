@@ -17,13 +17,11 @@ One request per connection (the client shuts its write side), at most 64 KiB, pa
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
 import socket
 import socketserver
-import stat
 import struct
 import subprocess
 import threading
@@ -36,7 +34,9 @@ from typing import Any
 from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.host_paths import HostPaths
 from vlm_pipeline.common.images import ImageMismatchError, check_pinned_image
+from vlm_pipeline.common.job_kinds import NGC_ENTRYPOINT, job_entrypoint
 from vlm_pipeline.common.jobrun import STOP_GRACE_S, ContainerJob, docker_args
+from vlm_pipeline.common.run_log import open_run_log
 from vlm_pipeline.runner.protocol import (
     MAX_REQUEST_BYTES,
     ImageQuery,
@@ -76,35 +76,6 @@ class RunnerConfig:
     job_uid: int | None = None  # default: the owner of the data root
     job_gid: int | None = None
     allowed_peer_uids: frozenset[int] = frozenset()  # who may talk to the socket (N2); empty: this process's uid
-
-
-def _open_run_log(run_dir: Path, *, write: bool) -> int:
-    """The fd of ``<run_dir>/logs/stdout.log``, reached through dir fds, never through a link (security R2).
-
-    The run dir belongs to the job (and the app writes there too): ``logs`` may have been swapped for a symlink and
-    ``stdout.log`` for a FIFO. Every step is ``O_NOFOLLOW``, the file is opened ``O_NONBLOCK`` (a FIFO never blocks the
-    runner) and must be a regular file; anything else raises ``ValueError`` (submit refused, logs empty).
-    """
-    try:
-        run_fd = os.open(run_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
-        try:
-            if write:
-                with contextlib.suppress(FileExistsError):
-                    os.mkdir("logs", 0o755, dir_fd=run_fd)
-            logs_fd = os.open("logs", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=run_fd)
-        finally:
-            os.close(run_fd)
-        try:
-            flags = (os.O_WRONLY | os.O_APPEND | os.O_CREAT) if write else os.O_RDONLY
-            fd = os.open("stdout.log", flags | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, 0o644, dir_fd=logs_fd)
-        finally:
-            os.close(logs_fd)
-    except OSError as exc:  # ELOOP / ENOTDIR (a link), ENXIO (a FIFO with no reader)...
-        raise ValueError(f"run log unusable ({exc.strerror})") from None
-    if not stat.S_ISREG(os.fstat(fd).st_mode):
-        os.close(fd)
-        raise ValueError("stdout.log is not a regular file")
-    return fd
 
 
 class Runner:
@@ -150,17 +121,22 @@ class Runner:
 
     def _submit(self, sub: Submit) -> dict[str, Any]:
         run_dir, inputs = self._host(sub.run_dir), tuple(self._host(p) for p in sub.inputs)
-        image_id = self._image_id(sub.image_tag)
+        image_id, image_entrypoint = self._image_facts(sub.image_tag)
         check_pinned_image(self.cfg.host_project, sub.image_tag, image_id, require_approved=True)
+        # The entrypoint comes from the job kind's closed set, never from the image or the request (security, ADR-015).
+        entrypoint, command = job_entrypoint(sub.job_kind, sub.argv)  # the protocol already allowed this argv
+        if entrypoint == NGC_ENTRYPOINT and image_entrypoint != [NGC_ENTRYPOINT]:
+            return {"ok": False, "error": "entrypoint_mismatch"}  # not an NGC image: its wrapper is not there
         if sub.gpu:
             gpu_lock.verify_token(self.cfg.lock_path, sub.lock_token or "")
         job = ContainerJob(
-            name=sub.run_id, image=image_id or sub.image_tag, argv=sub.argv, gpu=sub.gpu, memory_gb=sub.memory_gb,
+            name=sub.run_id, image=image_id or sub.image_tag, argv=command, entrypoint=entrypoint, gpu=sub.gpu,
+            memory_gb=sub.memory_gb,
             narrow=True, rw_dirs=(run_dir,), ro_inputs=inputs, code_root=self.cfg.host_project,
             code_files=(EVAL_WORKER,) if sub.job_kind == "eval" else (), uid=self.job_uid, gid=self.job_gid,
         )  # fmt: skip
         argv = docker_args(job, self.cfg.data_root, lock_token=sub.lock_token)  # validates every mount source
-        fd = _open_run_log(run_dir, write=True)  # before the marker: a planted logs/ link refuses the job
+        fd = open_run_log(run_dir, write=True)  # before the marker: a planted logs/ link refuses the job
         self._mark_started(sub.run_id, run_dir)  # one job per run id, at the trust boundary
         with os.fdopen(fd, "ab") as out:
             self._popen(argv, stdout=out, stderr=subprocess.STDOUT)
@@ -187,8 +163,20 @@ class Runner:
 
     # ------------------------------------------------------------------------------------------ helpers
     def _image_id(self, tag: str) -> str | None:
-        out = self._docker(["image", "inspect", "-f", "{{.Id}}", tag])
-        return out.stdout.strip() or None if out.returncode == 0 else None
+        return self._image_facts(tag)[0]
+
+    def _image_facts(self, tag: str) -> tuple[str | None, list[str] | None]:
+        """(local image id, its Config.Entrypoint) in one inspect; (None, None) when the image is not here."""
+        out = self._docker(["image", "inspect", "-f", "{{.Id}}|{{json .Config.Entrypoint}}", tag])
+        if out.returncode != 0 or "|" not in out.stdout:
+            return None, None
+        image_id, raw = out.stdout.strip().split("|", 1)
+        try:
+            entrypoint = json.loads(raw)
+        except ValueError:
+            entrypoint = None
+        valid = isinstance(entrypoint, list) and all(isinstance(a, str) for a in entrypoint)
+        return image_id or None, entrypoint if valid else None
 
     def _ours(self, name: str, run_id: str) -> dict[str, Any] | None:
         """The container's state if it carries BOTH our labels, else None (never touch another service)."""
@@ -221,7 +209,7 @@ class Runner:
     def _tail(self, run_id: str, lines: int) -> str:
         try:
             marker = json.loads((self.cfg.state_dir / "started" / run_id).read_text(encoding="utf-8"))
-            fd = _open_run_log(Path(marker["run_dir"]), write=False)
+            fd = open_run_log(Path(marker["run_dir"]))
         except (OSError, ValueError, KeyError):
             return ""
         with os.fdopen(fd, "rb") as fh:

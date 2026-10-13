@@ -148,11 +148,13 @@ class RunnerLauncher:
 
         if not job.narrow or len(job.rw_dirs) != 1:
             raise RunnerError("not_a_narrowed_job")
-        kind = job_kind(tuple(job.argv))
+        # The runner picks the entrypoint from the job kind; a job naming its own (vLLM: python3) sends it as argv[0].
+        argv = (job.entrypoint, *job.argv) if job.entrypoint else tuple(job.argv)
+        kind = job_kind(argv)
         if kind is None:
             raise RunnerError("argv_not_allowed")
         reply = self._call({
-            "command": "submit", "run_id": job.name, "job_kind": kind, "image_tag": job.image, "argv": list(job.argv),
+            "command": "submit", "run_id": job.name, "job_kind": kind, "image_tag": job.image, "argv": list(argv),
             "gpu": job.gpu, "memory_gb": job.memory_gb, "lock_token": lock_token,
             "run_dir": _app_path(job.rw_dirs[0], project_root),
             "inputs": [_app_path(p, project_root) for p in job.ro_inputs],
