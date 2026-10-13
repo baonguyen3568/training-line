@@ -70,3 +70,13 @@ Write comparison table + decision + risks into `.team/proposals/001-*.md`; send 
 - Memory numbers on GB10 (UMA): the peak is ALWAYS `run.json` `peak_mem_gb` (jobrun memguard, host-wide), never
   `torch.cuda.max_memory_allocated` (allocator only: B-4 probe showed 6.3 GB torch vs 16.6 GB real). Label any torch
   number `torch_alloc_peak_gb`. The "no invented numbers" site gate checks a number exists in a source, not its meaning.
+- Catalog edits ripple: `configs/catalog/models.yaml` values (ram_gb_train, ram_source…) are baked into
+  `schemas/node_types.snapshot.json` + `frontend/src/generated/node-types.json`. Regenerate in a CLEAN worktree at HEAD
+  (`scripts/export_schemas.py`, `npm run schemas` with node_modules symlinked) and stage those blobs only: the shared
+  tree's regen sweeps in other people's uncommitted schema changes.
+- Catalog image limits must reach the template: Qwen3.5 templates ignored `min/max_pixels` until f95897c (9.8k vs 0.9k
+  image tokens on a large receipt). `test_qwen_pixel_limits_reach_the_processor` guards it; any new image_policy needs
+  the same catalog = template test.
+- Measure template runs through the real executor from a clean worktree (`git worktree add --detach .cache/wt-research
+  HEAD`, run with `VLM_PROJECT_ROOT=<main tree>`): run.json then records the MAIN tree's git_commit/dirty, so write the
+  worktree commit into the benchmark record yourself.
