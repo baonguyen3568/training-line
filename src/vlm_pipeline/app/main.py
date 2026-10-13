@@ -11,7 +11,7 @@ import secrets
 import sys
 import threading
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any, Literal
@@ -483,6 +483,8 @@ def create_app(
     secure: bool = True,
     static_dir: Path | None = None,
     secret_key_file: Path | None = None,
+    public_origins: Sequence[str] = (),
+    proxy_peer: str | None = None,
 ) -> FastAPI:
     """Build the app (D13 security on by default). ``secure=False`` only for unit tests of the API itself.
 
@@ -507,7 +509,14 @@ def create_app(
         from vlm_pipeline.app import security  # bao-security (D13)
 
         app.state.startup_token = security.install_security(
-            app, port=port, dev=dev, token=token, secret=secret, ws_auth_timeout_s=ws_auth_timeout_s
+            app,
+            port=port,
+            dev=dev,
+            public_origins=public_origins,
+            proxy_peer=proxy_peer,
+            token=token,
+            secret=secret,
+            ws_auth_timeout_s=ws_auth_timeout_s,
         )
         ws_auth = security.ws_authenticate
 

@@ -1,8 +1,9 @@
-"""``vlm-app [--port 7870] [--dev] [--worker fake|container]``: start the local app server (127.0.0.1 only)."""
+"""``vlm-app [--port 4003] [--dev] [--worker fake|container]``: start the app server (127.0.0.1; LAN only via nginx)."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from typing import TYPE_CHECKING
 
@@ -20,18 +21,41 @@ def cmd_app(args: argparse.Namespace) -> int:
     from vlm_pipeline.common.paths import project_root
     from vlm_pipeline.nodes import REGISTRY
 
+    lan = lan_settings()
+    if isinstance(lan, str):
+        print(f"vlm app: {lan}", file=sys.stderr, flush=True)
+        return 2
+    origins, proxy_peer = lan
     services = DefaultServices(registry=REGISTRY, root=project_root(), worker=args.worker)
     port = public_port(args.port)  # what the browser uses: the Host allowlist and the printed link (D13)
-    app = create_app(services, port=port, dev=args.dev, secure=True)
+    app = create_app(services, port=port, dev=args.dev, secure=True, public_origins=origins, proxy_peer=proxy_peer)
     _start_retention_scheduler(app, services)
-    token = getattr(app.state, "startup_token", None)
-    url = f"http://127.0.0.1:{port}/" + (f"?token={token}" if token else "")
-    print(f"vlm app: open {url}", file=sys.stderr, flush=True)  # shown once, never logged (D13)
+    guard = getattr(app.state, "vlm_security", None)
+    if guard is not None:
+        guard.announce(guard.token)  # the sign-in links (#t=, never sent to a server); shown, never logged (D13)
     uvicorn.run(app, host=bind_host(), port=args.port, log_level="info", access_log=False)
     return 0
 
 
 PUBLIC_PORT_ENV = "VLM_PUBLIC_PORT"
+
+
+def lan_settings() -> tuple[tuple[str, ...], str | None] | str:
+    """ADR-019: ``(VLM_PUBLIC_ORIGINS, VLM_PROXY_PEER)`` validated, or the reason the app must not start.
+
+    A bad value stops the app, never widens access. In compose, LAN origins without nginx's fixed address would
+    silently turn the peer check off (security): refused.
+    """
+    from vlm_pipeline.app.security import PROXY_PEER_ENV, PUBLIC_ORIGINS_ENV, parse_proxy_peer, parse_public_origins
+
+    try:
+        origins = parse_public_origins(os.environ.get(PUBLIC_ORIGINS_ENV, ""))
+        proxy_peer = parse_proxy_peer(os.environ.get(PROXY_PEER_ENV, ""))
+    except ValueError as exc:
+        return str(exc)
+    if origins and proxy_peer is None and os.environ.get("VLM_IN_COMPOSE") == "1":
+        return f"{PUBLIC_ORIGINS_ENV} needs {PROXY_PEER_ENV} (nginx's fixed address) in compose"
+    return origins, proxy_peer
 
 
 def public_port(listen_port: int) -> int:
@@ -81,8 +105,8 @@ def _start_retention_scheduler(app: FastAPI, services: DefaultServices) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vlm-app")
-    parser.add_argument("--port", type=int, default=7870)
-    parser.add_argument("--dev", action="store_true", help="allow the Vite dev origin :7875, enable /api/docs")
+    parser.add_argument("--port", type=int, default=4003)  # D-8: 4003 dev app, 4001 the compose app's host port
+    parser.add_argument("--dev", action="store_true", help="allow the Vite dev origin :4010, enable /api/docs")
     parser.add_argument("--worker", choices=["fake", "container"], default="fake")
     return cmd_app(parser.parse_args(argv))
 

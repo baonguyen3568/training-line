@@ -24,7 +24,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from vlm_pipeline.app.secret_store import MAX_SECRET_CHARS, SECRET_FIELDS, SecretKeyError, SecretStore, load_key
-from vlm_pipeline.app.security import SESSION_COOKIE
 from vlm_pipeline.common.app_config import effective_profile, read_policy
 
 MAX_BODY_BYTES = 16 * 1024
@@ -72,8 +71,8 @@ def _error(status: int, code: str, **params: Any) -> JSONResponse:
 
 def _actor(request: Request) -> str:
     """A short, stable id of the browser session for the audit: a hash, never the cookie itself."""
-    cookie = request.cookies.get(SESSION_COOKIE, "")
-    return hashlib.sha256(cookie.encode()).hexdigest()[:12] if cookie else "local"
+    sid = getattr(request.state, "vlm_sid", None)  # set by the security middleware (the session id, never a token)
+    return hashlib.sha256(sid.encode()).hexdigest()[:12] if isinstance(sid, str) else "local"
 
 
 def _admin_values(policy: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
