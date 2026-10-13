@@ -20,12 +20,14 @@ services:
     image: ntc-training-app:local
     user: "${VLM_UID}:${VLM_GID}"
     group_add: ["${VLM_GID}"]  # the runner socket is 0660 runner:<run gid>
-    ports: ["127.0.0.1:${VLM_PORT:-7870}:7870"]
+    ports: ["127.0.0.1:${VLM_PORT:-4001}:7870"]
     environment:
       VLM_RUNNER_SOCKET: /run/vlm-runner/runner.sock
       VLM_GPU_LOCK_PATH: /run/vlm-lock/GPU_LOCK
       VLM_PROFILE: "${VLM_PROFILE:-}"
-      VLM_PUBLIC_PORT: "${VLM_PORT:-7870}"  # the published port: the Host allowlist and the link (listens on 7870)
+      VLM_PUBLIC_PORT: "${VLM_PORT:-4001}"  # the published port: the Host allowlist and the link (listens on 7870)
+      VLM_PUBLIC_ORIGINS: "${VLM_PUBLIC_ORIGINS:-}"  # ADR-019: the LAN origins nginx serves (empty: local only)
+      VLM_PROXY_PEER: "${VLM_PROXY_PEER:-}"  # nginx's fixed address on the edge network
     volumes:  # data only: the image carries the code (no repo mount)
       - "${VLM_DATA_ROOT:?}/outputs:/app/outputs"  # includes outputs/system: the app is trusted for it (security N2)
       - "${VLM_DATA_ROOT}/.cache:/app/.cache"
@@ -35,6 +37,7 @@ services:
       - "runner-sock:/run/vlm-runner"
       - "${VLM_POLICY_FILE:?}:/home/app/.config/ntc-training/policy.toml:ro"  # one file, never the folder
       - "${VLM_SECRETS_KEY_FILE:?}:/home/app/.config/ntc-training/secrets.key:ro"
+    networks: [default, edge]
     depends_on: [runner]
     mem_limit: 4g
 
@@ -95,7 +98,35 @@ services:
     depends_on: [runner]
     mem_limit: 128m
 
+  # ADR-019 LAN edge (profile "lan": only when .env.local sets VLM_LAN_BIND). The ONLY port on the LAN: the LAN IP,
+  # never 0.0.0.0; TLS; subnet allowlist; then the app's own sign-in. Its fixed address is VLM_PROXY_PEER, so the app
+  # refuses a local Host coming through it and a LAN Host coming any other way.
+  nginx:
+    <<: *hardening
+    profiles: [lan]
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine@sha256:adf5042a17f4ecdd200c595fa9ffd1be37efb18f89a830bd1a00e4ab4d59d42c
+    entrypoint: ["nginx", "-g", "daemon off;"]  # no entrypoint scripts: the rendered config is used as is
+    user: "${VLM_UID}:${VLM_GID}"  # reads the 0600 server key owned by the installing user
+    ports: ["${VLM_LAN_BIND:-127.0.0.1}:${VLM_LAN_PORT:-4000}:8443"]
+    volumes:  # the server certificate + key only: never ca.key, never the tls folder
+      - "${VLM_LAN_CONF:-/dev/null}:/etc/nginx/nginx.conf:ro"
+      - "${VLM_TLS_DIR:-/dev/null}/server.crt:/etc/nginx/tls/server.crt:ro"
+      - "${VLM_TLS_DIR:-/dev/null}/server.key:/etc/nginx/tls/server.key:ro"
+    networks:
+      edge:
+        ipv4_address: "${VLM_PROXY_PEER:-10.231.47.2}"
+    depends_on: [app]
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
 networks:
+  edge:  # nginx <-> app only (fixed subnet: nginx's address is the app's proxy peer)
+    ipam:
+      config:
+        - subnet: "${VLM_EDGE_SUBNET:-10.231.47.0/29}"
+          ip_range: "${VLM_EDGE_IP_RANGE:-10.231.47.4/30}"  # the app's pool: never nginx's fixed .2
   egress:
     internal: true  # no route out: download jobs reach the internet only through egress-proxy
 

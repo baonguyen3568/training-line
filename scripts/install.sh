@@ -49,7 +49,7 @@ setting() {  # value of one KEY=value line, never the whole file into the enviro
 DATA_ROOT="$(setting VLM_DATA_ROOT)"
 DATA_ROOT="${DATA_ROOT:-$ROOT}"
 PORT="$(setting VLM_PORT)"
-PORT="${PORT:-7870}"
+PORT="${PORT:-4001}"  # D-8: project servers live on 127.0.0.1:4001-4050
 PROFILE="$(setting VLM_PROFILE)"
 # These values reach .env.compose, which compose interpolates ($, spaces, ':' would change a mount): strict checks,
 # the same rules the app applies to a data root (common/app_config.check_data_root).
@@ -102,6 +102,48 @@ if [[ ! -e "$CONFIG_DIR/policy.toml" ]]; then
   fi
 fi
 
+# ------------------------------------------------------------------------------------------------ LAN (optional)
+# ADR-019: set VLM_LAN_BIND in .env.local (this machine's LAN IPv4) to open the app to the LAN through nginx + TLS.
+# Unset: nothing listens beyond 127.0.0.1. The CA key never leaves ~/.config/ntc-training/tls (never mounted).
+LAN_BIND="$(setting VLM_LAN_BIND)"
+LAN_PORT="$(setting VLM_LAN_PORT)"; LAN_PORT="${LAN_PORT:-4000}"
+EDGE_SUBNET="$(setting VLM_EDGE_SUBNET)"; EDGE_SUBNET="${EDGE_SUBNET:-10.231.47.0/29}"
+TLS_DIR="$CONFIG_DIR/tls"
+LAN_CONF="$CONFIG_DIR/lan/nginx.conf"
+PROXY_PEER=""
+PUBLIC_ORIGINS=""
+command -v python3 >/dev/null || fail "python3 is needed to check the network settings"
+lan_value() { sed -n "s/^${1}=\(.*\)$/\1/p" <<<"$2"; }
+# The app always joins the nginx<->app "edge" network: its subnet must not overlap any network of this machine.
+edge_out="$(python3 -I "$ROOT/scripts/lib_lan.py" edge "$EDGE_SUBNET")" || fail "set another VLM_EDGE_SUBNET in .env.local"
+EDGE_IP_RANGE="$(lan_value EDGE_IP_RANGE "$edge_out")"
+if [[ -n "$LAN_BIND" ]]; then
+  command -v openssl >/dev/null || fail "openssl is needed for the LAN certificate (package openssl)"
+  lan_out="$(python3 -I "$ROOT/scripts/lib_lan.py" lan "$LAN_BIND" "$LAN_PORT" "$(setting VLM_LAN_ALLOW)" \
+    "$(hostname -s)")" || fail "fix the LAN settings in .env.local (VLM_LAN_*), or remove VLM_LAN_BIND"
+  LAN_ALLOW="$(lan_value LAN_ALLOW "$lan_out")"
+  PROXY_PEER="$(lan_value PROXY_PEER "$edge_out")"
+  SERVER_NAMES="$(lan_value SERVER_NAMES "$lan_out")"
+  PUBLIC_ORIGINS="$(lan_value PUBLIC_ORIGINS "$lan_out")"
+  ours_lan="$(docker ps --filter label=com.docker.compose.project=ntc-training --format '{{.Ports}}' 2>/dev/null || true)"
+  if (exec 3<>"/dev/tcp/$LAN_BIND/$LAN_PORT") 2>/dev/null && [[ "$ours_lan" != *"$LAN_BIND:$LAN_PORT->"* ]]; then
+    fail "port $LAN_BIND:$LAN_PORT is already used by another program: set another VLM_LAN_PORT in .env.local"
+  fi
+  if (( DRY_RUN )); then
+    say "[dry-run] LAN: CA + server certificate in $TLS_DIR for: $SERVER_NAMES"
+    say "[dry-run] LAN: nginx on https://$LAN_BIND:$LAN_PORT (allow $LAN_ALLOW), config $LAN_CONF"
+  else
+    # shellcheck source=scripts/lib_lan_tls.sh
+    source "$ROOT/scripts/lib_lan_tls.sh"
+    new_ca=0; [[ -f "$TLS_DIR/ca.crt" ]] || new_ca=1
+    # shellcheck disable=SC2086  # SERVER_NAMES is a validated, space-separated list
+    make_lan_tls "$TLS_DIR" $SERVER_NAMES || fail "the LAN certificate could not be made"
+    (( ! new_ca )) || say "created a local certificate authority: $TLS_DIR/ca.crt (install it on the devices that open the app)"
+    render_nginx_conf "$ROOT/docker/nginx/nginx.conf.template" "$LAN_CONF" "$SERVER_NAMES" "$LAN_ALLOW" "$LAN_PORT" \
+      || fail "could not write $LAN_CONF"
+  fi
+fi
+
 # ------------------------------------------------------------------------------------------------ compose env
 # Only computed, non-secret values: compose reads them with --env-file; nothing here is a password or token.
 COMPOSE_ENV="$ROOT/.env.compose"
@@ -121,7 +163,14 @@ VLM_POLICY_FILE=$CONFIG_DIR/policy.toml
 VLM_SECRETS_KEY_FILE=$CONFIG_DIR/secrets.key
 VLM_RUNNER_SECRETS=$SECRETS_DIR
 VLM_BUILD_COMMIT=$COMMIT
+VLM_EDGE_SUBNET=$EDGE_SUBNET
+VLM_EDGE_IP_RANGE=$EDGE_IP_RANGE
+VLM_PUBLIC_ORIGINS=$PUBLIC_ORIGINS
+VLM_PROXY_PEER=$PROXY_PEER
 EOF
+  if [[ -n "$LAN_BIND" ]]; then
+    printf '%s\n' "VLM_LAN_BIND=$LAN_BIND" "VLM_LAN_PORT=$LAN_PORT" "VLM_LAN_CONF=$LAN_CONF" "VLM_TLS_DIR=$TLS_DIR"
+  fi
 }
 if (( DRY_RUN )); then say "[dry-run] write $COMPOSE_ENV:"; compose_env; else
   (umask 077; compose_env > "$COMPOSE_ENV")
@@ -129,6 +178,7 @@ fi
 
 # ------------------------------------------------------------------------------------------------ build + start
 COMPOSE=(docker compose --project-directory "$ROOT" -f "$ROOT/compose.yaml" --env-file "$COMPOSE_ENV")
+[[ -z "$LAN_BIND" ]] || COMPOSE+=(--profile lan)
 # The port must be free, or already ours (a re-run): another app on it would get the browser's requests.
 ours="$(docker ps --filter label=com.docker.compose.project=ntc-training --format '{{.Ports}}' 2>/dev/null || true)"
 if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && [[ "$ours" != *":$PORT->"* ]]; then
@@ -136,6 +186,8 @@ if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && [[ "$ours" != *":$PORT->"
 fi
 run "${COMPOSE[@]}" build
 run "${COMPOSE[@]}" up -d
+# A re-render replaces nginx.conf / the certificate files (new inodes): restart so nginx reads them.
+[[ -z "$LAN_BIND" ]] || run "${COMPOSE[@]}" restart nginx
 # The default template's model + dataset, through THE app's download path (vlm-runner, egress proxy, verify, install).
 if (( ! SKIP_DOWNLOAD )); then
   answer="y"
@@ -151,4 +203,8 @@ if (( ! SKIP_DOWNLOAD )); then
 fi
 say ""
 say "NTC-Training is starting on http://127.0.0.1:$PORT/"
-say "Open the link printed by:  ${COMPOSE[*]} logs app | grep 'http://127.0.0.1'"
+say "Open the link printed by:  ${COMPOSE[*]} logs app | grep 'open http'"
+if [[ -n "$LAN_BIND" ]]; then
+  say "On the LAN: https://$LAN_BIND:$LAN_PORT/ (each device must trust $TLS_DIR/ca.crt first)."
+  say "Anyone with the link controls this project: share it only with people you trust (Settings: sign out everywhere)."
+fi

@@ -39,11 +39,33 @@ dòng `HF_TOKEN` khỏi `.env` để token không còn nằm dạng chữ thư�
 Sau khi cài, lấy đường link có mã đăng nhập một lần:
 
 ```bash
-docker compose --env-file .env.compose logs app | grep 'http://127.0.0.1'
+docker compose --env-file .env.compose logs app | grep 'open http'
 ```
 
-App chỉ nghe trên `127.0.0.1`. Muốn dùng từ máy khác, hãy mở SSH tunnel
-(`ssh -L 7870:127.0.0.1:7870 <máy>`), đừng mở cổng ra mạng.
+Link có dạng `http://127.0.0.1:4001/#t=…`. Mã nằm sau dấu `#` nên trình duyệt không gửi nó lên máy chủ; trang đăng
+nhập đọc mã rồi đổi thành phiên đăng nhập. Mỗi lần app khởi động lại sẽ có mã mới. Nút **Cài đặt → Đăng xuất mọi
+thiết bị** cũng đổi mã ngay.
+
+Mặc định app chỉ nghe trên `127.0.0.1`.
+
+### Mở cho máy khác trong mạng LAN (tuỳ chọn, ADR-019)
+
+1. Trong `.env.local`, đặt `VLM_LAN_BIND=<IP LAN của máy này>` (ví dụ `192.168.2.178`), rồi chạy lại `scripts/install.sh`.
+   Lệnh cài sẽ:
+   - tạo một CA nội bộ có Name Constraints, chỉ ký được cho IP/tên của máy này;
+   - tạo chứng chỉ máy chủ (gia hạn tự động khi chạy lại lệnh cài);
+   - chạy nginx trên `https://<IP>:4000`. Chỉ các máy trong `VLM_LAN_ALLOW` (mặc định: cùng dải /24) vào được.
+2. Cài file `~/.config/ntc-training/tls/ca.crt` vào từng thiết bị sẽ mở app (mục "chứng chỉ tin cậy" của hệ điều hành
+   hoặc trình duyệt). Đừng bấm "bỏ qua cảnh báo chứng chỉ": làm vậy là mất lớp bảo vệ chống nghe lén.
+3. Mở link `https://<IP>:4000/#t=…` (cũng lấy bằng lệnh `logs app` ở trên).
+
+Rủi ro còn lại, cần biết trước khi bật:
+
+- Ai có link hoặc phiên đăng nhập là điều khiển được toàn bộ dự án: job, dữ liệu, export. Chưa có tài khoản riêng
+  cho từng người. Chỉ gửi link cho người tin cậy. Lộ link thì vào **Đăng xuất mọi thiết bị**.
+- Link đăng nhập in trong `docker logs` của app. Ai có quyền docker trên máy này đọc được cho tới lần đổi mã tiếp theo.
+- Docker bỏ qua tường lửa UFW: chỉ nginx (bind đúng IP LAN, kèm danh sách dải mạng được phép) chặn truy cập.
+- Lỗi của app giờ có thể bị khai thác từ trong mạng LAN.
 
 ## Dừng, khởi động lại
 
