@@ -1,0 +1,32 @@
+---
+// Lucide icon (ISC, src/icons/lucide/LICENSE), inlined at build time: no icon font, no request, CSP-neutral.
+// Decorative by default (aria-hidden); pass `label` when the icon is the only content of a control.
+const files = import.meta.glob<string>("../icons/lucide/*.svg", { query: "?raw", import: "default", eager: true });
+
+interface Props {
+  name: string;
+  size?: number;
+  label?: string;
+  class?: string;
+}
+const { name, size = 16, label, class: className } = Astro.props;
+const raw = files[`../icons/lucide/${name}.svg`];
+if (!raw) throw new Error(`Icon: unknown Lucide icon "${name}"`);
+const body = raw.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+---
+
+<svg
+  class:list={["ico", className]}
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.75"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden={label ? undefined : "true"}
+  role={label ? "img" : undefined}
+  aria-label={label}
+  set:html={body}
+/>

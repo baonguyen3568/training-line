@@ -1,0 +1,224 @@
+/* Landing editor preview (EditorPreview.astro). Fixed 1000px canvas scaled down on narrow screens by scrolling. */
+.editor-preview {
+  margin: 56px 0 0;
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  background: var(--bg1);
+  box-shadow:
+    0 40px 120px -40px #000,
+    0 0 0 1px #00000080;
+  overflow: hidden;
+}
+.ep-toolbar,
+.ep-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
+  background: var(--bg1);
+}
+.ep-toolbar {
+  border-bottom: 1px solid var(--line);
+}
+.ep-check {
+  border-top: 1px solid var(--line);
+  color: var(--tx2);
+}
+.ep-run {
+  margin-left: auto;
+  background: var(--ac);
+  color: #fff;
+  border-radius: var(--r);
+  padding: 6px 12px;
+  font-weight: 600;
+}
+.ep-scroll {
+  overflow-x: auto;
+  background-color: var(--color-canvas-background);
+  background-image: radial-gradient(var(--color-canvas-grid-dot) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.ep-canvas {
+  position: relative;
+  width: 1080px;
+  margin: 0 auto;
+}
+.ep-lanes span {
+  position: absolute;
+  top: 14px;
+  font-size: 12px;
+  color: var(--tx3);
+}
+.ep-wires {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.ep-wires path {
+  fill: none;
+  stroke-width: var(--node-wire-width);
+}
+.ep-node {
+  position: absolute;
+  width: var(--node-width);
+  border: 1px solid var(--color-canvas-node-border);
+  box-shadow: 0 6px 18px -6px #000c;
+  border-radius: var(--r);
+  background: var(--bg2);
+  font-size: 12px;
+}
+.ep-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--node-header-height);
+  padding: 0 10px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+.ep-step {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line2);
+  color: var(--tx3);
+  font: 500 12px/1 var(--mono);
+}
+.ep-ports {
+  list-style: none;
+  margin: 0;
+  padding: 1px 0;
+}
+.ep-ports li {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--tx2);
+}
+.ep-ports li.out {
+  justify-content: flex-end;
+}
+.ep-ports i {
+  position: absolute;
+  width: var(--node-port-size);
+  height: var(--node-port-size);
+  background: var(--pc);
+}
+.ep-ports li.in i {
+  left: -6px;
+}
+.ep-ports li.out i {
+  right: -6px;
+}
+.ep-ports i.sq {
+  border-radius: 1.5px;
+}
+.ep-ports i.ci {
+  border-radius: 50%;
+}
+.ep-ports i.di {
+  transform: rotate(45deg);
+}
+.ep-state {
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--line);
+  color: var(--tx2);
+}
+/* Before/after states share one grid cell; only visibility changes (discrete, animatable, no layout shift). */
+.swap {
+  display: inline-grid;
+}
+.swap > * {
+  grid-area: 1 / 1;
+}
+.s-before {
+  visibility: hidden;
+}
+
+/* The one motion moment. Default (no support / reduced motion): final state, wire drawn.
+   animation-timeline/range live in their own rules: the CSS minifier folds longhands into the `animation`
+   shorthand, which drops the timeline in Chromium (verified: animationName was "none"). */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .editor-preview {
+      view-timeline-name: --ep;
+    }
+    .hero-wire {
+      stroke-dasharray: 1;
+      animation-name: ep-draw;
+      animation-fill-mode: both;
+    }
+    .editor-preview .s-before {
+      animation-name: ep-hide;
+      animation-fill-mode: both;
+    }
+    .editor-preview .s-after {
+      animation-name: ep-show;
+      animation-fill-mode: both;
+    }
+    .hero-node {
+      animation-name: ep-ready;
+      animation-fill-mode: both;
+    }
+    .editor-preview :is(.hero-wire, .s-before, .s-after, .hero-node) {
+      animation-timeline: --ep;
+      animation-range: entry 60% entry 100%;
+      animation-timing-function: linear;
+    }
+  }
+}
+@keyframes ep-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ep-hide {
+  0%,
+  99% {
+    visibility: visible;
+  }
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes ep-show {
+  0%,
+  99% {
+    visibility: hidden;
+  }
+  100% {
+    visibility: visible;
+  }
+}
+@keyframes ep-ready {
+  0%,
+  99% {
+    border-color: var(--color-status-ink-critical);
+  }
+  100% {
+    border-color: var(--line2);
+  }
+}
+/* Ink-Not-Label: only the state glyph carries status ink; the label stays in text tokens. */
+.si.ok {
+  color: var(--color-status-ink-good);
+}
+.si.bad {
+  color: var(--color-status-ink-critical);
+}
+@media (max-width: 760px) {
+  /* The 1080px canvas scrolls sideways: fade the right edge so a node is never read as cut off. */
+  .ep-scroll {
+    mask-image: linear-gradient(to right, #000 85%, transparent);
+  }
+}

@@ -1,12 +1,131 @@
 ---
+// Landing, direction D4 (contract: .impeccable/surfaces/site-src-pages-index-astro.md). Copy: design mock D4
+// (design/m2/directions/chuan); error-card text is the app's own MEM-001 copy; demo numbers are labelled "minh hoạ".
+import EditorPreview from "~/components/EditorPreview.astro";
+import Icon from "~/components/Icon.astro";
+import copy from "~/generated/app-copy.json";
 import Marketing from "~/layouts/Marketing.astro";
-import { productName } from "~/data/nav";
+import "~/styles/landing.css";
+import "~/styles/editor-preview.css";
+import { installHref } from "~/data/nav";
+
+const mem = copy.error["MEM-001"];
+const memWhat = mem.what.replace("{need_gb}", "14").replace("{avail_gb}", "9");
+const [memBefore, memAfter] = memWhat.split(/(?=máy chỉ còn)/);
 ---
 
-<Marketing title={productName} description="Fine-tune, nén và đánh giá model thị giác-ngôn ngữ bằng kéo thả, không cần viết code.">
-  <section class="hero">
-    <h1>{productName}</h1>
-    <p>Khung trang chủ (M2-3). Nội dung và hiệu ứng làm sau khi user chọn hướng thiết kế (M2-1, M2-4).</p>
-    <p><a href="/docs/bat-dau/">Đọc tài liệu</a></p>
+<Marketing title="NTC Training" description="Dạy AI đọc hoá đơn, biểu đồ và ảnh của bạn bằng kéo thả. Miễn phí, mã nguồn mở Apache-2.0.">
+  <section class="hero wrap" id="install">
+    <h1>Dạy AI đọc hoá đơn, biểu đồ và ảnh của bạn. <span>Chỉ bằng kéo thả.</span></h1>
+    <p class="lead">
+      Mỗi bước là một khối: lấy dữ liệu, chọn model, fine-tune, đo điểm, xuất model. Bạn nối dây rồi bấm Chạy. App kiểm
+      tra kết nối, bộ nhớ và dung lượng trước khi chạy, để một lần train dài không hỏng giữa chừng.
+    </p>
+    <div class="cta">
+      <div class="install" aria-label="Lệnh cài đặt (minh hoạ)">
+        <Icon name="terminal" size={14} class="prompt" />
+        <code>git clone …/ntc-training &amp;&amp;<wbr /> ./install.sh</code>
+        <button class="help" popovertarget="pop-install" aria-label="Về lệnh cài đặt">
+          <Icon name="circle-question-mark" size={14} />
+        </button>
+      </div>
+      <a class="btn primary" href={installHref}><Icon name="download" />Tải về &amp; cài đặt</a>
+    </div>
+    <div id="pop-install" popover>
+      Lệnh <b>minh hoạ</b>: đường dẫn repo chính thức sẽ cập nhật khi phát hành.
+      <a class="link" href={installHref}>Hướng dẫn cài đặt</a>
+    </div>
+    <div class="facts">
+      <span><Icon name="check" size={14} />Miễn phí · mã nguồn mở Apache-2.0</span>
+      <span><Icon name="layers" size={14} />Chạy trên NVIDIA NeMo AutoModel</span>
+      <span>
+        <Icon name="cpu" size={14} />Tối ưu cho DGX Spark
+        <button class="help" popovertarget="pop-spark" aria-label="Giải thích về DGX Spark">
+          <Icon name="circle-question-mark" size={14} />
+        </button>
+      </span>
+    </div>
+    <div id="pop-spark" popover>
+      <b>DGX Spark</b> là máy để bàn của NVIDIA với chip GB10 và 128 GB bộ nhớ dùng chung cho CPU và GPU. App đọc bộ nhớ
+      trống thật của máy để ước lượng trước mỗi bước.
+      <a class="link" href="/docs/phan-cung-va-bo-nho/">Đọc thêm</a>
+    </div>
+
+    <EditorPreview />
+  </section>
+
+  <section class="guard wrap">
+    <div>
+      <h2>Chặn lỗi trước khi chạy, không phải sau ba giờ train.</h2>
+      <p>Trước khi bấm Chạy, app kiểm tra cả workflow. Lỗi nào sửa được thì có nút sửa ngay, viết bằng lời thường.</p>
+      <ul class="checks">
+        <li>
+          <Icon name="workflow" size={18} />
+          <div>
+            <b>Nối đúng kiểu</b><span
+              >Cổng Dữ liệu chỉ nhận Dữ liệu, cổng Model chỉ nhận Model. Nối sai thì dây bật lại và app nói rõ cổng cần
+              gì.</span
+            >
+          </div>
+          <button class="help" popovertarget="pop-ports" aria-label="Về các loại cổng"><Icon name="circle-question-mark" size={14} /></button>
+        </li>
+        <li>
+          <Icon name="memory-stick" size={18} />
+          <div>
+            <b>Đủ bộ nhớ và dung lượng</b><span
+              >Ước lượng RAM, thời gian và ổ đĩa cho từng bước, so với phần còn trống thật của máy dùng chung.</span
+            >
+          </div>
+          <button class="help" popovertarget="pop-est" aria-label="Về ước lượng"><Icon name="circle-question-mark" size={14} /></button>
+        </li>
+        <li>
+          <Icon name="message-square" size={18} />
+          <div>
+            <b>Thông báo lỗi dễ hiểu</b><span
+              >Không có stack trace. Mỗi lỗi nói chuyện gì xảy ra và bạn có thể làm gì tiếp.</span
+            >
+          </div>
+          <button class="help" popovertarget="pop-codes" aria-label="Về mã lỗi"><Icon name="circle-question-mark" size={14} /></button>
+        </li>
+      </ul>
+      <div id="pop-ports" popover>
+        Cổng có <b>màu, hình và nhãn</b>: ■ Dữ liệu, ● Model, ◆ Kết quả đo. Không bao giờ chỉ dựa vào màu.
+        <a class="link" href="/docs/node-va-cong/">Đọc thêm</a>
+      </div>
+      <div id="pop-est" popover>
+        Mỗi con số ghi rõ nguồn: <b>đo thực tế trên máy này</b>, ước lượng theo công thức, hoặc <b>chưa có số đo</b>. App
+        không tự đặt số. <a class="link" href="/docs/kiem-tra-truoc-khi-chay/">Đọc thêm</a>
+      </div>
+      <div id="pop-codes" popover>
+        Mỗi lỗi có một mã (vd MEM-001) để tra trong tài liệu và gửi báo cáo.
+        <a class="link" href="/docs/xu-ly-su-co-bo-nho/">Đọc thêm</a>
+      </div>
+    </div>
+
+    <article class="ecard" aria-label="Ví dụ thẻ lỗi">
+      <header>
+        <Icon name="triangle-alert" size={18} />
+        <h3>{mem.title}</h3>
+        <span class="tag">Ví dụ</span>
+      </header>
+      <div class="body">
+        <p class="lbl">Chuyện gì xảy ra</p>
+        <p>
+          {memBefore}{memAfter}
+          <button class="help" popovertarget="pop-num" aria-label="Về các con số"><Icon name="circle-question-mark" size={14} /></button>
+        </p>
+        <div id="pop-num" popover>
+          14 GB và 9 GB là <b>số minh hoạ</b>. Trong app, số lấy từ ước lượng của bước và bộ nhớ trống thật của máy.
+        </div>
+        <p class="lbl">Cách sửa</p>
+        <div class="acts" aria-hidden="true">
+          <span class="btn primary sm"><Icon name="clock-arrow-up" size={14} />{copy.preflight.queue_when_busy}</span>
+        </div>
+        <details>
+          <summary>Chi tiết kỹ thuật</summary>
+          <p class="mono">MEM-001 · ước lượng: minh hoạ</p>
+        </details>
+      </div>
+    </article>
   </section>
 </Marketing>

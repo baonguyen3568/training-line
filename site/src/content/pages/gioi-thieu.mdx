@@ -1,0 +1,41 @@
+---
+title: Giới thiệu
+description: NTC-Training giúp người không viết code tự dạy model AI đọc ảnh và tài liệu của mình, bằng các bước kéo thả.
+sources:
+  - PRODUCT.md
+  - docs/adr/ADR-003-license-distribution.md
+  - docs/adr/ADR-009-app-architecture-direction.md
+numbers_without_source: ["5"]
+---
+import Hint from '~/components/Hint.astro';
+
+## Vì sao có NTC-Training
+
+Model AI đọc ảnh và tài liệu ngày càng giỏi. Nhưng để nó làm tốt việc của riêng bạn, như đọc đúng mẫu hoá đơn của công ty bạn, bạn phải dạy thêm cho nó bằng dữ liệu của mình.
+
+Việc dạy thêm đó hiện vẫn cần viết code, cài môi trường GPU, chỉnh hàng chục tham số. Nhiều khi phải chờ vài giờ mới biết mình đã cấu hình sai từ đầu.
+
+NTC-Training biến cả quá trình thành các bước bạn kéo vào màn hình rồi nối dây: lấy dữ liệu, chọn model, dạy model, chạy thử, nén, đo điểm và xuất model. Trước khi bấm Chạy, app kiểm tra mọi thứ để lỗi được báo ngay, bằng lời thường.
+
+## Dành cho ai
+
+- **Người làm nghiệp vụ không viết code**: kế toán, vận hành, nghiên cứu ứng dụng. Bạn có một thư mục ảnh cùng câu hỏi và đáp án, và biết mình muốn model giỏi hơn ở việc gì. Mở một mẫu có sẵn, trỏ tới dữ liệu của bạn, rồi bấm Chạy.
+- **Kỹ sư ML**: chế độ Nâng cao mở toàn bộ tham số của engine, cho bung từng bước thành các bước nhỏ hơn, xem nhật ký và so sánh các lần chạy. Workflow lưu thành file để chia sẻ.
+
+## Nguyên tắc
+
+1. **Mở là chạy.** Mỗi mẫu có thiết lập mặc định an toàn và một bộ dữ liệu mẫu nhỏ để chạy ngay.
+2. **Chặn lỗi trước khi chạy.** Kiểu kết nối, bộ nhớ và dung lượng được kiểm tra trước, không để hỏng sau nhiều giờ train.
+3. **Nói bằng ngôn ngữ của bạn.** Tiếng Việt trước. Thuật ngữ kỹ thuật nằm sau dấu <Hint title="Vì sao có dấu ?">Giải thích phụ được để trong dấu "?" như thế này, để trang chính chỉ còn những gì bạn cần đọc.</Hint>.
+4. **Trung thực về số liệu.** Mọi ước lượng đều ghi rõ nguồn. Chưa đo thì ghi "chưa có số đo", không đoán.
+5. **Không chỉ dùng màu.** Trạng thái và kiểu cổng luôn có hình và chữ đi kèm.
+
+## Chạy trên gì
+
+Bên dưới là bộ công cụ chính chủ của NVIDIA. Việc dạy model dùng NVIDIA NeMo AutoModel; việc nén model dùng NVIDIA TensorRT Model Optimizer. App được tối ưu trước hết cho NVIDIA DGX Spark. <Hint title="Máy dùng chung">DGX Spark có bộ nhớ dùng chung giữa CPU và GPU, và thường chạy cùng các ứng dụng khác. Vì vậy app luôn so ước lượng với phần bộ nhớ còn trống thật, và mỗi lúc chỉ chạy một việc nặng.</Hint>
+
+NTC-Training là dự án độc lập, không liên kết và không được NVIDIA bảo trợ. NVIDIA, NeMo, TensorRT và DGX Spark là nhãn hiệu của NVIDIA Corporation.
+
+## Mã nguồn mở
+
+NTC-Training miễn phí và phát hành theo giấy phép Apache-2.0. Xem [Miễn phí & mã nguồn mở](/ma-nguon-mo/).

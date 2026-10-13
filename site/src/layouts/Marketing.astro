@@ -1,7 +1,12 @@
 ---
+// Marketing + policy layout, direction D4 "Chuẩn doanh nghiệp" (.impeccable/surfaces/site-src-pages-index-astro.md).
+// No JS: the mobile menu and every "?" are native popovers.
 import "~/generated/tokens.css";
+import "~/styles/fonts.css";
 import "~/styles/site.css";
-import { footer, nav, productName } from "~/data/nav";
+import Icon from "~/components/Icon.astro";
+import Wordmark from "~/components/Wordmark.astro";
+import { footer, installHref, nav, productName } from "~/data/nav";
 
 interface Props {
   title: string;
@@ -9,43 +14,62 @@ interface Props {
 }
 const { title, description } = Astro.props;
 const path = Astro.url.pathname;
+const current = (href: string) => (path.startsWith(href) ? "page" : undefined);
 ---
 
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <meta name="referrer" content="no-referrer" />
-    <title>{title === productName ? title : `${title} · ${productName}`}</title>
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>{title === productName ? "NTC Training" : `${title} · NTC Training`}</title>
   </head>
   <body>
     <a class="skip" href="#main">Bỏ qua tới nội dung</a>
-    <header class="site-header">
-      <a class="brand" href="/">{productName}</a>
-      <nav aria-label="Chính">
-        <ul>
-          {
-            nav.map((item) => (
-              <li>
-                <a href={item.href} aria-current={path.startsWith(item.href) ? "page" : undefined}>
-                  {item.label}
-                </a>
-              </li>
-            ))
-          }
-        </ul>
+    <header class="site-nav">
+      <a href="/" class="home" aria-label="NTC Training, trang chủ"><Wordmark /></a>
+      <nav aria-label="Chính" class="nav-main">
+        {nav.map((item) => <a href={item.href} aria-current={current(item.href)}>{item.label}</a>)}
+      </nav>
+      <div class="right">
+        <a class="btn ghost sm hide-narrow" href="/docs/bat-dau/"><Icon name="book-open" size={14} />Tài liệu</a>
+        <a class="btn primary sm" href={installHref}><Icon name="download" size={14} />Tải về &amp; cài đặt</a>
+        <button class="ib menu-btn" popovertarget="site-menu" aria-label="Mở menu">
+          <Icon name="panel-left" />
+        </button>
+      </div>
+      <nav id="site-menu" popover aria-label="Menu">
+        {nav.map((item) => <a href={item.href} aria-current={current(item.href)}>{item.label}</a>)}
       </nav>
     </header>
     <main id="main">
       <slot />
     </main>
-    <footer class="site-footer">
-      <nav aria-label="Chân trang">
-        <ul>{footer.map((item) => <li><a href={item.href}>{item.label}</a></li>)}</ul>
-      </nav>
-      <p>Miễn phí, mã nguồn mở Apache-2.0. Built on NVIDIA software.</p>
+    <footer class="site-foot">
+      <div class="wrap foot-grid">
+        <div class="foot-brand">
+          <Wordmark />
+          <p>Apache-2.0 · Không cookie, không theo dõi.</p>
+        </div>
+        {
+          footer.map((col) => (
+            <nav aria-label={col.title}>
+              <h2>{col.title}</h2>
+              <ul>
+                {col.links.map((l) => (
+                  <li>
+                    <a href={l.href}>{l.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))
+        }
+      </div>
     </footer>
   </body>
 </html>

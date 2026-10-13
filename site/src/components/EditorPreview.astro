@@ -1,0 +1,147 @@
+---
+// Landing proof (D4 contract): the app's editor rendered as HTML from the REAL template and the app's own copy
+// (configs/templates/invoice_to_json.json + i18n vi.yaml via scripts/app_copy.py), not a picture.
+// One motion moment (CARD.md): as the frame scrolls in, the "Dữ liệu học" wire connects, Fine-tune turns
+// "Sẵn sàng" and the check bar turns green. CSS scroll-driven, no JS; without support or with reduced motion
+// the final state is shown.
+import Icon from "~/components/Icon.astro";
+import copy from "~/generated/app-copy.json";
+
+type Port = { type: string; optional: boolean };
+type NodeType = { category: string; inputs: Record<string, Port>; outputs: Record<string, Port> };
+const types = copy.node_types as Record<string, NodeType>;
+const nodeCopy = copy.node as Record<string, { title: string; port?: Record<string, string> }>;
+const portTypes = copy.port_types as { id: string; color_token: string; parent: string | null }[];
+const tpl = copy.templates.invoice_to_json as {
+  workflow?: { nodes: { id: string; type: string }[]; edges: { from: [string, string]; to: [string, string] }[] };
+  nodes?: { id: string; type: string }[];
+  edges?: { from: [string, string]; to: [string, string] }[];
+};
+const wf = tpl.workflow ?? (tpl as Required<typeof tpl>);
+
+const W = 240; // design token node.width
+const HEAD = 32; // node.header_height
+const ROW = 22;
+// Lane layout like the app (lanes.ts): x from the lane, rows within the lane.
+const LANE_X: Record<string, number> = { source: 20, data: 290, train: 560, eval: 830 };
+const LANE_LABEL: Record<string, string> = {
+  source: copy.canvas.lane.source,
+  data: copy.canvas.lane.prepare,
+  train: copy.canvas.lane.train,
+  eval: copy.canvas.lane.eval,
+};
+const rowOf: Record<string, number> = {};
+const pos: Record<string, { x: number; y: number }> = {};
+for (const n of wf.nodes) {
+  const lane = types[n.type]?.category ?? "source";
+  const row = (rowOf[lane] = (rowOf[lane] ?? -1) + 1);
+  pos[n.id] = { x: LANE_X[lane] ?? 20, y: 52 + row * 170 };
+}
+const step = Object.fromEntries(wf.nodes.map((n, i) => [n.id, i + 1]));
+const portColor = (t: string) => {
+  const pt = portTypes.find((p) => p.id === t);
+  return pt ? `var(--${pt.color_token.replaceAll(".", "-")})` : "var(--color-port-value)";
+};
+const shape = (t: string) => (t === "Dataset" ? "sq" : t === "Model" || t === "Checkpoint" ? "ci" : "di");
+const label = (type: string, port: string, t: string) =>
+  nodeCopy[type]?.port?.[port] ?? (copy.port as Record<string, string>)[t.toLowerCase()] ?? t;
+
+const inY = (id: string, port: string) => {
+  const n = wf.nodes.find((x) => x.id === id);
+  const names = Object.keys(types[n?.type ?? ""]?.inputs ?? {});
+  return pos[id].y + HEAD + 12 + names.indexOf(port) * ROW;
+};
+const outY = (id: string, port: string) => {
+  const n = wf.nodes.find((x) => x.id === id);
+  const ins = Object.keys(types[n?.type ?? ""]?.inputs ?? {}).length;
+  const names = Object.keys(types[n?.type ?? ""]?.outputs ?? {});
+  return pos[id].y + HEAD + 12 + (ins + names.indexOf(port)) * ROW;
+};
+const wires = wf.edges.map((e) => {
+  const [fid, fport] = e.from;
+  const [tid, tport] = e.to;
+  const x1 = pos[fid].x + W;
+  const y1 = outY(fid, fport);
+  const x2 = pos[tid].x;
+  const y2 = inY(tid, tport);
+  const dx = Math.max(40, (x2 - x1) / 2);
+  const fType = types[wf.nodes.find((n) => n.id === fid)?.type ?? ""]?.outputs[fport]?.type ?? "";
+  return {
+    d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`,
+    color: portColor(fType),
+    hero: tid === "n4" && tport === "train_data", // the wire that connects itself
+  };
+});
+const height = Math.max(...Object.values(pos).map((p) => p.y)) + 210;
+const ready = copy.node_state.ready;
+const notReady = copy.node_state.not_ready;
+const missing = copy.error["CFG-003"].title;
+---
+
+<figure class="editor-preview" data-testid="motion-editor" aria-label="Giao diện NTC Training: template Đọc hoá đơn → JSON">
+  <div class="ep-toolbar">
+    <b>{copy.template.invoice_to_json.title}</b>
+    <button class="help" popovertarget="pop-editor" aria-label="Về khung giao diện này">
+      <Icon name="circle-question-mark" size={14} />
+    </button>
+    <span class="ep-run" aria-hidden="true">▶ {copy.app?.run ?? "Chạy"}</span>
+  </div>
+  <div class="ep-scroll" tabindex="0" role="region" aria-label="Canvas (cuộn ngang trên màn hình hẹp)">
+  <div class="ep-canvas" style={`height:${height}px`}>
+    <div class="ep-lanes" aria-hidden="true">
+      {Object.entries(LANE_X).map(([lane, x]) => <span style={`left:${x}px`}>{LANE_LABEL[lane]}</span>)}
+    </div>
+    <svg class="ep-wires" width="1080" height={height} viewBox={`0 0 1080 ${height}`} aria-hidden="true">
+      {wires.map((w) => <path d={w.d} stroke={w.color} class={w.hero ? "hero-wire" : undefined} pathLength="1" />)}
+    </svg>
+    {
+      wf.nodes.map((n) => {
+        const t = types[n.type];
+        return (
+          <div class:list={["ep-node", n.id === "n4" && "hero-node"]} style={`left:${pos[n.id].x}px;top:${pos[n.id].y}px`}>
+            <div class="ep-head">
+              <span class="ep-step">{step[n.id]}</span>
+              {nodeCopy[n.type]?.title ?? n.type}
+            </div>
+            <ul class="ep-ports">
+              {Object.entries(t?.inputs ?? {}).map(([name, p]) => (
+                <li class="in">
+                  <i class={shape(p.type)} style={`--pc:${portColor(p.type)}`} />
+                  {label(n.type, name, p.type)}
+                </li>
+              ))}
+              {Object.entries(t?.outputs ?? {}).map(([name, p]) => (
+                <li class="out">
+                  {label(n.type, name, p.type)}
+                  <i class={shape(p.type)} style={`--pc:${portColor(p.type)}`} />
+                </li>
+              ))}
+            </ul>
+            <div class="ep-state">
+              {n.id === "n4" ? (
+                <span class="swap">
+                  <span class="s-before"><span class="si bad">✕</span> {notReady}</span>
+                  <span class="s-after"><span class="si ok">✓</span> {ready}</span>
+                </span>
+              ) : (
+                <span><span class="si ok">✓</span> {ready}</span>
+              )}
+            </div>
+          </div>
+        );
+      })
+    }
+  </div>
+  </div>
+  <div class="ep-check" aria-hidden="true">
+    <b>{copy.preflight.title}:</b>
+    <span class="swap">
+      <span class="s-before"><span class="si bad">✕</span> {missing}</span>
+      <span class="s-after"><span class="si ok">✓</span> {copy.preflight.summary_ok}</span>
+    </span>
+  </div>
+  <div id="pop-editor" popover>
+    Template <b>{copy.template.invoice_to_json.title}</b>. {copy.template.invoice_to_json.built_on}. Bố cục và chữ
+    lấy từ app; trạng thái <b>minh hoạ</b>.
+  </div>
+</figure>

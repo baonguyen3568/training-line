@@ -1,0 +1,186 @@
+/* Landing (D4), ported from design/m2/directions/chuan/index.html; sizes ≥ 12px (impeccable hook). */
+.hero {
+  padding: 80px 0 0;
+}
+.hero h1 {
+  margin: 0;
+  max-width: 21ch;
+  font: 700 clamp(2.375rem, 4.2vw, 3.75rem) / 1.06 var(--sans);
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.hero h1 span {
+  color: var(--tx2);
+}
+.hero .lead {
+  margin: 24px 0 0;
+  max-width: 58ch;
+  color: var(--tx2);
+  font-size: 18px;
+  line-height: 1.6;
+}
+.cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 36px;
+}
+.install {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  background: var(--bg1);
+  color: var(--tx2);
+  font: 400 13.5px/1.4 var(--mono);
+  max-width: 100%;
+  overflow-x: auto;
+}
+.install .prompt {
+  color: var(--tx3);
+}
+.install code {
+  color: var(--tx);
+  white-space: nowrap;
+  user-select: all;
+}
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  margin-top: 28px;
+  color: var(--tx2);
+  font-size: 14px;
+}
+.facts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.guard {
+  padding: 140px 0 40px;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 460px);
+  gap: 80px;
+  align-items: start;
+}
+.guard h2 {
+  margin: 0;
+  font: 700 clamp(1.875rem, 2.8vw, 2.5rem) / 1.12 var(--sans);
+  letter-spacing: -0.03em;
+  max-width: 16ch;
+}
+.guard > div > p {
+  margin: 18px 0 0;
+  color: var(--tx2);
+  font-size: 17px;
+  max-width: 52ch;
+}
+.checks {
+  list-style: none;
+  margin: 40px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.checks li {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.checks li > .ico {
+  margin-top: 3px;
+  color: var(--ac-tx);
+}
+.checks b {
+  display: block;
+  font-weight: 600;
+  font-size: 15.5px;
+}
+.checks span {
+  color: var(--tx2);
+  font-size: 14.5px;
+}
+.ecard {
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  background: var(--bg1);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.ecard header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.ecard header .ico {
+  color: var(--color-status-ink-critical);
+}
+.ecard h3 {
+  margin: 0;
+  font: 600 16px/1.3 var(--sans);
+}
+.ecard header .tag {
+  margin-left: auto;
+}
+.ecard .body {
+  padding: 16px 18px 18px;
+}
+.ecard .lbl {
+  font: 600 12px/1 var(--sans);
+  color: var(--tx3);
+  margin: 16px 0 8px;
+}
+.ecard .lbl:first-child {
+  margin-top: 0;
+}
+.ecard p {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+}
+.ecard .acts .btn {
+  width: 100%;
+  justify-content: flex-start;
+  cursor: default;
+}
+.ecard details {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--tx3);
+}
+.ecard summary {
+  cursor: pointer;
+}
+.ecard details p {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  /* design r2: the command wraps after "&&" instead of being cut at the right edge */
+  .install code {
+    white-space: normal;
+  }
+  .install {
+    padding: 8px 12px;
+  }
+  .cta .btn.primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .hero {
+    padding-top: 48px;
+  }
+  .guard {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    padding-top: 80px;
+  }
+}
