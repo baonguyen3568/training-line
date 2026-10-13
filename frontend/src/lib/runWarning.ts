@@ -26,3 +26,23 @@ export function runWarningText(
     : tpOptional(["error", err.code, "what"], params);
   return what === undefined ? { title } : { title, what };
 }
+
+/**
+ * Text for a step's runtime error (event `error`). The server renders title/what/why in the socket's locale; an
+ * older server sends only code + params, then a basic text is built here (node ids → titles) and a "what" that
+ * has variants (only the server can choose one) is left out rather than guessed.
+ */
+export function runErrorText(
+  err: EventError,
+  nodeLabel: (nodeId: string) => string,
+): { title: string; what?: string; why?: string } {
+  if (err.title) {
+    return {
+      title: err.title,
+      ...(err.what ? { what: err.what } : {}),
+      ...(err.why ? { why: err.why } : {}),
+    };
+  }
+  const basic = runWarningText(err, nodeLabel);
+  return basic;
+}

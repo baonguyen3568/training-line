@@ -11,6 +11,7 @@ import { withCode } from "../lib/machineText";
 import { nodeDesc, nodeTitle, SEVERITY_GLYPH, workflowTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
+import { runErrorText } from "../lib/runWarning";
 import { selfAndDownstream } from "../lib/topo";
 import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
@@ -429,6 +430,14 @@ export function Inspector() {
   const spec = specs.get(node.type);
   if (!spec) return <aside className="inspector">{t("error.CFG-004.title")}</aside>;
   const issues = validation?.errors.filter((e) => e.node_id === node.id) ?? [];
+  const runState = run?.nodes[node.id];
+  const runError = runState?.status === "failed" ? runState.error : undefined;
+  const runErrorTexts = runError
+    ? runErrorText(runError, (id) => {
+        const n = workflow.nodes.find((x) => x.id === id);
+        return n ? nodeTitle(specs.get(n.type), n.type) : id;
+      })
+    : undefined;
   const fieldErrors = (param: string) => issues.filter((e) => e.param === param).map((e) => e.what);
 
   // x-ui.visible_when: a field that does not apply right now is hidden but keeps its value, and is shown anyway
@@ -515,6 +524,35 @@ export function Inspector() {
         </p>
       )}
 
+      {runError && (
+        // the step failed while running: say why and how to fix it, like a pre-flight issue
+        <div className="error-card" role="alert" data-code={runError.code}>
+          <ErrorIcon tone="critical" />
+          <strong>{runErrorTexts?.title}</strong>
+          {runErrorTexts?.what && <p>{withCode(runErrorTexts.what, runError.params ?? {})}</p>}
+          {runErrorTexts?.why && (
+            <p className="muted small">
+              {t("error_card.why")}: {runErrorTexts.why}
+            </p>
+          )}
+          {runError.already_optimized && (
+            <p className="small">{t("error_card.already_optimized")}</p>
+          )}
+          <QuickFixes
+            nodeId={node.id}
+            issue={{
+              node_id: node.id,
+              code: runError.code,
+              severity: "error",
+              params: (runError.params ?? {}) as Record<string, string | number>,
+              title: runErrorTexts?.title ?? runError.code,
+              what: runErrorTexts?.what ?? "",
+              action_ids: runError.action_ids ?? [],
+              ...(runError.actions ? { actions: runError.actions } : {}),
+            }}
+          />
+        </div>
+      )}
       {issues.length > 0 && (
         <ul className="error-cards">
           {issues.map((e) => (

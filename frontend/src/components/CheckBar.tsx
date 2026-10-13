@@ -3,7 +3,7 @@ import { useState } from "react";
 import { t } from "../i18n";
 import { estimateLine, formatDuration } from "../lib/format";
 import { nodeTitle, SEVERITY_GLYPH } from "../lib/nodeText";
-import { runWarningText } from "../lib/runWarning";
+import { runErrorText, runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
@@ -44,6 +44,10 @@ export function CheckBar() {
     const n = workflow.nodes.find((x) => x.id === id);
     return n ? nodeTitle(specs.get(n.type), n.type) : id;
   };
+  // A step that failed while running: one row each, "{step} › {error}" + "Chỉ cho tôi" (design 1.0)
+  const runErrors = states.flatMap(([id, s]) =>
+    s.status === "failed" && s.error ? [{ id, title: runErrorText(s.error, nodeLabel).title }] : [],
+  );
   const runWarnings = states.flatMap(([id, s]) =>
     (s.warnings ?? []).map((w) => ({ id, ...runWarningText(w, nodeLabel) })),
   );
@@ -77,6 +81,17 @@ export function CheckBar() {
             {running && (
               <span data-testid="run-progress">{progress ?? t("node_state.queued")}</span>
             )}
+            {runErrors.map((e) => (
+              <span key={e.id} className="run-error" data-testid="run-error">
+                <span className="si si-bad" aria-hidden="true">
+                  <Icon name="circle-x" size={14} />
+                </span>{" "}
+                {nodeLabel(e.id)} › {e.title}{" "}
+                <button type="button" className="link" onClick={() => showMe(e.id)}>
+                  {t("preflight.show_me")}
+                </button>
+              </span>
+            ))}
             {runWarnings.map((w, i) => (
               <button
                 // biome-ignore lint/suspicious/noArrayIndexKey: warnings are append-only for one run
@@ -96,7 +111,16 @@ export function CheckBar() {
             {run.done && (
               <>
                 <span className={failedCount > 0 || lost ? "run-result bad" : "run-result"}>
-                  {failedCount > 0 || lost ? "✕" : "✓"} {finishedText}
+                  <span
+                    className={`si ${failedCount > 0 || lost ? "si-bad" : "si-completed"}`}
+                    aria-hidden="true"
+                  >
+                    <Icon
+                      name={failedCount > 0 || lost ? "circle-x" : "circle-check-big"}
+                      size={14}
+                    />
+                  </span>{" "}
+                  {finishedText}
                 </span>{" "}
                 <button
                   type="button"

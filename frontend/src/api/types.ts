@@ -324,6 +324,14 @@ export type NodeRunStatus =
 export interface EventError {
   code: string;
   params?: Record<string, unknown>;
+  /** Rendered in the WS locale when the server does it (events ?locale=); else the client renders a basic text. */
+  title?: string;
+  what?: string;
+  why?: string | null;
+  /** G-3 resolved quick fixes (a3f5bbb), same shape as validate issues. */
+  actions?: ResolvedAction[];
+  action_ids?: string[];
+  already_optimized?: boolean;
 }
 export interface NodeStatusEvent {
   type: "node_status";

@@ -138,8 +138,14 @@ export function StatusBar() {
   const current = states.find(([, s]) => s.status === "running");
   const node = current && workflow.nodes.find((n) => n.id === current[0]);
   const steps = stepNumbers(workflow);
+  const failed = states.filter(([, s]) => s.status === "failed").length;
+  // a failed run says how many steps failed (design 1.0); the dock lists them with "Chỉ cho tôi"
   const text = run.done
-    ? t(`run_monitor.status.${run.status === "completed" ? "completed" : (run.status ?? "failed")}`)
+    ? failed > 0
+      ? t("run.finished_with_errors", { error_count: failed })
+      : t(
+          `run_monitor.status.${run.status === "completed" ? "completed" : (run.status ?? "failed")}`,
+        )
     : node
       ? t("run.progress", {
           current_step: steps.get(node.id) ?? done + 1,
@@ -150,8 +156,11 @@ export function StatusBar() {
   const pct = states.length ? Math.round((done / states.length) * 100) : 0;
   return (
     <footer className="sb" role="status" aria-live="polite">
-      <span className={`si ${run.done ? "si-completed" : "si-running"}`}>
-        <Icon name={run.done ? "circle-check-big" : "loader-circle"} size={14} />
+      <span className={`si ${!run.done ? "si-running" : failed ? "si-bad" : "si-completed"}`}>
+        <Icon
+          name={!run.done ? "loader-circle" : failed ? "circle-x" : "circle-check-big"}
+          size={14}
+        />
       </span>
       <span>{text}</span>
       {!run.done && (

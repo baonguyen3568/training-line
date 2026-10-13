@@ -2,6 +2,7 @@
 // CSRF: the token comes from `GET /api/session` (JSON body) and is kept ONLY in module memory — never a
 // readable cookie (cookies are not port-isolated on 127.0.0.1, so other local apps could toss/overwrite them)
 // and never localStorage. It changes on every server restart; a 403 csrf_invalid triggers one refresh + retry.
+import { getLocale } from "../i18n";
 import type {
   BugReport,
   MetricsPage,
@@ -201,7 +202,7 @@ export const httpApi: Api = {
     // first message carries the CSRF token (P003 D13). Server closes with 4401 if missing/invalid.
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(
-      `${proto}//${location.host}/api/runs/${encodeURIComponent(id)}/events`,
+      `${proto}//${location.host}/api/runs/${encodeURIComponent(id)}/events?locale=${getLocale()}`,
     );
     let closed = false;
     ws.onopen = () => {

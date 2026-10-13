@@ -511,7 +511,10 @@ function EditorInner() {
 
   if (!workflow) return null;
   const d4 = skin === "d4";
-  const errorCount = validation?.errors.filter((e) => e.severity === "error").length ?? 0;
+  // pre-flight errors + steps that failed while running (the dock opens on the first one, design 1.0)
+  const errorCount =
+    (validation?.errors.filter((e) => e.severity === "error").length ?? 0) +
+    Object.values(run?.nodes ?? {}).filter((s) => s.status === "failed").length;
   return (
     <div className={d4 ? "editor d4" : "editor"}>
       {d4 ? (

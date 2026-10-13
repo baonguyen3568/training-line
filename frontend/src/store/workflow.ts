@@ -24,6 +24,8 @@ export interface NodeRunState {
   message?: string;
   /** Run `warning` events for this node (e.g. CACHE-001: the saved result is unreadable, the step runs again). */
   warnings?: EventError[];
+  /** The failing step's error as the server sent it (code, params, rendered text, quick fixes). */
+  error?: EventError;
   /** G-4: run-dir base "<nid>-<key16>" from node_status, what "Đặt lại bước" acts on. */
   nodeBase?: string;
   /** D5: queued for memory / the GPU lock (node_state); cleared by the next node_status. */
@@ -345,12 +347,17 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
         if (ev.type === "node_status") {
           const st: NodeRunState = { status: ev.status };
           if (ev.progress !== undefined) st.progress = ev.progress;
-          if (ev.error) st.errorCode = ev.error.code;
+          if (ev.error) {
+            st.errorCode = ev.error.code;
+            st.error = ev.error;
+          }
           const prev = run.nodes[ev.node_id];
           if (prev?.warnings) st.warnings = prev.warnings;
           const base = ev.node_base ?? prev?.nodeBase; // later events without a key keep the known base
           if (base) st.nodeBase = base;
           set({ run: { ...run, nodes: { ...run.nodes, [ev.node_id]: st } } });
+          // nothing selected: show the first failed step's card; never steal focus from a step the user picked
+          if (ev.status === "failed" && get().selectedId === null) set({ selectedId: ev.node_id });
         } else if (ev.type === "node_state") {
           const prev = run.nodes[ev.node_id] ?? { status: "running" as const };
           const waiting = {
