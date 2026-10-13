@@ -55,7 +55,7 @@ from vlm_pipeline.graph.worker import (
     checkpoint_dirs,
     port_of,
 )
-from vlm_pipeline.nodes.spec import NodeSpec, is_compatible
+from vlm_pipeline.nodes.spec import NodeSpec, is_compatible, model_kind
 from vlm_pipeline.train.advanced import AdvancedNotForModelError, keys_not_for
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path, templates_digest
@@ -197,7 +197,7 @@ class RealWorker:
             port = port_of(key)  # a many-port's extra wires (heldout.1...) have the same kind as the port
             port_spec = job.spec.inputs.get(port)
             if port_spec is not None and is_compatible(port_spec.type, "Model"):
-                inputs[port] = "model"
+                inputs[port] = model_kind(ref.type)  # the same kind the canvas derives from the output port
                 if model is None:
                     try:
                         model = self.base_of(ref)
@@ -295,6 +295,7 @@ class RealWorker:
     def _eval(self, job: NodeJob) -> NodeResult:
         """Benchmark node (B-5): bao-tester's engine (eval/node_worker.py) on the model and its catalog base."""
         from vlm_pipeline.eval.node_worker import EvalJobFailed, EvalRequest, ModelRef, run_eval_benchmarks
+        from vlm_pipeline.serve.vllm_runner import run_vllm_batch
 
         model = job.inputs["model"]
         entry = self.base_of(model)
@@ -305,6 +306,7 @@ class RealWorker:
             base=ModelRef(base_path.resolve(), f"{entry.repo}@{entry.revision}"),
             entry=entry, run_dir=job.run_dir.resolve(), image=self.image, who=self.who,
             cancel=job.cancel, on_wait=job.on_wait,
+            vllm_batch=run_vllm_batch,  # suite ocrbench (eval may not import serve: injected here)
         )  # fmt: skip
         try:
             outcome = run_eval_benchmarks(request)

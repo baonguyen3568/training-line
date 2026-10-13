@@ -11,7 +11,7 @@ from vlm_pipeline.data.local_folder import preview_folder
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ
 from vlm_pipeline.nodes.source import MODEL_HF_PICK
-from vlm_pipeline.nodes.spec import GraphView, Issue, is_compatible
+from vlm_pipeline.nodes.spec import GraphView, Issue, is_compatible, model_kind
 from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM
 
 _TRAIN_TYPES = frozenset({TRAIN_LORA_VLM.type_id, TRAIN_SFT_VLM.type_id})
@@ -43,7 +43,7 @@ _SOURCE_KINDS = {"data.local_folder": "dataset:local", "data.hf_load": "dataset:
 
 
 def input_kinds(view: GraphView, node_id: str) -> dict[str, str]:
-    """Wired input ports -> ``dataset:hub`` | ``dataset:local`` | ``model`` | ``other`` (SupportQuery.inputs).
+    """Wired input ports -> ``dataset:hub`` | ``dataset:local`` | ``model:<type>`` | ``other`` (SupportQuery.inputs).
 
     Data is traced through pass-through nodes (split and the curation nodes) to its source: a split of a
     local folder is local; a mix is local when every input is.
@@ -54,10 +54,16 @@ def input_kinds(view: GraphView, node_id: str) -> dict[str, str]:
         if src is None:
             continue
         if is_compatible(pspec.type, "Model"):
-            kinds[port] = "model"
+            kinds[port] = _model_kind_of(view, src)
             continue
         kinds[port] = _data_kind(view, src, set())
     return kinds
+
+
+def _model_kind_of(view: GraphView, src: str) -> str:
+    """``model:<type>`` of the model ``src`` outputs (its one Model-typed output port), ``model`` if ambiguous."""
+    types = {p.type for p in view.specs[src].outputs.values() if is_compatible(p.type, "Model")}
+    return model_kind(types.pop()) if len(types) == 1 else "model"
 
 
 def _data_kind(view: GraphView, src: str | None, seen: set[str]) -> str:

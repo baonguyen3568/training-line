@@ -64,6 +64,15 @@ def is_compatible(src_type: str, dst_type: str) -> bool:
     return False
 
 
+def model_kind(artifact_type: str) -> str:
+    """``SupportQuery.inputs`` kind of a Model port: ``model:<artifact type>``, e.g. ``model:Adapter``.
+
+    The canvas (output port type) and the run (``ArtifactRef.type``) both use this, so a check that refuses e.g. an
+    unmerged adapter says the same thing in both places.
+    """
+    return f"model:{artifact_type}"
+
+
 class PortSpec(_Frozen):
     type: str
     optional: bool = False

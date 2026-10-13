@@ -87,7 +87,7 @@ class SupportQuery:
     """What decides whether a worker can run a node, known both on the canvas and at run time (no file access).
 
     ``model``: the catalog model at the origin of the node's model input (None: no model input, or not traceable).
-    ``inputs``: wired ports only, ``port -> "dataset:hub" | "dataset:local" | "model" | "other"``.
+    ``inputs``: wired ports only, ``port -> "dataset:hub" | "dataset:local" | "model:<artifact type>" | "other"``.
     """
 
     node_id: str
