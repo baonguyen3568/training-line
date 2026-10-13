@@ -20,6 +20,8 @@ storage:
     UNKNOWN_STATUS: Không đọc được trạng thái của run "{run}" nên app giữ lại cho an toàn.
     RUN_INTERRUPTED: Run "{run}" bị gián đoạn. App giữ các bản lưu tới {until} để bạn chạy tiếp; sau đó chỉ giữ lại bản lưu cuối cùng.
     INPUT_OF_RUNNING_ATTEMPT: Lần chạy mới của bước "{node}" đang chạy tiếp từ bản lưu này. Xoá được khi lần chạy đó xong, hoặc khi nó không còn chạy tiếp được nữa.
+    GENERATION_UNREADABLE: App không đọc được dữ liệu nội bộ của bước "{node}" nên chưa đặt lại được. Đây không phải lỗi của bạn; hãy báo quản trị viên kiểm tra thư mục outputs/system/node_generations.
+    GENERATION_LIMIT: Bước "{node}" đã được đặt lại quá nhiều lần. Hãy xoá bước này rồi kéo một bước mới từ thư viện vào thay.
   attention:
     RUN_INTERRUPTED_EXPIRING: Bước "{node}" (run "{run}") bị gián đoạn. Hãy chạy tiếp trước {until}; sau mốc đó app dọn các bản lưu cũ, chỉ giữ lại bản lưu cuối cùng.
   consequence:
@@ -29,6 +31,18 @@ storage:
     WILL_RECOMPUTE: Có thể tạo lại, mất khoảng {minutes} phút.
     PERMANENT_LOSS: '"{name}" sẽ mất vĩnh viễn — không khôi phục hay tạo lại y hệt được.'
     RESUME_IMPOSSIBLE: Model vẫn dùng được, nhưng không thể train tiếp run "{run}" từ điểm này.
+  reset_step:
+    menu: Đặt lại bước
+    menu_hint: Xoá mọi lần chạy của bước này để chạy lại từ đầu.
+    title: Đặt lại bước này?
+    body: App sẽ xoá {attempt_count} lần chạy của bước "{node}" và giải phóng {gb} GB. Lần chạy sau, bước này chạy lại từ đầu.
+    downstream: Các bước phía sau dùng kết quả của bước này cũng sẽ chạy lại.
+    lost_lead: "Sẽ mất:"
+    lost_checkpoints: Các bản lưu (checkpoint) của bước này
+    lost_history: Nhật ký và biểu đồ của các lần chạy này
+    confirm: Đặt lại bước
+    done: Đã đặt lại bước "{node}", giải phóng {gb} GB.
+    nothing: Bước này chưa chạy lần nào, không có gì để đặt lại.
   dialog:
     title: Xoá {item_count} mục, giải phóng {gb} GB?
     typed_confirm: Gõ  {confirm_text}  để xác nhận

@@ -466,8 +466,13 @@ def _may_still_resume(run_dir: Path, data: dict[str, object], now: float, policy
     return now < last + policy.interrupted_days * DAY_S
 
 
-def resume_inputs(root: Path, *, now: float | None = None, policy: RetentionPolicy = DEFAULT_POLICY) -> ResumeInputs:
-    """Sources (``run.json`` ``resumed_from``) of every attempt that may still resume, in both runs roots."""
+def resume_inputs(
+    root: Path, *, now: float | None = None, policy: RetentionPolicy = DEFAULT_POLICY, ignore_node: str | None = None
+) -> ResumeInputs:
+    """Sources (``run.json`` ``resumed_from``) of every attempt that may still resume, in both runs roots.
+
+    ``ignore_node`` (``<nid>-<key16>``): attempts of that node do not count as users (G-4 resets the node as a whole).
+    """
     ts = time.time() if now is None else now
     dirs: set[Path] = set()
     prefixes: set[tuple[Path, str]] = set()
@@ -478,29 +483,55 @@ def resume_inputs(root: Path, *, now: float | None = None, policy: RetentionPoli
         for run_dir in sorted(base.iterdir()):
             if run_dir.is_symlink() or not run_dir.is_dir():
                 continue
-            try:
-                data = read_small_json(run_dir / "run.json")
-            except FileNotFoundError:
-                continue  # no manifest yet: nothing it resumes from is recorded
-            except (OSError, ValueError):
-                data = None
-            if not isinstance(data, dict):  # unreadable: a later attempt may be resuming from its node (fail closed)
-                if _LATER_ATTEMPT_RE.fullmatch(run_dir.name):
-                    logger.warning("run %s: unreadable run.json, every attempt of its node is kept", run_dir.name)
-                    prefixes.add((base.resolve(), _node_prefix(run_dir.name)))
+            if ignore_node is not None and _node_prefix(run_dir.name) == ignore_node:
                 continue
-            if data.get("resumed_from") is None:
-                continue
-            if not _may_still_resume(run_dir, data, ts, policy):
-                continue
-            target = _resume_target(base, data["resumed_from"])
-            if target is not None:
-                dirs.add(target.resolve())
-            else:
-                logger.warning("run %s: unreadable resumed_from, every attempt of its node is kept", run_dir.name)
-                prefixes.add((base.resolve(), _node_prefix(run_dir.name)))
+            _add_resume_source(base, run_dir, ts, policy, dirs, prefixes)
     _add_resume_leases(root, dirs, prefixes)
     return ResumeInputs(frozenset(dirs), frozenset(prefixes))
+
+
+def _add_resume_source(  # noqa: PLR0917 - accumulates into the two sets of resume_inputs
+    base: Path, run_dir: Path, now: float, policy: RetentionPolicy, dirs: set[Path], prefixes: set[tuple[Path, str]]
+) -> None:
+    """Adds the source ``run_dir``'s run.json says it resumes from (or its node, when unreadable: fail closed)."""
+    try:
+        data = read_small_json(run_dir / "run.json")
+    except FileNotFoundError:
+        return  # no manifest yet: nothing it resumes from is recorded
+    except (OSError, ValueError):
+        data = None
+    if not isinstance(data, dict):  # unreadable: a later attempt may be resuming from its node (fail closed)
+        if _LATER_ATTEMPT_RE.fullmatch(run_dir.name):
+            logger.warning("run %s: unreadable run.json, every attempt of its node is kept", run_dir.name)
+            prefixes.add((base.resolve(), _node_prefix(run_dir.name)))
+        return
+    if data.get("resumed_from") is None or not _may_still_resume(run_dir, data, now, policy):
+        return
+    target = _resume_target(base, data["resumed_from"])
+    if target is not None:
+        dirs.add(target.resolve())
+    else:
+        logger.warning("run %s: unreadable resumed_from, every attempt of its node is kept", run_dir.name)
+        prefixes.add((base.resolve(), _node_prefix(run_dir.name)))
+
+
+def resume_lease_files(root: Path) -> list[Path] | None:
+    """Entries of ``outputs/system/resume_leases`` ([] when there is no store); None when the store is unsafe.
+
+    Unsafe = a symlink or a non-directory on any component of its path, or unreadable: which sources are leased is
+    then unknown and every caller fails closed.
+    """
+    leases = root / RESUME_LEASES_REL
+    try:
+        for part in (root / "outputs", root / "outputs" / "system", leases):  # every component, not only the last
+            if not stat.S_ISDIR(part.lstat().st_mode):
+                raise NotADirectoryError(part)
+        return sorted(leases.iterdir())
+    except FileNotFoundError:
+        return []  # no lease store yet: no lease
+    except OSError:
+        logger.warning("%s is not a plain directory: resume leases unknown (fail closed)", RESUME_LEASES_REL)
+        return None
 
 
 def _add_resume_leases(root: Path, dirs: set[Path], prefixes: set[tuple[Path, str]]) -> None:
@@ -510,17 +541,9 @@ def _add_resume_leases(root: Path, dirs: set[Path], prefixes: set[tuple[Path, st
     (orphans are removed by ``stale_runs``, never judged here). An unreadable lease keeps its whole node; an unsafe
     store (a symlink or a non-directory anywhere on its path, unreadable) keeps every graph run dir this pass.
     """
-    leases = root / RESUME_LEASES_REL
     base = root / GRAPH_RUNS_REL
-    try:
-        for part in (root / "outputs", root / "outputs" / "system", leases):  # every component, not only the last
-            if not stat.S_ISDIR(part.lstat().st_mode):
-                raise NotADirectoryError(part)
-        entries = sorted(leases.iterdir())
-    except FileNotFoundError:
-        return  # no lease store yet: no lease
-    except OSError:  # a symlink, a file or an unreadable store: which sources are leased is unknown (fail closed)
-        logger.warning("%s is not a plain directory: every graph checkpoint is kept this pass", RESUME_LEASES_REL)
+    entries = resume_lease_files(root)
+    if entries is None:
         prefixes.add((base.resolve(), ""))
         return
     for lease in entries:
@@ -626,7 +649,7 @@ def item_path(root: Path, item: PlanItem) -> Path:
     return target
 
 
-def _append_jsonl(path: Path, record: dict[str, object]) -> None:
+def append_jsonl(path: Path, record: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -731,8 +754,8 @@ def apply(
             "manual": manual,
             "approved_by": approved_by,
         }
-        _append_jsonl(root / item.runs_rel / item.run_id / "events.jsonl", event)
-        _append_jsonl(root / CLEANUP_LOG_REL, {**event, "run_id": item.run_id})
+        append_jsonl(root / item.runs_rel / item.run_id / "events.jsonl", event)
+        append_jsonl(root / CLEANUP_LOG_REL, {**event, "run_id": item.run_id})
     return result
 
 

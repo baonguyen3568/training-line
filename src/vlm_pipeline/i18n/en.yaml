@@ -20,6 +20,8 @@ storage:
     UNKNOWN_STATUS: The status of run "{run}" cannot be read, so the app keeps it to be safe.
     RUN_INTERRUPTED: Run "{run}" was interrupted. Its checkpoints are kept until {until} so you can resume it; after that only the last one is kept.
     INPUT_OF_RUNNING_ATTEMPT: A newer run of step "{node}" resumes from these checkpoints. You can delete them once that run finishes or can no longer be resumed.
+    GENERATION_UNREADABLE: The app cannot read the internal records of step "{node}", so it cannot reset it yet. This is not your fault; ask an admin to check outputs/system/node_generations.
+    GENERATION_LIMIT: Step "{node}" has been reset too many times. Remove it and drag a new one in from the library.
   attention:
     RUN_INTERRUPTED_EXPIRING: Step "{node}" (run "{run}") was interrupted. Resume it before {until}; after that the app cleans up older checkpoints and keeps only the last one.
   consequence:
@@ -29,6 +31,18 @@ storage:
     WILL_RECOMPUTE: Can be regenerated in about {minutes} minutes.
     PERMANENT_LOSS: '"{name}" will be lost permanently — it cannot be restored or recreated exactly.'
     RESUME_IMPOSSIBLE: The model still works, but run "{run}" can no longer continue training from this point.
+  reset_step:
+    menu: Reset step
+    menu_hint: Delete every run of this step so it starts over.
+    title: Reset this step?
+    body: The app will delete {attempt_count} runs of step "{node}" and free {gb} GB. Next time, this step runs from the start.
+    downstream: Later steps that use this step's results will run again too.
+    lost_lead: "You will lose:"
+    lost_checkpoints: This step's checkpoints
+    lost_history: The logs and charts of these runs
+    confirm: Reset step
+    done: Step "{node}" was reset; {gb} GB freed.
+    nothing: This step has not run yet; there is nothing to reset.
   dialog:
     title: Delete {item_count} items and free {gb} GB?
     typed_confirm: Type  {confirm_text}  to confirm

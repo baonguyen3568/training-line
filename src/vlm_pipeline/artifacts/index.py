@@ -255,6 +255,16 @@ class ArtifactIndex:
             ).fetchall()
         return [r["run_id"] for r in rows]
 
+    def keys_for_run_dirs(self, run_dirs: Sequence[Path]) -> list[str]:
+        """Cache keys whose node run dir is one of ``run_dirs`` (absolute paths, as recorded), any state."""
+        wanted = json.dumps(sorted({str(p) for p in run_dirs}))
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT cache_key FROM artifacts WHERE run_dir IN (SELECT value FROM json_each(?)) ORDER BY cache_key",
+                (wanted,),
+            ).fetchall()
+        return [r["cache_key"] for r in rows]
+
     def stale_leases(self, *, older_than_s: float = STALE_LEASE_S) -> list[tuple[str, str, float]]:
         """(cache_key, run_id, since) of leases older than ``older_than_s``: reported, still blocking."""
         cutoff = self._clock() - older_than_s

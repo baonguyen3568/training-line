@@ -30,7 +30,7 @@ from fastapi.responses import JSONResponse
 
 from vlm_pipeline import i18n
 from vlm_pipeline.app.uploads import clean_label
-from vlm_pipeline.artifacts import cache_retention, retention
+from vlm_pipeline.artifacts import cache_retention, node_reset, retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
 from vlm_pipeline.artifacts.storage import du_bytes
 from vlm_pipeline.common.app_config import effective_profile, read_policy
@@ -237,18 +237,18 @@ _UNTIL_FORMAT = {"vi": "%H:%M %d/%m", "en": "%b %d, %H:%M"}  # short date + time
 
 def _step_title(root: Path, item: retention.PlanItem, locale: str) -> str:
     """Node title of the run (app runs are named ``"<node type> <entry>"``), else the run's name, else its id."""
-    return _title_of(root / item.runs_rel / item.run_id / "run.json", item.run_id, locale)
+    return title_of(root / item.runs_rel / item.run_id / "run.json", item.run_id, locale)
 
 
 def _cache_title(root: Path, item: cache_retention.CacheItem, locale: str) -> str:
     for rel in cache_retention.RUN_ROOTS:
         run_json = root / rel / item.run_id / "run.json"
         if run_json.parent.is_dir() and not run_json.parent.is_symlink():
-            return _title_of(run_json, item.run_id, locale)
+            return title_of(run_json, item.run_id, locale)
     return item.run_id
 
 
-def _title_of(run_json: Path, fallback: str, locale: str) -> str:
+def title_of(run_json: Path, fallback: str, locale: str) -> str:
     try:  # a job can rewrite its own run.json: read safely, shown as a clean label (no bidi/control chars, short)
         data = read_small_json(run_json)
         name = clean_label(str(data.get("name") or "")) if isinstance(data, dict) else ""
@@ -293,6 +293,23 @@ class StorageApi:
     settings: StorageSettings
     plans: _Plans = field(default_factory=_Plans)
     lock_path: Path | None = None  # GPU lock file; default $VLM_GPU_LOCK_PATH or <root>/.team/GPU_LOCK
+
+    def lock_file(self) -> Path:
+        """The GPU lock file this API checks (also used by the node-reset routes)."""
+        return self._lock_path()
+
+    def error(self, code: str, locale: str, **params: Any) -> dict[str, Any]:
+        return _error(code, locale, **params)
+
+    def recent_unapproved_bytes(self) -> int:
+        """Manual deletes without approval in the last 24 h, every source together (no splitting into batches)."""
+        log = self.root / CLEANUP_LOG_REL
+        since = time.time() - APPROVAL_WINDOW_S
+        return (
+            cache_retention.unapproved_manual_bytes_since(log, since)
+            + retention.unapproved_bytes_since(log, since)
+            + node_reset.unapproved_reset_bytes_since(log, since)
+        )
 
     def _lock_path(self) -> Path:
         if self.lock_path is not None:
@@ -369,11 +386,7 @@ class StorageApi:
             [k for k in wanted if planned[k] == CACHE], confirm, skipped
         )
         pruned, pruned_confirmed = self._choose_retention([k for k in wanted if planned[k] != CACHE], confirm, skipped)
-        log = self.root / CLEANUP_LOG_REL
-        since = time.time() - APPROVAL_WINDOW_S
-        recent = cache_retention.unapproved_manual_bytes_since(log, since) + retention.unapproved_bytes_since(
-            log, since
-        )
+        recent = self.recent_unapproved_bytes()
         total_gb = (cache_bytes + sum(i.reclaim_bytes for i in pruned) + recent) / GIB  # no splitting into batches
         if self.settings.approval_policy == "threshold" and total_gb > self.settings.approval_threshold_gb:
             return self._approval_required(total_gb, cache_keys, pruned, pruned_confirmed, locale)
@@ -505,6 +518,10 @@ def on_startup(index: ArtifactIndex, active_graph_run_ids: list[str]) -> int:
 
 
 def register_storage_routes(app: FastAPI, api: StorageApi) -> None:
+    from vlm_pipeline.app.storage_reset import register_reset_routes
+
+    register_reset_routes(app, api)
+
     @app.get("/api/storage/plan")
     def storage_plan(locale: Locale = i18n.DEFAULT_LOCALE) -> dict[str, Any]:
         return api.plan(locale)
