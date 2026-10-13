@@ -335,9 +335,13 @@ def wait_for_memory(
             return True
         waited = clock() - start
         if waited >= timeout_s:
+            avail = snapshot.mem_available_gb if cgroup is None else min(snapshot.mem_available_gb, cgroup)
+            short = {"waiting_for": "memory", "need_gb": round(need, 1), "avail_gb": round(avail, 1)}
+            if host_ok and vram is not None:  # the host fits: it is the GPU's own memory the job waited for
+                short = {"waiting_for": "vram", "need_gb": round(vram[0], 1), "avail_gb": round(vram[1], 1)}
             raise MemoryWaitTimeoutError(
                 f"no memory for {est_peak_gb:.1f} GB after {waited / 60:.0f} min",
-                params={"minutes": math.ceil(waited / 60)},
+                params={"minutes": math.ceil(waited / 60), **short},
             )
         if on_wait is not None:
             avail = snapshot.mem_available_gb if cgroup is None else min(snapshot.mem_available_gb, cgroup)

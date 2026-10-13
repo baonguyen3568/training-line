@@ -191,7 +191,10 @@ error:
       corrupt: Không đọc được file khoá máy nên app tạm coi máy là đang bận. Hãy báo quản trị viên.
   SYS-002:
     title: Chờ máy rảnh quá lâu
-    what: Workflow đã chờ {minutes} phút nhưng máy vẫn bận với tác vụ khác.
+    what:
+      lock: 'Workflow đã chờ {minutes} phút nhưng GPU vẫn đang bận với một việc nặng khác.'
+      memory: 'Workflow đã chờ {minutes} phút nhưng máy vẫn chưa đủ bộ nhớ trống: cần khoảng {need_gb} GB, đang trống {avail_gb} GB.'
+      vram: 'Workflow đã chờ {minutes} phút nhưng GPU vẫn chưa đủ bộ nhớ riêng (VRAM) trống: cần khoảng {need_gb} GB, đang trống {avail_gb} GB.'
   GPU-003:
     title: Kiểu nén này chạy chậm trên máy
     what: NVFP4 trên máy này có thể chạy chậm hơn FP8 mà chất lượng tương đương.
@@ -247,7 +250,16 @@ error:
     what: '"{node}" cần "{port}" nhưng chưa có dây nối vào.'
   CFG-005:
     title: Một thiết lập không hợp lệ
-    what: '"{param}" của "{node}" đang là {value}, nhưng phải {rule}.'
+    what:
+      default: '"{param}" của "{node}" đang là {value}, nhưng phải {rule}.'
+      advanced_type: 'Tuỳ chọn engine "{key}" của bước "{node}" sai kiểu giá trị (đang là {value}). Hãy nhập đúng kiểu ghi trong "?" của tuỳ chọn này.'
+      advanced_range: 'Tuỳ chọn engine "{key}" của bước "{node}" đang là {value}, nằm ngoài khoảng cho phép. Xem khoảng trong "?" của tuỳ chọn này.'
+      advanced_choice: 'Tuỳ chọn engine "{key}" của bước "{node}" đang là {value}, không thuộc các lựa chọn có sẵn. Hãy chọn một giá trị trong danh sách.'
+      advanced_resolver: 'Tuỳ chọn engine "{key}" của bước "{node}" dùng biểu thức tham chiếu tới giá trị khác, app không cho phép. Hãy nhập một giá trị cụ thể.'
+      advanced_not_offered: 'Engine của bước "{node}" không có tuỳ chọn "{key}" ở phiên bản này. Hãy xoá tuỳ chọn đó.'
+      advanced_too_many: 'Bước "{node}" có quá nhiều tuỳ chọn engine đã đổi. Hãy bỏ bớt những tuỳ chọn không cần.'
+      advanced_not_for_model: 'Tuỳ chọn engine "{key}" không dùng được với model đang nối vào bước "{node}". Hãy xoá tuỳ chọn đó hoặc đổi model.'
+      advanced: 'Một tuỳ chọn engine của bước "{node}" không hợp lệ. Mở mục Nâng cao của bước này để xem và sửa.'
   CFG-006:
     title: Có dây nối tới bước không tồn tại
     what: Một dây trỏ tới "{node_id}" nhưng bước này đã bị xoá hoặc đổi tên.

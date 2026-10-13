@@ -67,9 +67,9 @@ def test_timeout_raises_sys_002_with_minutes() -> None:
     clock = _Clock()
     with pytest.raises(MemoryWaitTimeoutError) as ei:
         wait_for_memory(20.0, read=_feed(*[10.0] * 100), read_cgroup=lambda: None, cancel=_Tick(clock),
-                        clock=clock, poll_s=60.0, timeout_s=300.0)  # fmt: skip
+                        clock=clock, poll_s=60.0, timeout_s=300.0, gpus=lambda: [])  # fmt: skip
     assert ei.value.code == "SYS-002"
-    assert ei.value.params == {"minutes": 5}
+    assert ei.value.params == {"minutes": 5, "waiting_for": "memory", "need_gb": 28.0, "avail_gb": 10.0}
 
 
 def _gpu(free_gb_seq: list[float]):  # type: ignore[no-untyped-def]
@@ -113,3 +113,17 @@ def test_uma_asks_nvidia_smi_once_not_on_every_poll() -> None:
     assert wait_for_memory(20.0, read=_feed(5.0, 5.0, 80.0), read_cgroup=lambda: None, cancel=_Tick(clock),
                            clock=clock, gpus=gpus)  # fmt: skip
     assert len(calls) == 1
+
+
+def test_timeout_says_what_it_waited_for() -> None:
+    """SYS-002 text variants (bao-design): host memory vs discrete-GPU VRAM, with the numbers."""
+    clock = _Clock()
+    with pytest.raises(MemoryWaitTimeoutError) as ei:
+        wait_for_memory(20.0, read=_feed(*[200.0] * 5), read_cgroup=lambda: None, cancel=_Tick(clock), clock=clock,
+                        timeout_s=60.0, poll_s=30.0, gpus=_gpu([10.0] * 5))  # fmt: skip
+    assert ei.value.params == {"minutes": 1, "waiting_for": "vram", "need_gb": 25.0, "avail_gb": 10.0}
+    clock = _Clock()
+    with pytest.raises(MemoryWaitTimeoutError) as ei:
+        wait_for_memory(20.0, read=_feed(*[5.0] * 5), read_cgroup=lambda: None, cancel=_Tick(clock), clock=clock,
+                        timeout_s=60.0, poll_s=30.0, gpus=lambda: [])  # fmt: skip
+    assert ei.value.params["waiting_for"] == "memory"

@@ -187,7 +187,17 @@ SYS-002:
   slug: GPU_LOCK_TIMEOUT
   severity: warn
   prevent_in_preflight: false
-  params: [minutes]
+  # waiting_for: what the queue waited for. memory = the host's free RAM under the 80%-of-free rule (ADR-005 A1),
+  # vram = a discrete GPU's free VRAM (D-4); both carry need_gb / avail_gb. Absent (older emitters) = lock.
+  params:
+    - minutes
+    - {name: waiting_for, type: enum, values: [lock, memory, vram]}
+    - need_gb
+    - avail_gb
+  variants:
+    - {when: {waiting_for: memory}, key: memory}
+    - {when: {waiting_for: vram}, key: vram}
+    - {when: {}, key: lock}
   match:
     - {kind: executor, value: queue_wait_timeout}
   actions:
@@ -453,6 +463,19 @@ CFG-005:
   # key: the dotted engine option inside `advanced` (P016 §3, one issue per bad key; "" when the key has no valid shape,
   # never echoed). rule for advanced: type | range | choice | resolver | not_offered | too_many | not_for_model.
   params: [{name: node, ref: node}, {name: param, ref: param}, value, rule, key]
+  # Variants in order (first match): advanced option texts by rule, the generic advanced text when the key is empty
+  # or the rule unknown (every advanced_* text names {key}), and the original text for every other param (bao-design).
+  variants:
+    - {when: {param: advanced, rule: too_many}, key: advanced_too_many}
+    - {when: {param: advanced, key: ""}, key: advanced}
+    - {when: {param: advanced, rule: type}, key: advanced_type}
+    - {when: {param: advanced, rule: range}, key: advanced_range}
+    - {when: {param: advanced, rule: choice}, key: advanced_choice}
+    - {when: {param: advanced, rule: resolver}, key: advanced_resolver}
+    - {when: {param: advanced, rule: not_offered}, key: advanced_not_offered}
+    - {when: {param: advanced, rule: not_for_model}, key: advanced_not_for_model}
+    - {when: {param: advanced}, key: advanced}
+    - {when: {}, key: default}
   match:
     - {kind: validate, value: "node params ValidationError"}
     # Runtime guard from AutoModel patch 0002: trainable share outside the recipe's expectation (freeze did not

@@ -191,7 +191,10 @@ error:
       corrupt: The machine's lock file can't be read, so the app treats the machine as busy for now. Please tell an admin.
   SYS-002:
     title: Waited too long for the machine
-    what: The workflow has waited {minutes} minutes but the machine is still busy.
+    what:
+      lock: 'The workflow has waited {minutes} minutes, but the GPU is still busy with another heavy job.'
+      memory: 'The workflow has waited {minutes} minutes, but there is still not enough free memory: it needs about {need_gb} GB and {avail_gb} GB is free.'
+      vram: 'The workflow has waited {minutes} minutes, but the GPU still lacks free VRAM: it needs about {need_gb} GB and {avail_gb} GB is free.'
   GPU-003:
     title: This compression is slow here
     what: On this machine NVFP4 may run slower than FP8 with similar quality.
@@ -247,7 +250,16 @@ error:
     what: '"{node}" needs "{port}" but nothing is connected.'
   CFG-005:
     title: A setting is not valid
-    what: '"{param}" of "{node}" is {value}, but it must {rule}.'
+    what:
+      default: '"{param}" of "{node}" is {value}, but it must {rule}.'
+      advanced_type: 'Engine option "{key}" of "{node}" has the wrong kind of value ({value}). Enter the kind shown in the option''s "?".'
+      advanced_range: 'Engine option "{key}" of "{node}" is {value}, outside the allowed range. See the range in the option''s "?".'
+      advanced_choice: 'Engine option "{key}" of "{node}" is {value}, which is not one of its choices. Pick a value from the list.'
+      advanced_resolver: 'Engine option "{key}" of "{node}" refers to another value, which the app does not allow. Enter a plain value.'
+      advanced_not_offered: 'The engine of "{node}" has no option "{key}" in this version. Remove that option.'
+      advanced_too_many: '"{node}" has too many changed engine options. Remove the ones you do not need.'
+      advanced_not_for_model: 'Engine option "{key}" does not work with the model connected to "{node}". Remove the option or change the model.'
+      advanced: 'An engine option of "{node}" is not valid. Open the step''s Advanced section to review it.'
   CFG-006:
     title: A wire points to a missing step
     what: A wire points to "{node_id}", but that step was deleted or renamed.

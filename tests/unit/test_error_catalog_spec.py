@@ -211,6 +211,8 @@ def test_variants_cover_every_combination() -> None:
         variants = getattr(entry, "variants", None)
         if not variants:
             continue
+        if any(not v.when for v in variants):  # a catch-all variant (when: {}) matches every combination, also of
+            continue  # free-form params such as CFG-005's param / key
         names = sorted({n for v in variants for n in v.when})
         for combo in itertools.product(*(_values(entry, n) for n in names)):
             env = dict(zip(names, combo, strict=True))

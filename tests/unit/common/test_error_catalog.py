@@ -371,3 +371,21 @@ def test_resolved_actions_without_a_node_never_ship_a_param_patch() -> None:
     err = SimpleNamespace(code="QNT-001", params={"reason": "top1"})
     graph_op = next(a for a in resolved_actions(err, NodeContext(params={})) if a["id"] == "remove_step")
     assert (graph_op["kind"], graph_op["patch"]) == ("patch", None)  # a graph operation, known by its id
+
+
+@pytest.mark.parametrize(
+    ("code", "params", "variant"),
+    [
+        ("CFG-005", {"param": "advanced", "key": "optimizer.lr", "rule": "range"}, "advanced_range"),
+        ("CFG-005", {"param": "advanced", "key": "", "rule": "range"}, "advanced"),  # never a text naming ""
+        ("CFG-005", {"param": "advanced", "key": "", "rule": "too_many"}, "advanced_too_many"),
+        ("CFG-005", {"param": "advanced", "key": "x", "rule": "new_rule"}, "advanced"),
+        ("CFG-005", {"param": "max_seq_len", "rule": "trainable_pct"}, "default"),
+        ("SYS-002", {"minutes": 30}, "lock"),
+        ("SYS-002", {"minutes": 30, "waiting_for": "vram"}, "vram"),
+    ],
+)
+def test_text_variants_follow_the_params(code: str, params: dict[str, object], variant: str) -> None:
+    from vlm_pipeline.common.error_catalog import variant_key
+
+    assert variant_key(code, params) == variant
