@@ -10,12 +10,16 @@ Each failed condition is a ``Finding`` carrying a catalog ``code`` + ``params`` 
 from __future__ import annotations
 
 import json
+import math
+import threading
+import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import ClassVar
 
 from vlm_pipeline.common.diskguard import DiskSnapshot, LockStatus, check_disk, check_lock, read_disk, required_disk_gb
-from vlm_pipeline.common.errors import ExitCode
+from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 from vlm_pipeline.common.gpu_lock import default_lock_path
 from vlm_pipeline.common.memguard import (
     DEFAULT_THRESHOLDS,
@@ -204,4 +208,59 @@ def preflight(
     return combine(findings, details=details)
 
 
-__all__ = ["Finding", "Verdict", "check_lock_status", "check_memory", "combine", "preflight"]
+class MemoryWaitTimeoutError(VlmPipelineError):
+    """The job waited ``minutes`` for free memory (ADR-005 A1 budget) and still did not fit: tell the user."""
+
+    code: ClassVar[str] = "SYS-002"
+
+
+def wait_for_memory(
+    est_peak_gb: float,
+    *,
+    thresholds: MemThresholds = DEFAULT_THRESHOLDS,
+    poll_s: float = 30.0,
+    timeout_s: float = 1800.0,
+    on_wait: Callable[[dict[str, float]], None] | None = None,
+    cancel: threading.Event | None = None,
+    read: Callable[[], MemSnapshot] = read_meminfo,
+    read_cgroup: Callable[[], float | None] = read_cgroup_available_gb,
+    clock: Callable[[], float] = time.monotonic,
+) -> bool:
+    """Block until a job of ``est_peak_gb`` fits the memory budget (PM 2026-10-13: queue, do not fail).
+
+    Returns True when it fits (immediately if it already does), False when ``cancel`` is set while waiting.
+    ``on_wait({need_gb, avail_gb, waited_s})`` is called on every poll that does not fit (the UI shows "waiting
+    for free memory"). Past ``timeout_s`` raises ``MemoryWaitTimeoutError`` (SYS-002, params ``minutes``). No lock
+    is taken here: callers wait BEFORE acquiring the GPU lock.
+    """
+    stop = cancel if cancel is not None else threading.Event()
+    start = clock()
+    need = thresholds.required_available_gb(est_peak_gb)
+    while True:
+        snapshot = read()
+        cgroup = read_cgroup()
+        if not check_memory(est_peak_gb, snapshot=snapshot, cgroup_available_gb=cgroup, thresholds=thresholds):
+            return True
+        waited = clock() - start
+        if waited >= timeout_s:
+            raise MemoryWaitTimeoutError(
+                f"no memory for {est_peak_gb:.1f} GB after {waited / 60:.0f} min",
+                params={"minutes": math.ceil(waited / 60)},
+            )
+        if on_wait is not None:
+            avail = snapshot.mem_available_gb if cgroup is None else min(snapshot.mem_available_gb, cgroup)
+            on_wait({"need_gb": round(need, 2), "avail_gb": round(avail, 2), "waited_s": waited})
+        if stop.wait(poll_s):
+            return False
+
+
+__all__ = [
+    "Finding",
+    "MemoryWaitTimeoutError",
+    "Verdict",
+    "check_lock_status",
+    "check_memory",
+    "combine",
+    "preflight",
+    "wait_for_memory",
+]
