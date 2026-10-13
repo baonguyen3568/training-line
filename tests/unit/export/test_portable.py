@@ -65,3 +65,17 @@ def test_machine_paths_in_any_text_file_are_found(tmp_path: Path) -> None:
         "notes.txt: contains a machine path (/home/)",
         "trainer_state.json: contains a machine path (/workspace)",
     ]
+
+
+def test_files_identical_to_upstream_are_not_marker_scanned(tmp_path: Path) -> None:
+    """Qwen's own vocab.json has a "/workspace" token: same bytes as upstream = nothing of this machine."""
+    up, out = tmp_path / "up", tmp_path / "out"
+    up.mkdir()
+    out.mkdir()
+    (up / "vocab.json").write_text('{"/workspace": 1}')
+    (out / "vocab.json").write_text('{"/workspace": 1}')
+    (out / "README.md").write_text("trained in /home/x/run\n")
+    findings = portable.absolute_path_findings(out, upstream=up)
+    assert findings == ["README.md: contains a machine path (/home/)"]
+    (out / "vocab.json").write_text('{"/workspace": 2}')  # changed here: scanned again
+    assert "vocab.json: contains a machine path (/workspace)" in portable.absolute_path_findings(out, upstream=up)

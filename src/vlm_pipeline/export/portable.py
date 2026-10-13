@@ -8,6 +8,7 @@ layout and breaks elsewhere).
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -46,13 +47,33 @@ def remote_code_findings(folder: Path) -> list[str]:
     return findings
 
 
-def absolute_path_findings(folder: Path) -> list[str]:
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _same_as_upstream(path: Path, upstream: Path | None) -> bool:
+    """``path`` is byte-identical to the file of the same name in the base model's own snapshot."""
+    if upstream is None:
+        return False
+    original = upstream / path.name
+    return original.is_file() and original.stat().st_size == path.stat().st_size and _sha256(original) == _sha256(path)
+
+
+def absolute_path_findings(folder: Path, *, upstream: Path | None = None) -> list[str]:
     """Machine paths a shared folder must not carry (they leak the user name and break elsewhere).
 
     Every text file (json/txt/jinja/md) is scanned for path markers; JSON ``_name_or_path`` must not be absolute.
+    A file byte-identical to the one in ``upstream`` (the base model's snapshot) is not marker-scanned: it holds
+    nothing of this machine (Qwen's vocab has a "/workspace" token).
     """
     findings: list[str] = []
     for text_file in sorted(p for p in folder.iterdir() if p.suffix in TEXT_SUFFIXES and p.is_file()):
+        if _same_as_upstream(text_file, upstream):
+            continue
         text = text_file.read_bytes().decode("utf-8", errors="replace")
         findings += [f"{text_file.name}: contains a machine path ({m})" for m in _PATH_MARKERS if m in text]
     for cfg in sorted(folder.glob("*.json")):

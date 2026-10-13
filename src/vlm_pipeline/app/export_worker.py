@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
+import re
 import secrets
 import shutil
 import stat
@@ -32,6 +34,7 @@ from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
 if TYPE_CHECKING:
     from vlm_pipeline.app.workers import RealWorker
 
+logger = logging.getLogger(__name__)
 COPY_SUFFIXES = frozenset({".safetensors", ".json", ".jinja", ".txt", ".model", ".tiktoken"})
 NEVER_COPY = frozenset({"run.json", "merge_report.json", "dataset.json", "problems.json", "export.json"})
 
@@ -64,35 +67,69 @@ class ExportIncompleteError(VlmPipelineError):
     code: ClassVar[str] = "EXP-004"
 
 
-def _copy_allowed(src: Path, dst: Path, *, blobs: Path | None = None) -> list[str]:
+_SHA256_NAME = re.compile(r"[0-9a-f]{64}")
+
+
+def _copy_verified(source: Path, dest: Path, *, expect: str | None) -> bool:
+    """Copy ``source``'s content; with ``expect`` (a sha256) the bytes must hash to it, else nothing is kept.
+
+    A damaged cache blob is left out: the completeness check then names the missing file (EXP-004).
+    """
+    digest = hashlib.sha256()
+    with source.open("rb") as fin, dest.open("xb") as fout:
+        for chunk in iter(lambda: fin.read(8 << 20), b""):
+            digest.update(chunk)
+            fout.write(chunk)
+    if expect is not None and digest.hexdigest() != expect:
+        dest.unlink()
+        logger.warning("export: blob %s does not match its sha256 name; left out", source.name[:12])
+        return False
+    return True
+
+
+def _copy_allowed(src: Path, dst: Path, *, blobs: tuple[Path, ...] = ()) -> list[str]:
     """Copy the model files of ``src`` (plain files) into ``dst``; returns the names copied.
 
-    An HF hub snapshot is made of links into its repo's ``blobs/``: a link whose target is a plain file inside
-    ``blobs`` (that repo only) is copied as its content; any other link is skipped.
+    An HF hub snapshot is made of links into its repo's ``blobs/``, which may link again into the shared,
+    deduplicated store ``.cache/hf/hub/blobs/<xx>/<sha256>`` (tester, release 1.0). A link whose final target is a
+    plain file inside one of ``blobs`` is copied as its content (a shared-store file must hash to its name); any
+    other link is skipped.
     """
     copied = []
     for path in sorted(src.iterdir()):
         if path.suffix not in COPY_SUFFIXES or path.name in NEVER_COPY:
             continue
-        source = path
+        source, expect = path, None
         if path.is_symlink():
             target = Path(os.path.realpath(path))
-            if blobs is None or not target.is_relative_to(blobs):
+            if not any(target.is_relative_to(b) for b in blobs):
                 continue
             source = target
+            expect = target.name if blobs[-1:] and target.is_relative_to(blobs[-1]) else None
+            if expect is not None and not _SHA256_NAME.fullmatch(expect):
+                continue  # the shared store names blobs by sha256: anything else is not one of its blobs
         if not stat.S_ISREG(source.lstat().st_mode):
             continue
-        shutil.copyfile(source, dst / path.name)
-        copied.append(path.name)
+        if _copy_verified(source, dst / path.name, expect=expect):
+            copied.append(path.name)
     return copied
 
 
-def _hub_blobs(root: Path, src: Path) -> Path | None:
-    """``blobs/`` of the HF hub repo ``src`` is a snapshot of (resolved), or None when ``src`` is not in the hub."""
-    rel = src.resolve().relative_to(root.resolve()) if src.resolve().is_relative_to(root.resolve()) else None
-    if rel is None or rel.parts[:3] != (".cache", "hf", "hub") or len(rel.parts) < 4:
-        return None
-    return Path(os.path.realpath(root.resolve().joinpath(*rel.parts[:4], "blobs")))
+def _hub_blobs(root: Path, src: Path) -> tuple[Path, ...]:
+    """Where the links of hub snapshot ``src`` may lead: its repo's ``blobs/``, then the shared store (resolved).
+
+    Empty when ``src`` is not in the hub. The shared ``.cache/hf/hub/blobs`` store is last: its files are checked
+    against their sha256 names.
+    """
+    base = root.resolve()
+    real = src.resolve()
+    if not real.is_relative_to(base):
+        return ()
+    rel = real.relative_to(base)
+    if rel.parts[:3] != (".cache", "hf", "hub") or len(rel.parts) < 4 or rel.parts[3] == "blobs":
+        return ()
+    hub = base.joinpath(*rel.parts[:3])
+    return (Path(os.path.realpath(hub / rel.parts[3] / "blobs")), Path(os.path.realpath(hub / "blobs")))
 
 
 def _check_complete(folder: Path, job: NodeJob) -> None:
@@ -138,10 +175,11 @@ def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
     tmp = dest.with_name(f".{dest.name}.tmp-{secrets.token_hex(4)}")
     tmp.mkdir()
     try:
+        upstream = worker._catalog_model_path(entry)
         _copy_allowed(src, tmp, blobs=_hub_blobs(worker.root, src))
         _check_complete(tmp, job)
         portable.neutralize_name_or_path(tmp, f"{entry.repo}@{entry.revision}")
-        if portable.remote_code_findings(tmp) or portable.absolute_path_findings(tmp):
+        if portable.remote_code_findings(tmp) or portable.absolute_path_findings(tmp, upstream=upstream):
             raise ExportUnsupportedError("export is not portable", params=unsupported)
         base_ref = model.hash if "@" in model.hash.split(":", 1)[0] else None
         components, mods, gaps = notices.lineage(
@@ -151,7 +189,7 @@ def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
         try:
             attribution = notices.write_notices(
                 tmp, root=worker.root, components=components, modifications=mods, gaps=gaps, catalog=worker.catalog,
-                upstream_dir=worker._catalog_model_path(entry),
+                upstream_dir=upstream,
             )  # fmt: skip
         except notices.LicenseTextMissingError as exc:
             raise ExportLicenseMissingError(str(exc), params={"license_ids": ", ".join(exc.licenses)}) from exc

@@ -164,3 +164,51 @@ def test_a_sharded_export_needs_every_shard_its_index_names(tmp_path: Path) -> N
     assert err.value.params["files"] == "model-00002-of-00002.safetensors"
     (folder / "model-00002-of-00002.safetensors").write_bytes(b"w")
     export_worker._check_complete(folder, job)
+
+
+def _shared_blob(w: RealWorker, data: bytes, *, name: str | None = None) -> Path:
+    import hashlib
+
+    sha = name or hashlib.sha256(data).hexdigest()
+    blob = w.root / ".cache" / "hf" / "hub" / "blobs" / sha[:2] / sha
+    blob.parent.mkdir(parents=True, exist_ok=True)
+    blob.write_bytes(data)
+    return blob
+
+
+def test_weights_reached_through_the_shared_blob_store_are_exported(tmp_path: Path) -> None:
+    """tester BUG 1: snapshot -> repo blobs/<x> (a link) -> .cache/hf/hub/blobs/<xx>/<sha256> (the file)."""
+    w, entry, _ = _setup(tmp_path)
+    snap = _hub_snapshot(w, entry)
+    (snap / "model.safetensors").unlink()
+    repo_blob = snap.parent.parent / "blobs" / "04b1c3"
+    repo_blob.symlink_to(_shared_blob(w, b"big weights"))
+    (snap / "model.safetensors").symlink_to("../../blobs/04b1c3")
+    picked = w.run(_job_pick(w))
+    w.run(_job(Path(picked.outputs["model"].path), w.root / "outputs" / "graph" / "runs" / "x-1",
+               ref=picked.outputs["model"]))  # fmt: skip
+    assert (w.root / "outputs" / "exports" / "my-model" / "model.safetensors").read_bytes() == b"big weights"
+
+
+def test_a_shared_blob_whose_content_is_not_its_name_is_left_out(tmp_path: Path) -> None:
+    w, entry, _ = _setup(tmp_path)
+    snap = _hub_snapshot(w, entry)
+    (snap / "model.safetensors").unlink()
+    (snap / "model.safetensors").symlink_to(_shared_blob(w, b"tampered", name="0" * 64))
+    picked = w.run(_job_pick(w))
+    with pytest.raises(export_worker.ExportIncompleteError) as err:
+        w.run(_job(Path(picked.outputs["model"].path), w.root / "outputs" / "graph" / "runs" / "x-1",
+                   ref=picked.outputs["model"]))  # fmt: skip
+    assert err.value.params["files"] == "*.safetensors"
+
+
+def test_a_tokenizer_identical_to_upstream_may_hold_a_path_like_token(tmp_path: Path) -> None:
+    """tester BUG 2: Qwen's own vocab has a "/workspace" token; only files changed on this machine are scanned."""
+    w, entry, _ = _setup(tmp_path)
+    snap = _hub_snapshot(w, entry)
+    vocab = '{"/workspace": 1, "a": 2}'
+    (snap / "vocab.json").write_text(vocab)
+    picked = w.run(_job_pick(w))
+    w.run(_job(Path(picked.outputs["model"].path), w.root / "outputs" / "graph" / "runs" / "x-1",
+               ref=picked.outputs["model"]))  # fmt: skip
+    assert (w.root / "outputs" / "exports" / "my-model" / "vocab.json").read_text() == vocab
