@@ -131,9 +131,12 @@ def main() -> int:
 
     out_dir, t0 = Path(a.out), time.time()
     report: dict[str, Any] = {"modelopt": modelopt.__version__, "transformers": transformers.__version__, **vars(a)}
-    processor = AutoProcessor.from_pretrained(a.model)
-    model = AutoModelForImageTextToText.from_pretrained(a.model, torch_dtype=torch.bfloat16).to("cuda").eval()
+    processor = AutoProcessor.from_pretrained(a.model, local_files_only=True)
+    model = AutoModelForImageTextToText.from_pretrained(a.model, torch_dtype=torch.bfloat16, local_files_only=True)
+    model = model.to("cuda").eval()
     report["model_class"] = type(model).__name__
+    report["model_revision"] = Path(a.model).name  # HF snapshot dir name = commit sha
+    report["skip_patterns"] = list(SKIP_PATTERNS)
     calib = load_images(Path(a.cord), "train", a.calib)
     held = load_images(Path(a.cord), "validation", a.parity)
     with torch.no_grad():
@@ -154,7 +157,8 @@ def main() -> int:
     report["size_gb"] = {"bf16": round(dir_gb(Path(a.model)), 3), "fp8": round(dir_gb(fp8_dir), 3)}
     qcfg = fp8_dir / "hf_quant_config.json"
     report["hf_quant_config"] = json.loads(qcfg.read_text()) if qcfg.exists() else None
-    report["peak_gpu_gb"] = round(torch.cuda.max_memory_allocated() / 2**30, 2)
+    # torch allocator peak only: on GB10 (UMA) the real peak is run.json peak_mem_gb (jobrun memguard)
+    report["torch_alloc_peak_gb"] = round(torch.cuda.max_memory_allocated() / 2**30, 2)
     report["wall_s"] = round(time.time() - t0, 1)
     (out_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
