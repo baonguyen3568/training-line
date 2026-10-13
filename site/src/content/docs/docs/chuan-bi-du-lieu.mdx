@@ -1,0 +1,72 @@
+---
+title: Chuẩn bị thư mục dữ liệu của bạn
+description: "Cách xếp ảnh và file labels.jsonl để node Thư mục ảnh + câu hỏi/đáp án đọc được, kèm ví dụ và các lỗi thường gặp."
+sidebar:
+  order: 5
+sources:
+  - src/vlm_pipeline/data/local_folder.py
+  - src/vlm_pipeline/data/config.py
+  - src/vlm_pipeline/common/local_records.py
+  - src/vlm_pipeline/common/image_rules.py
+  - .team/proposals/P4-2-standards-as-data.md
+---
+import Hint from '~/components/Hint.astro';
+
+Đặt mọi ảnh vào một thư mục, cùng với một file tên **`labels.jsonl`**. Mỗi dòng của file là một mẫu: tên ảnh và câu trả lời bạn muốn model học. File phải lưu ở mã **UTF-8**.
+
+## Ví dụ
+
+Thư mục:
+
+```
+hoa-don-cua-toi/
+  labels.jsonl
+  hd001.jpg
+  hd002.png
+```
+
+`labels.jsonl` (mỗi dòng một mẫu):
+
+```json
+{"image": "hd001.jpg", "target": {"store": "Cafe A", "total": "45.000"}}
+{"image": "hd002.png", "target": "Tổng tiền: 120.000", "prompt": "Tổng tiền trên hoá đơn là bao nhiêu?"}
+```
+
+| Khoá | Bắt buộc | Nghĩa |
+|---|---|---|
+| `image` | Có | Tên file ảnh trong chính thư mục này |
+| `target` | Có | Câu trả lời mong muốn: một đoạn chữ, hoặc một object JSON |
+| `prompt` | Không | Câu hỏi đặt cho model. Bỏ trống thì app dùng câu mặc định "Describe this image." |
+
+<Hint title="Khi nào target nên là object JSON?">
+Khi bạn muốn model trả về các trường có cấu trúc (như mẫu Đọc hoá đơn). App chuyển object đó sang đúng định dạng model đã học, và chấm điểm được theo từng trường. Nếu target là đoạn chữ, app dùng nguyên văn.
+</Hint>
+
+<Hint title="Model Nemotron Parse có dùng prompt không?">
+Không. Nemotron Parse luôn dùng câu lệnh cố định của nó, nên khoá `prompt` bị bỏ qua với model này.
+</Hint>
+
+## Yêu cầu với ảnh
+
+- Định dạng PNG, JPEG hoặc WEBP.
+- Mỗi ảnh không quá 20 MB và không quá 40 triệu điểm ảnh.
+- Cạnh dài nhất không quá 4096 điểm ảnh (đổi được trong phần Nâng cao của node, tối đa 8192).
+- Mỗi ảnh chỉ xuất hiện ở một dòng.
+
+## Lỗi thường gặp
+
+App kiểm cả thư mục trước khi train và liệt kê các dòng có vấn đề (tối đa 50 dòng mỗi lần, kèm tổng số):
+
+| Vấn đề | Cách sửa |
+|---|---|
+| Không có file `labels.jsonl` | Đặt file đúng tên vào thư mục đã chọn |
+| Dòng không phải JSON hợp lệ | Mỗi dòng phải là một object `{...}` riêng, không có dấu phẩy cuối dòng. File lưu từ Excel thường không phải UTF-8: hãy lưu lại ở mã UTF-8 |
+| Có khoá lạ | Chỉ dùng `image`, `target`, `prompt` |
+| Tên ảnh sai hoặc trỏ ra ngoài thư mục | Ghi đúng tên file, không dùng đường dẫn như `../` |
+| `target` trống | Ghi câu trả lời cho mọi dòng |
+| Ảnh trùng | Mỗi ảnh chỉ một dòng |
+| Ảnh hỏng, sai định dạng hoặc quá lớn | Lưu lại thành PNG hoặc JPEG, thu nhỏ nếu cần |
+
+<Hint title="Cần bao nhiêu mẫu?">
+Với dưới 100 mẫu, model dễ học thuộc thay vì học cách làm; app sẽ cảnh báo. Nên có thêm một phần dữ liệu để kiểm tra; bước **Chia dữ liệu học / kiểm tra** tách giúp bạn.
+</Hint>
