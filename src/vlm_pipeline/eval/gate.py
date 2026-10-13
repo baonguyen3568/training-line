@@ -118,8 +118,14 @@ def finetune_gate(results: list[BenchmarkResult], gates: dict[str, Any] | None =
 def quant_gate(results: list[BenchmarkResult], precision: str, gates: dict[str, Any] | None = None) -> GateResult:
     """Quantized model vs its bf16 parent (P002 B3); ``precision`` is a key of ``quant_vs_parent``.
 
-    TODO(P002): judge FAIL on the paired CI (high < threshold) instead of the mean point estimate; benchmark ids
-    ("ocrbench", "docvqa") and structured_output move to the benchmark registry (configs/eval, bao-research).
+    PASS / WARN / FAIL follow the point estimates (P002 §A6). The paired CI95 of each benchmark's delta is still
+    read: a CI that reaches the FAIL level while the point estimate does not adds WARN ``uncertain_run_full``
+    (with 0/1 scores the CI half-width is about 1.96 * sqrt(discordant share / n): 500 questions cannot separate
+    -1 from 0).
+    TODO(multi-benchmark suites): -2 is the level of the MEAN; with several benchmarks the uncertain label should
+    use the CI of the mean against -2 and each benchmark's CI against fail_below_any (-5). Correct today because
+    the quantize template's suite is OCRBench alone.
+    TODO: benchmark ids ("ocrbench", "docvqa") and structured_output move to the benchmark registry.
     """
     gates = gates or load_gates()
     rules = gates["quant_vs_parent"][precision]
@@ -134,6 +140,12 @@ def quant_gate(results: list[BenchmarkResult], precision: str, gates: dict[str, 
             continue
         if r.delta < rules["fail_below_any"]:
             reasons.append(Reason("quant_drop_any", Verdict.FAIL, r.benchmark, r.delta, rules["fail_below_any"]))
+        elif (
+            r.delta_ci95 is not None and r.delta >= rules["warn_min_mean"] and r.delta_ci95[0] < rules["warn_min_mean"]
+        ):
+            reasons.append(
+                Reason("uncertain_run_full", Verdict.WARN, r.benchmark, list(r.delta_ci95), rules["warn_min_mean"])
+            )
         ocr_limit = rules.get("ocr_docvqa_fail_below")
         if ocr_limit is not None and r.benchmark in {"ocrbench", "docvqa"} and r.delta < ocr_limit:
             reasons.append(Reason("quant_drop_ocr", Verdict.FAIL, r.benchmark, r.delta, ocr_limit))

@@ -98,3 +98,20 @@ def test_nvfp4_ocr_is_stricter() -> None:
 def test_quant_on_few_samples_is_only_indicative() -> None:
     result = quant_gate([BenchmarkResult("cord_test", n=30, delta=0.0)], "fp8")
     assert (result.status, [r.code for r in result.reasons]) == (Verdict.WARN, ["quick_measurement"])
+
+
+def test_quant_ci_reaching_the_fail_level_asks_for_a_full_run() -> None:
+    # P002 A6: the point estimate passes (-0.5), but the paired CI reaches -2 (FP8 FAIL level): WARN, run the full set.
+    wide = BenchmarkResult("ocrbench", n=500, delta=-0.5, delta_ci95=(-2.6, 1.6))
+    result = quant_gate([wide], "fp8")
+    assert result.status == Verdict.WARN
+    assert [r.code for r in result.reasons] == ["uncertain_run_full"]
+    narrow = BenchmarkResult("ocrbench", n=1000, delta=-0.5, delta_ci95=(-1.4, 0.4))
+    assert quant_gate([narrow], "fp8").status == Verdict.PASS
+
+
+def test_quant_point_estimate_still_decides_fail() -> None:
+    bad = BenchmarkResult("ocrbench", n=1000, delta=-2.5, delta_ci95=(-3.5, -1.5))
+    result = quant_gate([bad], "fp8")
+    assert result.status == Verdict.FAIL
+    assert "uncertain_run_full" not in [r.code for r in result.reasons]  # already a FAIL, no extra hedge
