@@ -1,6 +1,15 @@
 # Proposal 013: storage gaps G-1 (panel API) và G-2 (retention theo lịch)
 
-- Tác giả: bao-cleanup, 2026-10-13. Trạng thái: **DRAFT**, chờ PM chốt các câu hỏi Q1–Q4.
+- Tác giả: bao-cleanup, 2026-10-13. Trạng thái: **ACCEPTED** (PM chốt 2026-10-13).
+
+## Quyết định PM (2026-10-13)
+- **Q1**: đồng ý. Scheduler tự áp dụng D3, set-aside đã superseded và evict cache tạm. **Không bao giờ** tự làm item
+  PERMANENT_LOSS hay item bị chặn; các item đó vào mục "Cần bạn chọn".
+- **Q2**: đồng ý. Scheduler tính vào quota 20 GB/24h của `shared_dev`, dừng khi chạm ngưỡng, không tự duyệt.
+- **Q3**: **bỏ qua lượt khi GPU lock đang được giữ** (khác đề xuất), để tránh tranh IO/RAM với job train và để việc
+  suy luận về an toàn đơn giản hơn. Lượt sau chạy lại.
+- **Q4**: đồng ý. Bản cài cá nhân bật mặc định; `shared_dev` chỉ dry-run cho tới khi PM bật.
+- **G-1**: bắt đầu ngay.
 - Phạm vi: mở rộng ADR-005, không đổi các luật D3/D7 đã chốt. Chỉ quyết định **cái gì chạy tự động** và **API cho panel**.
 - Reviewer: bao-backend (scheduler trong app), bao-security (đường xoá tự động), bao-frontend (schema API).
 
