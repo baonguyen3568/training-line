@@ -23,10 +23,10 @@
     "steps": 272
   },
   "code": {
-    "worktree_commit": "d7253f4 (clean worktree, VLM_PROJECT_ROOT = main tree)",
+    "worktree_commit": "d7253f4 (host side only: executor/worker/recipe/run_job ran from a clean worktree, VLM_PROJECT_ROOT = main tree)",
     "run_json_git_commit": "3441aa578ad00c80066cd6b059e3f081c4188cb3",
     "run_json_git_dirty": true,
-    "note": "run.json records the main tree's commit/dirty flag, not the clean worktree the driver ran from"
+    "note": "run.json records the main tree's commit/dirty flag. The container mounted the MAIN tree, so code inside the job (/workspace/src) was the shared working tree, possibly with others' uncommitted changes; the training engine itself is the pinned image vlm-automodel:26.08-6"
   },
   "container": {
     "image": "vlm-automodel:26.08-6",
