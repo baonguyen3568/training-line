@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -327,7 +329,9 @@ def test_a_run_id_gets_its_job_once(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     root = _probe_root(tmp_path, "bao-security APPROVED 2026-10-13")
     monkeypatch.setattr(jobrun, "image_digest", lambda _image: f"sha256:{'a' * 64}")
-    monkeypatch.setattr("vlm_pipeline.common.preflight.preflight", lambda *a, **k: SimpleNamespace(ok=True))
+    monkeypatch.setattr(
+        "vlm_pipeline.common.preflight.preflight", lambda *a, **k: SimpleNamespace(ok=True, findings=())
+    )
     monkeypatch.setattr(jobrun, "_wait_for_memory", lambda *a, **k: None)
     monkeypatch.setattr(jobrun, "git_state", lambda _root: ("c0ffee", False))
     monkeypatch.setattr(jobrun, "read_meminfo", lambda: SimpleNamespace(mem_available_gb=40.0))
@@ -369,3 +373,227 @@ def test_a_run_id_gets_its_job_once(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         run()
     assert run_json.read_bytes() == before  # the first job's history is never rewritten
     assert started == ["n4-0123456789abcdef"]  # no second job reached the container
+
+
+def _narrow_project(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    root = tmp_path / "proj"
+    for d in ("src/vlm_pipeline", "configs/train"):
+        (root / d).mkdir(parents=True)
+    run = root / "outputs" / "graph" / "runs" / "t-0123456789abcdef"
+    run.mkdir(parents=True)
+    repo = root / ".cache" / "hf" / "hub" / "models--org--m"
+    (repo / "blobs").mkdir(parents=True)
+    (repo / "blobs" / "abc").write_bytes(b"w")
+    (repo / "snapshots" / "rev").mkdir(parents=True)
+    (repo / "snapshots" / "rev" / "model.safetensors").symlink_to("../../blobs/abc")  # how HF lays out its cache
+    data = root / "data" / "mine"
+    data.mkdir(parents=True)
+    (data / "labels.jsonl").write_text("{}\n")
+    (root / ".env.local").write_text("HF_TOKEN=x\n")
+    return root, run, repo, data
+
+
+def _mounts(argv: list[str]) -> list[tuple[str, str, str]]:
+    """(source, target, mode) of every -v."""
+    out = []
+    for i, a in enumerate(argv):
+        if a == "-v":
+            src, dst, *mode = argv[i + 1].split(":")
+            out.append((src, dst, mode[0] if mode else "rw"))
+    return out
+
+
+def test_a_narrowed_job_sees_only_what_it_needs(tmp_path: Path) -> None:
+    """P017 step 6 (bao-security S6): src/configs ro, ONE rw dir (its run dir), inputs ro; no project, no secrets."""
+    root, run, repo, data = _narrow_project(tmp_path)
+    job = ContainerJob(name="t", image="img", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(repo, data))
+    argv = docker_args(job, root)
+    mounts = _mounts(argv)
+    sources = [Path(s) for s, _, _ in mounts]
+    assert not any(root == s or root.is_relative_to(s) for s in sources)  # never the project or one of its parents
+    assert not any(".env" in s.name or "system" in s.parts for s in sources)
+    assert [s for s, _, m in mounts if m != "ro"] == [str(run)]  # exactly one writable mount: its own run dir
+    assert (str(repo), "/workspace/.cache/hf/hub/models--org--m", "ro") in mounts
+    assert (str(data), "/workspace/data/mine", "ro") in mounts
+    assert {d for _, d, m in mounts if m == "ro"} >= {"/workspace/src", "/workspace/configs"}
+    assert "--tmpfs" in argv
+    assert "TRITON_CACHE_DIR=/workspace/outputs/graph/runs/t-0123456789abcdef/.cache/triton" in argv  # never shared
+
+
+@pytest.mark.parametrize(
+    "plant",
+    ["absolute_link", "link_out", "system_input", "env_input", "overlap", "outside", "link_in_path", "two_rw"],
+)
+def test_a_narrowed_job_refuses_unsafe_sources(tmp_path: Path, plant: str) -> None:
+    root, run, repo, data = _narrow_project(tmp_path)
+    inputs: tuple[Path, ...] = (repo,)
+    rw: tuple[Path, ...] = (run,)
+    if plant == "absolute_link":  # a job with rw on the project could have planted it
+        (repo / "snapshots" / "rev" / "leak").symlink_to("/etc/passwd")
+    elif plant == "link_out":
+        (repo / "snapshots" / "rev" / "leak").symlink_to("../../../../../../data/mine")
+    elif plant == "system_input":
+        (root / "outputs" / "system").mkdir()
+        inputs = (root / "outputs" / "system",)
+    elif plant == "env_input":
+        inputs = (root / ".env.local",)
+    elif plant == "overlap":
+        inputs = (run.parent,)  # a parent of the writable dir
+    elif plant == "outside":
+        inputs = (tmp_path,)
+    elif plant == "link_in_path":
+        (root / "data" / "alias").symlink_to(data)
+        inputs = (root / "data" / "alias",)
+    else:
+        other = root / "outputs" / "graph" / "runs" / "u-0123456789abcdef"
+        other.mkdir()
+        rw = (run, other)
+    job = ContainerJob(name="t", image="img", argv=("true",), narrow=True, rw_dirs=rw, ro_inputs=inputs)
+    with pytest.raises(ValueError, match=r"(?i)input|writable|symlink|outside|not a"):  # UnsafeMountSourceError too
+        docker_args(job, root)
+
+
+def _gpu_wait_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, verdicts: list[object]) -> tuple[Any, Any]:
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.runinfo import RunManifest
+
+    monkeypatch.setattr(jobrun, "GPU_POLL_S", 0.01)
+    calls = iter(verdicts)
+    monkeypatch.setattr("vlm_pipeline.common.preflight.preflight", lambda *a, **k: next(calls))
+    manifest = RunManifest(run_id="n4-0123456789abcdef", name="t", stage="train", task="sft")
+    run_dir = tmp_path / "outputs" / "graph" / "runs" / "n4-0123456789abcdef"
+    run_dir.mkdir(parents=True)
+    return (SimpleNamespace, jobrun), (manifest, run_dir)
+
+
+def _busy(state: str = "busy") -> object:
+    from vlm_pipeline.common.errors import ExitCode
+    from vlm_pipeline.common.preflight import Finding
+
+    f = Finding("SYS-001", ExitCode.LOCK_BUSY, "GPU busy", {"who": "x", "job": "y", "since": "s", "state": state})
+    return SimpleNamespace(ok=False, findings=(f,))
+
+
+def test_a_busy_gpu_is_waited_for_not_an_unknown_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """research R2: Run while another job trains -> the job queues (waiting_gpu), then takes the lock."""
+    (_, jobrun), (manifest, run_dir) = _gpu_wait_setup(
+        tmp_path, monkeypatch, [_busy(), _busy(), SimpleNamespace(ok=True, findings=())]
+    )
+    seen: list[dict[str, float]] = []
+    handle = jobrun._wait_for_gpu(
+        manifest, run_dir, tmp_path / "GPU_LOCK", 1.0, 0.0, who="t", project_root=tmp_path,
+        cancel=None, on_wait=seen.append, timeout_s=60, thresholds=jobrun.DEFAULT_THRESHOLDS,
+    )  # fmt: skip
+    assert handle.info.run_id == "n4-0123456789abcdef"
+    assert len(seen) == 2
+    assert all(s["gpu_busy"] == 1.0 for s in seen)
+
+
+@pytest.mark.parametrize("state", ["stale", "corrupt"])
+def test_a_stale_lock_fails_at_once_with_its_own_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    from vlm_pipeline.common.runinfo import read_manifest
+
+    (_, jobrun), (manifest, run_dir) = _gpu_wait_setup(tmp_path, monkeypatch, [_busy(state)])
+    with pytest.raises(jobrun.PreflightRefusedError) as err:
+        jobrun._wait_for_gpu(manifest, run_dir, tmp_path / "GPU_LOCK", 1.0, 0.0, who="t", project_root=tmp_path,
+                             cancel=None, on_wait=None, timeout_s=60, thresholds=jobrun.DEFAULT_THRESHOLDS)  # fmt: skip
+    assert err.value.code == "SYS-001"
+    assert err.value.params["state"] == state
+    assert (read_manifest(run_dir).status, read_manifest(run_dir).error_code) == ("failed", "SYS-001")
+
+
+def test_cancel_while_queued_for_the_gpu(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading
+
+    (_, jobrun), (manifest, run_dir) = _gpu_wait_setup(tmp_path, monkeypatch, [_busy()] * 5)
+    cancel = threading.Event()
+    cancel.set()
+    out = jobrun._wait_for_gpu(
+        manifest, run_dir, tmp_path / "GPU_LOCK", 1.0, 0.0, who="t", project_root=tmp_path,
+        cancel=cancel, on_wait=None, timeout_s=60, thresholds=jobrun.DEFAULT_THRESHOLDS,
+    )  # fmt: skip
+    assert out.status == "cancelled"
+    assert not (tmp_path / "GPU_LOCK").exists()
+
+
+def test_hf_links_into_the_shared_blob_store_mount_only_those_blobs(tmp_path: Path) -> None:
+    """Real HF cache: repo blobs link to hub/blobs/<xx>/<sha>; a prepared copy links into the repo. Only the files
+    those chains pass through are added (never the whole store: other repos' blobs stay unseen)."""
+    root, run, _repo, _data = _narrow_project(tmp_path)
+    hub = root / ".cache" / "hf" / "hub"
+    store = hub / "blobs" / "ab"
+    store.mkdir(parents=True)
+    (store / "abcd").write_bytes(b"w")
+    (store / "other").write_bytes(b"not for this job")
+    repo = hub / "models--org--p"
+    (repo / "blobs").mkdir(parents=True)
+    (repo / "blobs" / "sha1").symlink_to("../../blobs/ab/abcd")
+    (repo / "snapshots" / "r").mkdir(parents=True)
+    (repo / "snapshots" / "r" / "w.safetensors").symlink_to("../../blobs/sha1")
+    prepared = root / ".cache" / "prepared" / "p_1" / "model"
+    prepared.mkdir(parents=True)
+    (prepared / "config.json").write_text("{}")
+    (prepared / "w.safetensors").symlink_to("../../../hf/hub/models--org--p/blobs/sha1")
+    job = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(prepared,))
+    mounts = {(s, m) for s, _, m in _mounts(docker_args(job, root))}
+    assert (str(repo), "ro") in mounts
+    assert (str(store / "abcd"), "ro") in mounts
+    assert not any(s in (str(store), str(store / "other"), str(hub)) for s, _ in mounts)
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        ".cache",
+        ".cache/hf",
+        ".cache/hf/hub",
+        "outputs/runs",
+        "outputs/graph/runs",
+        "data",
+        "configs/../.team",
+        "src",
+        "uploads",
+    ],
+)
+def test_only_allowed_input_roots_are_mounted(tmp_path: Path, rel: str) -> None:
+    """bao-security S6-1: an allowlist of input roots, never a root itself (caches, other runs, the HF login token)."""
+    root, run, _repo, _data = _narrow_project(tmp_path)
+    target = root / rel
+    target.mkdir(parents=True, exist_ok=True)
+    job = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(target,))
+    with pytest.raises(ValueError, match=r"allowed input root|overlaps"):
+        docker_args(job, root)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "token",
+        "stored_tokens",
+        ".env.local",
+        "id_ed25519",
+        "server.pem",
+        "tls.key",
+        ".netrc",
+        ".git-credentials",
+        "credentials-gcp.json",
+    ],
+)
+def test_an_input_holding_a_credential_is_refused(tmp_path: Path, name: str) -> None:
+    root, run, _repo, data = _narrow_project(tmp_path)
+    (data / name).write_text("x")
+    job = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(data,))
+    with pytest.raises(ValueError, match=r"credential|secrets"):
+        docker_args(job, root)
+
+
+def test_a_job_cache_under_a_run_is_never_an_input(tmp_path: Path) -> None:
+    """security nit (a): another job's .so / triton cache in its run dir is never mounted into the next job."""
+    root, run, _repo, _data = _narrow_project(tmp_path)
+    other = root / "outputs" / "graph" / "runs" / "u-0123456789abcdef" / ".cache" / "torch_extensions"
+    other.mkdir(parents=True)
+    job = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(other,))
+    with pytest.raises(ValueError, match="job cache"):
+        docker_args(job, root)

@@ -23,6 +23,7 @@ from typing import ClassVar
 
 from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
+from vlm_pipeline.common.host_paths import check_mount_source, link_units, secret_file_problem, tree_problem
 from vlm_pipeline.common.images import check_pinned_image
 from vlm_pipeline.common.launcher import JobLauncher, LocalDockerLauncher
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
@@ -58,6 +59,13 @@ class ContainerJob:
     entrypoint: str | None = None
     uid: int = field(default_factory=os.getuid)
     gid: int = field(default_factory=os.getgid)
+    # P017 step 6 (narrowed mounts, bao-security): no project mount at all. The job sees src/ + configs/ (ro), the
+    # single writable dir ``rw_dirs[0]``, each of ``ro_inputs`` (host paths under the project/data root, ro, at their
+    # own container path) and ``code_files`` (single files, e.g. a worker script, ro). Compile caches live in the
+    # writable dir (never shared between jobs). App workers set it; team CLI jobs keep the project mount for now.
+    narrow: bool = False
+    ro_inputs: tuple[Path, ...] = ()
+    code_files: tuple[str, ...] = ()
 
 
 # Env every first-party job gets (P003 D2, ADR-005 D1 caches); never secrets.
@@ -149,10 +157,116 @@ def compile_cache_env(job: ContainerJob, project_root: Path, image_id: str | Non
     return env
 
 
+TMPFS_GB = 8  # /tmp in a narrowed job: RAM on UMA, so bounded; exec allowed (Triton/torch build fallbacks run there)
+NARROW_CODE_DIRS = ("src", "configs")
+
+
+def _narrow_cache_env(rw_rel: str) -> dict[str, str]:
+    """Every cache a job writes goes to its own writable dir: nothing is shared with another job (step 6 Q2)."""
+    base = f"{CONTAINER_ROOT}/{rw_rel}/.cache"
+    return {
+        "TORCH_EXTENSIONS_DIR": f"{base}/torch_extensions",
+        "TORCHINDUCTOR_CACHE_DIR": f"{base}/inductor",
+        "TRITON_CACHE_DIR": f"{base}/triton",
+        "HF_DATASETS_CACHE": f"{base}/hf_datasets",
+        "HF_MODULES_CACHE": f"{base}/hf_modules",
+        "MAX_JOBS": "2",
+    }
+
+
+_HUB_REPO = re.compile(r"^(?:models|datasets)--[A-Za-z0-9][A-Za-z0-9._-]*--[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _input_problem(rel: Path) -> str | None:
+    """None when ``rel`` is under an ALLOWED input root (bao-security S6-1: an allowlist, never "anything but").
+
+    One HF hub repo (or deeper), one prepared model, one run (graph node or CLI), one folder under data/, one upload.
+    Never a root itself (``.cache``, ``.cache/hf``, ``outputs/runs``, ``data``): those hold other users' data, caches
+    and the HF login token.
+    """
+    p = rel.parts
+    if not p or ".." in p or any(part.startswith(".env") for part in p):
+        return "outside the project or a secrets file"
+    allowed = (
+        (p[:3] == (".cache", "hf", "hub") and len(p) >= 4 and _HUB_REPO.fullmatch(p[3]) is not None)
+        or (p[:2] == (".cache", "prepared") and len(p) >= 3)
+        or (p[:3] == ("outputs", "graph", "runs") and len(p) >= 4)
+        or (p[:2] == ("outputs", "runs") and len(p) >= 3)
+        or (p[:1] == ("data",) and len(p) >= 2)
+        or (p[:1] == ("uploads",) and len(p) == 2)
+    )
+    if allowed and p[0] == "outputs" and ".cache" in p:  # another job's own .so / triton cache: never handed on
+        return "a job cache folder"
+    return None if allowed else "not under an allowed input root"
+
+
+def _checked_input(root: Path, rw: Path, given: Path) -> tuple[Path, set[Path]]:
+    """(path relative to the root, extra link units) of one read-only input, or ValueError naming the rule."""
+    if not given.is_relative_to(root):
+        raise ValueError(f"input {given} is outside the project")
+    rel = given.relative_to(root)
+    if (problem := _input_problem(rel)) is not None:
+        raise ValueError(f"input {rel}: {problem}")
+    if given == rw or given.is_relative_to(rw) or rw.is_relative_to(given):
+        raise ValueError(f"input {rel} overlaps the writable dir")
+    is_dir = given.is_dir() and not given.is_symlink()
+    check_mount_source(root, given, directory=is_dir)
+    if not is_dir:
+        return rel, set()
+    if (secret := secret_file_problem(given)) is not None:
+        raise ValueError(f"input {rel}: {secret} looks like a credential")
+    if rel.parts[:1] == (".cache",):  # HF caches link into repos / the blob store: follow, mount those units
+        problem, units = link_units(root, given)
+        if problem is not None:
+            raise ValueError(f"input {rel}: {problem}")
+        return rel, units
+    if (problem := tree_problem(given)) is not None:  # job-written data: no link at all
+        raise ValueError(f"input {rel}: {problem} is not a plain file")
+    return rel, set()
+
+
+def narrow_mounts(job: ContainerJob, project_root: Path) -> list[str]:
+    """``-v``/``--tmpfs`` args of a narrowed job (P017 step 6). Every source is checked on the host first.
+
+    One writable dir (the run dir); src/ + configs/ + ``code_files`` read-only; each input read-only at its own
+    container path, never the run dir or a parent/child of it, never under outputs/system, .git, .team or a .env*;
+    the walk from the root to each source has no symlink (``check_mount_source``) and the tree itself holds plain
+    files only, except an HF hub repo whose RELATIVE links stay inside it (``tree_problem``).
+    """
+    root = project_root.resolve()
+    if len(job.rw_dirs) != 1:
+        raise ValueError("a narrowed job has exactly one writable dir")
+    rw = validate_rw_dirs(root, job.rw_dirs)[0]
+    check_mount_source(root, rw, directory=True)
+    rw_rel = rw.relative_to(root)
+    code = (job.code_root or root).resolve()
+    args = ["--tmpfs", f"/tmp:rw,exec,nosuid,size={TMPFS_GB}g"]  # noqa: S108 - container path
+    for d in NARROW_CODE_DIRS:
+        args += ["-v", f"{check_mount_source(code, code / d, directory=True)}:{CONTAINER_ROOT}/{d}:ro"]
+    for f in job.code_files:
+        args += ["-v", f"{check_mount_source(code, code / f, directory=False)}:{CONTAINER_ROOT}/{f}:ro"]
+    args += ["-v", f"{rw}:{CONTAINER_ROOT}/{rw_rel.as_posix()}"]
+    extra: set[Path] = set()
+    mounted: list[Path] = []
+    for given in sorted({Path(os.path.normpath(p.absolute())) for p in job.ro_inputs}):
+        rel, units = _checked_input(root, rw, given)
+        extra |= units
+        mounted.append(given)
+        args += ["-v", f"{given}:{CONTAINER_ROOT}/{rel.as_posix()}:ro"]
+    for unit in sorted(extra):  # what those links pass through, not already inside a mounted input
+        if any(unit == m or unit.is_relative_to(m) for m in mounted):
+            continue
+        check_mount_source(root, unit, directory=unit.is_dir())
+        args += ["-v", f"{unit}:{CONTAINER_ROOT}/{unit.relative_to(root).as_posix()}:ro"]
+    return args
+
+
 def docker_args(
     job: ContainerJob, project_root: Path, *, lock_token: str | None = None, image_id: str | None = None
 ) -> list[str]:
     """Pure: the full ``docker run`` argv for ``job`` (tested; no shell, no user-controlled flags)."""
+    if job.narrow:
+        return _narrow_docker_args(job, project_root, lock_token=lock_token)
     env = {**BASE_ENV, **compile_cache_env(job, project_root, image_id), **job.env}  # job.env wins
     for key in env:
         if key in SECRET_ENV_ALLOWLIST:
@@ -182,6 +296,39 @@ def docker_args(
         "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",
         "--ulimit", "memlock=-1", "--ulimit", "stack=67108864",
         "-v", mount, *overlays, "-w", job.workdir,
+    ]  # fmt: skip
+    if job.gpu:
+        args += ["--gpus", "all"]
+    for key, value in sorted(env.items()):
+        args += ["-e", f"{key}={value}"]
+    args += _entrypoint_args(job.entrypoint)
+    return [*args, job.image, *job.argv]
+
+
+def _check_env(env: Mapping[str, str]) -> None:
+    for key in env:
+        if key in SECRET_ENV_ALLOWLIST:
+            continue
+        if key.startswith(_FORBIDDEN_ENV_PREFIXES) or _SECRET_NAME.search(key):
+            raise ValueError(f"secret-like env var {key} must not be passed to job containers")
+
+
+def _narrow_docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None) -> list[str]:
+    mounts = narrow_mounts(job, project_root)
+    rw_rel = job.rw_dirs[0].resolve().relative_to(project_root.resolve()).as_posix()
+    env = {**BASE_ENV, **_narrow_cache_env(rw_rel), **job.env}  # job.env wins
+    _check_env(env)
+    if lock_token is not None:
+        env[gpu_lock.TOKEN_ENV] = lock_token
+    args = [
+        "docker", "run", "--name", f"vlm-{job.name}",
+        "--label", "project=vlm-training",
+        "--network", "none",
+        "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
+        "--user", f"{job.uid}:{job.gid}",
+        "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",
+        "--ulimit", "memlock=-1", "--ulimit", "stack=67108864",
+        *mounts, "-w", job.workdir,
     ]  # fmt: skip
     if job.gpu:
         args += ["--gpus", "all"]
@@ -403,6 +550,68 @@ def _check_gate(job: ContainerJob, manifest: RunManifest, project_root: Path) ->
         raise RuntimeError(f"gate run refused, not reproducible: missing/invalid {gaps}")
 
 
+class PreflightRefusedError(VlmPipelineError):
+    """A preflight condition that waiting does not fix (disk, stale/corrupt lock, no GPU...): its catalog code."""
+
+    def __init__(self, code: str, reason: str, params: Mapping[str, object]) -> None:
+        super().__init__(reason, params=params)
+        self.code = code  # type: ignore[misc]  # the finding's own catalog code (MEM-001, DISK-001, SYS-001...)
+
+
+GPU_POLL_S = 10.0
+
+
+def _wait_for_gpu(
+    manifest: RunManifest,
+    run_dir: Path,
+    path: Path,
+    est_peak_gb: float,
+    ckpt_gb: float,
+    *,
+    who: str,
+    project_root: Path,
+    cancel: threading.Event | None,
+    on_wait: Callable[[dict[str, float]], None] | None,
+    timeout_s: float,
+    thresholds: MemThresholds,
+) -> gpu_lock.LockHandle | RunManifest:
+    """Preflight, then take the lock; QUEUE while another live job holds it (research R2: never SYS-000 for "busy").
+
+    A busy lock with a live holder is waited for (``on_wait({"gpu_busy": 1, ...})``, cancel stops the wait); a stale
+    or unreadable lock and every other refusal fail at once with the finding's own catalog code and params (a lock is
+    never removed here). A lost race on ``acquire`` just waits again. Returns the lock, or the CANCELLED manifest.
+    """
+    from vlm_pipeline.common.diskguard import check_lock
+    from vlm_pipeline.common.preflight import preflight
+
+    since = time.time()
+    while True:
+        verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb, thresholds=thresholds, lock_holder=lambda: check_lock(path))
+        busy = [f for f in verdict.findings if f.code == "SYS-001" and f.params.get("state") == "busy"]
+        refused = next((f for f in verdict.findings if f not in busy), None)
+        if refused is None and busy and time.time() - since > timeout_s:
+            refused = busy[0]
+        if refused is not None:
+            failed = {"status": RunStatus.FAILED, "error_code": refused.code, "ended_at": time.time()}
+            write_manifest(run_dir, manifest.model_copy(update=failed))
+            raise PreflightRefusedError(refused.code, refused.reason, refused.params)
+        if not busy:
+            try:
+                return gpu_lock.acquire(path, who=who, job=manifest.name, run_id=manifest.run_id,
+                                        host_pid=os.getpid(), run_dir=_relative(run_dir, project_root))  # fmt: skip
+            except gpu_lock.GpuLockError:
+                pass  # another job took it between the check and here: wait for that one too
+        if on_wait is not None:
+            try:
+                on_wait({"gpu_busy": 1.0, "since": since, "waited_s": time.time() - since})
+            except Exception:  # a broken UI callback must never stop the wait
+                logger.exception("on_wait callback failed")
+        if cancel is not None and cancel.wait(GPU_POLL_S):
+            return manifest.model_copy(update={"status": RunStatus.CANCELLED, "ended_at": time.time()})
+        if cancel is None:
+            time.sleep(GPU_POLL_S)
+
+
 def _wait_for_memory(
     manifest: RunManifest,
     run_dir: Path,
@@ -475,6 +684,7 @@ def run_job(
     require_approved_image: bool = True,
     on_wait: Callable[[dict[str, float]], None] | None = None,
     memory_wait_s: float = 1800.0,
+    lock_wait_s: float = 12 * 3600.0,
     launcher: JobLauncher | None = None,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock.
@@ -486,8 +696,6 @@ def run_job(
     reporting ``on_wait({need_gb, avail_gb, waited_s, since})`` on every poll; cancel while waiting -> CANCELLED
     without starting a container; still no memory after ``memory_wait_s`` -> FAILED with SYS-002 (raised).
     """
-    from vlm_pipeline.common.preflight import preflight
-
     launcher = launcher or LocalDockerLauncher()
     pinned_id = _checks_before_queueing(job, manifest, project_root, gate=gate, require_approved=require_approved_image)
     waited = _wait_for_memory(
@@ -501,18 +709,13 @@ def run_job(
     )
     if waited is not None:  # cancelled while waiting: nothing started, nothing to clean up
         return waited
-    verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb, thresholds=mem_thresholds)  # same budget as the wait
-    if not verdict.ok:
-        raise RuntimeError(f"preflight refused: {verdict.to_json()}")
     path = lock_path or gpu_lock.default_lock_path()
-    handle = gpu_lock.acquire(
-        path,
-        who=who,
-        job=manifest.name,
-        run_id=manifest.run_id,
-        host_pid=os.getpid(),
-        run_dir=_relative(run_dir, project_root),
-    )
+    handle = _wait_for_gpu(
+        manifest, run_dir, path, est_peak_gb, ckpt_gb, who=who, project_root=project_root, cancel=cancel,
+        on_wait=on_wait, timeout_s=lock_wait_s, thresholds=mem_thresholds,
+    )  # fmt: skip
+    if isinstance(handle, RunManifest):  # cancelled while queued for the GPU
+        return handle
     container = f"vlm-{job.name}"
     try:
         # One job per run dir, ever (P017): the atomic claim is the real gate (the early check above only avoids

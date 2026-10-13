@@ -34,6 +34,7 @@ from vlm_pipeline.common.run_claims import (
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, Stage, read_manifest, write_manifest
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
+from vlm_pipeline.graph.groups import expand
 from vlm_pipeline.graph.validation import Issue, validate
 from vlm_pipeline.graph.worker import (
     CHECKPOINT_MARKER,
@@ -262,7 +263,9 @@ class Executor:
             self._emit(gid, {"type": "run_status", "status": "invalid", "issues": [_issue_dict(i) for i in issues]})
             return run
 
-        nodes, edges = self._parse(workflow)
+        # P016: validate saw the file as written; the executor runs the flat graph (group instances inlined, ids
+        # ``<group>__<inner>``). Over-limit groups gave a CFG-012 error above, so this never runs on an empty graph.
+        nodes, edges = self._parse(expand(workflow, self.registry).workflow)
         order = _topo_order(list(nodes), edges)
         run = GraphRun(gid, dict.fromkeys(order, "pending"))
         cancel = threading.Event()
@@ -294,6 +297,9 @@ class Executor:
 
     def _set(self, run: GraphRun, node_id: str, status: str, **extra: Any) -> None:
         run.status[node_id] = status
+        key = extra.get("cache_key")
+        if isinstance(key, str) and "-" in key:  # G-4: the "<nid>-<key16>" a "Reset this step" acts on
+            extra.setdefault("node_base", f"{node_id}-{key.split('-', 1)[1][:16]}")
         self._emit(run.graph_run_id, {"type": "node_status", "node_id": node_id, "status": status, **extra})
 
     def _step(
@@ -357,7 +363,8 @@ class Executor:
             if problem is not None:
                 logger.warning("not resuming %s from %s: %s is not a plain file or dir", node.node_id, ckpt, problem)
                 return free, None, None
-            if "@" in identity and _manifest_digest(prev) != identity.rsplit("@", 1)[1]:  # missing = unverifiable
+            # identity = "container/<image>@<id>[+recipe:<sha12>]": compare the image id only (C1)
+            if "@" in identity and _manifest_digest(prev) != identity.rsplit("@", 1)[1].split("+", 1)[0]:
                 logger.warning("not resuming %s: the earlier attempt's image cannot be confirmed", node.node_id)
                 return free, None, None
             return free, ckpt, step
@@ -375,7 +382,7 @@ class Executor:
             error = classify(exc, cancelled=False, checkpoint_step=None).error
             assert error is not None  # noqa: S101 - a catalog error, never "cancelled"
             run.errors[nid] = error
-            self._set(run, nid, "failed", error=_error_dict(error))
+            self._set(run, nid, "failed", cache_key=key, error=_error_dict(error))
             return None
         if resume_from is not None and self.workspace is not None:  # C6: keep the source from now on (host side)
             write_resume_lease(self.workspace, run_dir.name, run=resume_from.parent.parent.name,
@@ -410,9 +417,10 @@ class Executor:
             run.warnings.setdefault(nid, []).append(warning)
             self._emit(run.graph_run_id, {"type": "warning", "node_id": nid, "error": _error_dict(warning)})
 
-        def waiting(info: dict[str, float], nid: str = nid) -> None:  # queued for memory before the GPU lock
+        def waiting(info: dict[str, float], nid: str = nid) -> None:  # queued for memory, then for the GPU lock
             extra: dict[str, Any] = {k: info[k] for k in ("need_gb", "avail_gb", "since") if k in info}
-            self._emit(run.graph_run_id, {"type": "node_state", "node_id": nid, "state": "waiting_memory", **extra})
+            state = "waiting_gpu" if info.get("gpu_busy") else "waiting_memory"
+            self._emit(run.graph_run_id, {"type": "node_state", "node_id": nid, "state": state, **extra})
 
         step = resume_step if resume_from is not None else read_checkpoint_step(run_dir)
         job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, step, waiting, resume_from=resume_from)
@@ -442,7 +450,8 @@ class Executor:
                 error_code=code,
                 started=started,
             )
-            self._set(run, nid, outcome.status, **({"error": _error_dict(outcome.error)} if outcome.error else {}))
+            failure = {"error": _error_dict(outcome.error)} if outcome.error else {}
+            self._set(run, nid, outcome.status, cache_key=key, **failure)
             self._drop_lease(run_dir)  # an interrupted attempt's run.json says resumed_from: retention takes over
             return
         run.outputs[nid] = dict(result.outputs)
@@ -507,6 +516,7 @@ def _issue_dict(issue: Issue) -> dict[str, Any]:
         "port": issue.port,
         "param": issue.param,
         "params": dict(issue.params),
+        "inner_path": list(issue.inner_path),  # P016: where inside a group the problem is
     }
 
 

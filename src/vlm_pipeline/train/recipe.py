@@ -7,6 +7,7 @@ LoRA vs full fine-tune, freezing. Host-safe (pydantic + pyyaml). Paths given her
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,19 @@ _LORA_EXCLUDE = ["*vision_tower*", "*vision*", "*visual*", "*image_encoder*", "*
 
 class RecipeError(ValueError):
     """No template for the model, or the template lacks a section we must override."""
+
+
+def templates_digest(project_root: Path) -> str:
+    """12 hex chars over every template (``<name>:<sha256>`` lines, sorted): part of container nodes' cache identity.
+
+    Any template edit (e.g. processor pixel limits) changes what a train / trial / eval run produces with the same node
+    params, so it must invalidate the cache. Coarse on purpose: one edit recomputes every container node.
+    """
+    lines = [
+        f"{path.name}:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+        for path in sorted((project_root / TEMPLATE_DIR).glob("*.yaml"))
+    ]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()[:12]
 
 
 def template_path(project_root: Path, entry: CatalogEntry) -> Path:

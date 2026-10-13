@@ -25,6 +25,7 @@ from vlm_pipeline.app.trial_worker import run_trial
 from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
 from vlm_pipeline.common.dataset_ref import DatasetRef, read_dataset_ref, write_dataset_ref
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
+from vlm_pipeline.common.host_paths import hub_repo_dir
 from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
 from vlm_pipeline.common.jobrun import (
     CONTAINER_ROOT,
@@ -35,10 +36,17 @@ from vlm_pipeline.common.jobrun import (
 from vlm_pipeline.common.model_ref import PickedModel, is_model_ref, resolve_model_ref, write_model_ref
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest
 from vlm_pipeline.graph.errors import ContainerExit
-from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, ArtifactRef, NodeJob, NodeResult, SupportQuery
+from vlm_pipeline.graph.worker import (
+    NOT_RESUMABLE_MARKER,
+    ArtifactRef,
+    NodeJob,
+    NodeResult,
+    SupportQuery,
+    checkpoint_dirs,
+)
 from vlm_pipeline.nodes.spec import NodeSpec, is_compatible
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
-from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path
+from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path, templates_digest
 
 logger = logging.getLogger(__name__)
 PREPARED_DIRS = {"nemotron-parse-v1.1": "nemotron-parse-v1.1_fd1e3c6b"}  # train.prepare outputs (hash-verified)
@@ -107,10 +115,14 @@ class RealWorker:
         self.who = who or caller_id()  # GPU_LOCK "who": the app passes "vlm-app"; scripts say who they are
 
     def identity(self, spec: NodeSpec) -> str:
-        """Part of the executor cache key: container nodes are keyed by the exact image (content id)."""
+        """Part of the executor cache key: container nodes are keyed by the exact image (content id) and recipes."""
         if spec.runner != "container":
             return "host/real-1"
-        return f"container/{self.image}@{self._image_id()}"
+        return f"container/{self.image}@{self._image_id()}+recipe:{self._recipes_id()}"
+
+    @functools.cache  # noqa: B019 - read once per app process like the image id; a template edit needs a restart
+    def _recipes_id(self) -> str:
+        return templates_digest(self.root)
 
     @functools.cache  # noqa: B019 - one worker per app process; the image id does not change while it runs
     def _image_id(self) -> str:
@@ -208,12 +220,44 @@ class RealWorker:
         ref = ArtifactRef(type="Model", path=str(descriptor), hash=f"{entry.repo}@{entry.revision}")
         return NodeResult(outputs={"model": ref})
 
+    def _train_inputs(
+        self, job: NodeJob, entry: CatalogEntry, base: ArtifactRef, train: DatasetRef, val: DatasetRef | None
+    ) -> tuple[Path, ...]:
+        """Read-only inputs of a train job: base model, data (+ val), and the resume checkpoint step (C3)."""
+        inputs = [self.mount_input(self.model_dir(base)), self.mount_input(train.path)]
+        if val is not None:
+            inputs.append(self.mount_input(val.path))
+        if job.resume_from is not None and entry.id not in RESUME_UNSUPPORTED:
+            inputs.append(job.resume_from)  # exactly that checkpoint step
+        return tuple(inputs)
+
+    def mount_input(self, path: str | Path) -> Path:
+        """The host dir/file a narrowed job mounts read-only to read ``path`` (P017 step 6).
+
+        An HF hub path mounts its whole repo dir (snapshot links point into ``blobs/``).
+        """
+        return hub_repo_dir(self.root, self.no_latest(self.host_path(str(path))))
+
+    def no_latest(self, path: Path) -> Path:
+        """``path`` with ``checkpoints/LATEST`` (a symlink the job wrote) replaced by the newest real checkpoint dir.
+
+        Chosen by the host from dir names (P017 C2): a job path or mount source never goes through a job's symlink.
+        """
+        if "LATEST" not in path.parts:
+            return path
+        i = path.parts.index("LATEST")
+        ckpts = checkpoint_dirs(Path(*path.parts[: i - 1]))
+        if not ckpts:
+            return path
+        newest: Path = ckpts[-1][1]
+        return newest.joinpath(*path.parts[i + 1 :])
+
     def model_dir(self, ref: ArtifactRef) -> Path:
         """Host folder of a Model artifact: a picked catalog model's cache folder, or a trained model's run folder."""
         path = self.host_path(ref.path)
         # A plain folder is a trained model, or a pick cached before model.json existed (legacy, read-only: a cache
         # hit reuses the entry without check_output_paths, which runs only on fresh results).
-        return resolve_model_ref(path, self.root) if is_model_ref(path) else path
+        return resolve_model_ref(path, self.root) if is_model_ref(path) else self.no_latest(path)
 
     def _catalog_model_path(self, entry: CatalogEntry) -> Path:
         """Host dir of a catalog model: the pinned prepared copy (remote code) or the hub snapshot."""
@@ -419,6 +463,9 @@ class RealWorker:
             argv=("automodel", self.container_path(run_dir / "config.yaml"), "--nproc-per-node", "1"),
             workdir="/opt/Automodel",
             env=_trainable_env(entry, params),
+            narrow=True,
+            rw_dirs=(run_dir,),
+            ro_inputs=self._train_inputs(job, entry, base, train, val),
         )
         try:
             final = run_job(
@@ -510,6 +557,8 @@ class RealWorker:
             gpu=False,
             read_only_project=True,  # the merge writes only its own run dir
             rw_dirs=(run_dir,),
+            narrow=True,
+            ro_inputs=(self.mount_input(self.model_dir(base)), self.mount_input(adapter.path)),
         )
         try:
             final = run_job(

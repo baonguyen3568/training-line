@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import re
-import stat
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -20,6 +19,7 @@ from pydantic import BaseModel
 
 from vlm_pipeline.common.catalog import CatalogEntry
 from vlm_pipeline.common.errors import VlmPipelineError
+from vlm_pipeline.common.host_paths import tree_problem
 from vlm_pipeline.nodes.spec import NodeSpec
 
 CHECKPOINT_MARKER = Path("checkpoints") / "LATEST"
@@ -175,23 +175,9 @@ def checkpoint_tree_problem(ckpt: Path) -> str | None:
     """The first entry of a checkpoint tree that is not a plain dir/file (symlink, fifo...), or None (P017 C3).
 
     A container follows a symlink INSIDE a read-only mount: one pointing at /run/secrets or /workspace must never be
-    handed to the next job.
+    handed to the next job. A checkpoint has no reason for any symlink: none is allowed.
     """
-    unreadable: list[str] = []
-
-    def failed(err: OSError) -> None:  # a dir that cannot be listed cannot be verified: fail closed
-        unreadable.append(str(err.filename))
-
-    try:
-        for dirpath, dirnames, filenames in os.walk(ckpt, followlinks=False, onerror=failed):
-            for name in (*dirnames, *filenames):
-                entry = Path(dirpath) / name
-                mode = entry.lstat().st_mode
-                if not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
-                    return entry.relative_to(ckpt).as_posix()
-    except OSError as exc:  # an entry vanished or cannot be read while walking: not a checkpoint to trust
-        return f"unreadable: {exc.strerror}"
-    return f"unreadable: {unreadable[0]}" if unreadable else None
+    return tree_problem(ckpt)
 
 
 __all__ = [

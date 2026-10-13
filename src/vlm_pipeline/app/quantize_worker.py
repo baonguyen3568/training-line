@@ -59,6 +59,8 @@ def run_quantize(worker: RealWorker, job: NodeJob) -> NodeResult:
         ),
         read_only_project=True,  # writes only its run dir; JIT caches go there too (jobrun.compile_cache_env)
         rw_dirs=(run_dir,),
+        narrow=True,
+        ro_inputs=(worker.mount_input(worker.model_dir(model)), worker.mount_input(data.path)),
     )
     need = est_peak_gb(entry, params.calib_size)
     try:

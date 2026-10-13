@@ -118,6 +118,13 @@ def template_overrides(worker: RealWorker, entry: CatalogEntry) -> dict[str, Any
     return decode_overrides_of(yaml.safe_load(path.read_text(encoding="utf-8")) or {}).as_dict()
 
 
+def request_inputs(worker: RealWorker, request: TrialRequest, *extra: str) -> tuple[Path, ...]:
+    """What a narrowed trial/bench job reads (P017 step 6): every dir/file its request names, mounted read-only."""
+    paths = [request.model_dir, request.generation_config_dir, request.processor_dir, request.adapter_dir,
+             request.image, *extra]  # fmt: skip
+    return tuple(worker.mount_input(p) for p in paths if p)
+
+
 def build_request(worker: RealWorker, job: NodeJob, image: Path) -> tuple[TrialRequest, CatalogEntry]:
     params = job.params
     assert isinstance(params, InferenceParams)  # noqa: S101 - registry guarantees the params model
@@ -180,6 +187,8 @@ def run_trial(worker: RealWorker, job: NodeJob) -> NodeResult:
         read_only_project=True,
         rw_dirs=(run_dir,),
         env={"HF_MODULES_CACHE": "/tmp/hf_modules", "TRITON_CACHE_DIR": "/tmp/triton"},  # noqa: S108
+        narrow=True,
+        ro_inputs=request_inputs(worker, request),
     )
     try:
         final = run_job(

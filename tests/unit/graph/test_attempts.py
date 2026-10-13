@@ -40,7 +40,7 @@ class Recorder(FakeWorker):
         self.jobs: list[NodeJob] = []
 
     def identity(self, spec: Any) -> str:
-        return f"container/vlm-x:1@{DIGEST}"
+        return f"container/vlm-x:1@{DIGEST}+recipe:0123456789ab"  # the real worker's shape (recipe hash suffix)
 
     def run(self, job: NodeJob) -> NodeResult:
         if job.node_id == "t":
@@ -131,9 +131,12 @@ def test_an_eleventh_try_is_a_clear_error(tmp_path: Path) -> None:
     for n in range(2, MAX_ATTEMPTS + 1):
         claim_run(tmp_path, f"{first.name}-a{n}", by="test")
     worker = Recorder(tmp_path)
-    run = _executor(tmp_path, worker).run(_wf())
+    events: list[dict[str, Any]] = []
+    run = _executor(tmp_path, worker).run(_wf(), on_event=events.append)
     assert worker.jobs == []
     assert run.errors["t"].code == "SYS-005"
+    failed = [e for e in events if e.get("node_id") == "t" and e.get("status") == "failed"]
+    assert failed[-1]["node_base"] == first.name  # what "Reset this step" acts on (G-4)
     assert run.errors["t"].params == {"node": "t", "attempt_count": MAX_ATTEMPTS}
 
 

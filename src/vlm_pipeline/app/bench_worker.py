@@ -18,7 +18,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from vlm_pipeline.app.trial_worker import base_of, est_peak_gb, template_overrides
+from vlm_pipeline.app.trial_worker import base_of, est_peak_gb, request_inputs, template_overrides
 from vlm_pipeline.common.catalog import CatalogEntry, load_dataset_catalog
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.jobrun import ContainerJob, MemoryPreemptedBeforeStartError, run_job
@@ -119,6 +119,8 @@ def _measure(worker: RealWorker, job: NodeJob, entry: CatalogEntry, trial: Trial
         read_only_project=True,  # same isolation as "Chạy thử" (remote model code): only this job's dir is writable
         rw_dirs=(run_dir,),
         env={"HF_MODULES_CACHE": "/tmp/hf_modules", "TRITON_CACHE_DIR": "/tmp/triton"},  # noqa: S108
+        narrow=True,
+        ro_inputs=request_inputs(worker, trial, request.data_dir),
     )
     try:
         final = run_job(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from vlm_pipeline.graph import validate
@@ -211,3 +212,13 @@ def test_wire_fan_out_is_capped() -> None:
     assert _reasons(_wf(nodes, [_e("m", "model", "f0", "model")], fan)) == []  # 400 wires
     edges = [_e("m", "model", "f0", "model")] * 6  # 6 x 400 generated wires > MAX_EDGES
     assert _reasons(_wf(nodes, edges, fan)) == ["too_many_edges"]
+
+
+def test_the_executor_runs_the_expanded_graph(tmp_path: Path) -> None:
+    """backend (a): validate checks the file as written; the executor runs the inlined nodes (ids <group>__<inner>)."""
+    from vlm_pipeline.graph.executor import Executor
+    from vlm_pipeline.graph.testing import FakeWorker
+
+    run = Executor(REGISTRY, FakeWorker(), tmp_path).run(_finetune(steps=20))
+    assert set(run.status) == {"d", "m", "ft__t", "ft__e"}
+    assert set(run.status.values()) == {"completed"}

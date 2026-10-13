@@ -209,8 +209,28 @@ def test_identity_keys_container_nodes_by_image(tmp_path: Path, monkeypatch: pyt
     train, pick = REGISTRY.get("train.sft_vlm"), REGISTRY.get("model.hf_pick")
     assert train is not None
     assert pick is not None
-    assert w.identity(train) == "container/vlm-automodel:26.08-3@sha256:abc"
+    assert w.identity(train).startswith("container/vlm-automodel:26.08-3@sha256:abc+recipe:")
     assert w.identity(pick) == "host/real-1"
+
+
+def test_identity_changes_with_any_template_byte(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A template edit (e.g. processor pixel limits) must never reuse a cached run made with the old template."""
+    import vlm_pipeline.common.jobrun as jobrun
+
+    monkeypatch.setattr(jobrun, "image_digest", lambda image: "sha256:abc")
+    import shutil
+
+    from vlm_pipeline.common.paths import project_root
+
+    root = tmp_path / "proj"  # a COPY of the templates: _root() symlinks the real ones
+    shutil.copytree(project_root() / "configs" / "train" / "templates", root / "configs" / "train" / "templates")
+    train = REGISTRY.get("train.lora_vlm")
+    assert train is not None
+    before = RealWorker(root, image="i").identity(train)
+    assert RealWorker(root, image="i").identity(train) == before  # unchanged templates: same key
+    template = next((root / "configs" / "train" / "templates").glob("*.yaml"))
+    template.write_bytes(template.read_bytes() + b" ")
+    assert RealWorker(root, image="i").identity(train) != before
 
 
 _ROW = "vlm-automodel | {tag} (local) | (local) | base arm64 sha256:aaa | {id} | 29GB | {review} | x"
