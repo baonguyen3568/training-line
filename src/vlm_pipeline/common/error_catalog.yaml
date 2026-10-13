@@ -308,6 +308,35 @@ DATA-005:
   actions:
     - {id: open_node, kind: navigate, target: "node:self", confirm: false}
 
+DATA-006:
+  slug: LOCAL_DATASET_INVALID
+  severity: error
+  prevent_in_preflight: false
+  # B-3b data.local_folder: the scan of the user's folder (labels.jsonl + images) found unusable lines. The full list
+  # (max 50) is in run_dir/problems.json. first_line is the 1-based labels.jsonl line (0 when the problem is the file
+  # itself). The 16 scan reasons map to 7 texts: say what to fix, not the parser's name for it.
+  params:
+    - {name: node, ref: node}
+    - problem_count
+    - first_line
+    - name: first_reason
+      type: enum
+      values: [labels_missing, labels_not_a_file, labels_too_large, not_json, bad_keys, bad_image_name, empty_target,
+               bad_prompt, duplicate_image, image_missing, image_not_a_file, image_too_large, image_too_many_pixels,
+               image_unreadable, image_too_big_side, no_samples]
+  variants:
+    - {when: {first_reason: [labels_missing, labels_not_a_file, labels_too_large]}, key: labels_file}
+    - {when: {first_reason: [not_json, bad_keys, empty_target, bad_prompt]}, key: line_format}
+    - {when: {first_reason: [bad_image_name, duplicate_image]}, key: image_name}
+    - {when: {first_reason: [image_missing, image_not_a_file]}, key: image_missing}
+    - {when: {first_reason: [image_too_large, image_too_many_pixels, image_too_big_side]}, key: image_too_large}
+    - {when: {first_reason: image_unreadable}, key: image_unreadable}
+    - {when: {first_reason: no_samples}, key: no_samples}
+  match:
+    - {kind: executor, value: "app/workers.py data.local_folder scan (B-3b)"}
+  actions:
+    - {id: pick_workspace_folder, kind: navigate, target: folder_picker, confirm: false}
+
 MODEL-001:
   slug: CKPT_LOAD_KEY_MISMATCH
   severity: error

@@ -162,6 +162,16 @@ error:
       unreadable: The image of "{node}" can't be opened or isn't a JPG, PNG or WEBP. Upload another image.
       too_large: The image of "{node}" is larger than 20 MB. Use a smaller image.
       too_many_pixels: The image of "{node}" has too high a resolution (over 40 megapixels). Shrink it and upload it again.
+  DATA-006:
+    title: Some of the data folder can't be used
+    what:
+      labels_file: The labels.jsonl file in the folder of "{node}" can't be read (missing, not a file, or too large). Fix the file and check again.
+      line_format: '{problem_count} lines of labels.jsonl don''t follow the format, the first is line {first_line}. Each line needs an image name and an answer, as shown in the Docs.'
+      image_name: '{problem_count} lines have an invalid or repeated image name, the first is line {first_line}. Each image should appear only once.'
+      image_missing: '{problem_count} lines point to an image that isn''t in the folder, the first is line {first_line}. Add the image or remove the line.'
+      image_too_large: '{problem_count} images are too large (file size or dimensions), the first is on line {first_line}. Shrink them and check again.'
+      image_unreadable: '{problem_count} images can''t be opened, the first is on line {first_line}. Use intact JPG, PNG or WEBP images.'
+      no_samples: The folder of "{node}" has no usable sample. Add images and their lines to labels.jsonl.
   MODEL-001:
     title: Can't read the converted model
     what: Parts of the model file don't match the expected format, usually due to a library version difference.

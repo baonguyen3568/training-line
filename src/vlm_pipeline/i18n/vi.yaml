@@ -162,6 +162,16 @@ error:
       unreadable: Ảnh của bước "{node}" không mở được hoặc không phải JPG, PNG, WEBP. Hãy tải lên ảnh khác.
       too_large: Ảnh của bước "{node}" lớn hơn 20 MB. Hãy dùng ảnh nhỏ hơn.
       too_many_pixels: Ảnh của bước "{node}" có độ phân giải quá lớn (trên 40 triệu điểm ảnh). Hãy thu nhỏ ảnh rồi tải lại.
+  DATA-006:
+    title: Thư mục dữ liệu có chỗ chưa dùng được
+    what:
+      labels_file: Không đọc được file labels.jsonl trong thư mục của bước "{node}" (thiếu, không phải file, hoặc quá lớn). Sửa file rồi bấm Kiểm tra lại.
+      line_format: Có {problem_count} dòng trong labels.jsonl chưa đúng mẫu, dòng đầu tiên là dòng {first_line}. Mỗi dòng cần ghi tên ảnh và câu trả lời theo mẫu trong Tài liệu.
+      image_name: Có {problem_count} dòng có tên ảnh không hợp lệ hoặc bị trùng, dòng đầu tiên là dòng {first_line}. Mỗi ảnh chỉ nên xuất hiện một lần.
+      image_missing: Có {problem_count} dòng trỏ tới ảnh không có trong thư mục, dòng đầu tiên là dòng {first_line}. Thêm ảnh hoặc xoá dòng đó.
+      image_too_large: Có {problem_count} ảnh quá lớn (dung lượng hoặc kích thước), ảnh đầu tiên ở dòng {first_line}. Thu nhỏ ảnh rồi bấm Kiểm tra lại.
+      image_unreadable: Có {problem_count} ảnh không mở được, ảnh đầu tiên ở dòng {first_line}. Dùng ảnh JPG, PNG hoặc WEBP còn nguyên vẹn.
+      no_samples: Thư mục của bước "{node}" không có mẫu nào dùng được. Thêm ảnh và dòng tương ứng vào labels.jsonl.
   MODEL-001:
     title: Không đọc được model sau khi chuyển đổi
     what: Các phần trong file model không khớp định dạng mong đợi, thường do khác phiên bản thư viện.
