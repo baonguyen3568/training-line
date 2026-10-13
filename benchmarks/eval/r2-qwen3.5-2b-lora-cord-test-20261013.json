@@ -1,0 +1,66 @@
+{
+ "purpose": "Published CORD-v2 test score of R2 (Qwen3.5-2B LoRA, 3 epochs, merged), compared with R0 (Nemotron-Parse v1.1 full SFT) on the same images; checkpoint chosen on validation, never on test",
+ "model": {
+  "base": "Qwen/Qwen3.5-2B@15852e8c16360a2fea060d615a32b45270f8a8fc",
+  "train_run": "n4-96d12a932c04f055-a2 (graph node run)",
+  "merged": "outputs/graph/runs/n5-7f7b4d037b03cc1c/merged (LATEST, step 272)",
+  "train_data": "CORD-v2 train as a local image folder (data/reference/cord-v2-train), target = gt_parse JSON",
+  "prompt": "Read this receipt and return its fields as JSON.",
+  "train_measurements": "benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json (research)"
+ },
+ "checkpoint_choice": {
+  "rule": "LOWEST_VAL wins only if its paired CI vs LATEST excludes 0, else LATEST (research, 2026-10-13)",
+  "validation": "CORD-v2 validation[0:100]",
+  "latest_272_field_f1": 89.39,
+  "lowest_val_181_field_f1": 90.45,
+  "paired_181_minus_272": {"delta": 1.06, "ci95": [-1.64, 4.37]},
+  "decision": "LATEST-272 (CI contains 0)",
+  "runs": ["20261013-1554-r2val-latest272-fe58", "20261013-1604-r2val-lowest181-b944"],
+  "note": "181 ran as base + adapter, 272 as merged weights; the difference may include merge effects, the decision is unchanged"
+ },
+ "image": "vlm-automodel:26.08-6",
+ "container_digest": "sha256:dc9da48fb5d79d62654b3594fd4139f28773ea73c832adfcd450f009ffc5a215",
+ "code": {
+  "worktree_commit": "df246f4",
+  "worker": "scripts/qa/eval_cord_chat_worker.py",
+  "worker_sha256": "2a2519e0b6da",
+  "scorer": "vlm_pipeline.eval.cord (field_f1_counts on the dict read by json_answer: outermost JSON object, parse failure = empty prediction)",
+  "note": "worker ran from a clean worktree; run.json git_dirty=True describes the shared main tree"
+ },
+ "decoding": {
+  "do_sample": false,
+  "num_beams": 1,
+  "batch_size": 1,
+  "max_new_tokens": 1024,
+  "enable_thinking": false,
+  "generation_config": "none in the base snapshot -> transformers defaults (repetition_penalty 1.0)",
+  "pixels": {"min_pixels": 200704, "max_pixels": 1003520}
+ },
+ "eval_run": "20261013-1712-r2test-clean-df246f4-merged272-378e",
+ "dataset": "naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98, test[0:100] (full test split)",
+ "results": {
+  "test": {
+   "field_f1": 86.42,
+   "field_f1_ci95": [81.38, 90.34],
+   "parse_fail_rate": 1.0,
+   "truncated_rate": 0.0,
+   "n": 100,
+   "nted_accuracy": null,
+   "json_exact": null,
+   "pending": "nTED / json_exact (CPU scoring running) and the base Qwen3.5-2B delta are added later"
+  }
+ },
+ "vs_r0": {
+  "r0_record": "benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json",
+  "r0_field_f1": 70.97,
+  "r2_minus_r0": {"delta": 15.45, "ci95": [10.42, 20.6]},
+  "method": "paired bootstrap over the same 100 test images (1000 resamples, seed 0), field F1 on the same ground truth",
+  "fairness_notes": [
+   "R0 answers Donut-style CORD tokens (read with token2json), R2 answers JSON (read with json_answer); both are scored as dicts with the same field F1",
+   "R0: full SFT 3 epochs (300 steps); R2: LoRA 3 epochs then merged; one training seed each, run-to-run variance not measured",
+   "R0 is the app default by user decision; both numbers are published"
+  ]
+ },
+ "speed": "582 s for 100 images including model load (~10 images/min, HF bf16, batch 1, GB10); R0 Parse ~7 images/min",
+ "ci_method": "bootstrap over images, 1000 resamples, seed 0, micro F1 from per-image (tp, errors) counts"
+}
