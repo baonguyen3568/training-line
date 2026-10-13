@@ -37,7 +37,14 @@ from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.host_paths import HostPaths
 from vlm_pipeline.common.images import ImageMismatchError, check_pinned_image
 from vlm_pipeline.common.jobrun import STOP_GRACE_S, ContainerJob, docker_args
-from vlm_pipeline.runner.protocol import MAX_REQUEST_BYTES, ProtocolError, RunRef, Submit, parse_request
+from vlm_pipeline.runner.protocol import (
+    MAX_REQUEST_BYTES,
+    ImageQuery,
+    ProtocolError,
+    RunRef,
+    Submit,
+    parse_request,
+)
 
 logger = logging.getLogger(__name__)
 LABEL = "project=vlm-training"
@@ -117,7 +124,12 @@ class Runner:
     def handle(self, raw: bytes) -> dict[str, Any]:
         try:
             request = parse_request(raw)
-            result = self._submit(request) if isinstance(request, Submit) else self._run_ref(request)
+            if isinstance(request, ImageQuery):
+                result = {"ok": True, "image_id": self._image_id(request.image_tag)}
+            elif isinstance(request, Submit):
+                result = self._submit(request)
+            else:
+                result = self._run_ref(request)
         except ProtocolError as exc:
             result = {"ok": False, "error": exc.reason}
         except ImageMismatchError:
@@ -305,3 +317,7 @@ def main() -> None:  # pragma: no cover - the container entrypoint
 
 
 __all__ = ["LABEL", "Runner", "RunnerConfig", "RunnerServer", "config_from_env"]
+
+
+if __name__ == "__main__":  # pragma: no cover - `python -m vlm_pipeline.runner.server` (runner image CMD)
+    main()

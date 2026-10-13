@@ -597,3 +597,38 @@ def test_a_job_cache_under_a_run_is_never_an_input(tmp_path: Path) -> None:
     job = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(other,))
     with pytest.raises(ValueError, match="job cache"):
         docker_args(job, root)
+
+
+def test_input_problem_matches_the_mount_rules(tmp_path: Path) -> None:
+    """fixcode: callers that build inputs refuse early with the same rules narrow_mounts applies."""
+    from vlm_pipeline.common.jobrun import input_problem
+
+    root, _run, repo, data = _narrow_project(tmp_path)
+    probe = root / "outputs" / "probe" / "inputs"
+    probe.mkdir(parents=True)
+    assert input_problem(root, repo) is None
+    assert input_problem(root, data) is None
+    assert "allowed input root" in (input_problem(root, probe) or "")
+    assert "outside the project" in (input_problem(root, tmp_path) or "")
+
+
+def test_a_refused_input_fails_before_the_run_dir_is_written(tmp_path: Path) -> None:
+    """fixcode: SEC-001 naming the input, not SYS-000 after run.json exists (no claim, no image lookup)."""
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.jobrun import JobInputRefusedError
+    from vlm_pipeline.common.run_claims import is_claimed
+    from vlm_pipeline.common.runinfo import RunManifest
+
+    root, run, _repo, _data = _narrow_project(tmp_path)
+    probe = root / "outputs" / "probe" / "inputs"
+    probe.mkdir(parents=True)
+    job = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(probe,))
+    with pytest.raises(JobInputRefusedError) as err:
+        jobrun.run_job(
+            job, RunManifest(run_id=run.name, name="t", stage="train", task="sft"), run, project_root=root,
+            who="t", est_peak_gb=1, lock_path=tmp_path / "GPU_LOCK",
+        )  # fmt: skip
+    assert err.value.code == "SEC-001"
+    assert err.value.params == {"path": "outputs/probe/inputs"}
+    assert not (run / "run.json").exists()
+    assert not is_claimed(root, run.name)

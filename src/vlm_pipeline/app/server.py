@@ -26,8 +26,19 @@ def cmd_app(args: argparse.Namespace) -> int:
     token = getattr(app.state, "startup_token", None)
     url = f"http://127.0.0.1:{args.port}/" + (f"?token={token}" if token else "")
     print(f"vlm app: open {url}", file=sys.stderr, flush=True)  # shown once, never logged (D13)
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="info", access_log=False)
+    uvicorn.run(app, host=bind_host(), port=args.port, log_level="info", access_log=False)
     return 0
+
+
+def bind_host() -> str:
+    """127.0.0.1, except inside the compose stack (``VLM_IN_COMPOSE=1``).
+
+    There the container must listen on all of ITS interfaces so the port mapping reaches it; compose publishes it on
+    the host's 127.0.0.1 only (ADR-015).
+    """
+    import os
+
+    return "0.0.0.0" if os.environ.get("VLM_IN_COMPOSE") == "1" else "127.0.0.1"  # noqa: S104 - container-only
 
 
 def _start_retention_scheduler(app: FastAPI, services: DefaultServices) -> None:

@@ -39,7 +39,7 @@ APP_ROOT = PurePosixPath("/app")
 UPLOAD_NAME = re.compile(r"^[0-9a-f]{32}\.png$")
 IMAGE_TAG = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,127}:[A-Za-z0-9._-]{1,64}$")
 LOCK_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
-COMMANDS = frozenset({"submit", "stop", "kill", "status", "logs", "remove"})
+COMMANDS = frozenset({"submit", "stop", "kill", "status", "logs", "remove", "image_id"})
 JOB_KINDS = frozenset({"train", "eval", "quantize", "probe", "download", "serve"})
 RUN_DIR_PARENTS = (APP_ROOT / "outputs" / "runs", APP_ROOT / "outputs" / "graph" / "runs")
 INPUT_ROOTS = (
@@ -174,6 +174,13 @@ def parse_submit(body: dict[str, Any]) -> Submit:
     )
 
 
+@dataclass(frozen=True)
+class ImageQuery:
+    """Read-only: the local id of a pinned tag (the app has no docker CLI; its cache keys need the id)."""
+
+    image_tag: str
+
+
 def parse_run_ref(body: dict[str, Any]) -> RunRef:
     command = body["command"]
     if command == "logs":
@@ -188,7 +195,7 @@ def parse_run_ref(body: dict[str, Any]) -> RunRef:
     return RunRef(command, _text(body["run_id"], "bad_run_id", RUN_ID))
 
 
-def parse_request(raw: bytes) -> Submit | RunRef:
+def parse_request(raw: bytes) -> Submit | RunRef | ImageQuery:
     """One request (JSON object, <= 64 KiB) -> its typed form, or ProtocolError naming the rule."""
     if len(raw) > MAX_REQUEST_BYTES:
         raise ProtocolError("request_too_large")
@@ -201,6 +208,9 @@ def parse_request(raw: bytes) -> Submit | RunRef:
     command = body.get("command")
     if command not in COMMANDS:
         raise ProtocolError("unknown_command")
+    if command == "image_id":
+        _closed(body, {"command", "image_tag"}, {"command", "image_tag"})
+        return ImageQuery(_text(body["image_tag"], "bad_image_tag", IMAGE_TAG))
     return parse_submit(body) if command == "submit" else parse_run_ref(body)
 
 
@@ -209,6 +219,7 @@ __all__ = [
     "INPUT_ROOTS",
     "JOB_KINDS",
     "MAX_REQUEST_BYTES",
+    "ImageQuery",
     "ProtocolError",
     "RunRef",
     "Submit",

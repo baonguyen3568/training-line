@@ -25,7 +25,7 @@ from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 from vlm_pipeline.common.host_paths import check_mount_source, link_units, secret_file_problem, tree_problem
 from vlm_pipeline.common.images import check_pinned_image
-from vlm_pipeline.common.launcher import JobLauncher, LocalDockerLauncher, default_launcher
+from vlm_pipeline.common.launcher import JobLauncher, default_launcher
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
 from vlm_pipeline.common.run_claims import RunDirClaimedError, claim_run, is_claimed
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
@@ -200,14 +200,14 @@ def _input_problem(rel: Path) -> str | None:
     return None if allowed else "not under an allowed input root"
 
 
-def _checked_input(root: Path, rw: Path, given: Path) -> tuple[Path, set[Path]]:
+def _checked_input(root: Path, rw: Path | None, given: Path) -> tuple[Path, set[Path]]:
     """(path relative to the root, extra link units) of one read-only input, or ValueError naming the rule."""
     if not given.is_relative_to(root):
         raise ValueError(f"input {given} is outside the project")
     rel = given.relative_to(root)
     if (problem := _input_problem(rel)) is not None:
         raise ValueError(f"input {rel}: {problem}")
-    if given == rw or given.is_relative_to(rw) or rw.is_relative_to(given):
+    if rw is not None and (given == rw or given.is_relative_to(rw) or rw.is_relative_to(given)):
         raise ValueError(f"input {rel} overlaps the writable dir")
     is_dir = given.is_dir() and not given.is_symlink()
     check_mount_source(root, given, directory=is_dir)
@@ -223,6 +223,40 @@ def _checked_input(root: Path, rw: Path, given: Path) -> tuple[Path, set[Path]]:
     if (problem := tree_problem(given)) is not None:  # job-written data: no link at all
         raise ValueError(f"input {rel}: {problem} is not a plain file")
     return rel, set()
+
+
+class JobInputRefusedError(VlmPipelineError):
+    """A read-only input of a narrowed job breaks the mount rules: refused before any run dir is written.
+
+    ``params["path"]`` is the input as the user knows it (relative to the project when inside it); the rule that
+    refused it is the message (technical detail only).
+    """
+
+    code: ClassVar[str] = "SEC-001"
+
+
+def input_problem(project_root: Path, path: Path) -> str | None:
+    """Why ``path`` cannot be a read-only input of a narrowed job, or None. Same rules as ``narrow_mounts``.
+
+    For callers that build inputs (``run_vllm_batch``...) and want to refuse early; ``run_job`` checks again.
+    """
+    root = project_root.resolve()
+    try:
+        _checked_input(root, None, Path(os.path.normpath(path.absolute())))
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
+def _refuse_bad_inputs(job: ContainerJob, project_root: Path) -> None:
+    root = project_root.resolve()
+    rw = validate_rw_dirs(root, job.rw_dirs)[0] if len(job.rw_dirs) == 1 else None
+    for given in sorted({Path(os.path.normpath(p.absolute())) for p in job.ro_inputs}):
+        try:
+            _checked_input(root, rw, given)
+        except ValueError as exc:
+            shown = given.relative_to(root).as_posix() if given.is_relative_to(root) else given.name
+            raise JobInputRefusedError(str(exc), params={"path": shown}) from None
 
 
 def narrow_mounts(job: ContainerJob, project_root: Path) -> list[str]:
@@ -530,8 +564,8 @@ def git_state(root: Path, dirs: tuple[str, ...] = _CODE_DIRS) -> tuple[str | Non
 
 
 def image_digest(image: str) -> str | None:
-    """Local image id of ``image`` (None when docker or the image is missing): ``LocalDockerLauncher.image_id``."""
-    return LocalDockerLauncher().image_id(image)
+    """Local image id of ``image`` (None when it is missing): the host docker CLI, or vlm-runner in compose."""
+    return default_launcher().image_id(image)
 
 
 def _check_gate(job: ContainerJob, manifest: RunManifest, project_root: Path) -> None:
@@ -667,6 +701,8 @@ def _checks_before_queueing(
     # (the memory wait and run_job's failure path both write run.json): its history is never rewritten.
     if is_claimed(project_root, manifest.run_id):
         raise RunDirClaimedError(manifest.run_id)
+    if job.narrow:  # an input the mount rules refuse fails here with SEC-001, not SYS-000 after the run dir exists
+        _refuse_bad_inputs(job, project_root)
     if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
         _check_gate(job, manifest, project_root)
     if not checks_images:  # vlm-runner gates and pins the image itself (compose: no docker CLI in the app)

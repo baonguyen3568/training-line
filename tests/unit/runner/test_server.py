@@ -262,3 +262,15 @@ def test_a_stranger_cannot_use_the_socket(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
     assert started == []
+
+
+def test_image_id_is_a_read_only_query(tmp_path: Path) -> None:
+    """The app (no docker CLI in compose) asks the runner for a tag's id: cache identity only, nothing runs."""
+    cfg = _project(tmp_path)
+    docker = FakeDocker()
+    runner, started = _runner(cfg, docker)
+    reply = runner.handle(json.dumps({"command": "image_id", "image_tag": "vlm-x:1"}).encode())
+    assert reply == {"ok": True, "image_id": IMAGE_ID}
+    assert started == []
+    bad = runner.handle(json.dumps({"command": "image_id", "image_tag": "x:1 --privileged"}).encode())
+    assert bad == {"ok": False, "error": "bad_image_tag"}

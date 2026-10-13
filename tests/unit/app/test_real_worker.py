@@ -202,9 +202,10 @@ def test_train_failure_raises_container_exit(
 
 
 def test_identity_keys_container_nodes_by_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    import vlm_pipeline.common.jobrun as jobrun
+    from vlm_pipeline.common.launcher import LocalDockerLauncher
 
-    monkeypatch.setattr(jobrun, "image_digest", lambda image: "sha256:abc")
+    monkeypatch.delenv("VLM_RUNNER_SOCKET", raising=False)
+    monkeypatch.setattr(LocalDockerLauncher, "image_id", lambda self, image: "sha256:abc")
     w = RealWorker(_root(tmp_path), image="vlm-automodel:26.08-3")
     train, pick = REGISTRY.get("train.sft_vlm"), REGISTRY.get("model.hf_pick")
     assert train is not None

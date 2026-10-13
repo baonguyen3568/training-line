@@ -133,7 +133,13 @@ class RunnerLauncher:
         return reply
 
     def image_id(self, image: str) -> str | None:
-        return None  # the runner resolves and pins it; the manifest gets the id the runner reports
+        """The runner's local id of ``image`` (cache identity); the gate itself stays in the runner's submit."""
+        try:
+            reply = self._call({"command": "image_id", "image_tag": image})
+        except OSError:
+            return None
+        value = reply.get("image_id")
+        return value if reply.get("ok") is True and isinstance(value, str) else None
 
     def run(
         self, job: ContainerJob, project_root: Path, *, lock_token: str | None, log_path: Path, image_id: str | None
