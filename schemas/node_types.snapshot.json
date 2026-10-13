@@ -121,8 +121,8 @@
                   "gated": false,
                   "label": "Qwen3.5 2B",
                   "license": "apache-2.0",
-                  "ram_gb": 16.0,
-                  "ram_source": "estimated",
+                  "ram_gb": 17.0,
+                  "ram_source": "measured",
                   "task_prompt_fixed": false,
                   "tier": "template",
                   "vendor": "qwen"
