@@ -317,3 +317,34 @@ def test_parse_resumes_since_patch_0005() -> None:
     """BUG-003 closed (26.08-6): no model starts over anymore; the error card offers "resume" again for Parse."""
     assert frozenset() == workers.RESUME_UNSUPPORTED
     assert workers.DEFAULT_TRAIN_IMAGE == "vlm-automodel:26.08-6"
+
+
+def test_merge_lora_runs_on_cpu_and_completes_from_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import vlm_pipeline.train.ckpt_complete as ckpt_complete
+
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    seen: dict[str, Any] = {}
+    completed: list[tuple[Path, Path]] = []
+    monkeypatch.setattr(ckpt_complete, "complete_from_base", lambda base, out: completed.append((base, out)) or [])
+
+    def fake_run_job(job: Any, manifest: RunManifest, run_dir: Path, **kw: Any) -> RunManifest:
+        seen.update(job=job, manifest=manifest)
+        return manifest.model_copy(update={"status": RunStatus.COMPLETED, "exit_code": 0})
+
+    monkeypatch.setattr(workers, "run_job", fake_run_job)
+    entry = w.catalog.get("qwen3.5-0.8b")
+    assert entry is not None
+    inputs = {
+        "base_model": ArtifactRef("Model", str(root / "m"), f"{entry.repo}@{entry.revision}"),
+        "adapter": ArtifactRef("Adapter", str(root / "outputs" / "graph" / "runs" / "t-1" / "a"), "t-1:abc"),
+    }
+    run_dir = root / "outputs" / "graph" / "runs" / "merge-1"
+    out = w.run(_job("train.merge_lora", {}, run_dir, inputs)).outputs["model"]
+    job = seen["job"]
+    assert (job.gpu, job.read_only_project, job.rw_dirs) == (False, True, (run_dir.resolve(),))
+    assert job.argv[:3] == ("python", "-m", "vlm_pipeline.train.merge_lora")
+    assert "--auto-class" in job.argv
+    assert seen["manifest"].parent_run_id == "t-1"
+    assert (out.type, out.path) == ("Checkpoint", str(run_dir.resolve() / "merged"))
+    assert completed == [(root / "m", run_dir.resolve() / "merged")]

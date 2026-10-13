@@ -125,6 +125,7 @@ class RealWorker:
             "data.split": self._split,
             "train.lora_vlm": self._train,
             "train.sft_vlm": self._train,
+            "train.merge_lora": self._merge_lora,
             "serve.vllm": functools.partial(run_trial, self),  # B-7 "Chạy thử" (app/trial_worker.py)
         }
 
@@ -298,6 +299,61 @@ class RealWorker:
         ref = ArtifactRef(type=out_type.type, path=str(out), hash=f"{run_id}:{config_hash}")
         return NodeResult(outputs={port: ref})
 
+    def _merge_lora(self, job: NodeJob) -> NodeResult:
+        """LoRA adapter + its base -> one HF checkpoint (CPU job in the training image; B-1)."""
+        base, adapter = job.inputs["base_model"], job.inputs["adapter"]
+        entry = self._entry_for(base)
+        if entry.auto_class != "AutoModelForImageTextToText":  # remote-code models never train LoRA (CFG-010)
+            raise NodeNotRunnableError("merge needs a native model", params={"node": job.node_id,
+                                                                            "node_type": job.spec.type_id})  # fmt: skip
+        run_dir = job.run_dir.resolve()
+        (run_dir / "logs").mkdir(parents=True, exist_ok=True)
+        out = run_dir / "merged"
+        run_id = run_dir.name[:120]
+        manifest = RunManifest(
+            run_id=run_id, name=f"{job.spec.type_id} {entry.display_name}", stage="train", task="merge_lora",
+            base_model=entry.repo, base_model_revision=entry.revision, container_image=self.image,
+            parent_run_id=_run_id_of(adapter),
+        )  # fmt: skip
+        container = ContainerJob(
+            name=run_id,
+            image=self.image,
+            argv=(
+                "python",
+                "-m",
+                "vlm_pipeline.train.merge_lora",
+                "--base",
+                self._container_path(self._host_path(base.path)),
+                "--adapter",
+                self._container_path(self._host_path(adapter.path)),
+                "--out",
+                self._container_path(out),
+                "--auto-class",
+                entry.auto_class,
+                "--dtype",
+                _merge_dtype(entry),
+            ),
+            gpu=False,
+            read_only_project=True,  # the merge writes only its own run dir
+            rw_dirs=(run_dir,),
+        )
+        try:
+            final = run_job(container, manifest, run_dir, project_root=self.root, who=self.who,
+                            est_peak_gb=_merge_peak_gb(entry), ckpt_gb=entry.disk_gb, cancel=job.cancel)  # fmt: skip
+        except MemoryPreemptedBeforeStartError as exc:
+            raise InsufficientMemoryError(str(exc), params={"need_gb": _merge_peak_gb(entry)}) from exc
+        if final.status != RunStatus.COMPLETED:
+            raise ContainerExit(final.exit_code or 1, oom_killed=bool(final.oom_killed),
+                                cancelled_by_executor=final.status == RunStatus.CANCELLED,
+                                log_tail=_tail(run_dir / "logs" / "stdout.log"))  # fmt: skip
+        from vlm_pipeline.train.ckpt_complete import complete_from_base
+
+        # Keys the HF class does not build (e.g. Qwen3.5 MTP head) are dropped on save: restore them from the base.
+        complete_from_base(self._host_path(base.path), out)
+        return NodeResult(
+            outputs={"model": ArtifactRef(type="Checkpoint", path=str(out), hash=f"{run_id}:{adapter.hash}")}
+        )
+
     @staticmethod
     def _write_metrics(run_dir: Path) -> None:
         for src, split in (("training.jsonl", "train"), ("validation.jsonl", "val")):
@@ -333,6 +389,25 @@ def _set_aside_checkpoints(run_dir: Path, model_id: str) -> None:
             moved = True
     if moved:
         logger.warning("%s cannot resume from a checkpoint yet: training starts over in %s", model_id, run_dir)
+
+
+MERGE_FP32_MAX_PARAMS_B = 4.0  # fp32 merge (exact delta) while the model fits the shared host comfortably
+
+
+def _merge_dtype(entry: CatalogEntry) -> str:
+    return "fp32" if entry.params_b <= MERGE_FP32_MAX_PARAMS_B else "bf16"
+
+
+def _merge_peak_gb(entry: CatalogEntry) -> float:
+    """Weights in the merge dtype + the saved copy, plus runtime: B/param x 2 + 4 GB (0.8B bf16 measured ~6 GB)."""
+    per_param = 4 if _merge_dtype(entry) == "fp32" else 2
+    return round(entry.params_b * per_param * 2 + 4, 1)
+
+
+def _run_id_of(artifact: ArtifactRef) -> str | None:
+    """Run id of a trained artifact (hash ``<run_id>:<config_hash>``), for run.json lineage."""
+    head = artifact.hash.split(":", 1)[0]
+    return head if ":" in artifact.hash and "@" not in head else None
 
 
 def _tail(path: Path, n: int = 30) -> str:
