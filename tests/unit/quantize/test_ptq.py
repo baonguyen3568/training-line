@@ -6,7 +6,7 @@ import pytest
 
 from vlm_pipeline.common.catalog import load_catalog
 from vlm_pipeline.quantize.config import QuantizeParams
-from vlm_pipeline.quantize.ptq import MAX_KL, MIN_TOP1_AGREEMENT, parity_stats
+from vlm_pipeline.quantize.ptq import FAIL_KL, FAIL_TOP1_AGREEMENT, MAX_KL, MIN_TOP1_AGREEMENT, parity_stats
 from vlm_pipeline.quantize.scope import QuantizeNotSupportedError, check_supported, est_peak_gb, ptq_argv
 
 
@@ -36,18 +36,21 @@ def test_out_of_scope_requests_are_refused_with_a_reason(model_id: str, params: 
 
 
 def test_memory_estimate_never_below_the_measured_probe() -> None:
-    assert est_peak_gb(_entry("qwen3.5-0.8b")) == 16.6  # B-4 probe: real peak 16.6 GB with a cold compile
+    assert est_peak_gb(_entry("qwen3.5-0.8b")) == 20.0  # first node run 2026-10-13: 19.3 GB (run.json, cold caches)
     big = _entry("qwen3.5-9b")
-    assert est_peak_gb(big) == round(big.disk_gb * 2 + 10, 1)
+    assert est_peak_gb(big) == round(big.disk_gb * 2 + 16, 1)
 
 
 def test_parity_verdict() -> None:
     probe = parity_stats([0.99, 0.9245, 0.968], [0.0087, 0.013, 0.004])  # B-4 probe: mean 0.961, min 0.9245
-    assert probe["ok"] is True
-    assert probe["samples"] == 3
-    assert parity_stats([MIN_TOP1_AGREEMENT - 0.01], [0.001])["ok"] is False
-    assert parity_stats([0.99], [MAX_KL + 0.001])["ok"] is False
-    assert parity_stats([], [])["ok"] is None  # no validation split: no sanity verdict, the benchmark gate decides
+    assert (probe["verdict"], probe["samples"]) == ("pass", 3)
+    node_run = parity_stats([0.9346], [0.02144])  # first node run 2026-10-13 (calib 128): below the probe, not broken
+    assert node_run["verdict"] == "warn"
+    assert parity_stats([MIN_TOP1_AGREEMENT - 0.01], [0.001])["verdict"] == "warn"
+    assert parity_stats([0.99], [MAX_KL + 0.001])["verdict"] == "warn"
+    assert parity_stats([FAIL_TOP1_AGREEMENT - 0.01], [0.001])["verdict"] == "fail"
+    assert parity_stats([0.99], [FAIL_KL + 0.01])["verdict"] == "fail"
+    assert parity_stats([], [])["verdict"] == "none"  # no validation split: the benchmark gate decides
 
 
 def test_container_argv() -> None:

@@ -24,12 +24,13 @@ class QuantizeNotSupportedError(VlmPipelineError):
 
 
 def est_peak_gb(entry: CatalogEntry) -> float:
-    """BF16 weights twice (model + calibration activations / export copy) + 10 GB runtime and JIT compile.
+    """BF16 weights twice (model + calibration activations / export copy) + 16 GB runtime and cold JIT compile.
 
-    B-4 probe, Qwen3.5-0.8B (1.77 GB snapshot): real peak 16.6 GB (run.json), of which ~3 min of nvcc compile on a
-    cold torch_extensions cache. Never below that measured value.
+    Measured on Qwen3.5-0.8B (1.77 GB snapshot), run.json peaks: B-4 probe 16.6 GB (calib 32); first node run
+    2026-10-13 19.3 GB (calib 128, cold Triton + nvcc caches: a read-only job compiles in its own run dir every time).
+    The 16 GB overhead is fitted on that one model (catalog disk_gb 2.0 -> 20.0 GB >= 19.3 measured).
     """
-    return round(max(16.6, entry.disk_gb * 2 + 10), 1)
+    return round(entry.disk_gb * 2 + 16, 1)
 
 
 def check_supported(entry: CatalogEntry, params: QuantizeParams, node_id: str) -> None:

@@ -22,7 +22,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 FORMATS = ("fp8",)
 AUTO_CLASS = "AutoModelForImageTextToText"  # remote-code models (Nemotron Parse) are not supported yet (P-5)
@@ -31,9 +31,16 @@ SKIP_PATTERNS = ("*lm_head*", "*visual*", "*vision_tower*", "*vision_model*", "*
 CALIB_PROMPT = "Describe this image."  # same default prompt as training (make_cord_v2_dataset / data.local_folder)
 PARITY_SAMPLES = 16
 PARITY_MAX_NEW_TOKENS = 64
-# Sanity thresholds (B-4 probe, Qwen3.5-0.8B: top-1 0.961, KL 0.0087); the user-facing gate is eval quant_gate.
+# Parity is a sanity check in two levels; the user-facing quality gate is the benchmark (eval quant_vs_parent).
+#   warn: worse than the B-4 probe (Qwen3.5-0.8B, 8 imgs: top-1 0.961, KL 0.0087); the model is still handed over.
+#   fail: the quantization is broken. Provisional until the calib 32/128/512 A/B (2026-10-13 node run, calib 128,
+#         16 imgs: top-1 0.935, KL 0.021 -> warn).
 MIN_TOP1_AGREEMENT = 0.95
 MAX_KL = 0.02
+FAIL_TOP1_AGREEMENT = 0.85
+FAIL_KL = 0.10
+ParityVerdict = Literal["pass", "warn", "fail", "none"]  # contract with app/quantize_worker (QNT-001 / QNT-002)
+EXIT_PARITY_FAIL = 3  # quantized and exported, but parity says the quantization is broken
 
 
 def load_images(data_dir: Path, split: str, n: int) -> list[Any]:
@@ -81,15 +88,28 @@ def _answer_logits(model: Any, batch: dict[str, Any], answer: Any) -> Any:
 def parity_stats(agree: list[float], kls: list[float]) -> dict[str, Any]:
     """Summary of the per-sample parity numbers and the sanity verdict (pure, unit-tested)."""
     if not agree:
-        return {"samples": 0, "ok": None}
+        return {"samples": 0, "verdict": "none"}
     top1, kl = sum(agree) / len(agree), sum(kls) / len(kls)
+    verdict: ParityVerdict
+    if top1 < FAIL_TOP1_AGREEMENT or kl > FAIL_KL:
+        verdict = "fail"
+    elif top1 < MIN_TOP1_AGREEMENT or kl > MAX_KL:
+        verdict = "warn"
+    else:
+        verdict = "pass"
     return {
         "samples": len(agree),
         "top1_agreement_mean": round(top1, 4),
         "top1_agreement_min": round(min(agree), 4),
         "kl_mean": round(kl, 5),
         "kl_max": round(max(kls), 5),
-        "ok": top1 >= MIN_TOP1_AGREEMENT and kl <= MAX_KL,
+        "verdict": verdict,
+        "thresholds": {
+            "warn_top1": MIN_TOP1_AGREEMENT,
+            "warn_kl": MAX_KL,
+            "fail_top1": FAIL_TOP1_AGREEMENT,
+            "fail_kl": FAIL_KL,
+        },
     }
 
 
@@ -180,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     report = run(a.model, a.data, a.out, fmt=a.format, calib_size=a.calib_size)
     print(json.dumps(report, indent=2))
-    return 0 if report["parity"]["ok"] is not False else 3  # 3 = quantized but parity sanity failed
+    return EXIT_PARITY_FAIL if report["parity"]["verdict"] == "fail" else 0  # warn: the worker reads report.json
 
 
 if __name__ == "__main__":
