@@ -236,3 +236,18 @@ def test_every_check_field_is_a_declared_std001_param() -> None:
     assert len(kinds) >= 10, kinds  # guard: an empty set would make the assertion below vacuous
     fields = {name for kind in kinds for name in kind.model_fields if name != "kind"}
     assert fields | {"rule", "message", "node", "param", "value"} <= declared, sorted(fields - declared)
+
+
+@pytest.mark.parametrize(("node", "port", "rule"), [("t", "train_data", "TRAIN-HELDOUT-DATA")])
+def test_eval_only_dataset_wired_into_training_is_an_error(
+    monkeypatch: pytest.MonkeyPatch, node: str, port: str, rule: str
+) -> None:
+    """Security (OCRBench, eval_only): an evaluation-only dataset can never feed training. Uses the repo's rules."""
+    from vlm_pipeline.common.catalog import DatasetEntry, load_dataset_catalog
+    from vlm_pipeline.nodes import standards
+
+    cord = load_dataset_catalog().datasets[0]
+    eval_only = DatasetEntry.model_validate({**cord.model_dump(), "use": "eval_only", "heldout_splits": cord.splits})
+    monkeypatch.setattr(standards, "_catalog_dataset", lambda upstream: eval_only if upstream else None)
+    issues = [i for i in validate(_lora(), REGISTRY) if i.code == "STD-001" and i.params["rule"] == rule]
+    assert [(i.severity, i.node_id, i.port) for i in issues] == [("error", node, port)]

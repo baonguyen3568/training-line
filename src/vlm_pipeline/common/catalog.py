@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Literal, Self
 
 import yaml
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 from vlm_pipeline.common.paths import project_root
 
@@ -21,6 +21,19 @@ DATASETS_PATH = Path("configs") / "catalog" / "datasets.yaml"
 # Hub repo id "org/name". No segment may start with "." so "../x" or "org/.." can never reach a path or URL.
 REPO_ID_PATTERN = r"^[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*$"
 REVISION_PATTERN = r"^[0-9a-f]{40}$"
+# A dataset whose parts are under many licences (e.g. OCRBench): no single text can be vendored, so it may only be
+# evaluated on, never trained on or redistributed (bao-security). Export lineage never contains it.
+UNVERIFIED_LICENSE = "mixed-unverified"
+
+
+def _snapshot_relative(path: str) -> str:
+    if ".." in path.split("/"):
+        raise ValueError(f"{path!r} leaves the snapshot")
+    return path
+
+
+# Relative path inside the dataset snapshot: no leading "/", no ".." segment.
+DataFile = Annotated[str, Field(pattern=r"^[A-Za-z0-9_][A-Za-z0-9_./-]*$"), AfterValidator(_snapshot_relative)]
 
 Tier = Literal["default", "template", "catalog", "baseline", "rnd"]
 
@@ -198,6 +211,18 @@ class DatasetEntry(BaseModel):
     gated: bool
     disk_gb: float = Field(gt=0)
     notices: Notices = ()
+    # Files the download step must verify (snapshot-relative path -> sha256), e.g. a security condition.
+    files_sha256: dict[DataFile, Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _unverified_licence_is_eval_only(self) -> Self:
+        if self.license == UNVERIFIED_LICENSE and (
+            self.use != "eval_only" or self.commercial == "yes" or not self.files_sha256
+        ):
+            raise ValueError(
+                f"{self.id}: license {UNVERIFIED_LICENSE} requires use eval_only, commercial != yes and files_sha256"
+            )
+        return self
 
     @model_validator(mode="after")
     def _heldout_are_splits(self) -> Self:
@@ -228,6 +253,15 @@ class DatasetCatalog(BaseModel):
 
     def get(self, dataset_id: str) -> DatasetEntry | None:
         return next((d for d in self.datasets if d.id == dataset_id), None)
+
+
+def license_ids_needing_text(catalog: Catalog, datasets: DatasetCatalog) -> set[str]:
+    """Licence ids that must have a vendored, approved text (configs/licenses): every one an export can contain.
+
+    Models, separately licensed model parts and datasets, except the eval-only ``mixed-unverified`` ones.
+    """
+    ids = {m.license for m in catalog.models} | {p.license for m in catalog.models for p in m.model_parts}
+    return ids | {d.license for d in datasets.datasets if d.license != UNVERIFIED_LICENSE}
 
 
 @functools.cache

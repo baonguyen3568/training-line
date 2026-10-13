@@ -60,12 +60,11 @@ def test_eval_only_dataset_is_never_trainable_and_heldout_must_exist() -> None:
 
 
 def test_every_catalog_licence_has_an_approved_locked_text() -> None:
+    from vlm_pipeline.common.catalog import license_ids_needing_text
     from vlm_pipeline.common.licenses import license_text
     from vlm_pipeline.common.paths import project_root
 
-    models = load_catalog().models
-    ids = {m.license for m in models} | {p.license for m in models for p in m.model_parts}
-    ids |= {d.license for d in load_dataset_catalog().datasets}
+    ids = license_ids_needing_text(load_catalog(), load_dataset_catalog())
     missing = sorted(i for i in ids if license_text(project_root(), i) is None)
     assert missing == [], f"add configs/licenses/<id>.txt + an APPROVED row in LICENSES.lock for {missing}"
 
@@ -161,3 +160,41 @@ def test_templates_use_template_tier_models_and_every_template_tier_model_is_use
     assert wrong == {}, f"templates use models whose catalog tier is not default/template: {wrong}"
     unused = sorted(m for m, tier in tiers.items() if tier == "template" and m not in used)
     assert unused == [], f"tier: template but no shipped template uses it: {unused}"
+
+
+@pytest.mark.parametrize(
+    ("override", "ok"),
+    [
+        (
+            {
+                "license": "mixed-unverified",
+                "use": "eval_only",
+                "commercial": "conditional",
+                "files_sha256": {"data/t.parquet": "a" * 64},
+            },
+            True,
+        ),
+        ({"license": "mixed-unverified", "use": "eval_only", "commercial": "conditional"}, False),  # hashes required
+        ({"license": "mixed-unverified", "use": "train"}, False),  # cannot train on unverified licences
+        ({"license": "mixed-unverified", "use": "eval_only", "commercial": "yes"}, False),
+        ({"files_sha256": {"data/test-00000-of-00001.parquet": "a" * 64}}, True),
+        ({"files_sha256": {"../escape.parquet": "a" * 64}}, False),
+        ({"files_sha256": {"/abs.parquet": "a" * 64}}, False),
+        ({"files_sha256": {"data/x.parquet": "not-a-sha"}}, False),
+    ],
+)
+def test_dataset_licence_and_file_hashes(override: dict[str, Any], ok: bool) -> None:
+    raw = {**load_dataset_catalog().datasets[0].model_dump(), **override}
+    if override.get("use") == "eval_only":
+        raw["heldout_splits"] = list(raw["splits"])
+    if ok:
+        DatasetEntry.model_validate(raw)
+    else:
+        with pytest.raises(ValidationError):
+            DatasetEntry.model_validate(raw)
+
+
+def test_unverified_licence_datasets_are_not_licence_text_requirements() -> None:
+    from vlm_pipeline.common.catalog import UNVERIFIED_LICENSE, license_ids_needing_text
+
+    assert UNVERIFIED_LICENSE not in license_ids_needing_text(load_catalog(), load_dataset_catalog())
