@@ -36,6 +36,8 @@ TAG_ATTR = re.compile(r"<[A-Za-z][^>]*>")  # JSX/HTML tags: attribute values are
 IMPORT = re.compile(r"^(import|export) .*$", re.M)
 NUMBER = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)*(?![\w])")  # prose: standalone numbers only
 SOURCE_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")  # sources: also "128GB", "CI95", "42.0"
+# Hashes / digests / UUIDs in sources (git sha, sha256, revisions): their digits are not numbers anyone measured.
+HEX_RUN = re.compile(r"(?<![0-9A-Za-z])(?=[0-9a-fA-F]*[a-fA-F])(?=[0-9a-fA-F]*\d)[0-9a-fA-F]{7,}(?![0-9A-Za-z])")
 CODE_ID = re.compile(r"\b[A-Z]{2,}-\d+\b")  # error codes (CFG-010) are identifiers, not claims
 IGNORE = {str(i) for i in range(11)}  # list positions, "1 model", "2 bước": too common to source, too small to mislead
 
@@ -50,7 +52,7 @@ def normalize(token: str) -> str:
 
 
 def numbers_in(text: str) -> set[str]:
-    return {normalize(m.group()) for m in SOURCE_NUMBER.finditer(text)}
+    return {normalize(m.group()) for m in SOURCE_NUMBER.finditer(HEX_RUN.sub(" ", text))}
 
 
 def prose(body: str) -> str:
@@ -62,8 +64,13 @@ def prose(body: str) -> str:
 def check_page(page: Path, repo: Path = REPO) -> dict[str, object]:
     text = page.read_text(encoding="utf-8")
     match = FRONTMATTER.match(text)
-    meta = yaml.safe_load(match.group(1)) if match else {}
-    meta = meta or {}
+    try:
+        meta = (yaml.safe_load(match.group(1)) if match else {}) or {}
+    except yaml.YAMLError as exc:  # a broken page is a finding, not a crash that hides every other page
+        mark = getattr(exc, "problem_mark", None)
+        line = mark.line + 2 if mark is not None else 1
+        return {"page": str(page.relative_to(repo)), "sources": [], "missing_sources": [],
+                "unsourced": [], "frontmatter_error": f"line {line}: {getattr(exc, 'problem', exc)}"}  # fmt: skip
     body = text[match.end() :] if match else text
     offset = text[: match.end()].count("\n") if match else 0
     sources = [str(s) for s in meta.get("sources") or []]
@@ -87,6 +94,7 @@ def check_page(page: Path, repo: Path = REPO) -> dict[str, object]:
         "sources": sources,
         "missing_sources": missing_sources,
         "unsourced": unsourced,
+        "frontmatter_error": None,
     }
 
 
@@ -97,7 +105,7 @@ def main() -> int:
     args = ap.parse_args()
     pages = sorted((REPO / args.root).rglob("*.mdx")) + sorted((REPO / args.root).rglob("*.md"))
     results = [check_page(p) for p in pages]
-    bad = [r for r in results if r["unsourced"] or r["missing_sources"]]
+    bad = [r for r in results if r["unsourced"] or r["missing_sources"] or r["frontmatter_error"]]
     print(
         json.dumps(
             {"pages": len(results), "pages_with_problems": len(bad), "results": bad}, indent=1, ensure_ascii=False

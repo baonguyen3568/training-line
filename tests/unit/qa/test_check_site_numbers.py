@@ -59,3 +59,23 @@ def test_explicit_whitelist(tmp_path: Path) -> None:
 def test_missing_source_file_is_reported(tmp_path: Path) -> None:
     result = _checker().check_page(_page(tmp_path, "Không có số.", ["benchmarks/nope.json"]), tmp_path)
     assert result["missing_sources"] == ["benchmarks/nope.json"]
+
+
+def test_digits_inside_hashes_do_not_source_a_number(tmp_path: Path) -> None:
+    # "86" must not be "sourced" by a sha (c86f...) or a revision; a real "86%" still is.
+    source = '{"revision": "7f0115a4b758c86f", "digest": "sha256:41140fb06cef5", "dir": "parse-v1.1_fd1e3c86"}'
+    assert _unsourced(tmp_path, "Bị cắt ở 86% hoá đơn.", source) == ["86"]
+    assert _unsourced(tmp_path, "Bị cắt ở 86% hoá đơn.", source + " truncated 86%") == []
+
+
+def test_vietnamese_decimal_comma_is_matched_against_a_dot_in_the_source(tmp_path: Path) -> None:
+    assert _unsourced(tmp_path, "Bộ nhớ cao nhất 19,8 GB.", "peak 19.8 GB") == []
+    assert _unsourced(tmp_path, "Bộ nhớ cao nhất 19,8 GB.", "peak 19.9 GB") == ["19,8"]
+
+
+def test_broken_frontmatter_is_a_finding_not_a_crash(tmp_path: Path) -> None:
+    page = tmp_path / "page.mdx"
+    page.write_text("---\ntitle: t\ndescription: bước đầu: mở mẫu\n---\nCó 3000 thứ.\n", encoding="utf-8")
+    result = _checker().check_page(page, tmp_path)
+    assert result["frontmatter_error"] is not None
+    assert result["frontmatter_error"].startswith("line ")
