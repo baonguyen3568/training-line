@@ -138,13 +138,13 @@ def _measure(worker: RealWorker, job: NodeJob, entry: CatalogEntry, trial: Trial
         raise InsufficientMemoryError(str(exc), params={"need_gb": est_peak_gb(entry)}) from exc
     result_path = run_dir / "result.json"
     if final.status != RunStatus.COMPLETED or not result_path.is_file():
-        from vlm_pipeline.app.workers import _tail
+        from vlm_pipeline.common.run_log import log_tail
 
         raise ContainerExit(
             75 if final.status == RunStatus.INTERRUPTED else (final.exit_code or 1),
             oom_killed=bool(final.oom_killed),
             cancelled_by_executor=final.status == RunStatus.CANCELLED,
-            log_tail=_tail(run_dir / "logs" / "stdout.log"),
+            log_tail=log_tail(run_dir),
         )
     result: dict[str, Any] = json.loads(result_path.read_text(encoding="utf-8"))
     result["run_id"] = run_id

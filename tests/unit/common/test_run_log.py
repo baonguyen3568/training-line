@@ -25,3 +25,12 @@ def test_links_fifos_and_bad_names_are_refused(tmp_path: Path) -> None:
     for name in ("stdout.log", "fifo.log", "../secret", "missing.log"):
         with pytest.raises(RunLogError):
             open_run_log(tmp_path, name=name)
+
+
+def test_log_tail_is_empty_for_an_unsafe_or_missing_log(tmp_path: Path) -> None:
+    from vlm_pipeline.common.run_log import log_tail
+
+    assert log_tail(tmp_path) == ""
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "stdout.log").write_text("a\nb\nc\n")
+    assert log_tail(tmp_path, 2) == "b\nc"

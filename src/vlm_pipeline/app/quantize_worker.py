@@ -7,10 +7,11 @@ Scope, memory estimate and argv: ``vlm_pipeline.quantize.scope``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from vlm_pipeline.common.errors import InsufficientMemoryError
 from vlm_pipeline.common.jobrun import ContainerJob, MemoryPreemptedBeforeStartError, run_job
+from vlm_pipeline.common.run_log import log_tail
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
@@ -75,14 +76,7 @@ def run_quantize(worker: RealWorker, job: NodeJob) -> NodeResult:
             final.exit_code or 1,
             oom_killed=bool(final.oom_killed),
             cancelled_by_executor=final.status == RunStatus.CANCELLED,
-            log_tail=_tail(run_dir / "logs" / "stdout.log"),
+            log_tail=log_tail(run_dir),
         )
     ref = ArtifactRef(type="QuantizedModel", path=str(out / "quantized"), hash=f"{run_id}:{model.hash}:{params.format}")
     return NodeResult(outputs={"quantized": ref})  # parity + sizes: <run_dir>/ptq/report.json
-
-
-def _tail(path: Any, n: int = 30) -> str:
-    try:
-        return "\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-n:])
-    except OSError:
-        return ""

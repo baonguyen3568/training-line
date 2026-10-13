@@ -22,7 +22,7 @@ from vlm_pipeline.app.uploads import UPLOADS_DIR, upload_path
 from vlm_pipeline.common.catalog import CatalogEntry
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.jobrun import ContainerJob, MemoryPreemptedBeforeStartError, run_job
-from vlm_pipeline.common.runinfo import RunManifest, RunStatus
+from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_small_json
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
 from vlm_pipeline.serve.config import InferenceParams
@@ -205,18 +205,22 @@ def run_trial(worker: RealWorker, job: NodeJob) -> NodeResult:
     except MemoryPreemptedBeforeStartError as exc:
         raise InsufficientMemoryError(str(exc), params={"need_gb": est_peak_gb(entry)}) from exc
     result_path = run_dir / "result.json"
-    result: dict[str, Any] = json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file() else {}
+    try:  # written by the job (remote model code): no link, no FIFO, bounded (bao-security B1 class)
+        raw = read_small_json(result_path)
+    except (OSError, ValueError):
+        raw = {}
+    result: dict[str, Any] = raw if isinstance(raw, dict) else {}
     if "error" in result:
         reason = str(result["error"].get("reason", "unreadable"))
         raise TrialImageError("image rejected in the container", params={"node": job.node_id, "reason": reason})
     if final.status != RunStatus.COMPLETED or "text" not in result:
-        from vlm_pipeline.app.workers import _tail
+        from vlm_pipeline.common.run_log import log_tail
 
         raise ContainerExit(
             75 if final.status == RunStatus.INTERRUPTED else (final.exit_code or 1),
             oom_killed=bool(final.oom_killed),
             cancelled_by_executor=final.status == RunStatus.CANCELLED,
-            log_tail=_tail(run_dir / "logs" / "stdout.log"),
+            log_tail=log_tail(run_dir),
         )
     if params.engine == "vllm":
         result["engine_requested"] = "vllm"  # proposal 014 §2: HF until the vLLM image passes probe + parity

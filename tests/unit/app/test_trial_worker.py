@@ -230,3 +230,25 @@ def test_check_support_refuses_only_a_missing_image() -> None:
         check_support("try", spec.validate_params({}), None, {"model": "model"})
     assert ei.value.params == {"node": "try", "reason": "missing"}
     check_support("try", spec.validate_params({"image": UID, "engine": "vllm"}), None, {"model": "model"})  # no raise
+
+
+def test_a_job_made_link_is_never_read_as_the_answer_nor_its_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run dir is the job's (remote model code): result.json / logs swapped for links to host files are refused."""
+    w = RealWorker(_root(tmp_path))
+    _, ref = _base_ref(w, "cosmos-reason2-2b")
+    secret = tmp_path / "host-secret.json"
+    secret.write_text('{"text": "CANARY"}')
+    run_dir = w.root / "run"
+
+    def fake_run_job(container: Any, manifest: RunManifest, rd: Path, **kw: Any) -> RunManifest:
+        (rd / "result.json").symlink_to(secret)
+        (rd / "logs" / "stdout.log").symlink_to(secret)
+        return manifest.model_copy(update={"status": RunStatus.COMPLETED, "exit_code": 0})
+
+    monkeypatch.setattr(trial_worker, "run_job", fake_run_job)
+    with pytest.raises(ContainerExit) as ei:
+        run_trial(w, _job({"image": UID}, run_dir, ref))
+    assert "CANARY" not in ei.value.log_tail
+    assert secret.read_text() == '{"text": "CANARY"}'  # never written through the link either

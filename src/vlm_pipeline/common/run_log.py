@@ -3,7 +3,7 @@
 The run dir belongs to the job, and model remote code may run inside it: ``logs`` may have been swapped for a symlink
 (to ``~/.config/ntc-training``, ``.env``, the HF token...) and the log for a FIFO. Each step goes through a dir fd
 with ``O_NOFOLLOW``; the file is opened ``O_NONBLOCK`` (a FIFO never blocks the reader) and must be a regular file.
-Same rules as vlm-runner's own opener (runner/server.py ``_open_run_log``), which can move here.
+The one opener of run logs: vlm-runner and the app workers both use it.
 """
 
 from __future__ import annotations
@@ -54,4 +54,12 @@ def tail_run_log(run_dir: Path, lines: int, *, name: str = "stdout.log", max_byt
     return data.decode("utf-8", errors="replace").splitlines()[-lines:]
 
 
-__all__ = ["RunLogError", "open_run_log", "tail_run_log"]
+def log_tail(run_dir: Path, n: int = 30) -> str:
+    """The last ``n`` lines of ``<run_dir>/logs/stdout.log`` for an error card; "" when the log is unsafe or missing."""
+    try:
+        return "\n".join(tail_run_log(run_dir, n))
+    except RunLogError:
+        return ""
+
+
+__all__ = ["RunLogError", "log_tail", "open_run_log", "tail_run_log"]

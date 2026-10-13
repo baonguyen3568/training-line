@@ -40,6 +40,7 @@ from vlm_pipeline.common.jobrun import (
     run_job,
 )
 from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.run_log import log_tail
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest
 from vlm_pipeline.eval import cord
 from vlm_pipeline.eval.config import EvalParams
@@ -252,7 +253,7 @@ def _generate(request: EvalRequest, model: ModelRef, ids: Sequence[int], run_dir
     except MemoryPreemptedBeforeStartError as exc:
         raise InsufficientMemoryError(str(exc), params={"need_gb": request.entry.ram_gb_train}) from exc
     if final.status != RunStatus.COMPLETED:
-        raise EvalJobFailed(final, _tail(run_dir / "logs" / "stdout.log"))
+        raise EvalJobFailed(final, log_tail(run_dir))
     return run_dir / "pred.jsonl"
 
 
@@ -427,10 +428,3 @@ def run_eval_benchmarks(request: EvalRequest) -> EvalOutcome:
     text = json.dumps(report, indent=1, ensure_ascii=False) + "\n"
     path.write_text(text, encoding="utf-8")
     return EvalOutcome(path, hashlib.sha256(text.encode()).hexdigest(), gate.status.name)
-
-
-def _tail(path: Path, n: int = 30) -> str:
-    try:
-        return "\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-n:])
-    except OSError:
-        return ""
