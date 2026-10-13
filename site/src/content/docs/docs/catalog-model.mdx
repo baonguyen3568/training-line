@@ -9,6 +9,9 @@ sources:
   - .team/proposals/001a-nvidia-default-model.md
   - docs/adr/ADR-001-amendment-2.md
   - src/vlm_pipeline/export/notices.py
+  - benchmarks/perf/qwen3.5-4b-9b-lora-mem-20261013.json
+  - benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json
+  - benchmarks/perf/r0-parse-s299-vs-base-hf-bench-20261013.json
 ---
 import Hint from '~/components/Hint.astro';
 
@@ -23,10 +26,10 @@ Model trên Hugging Face có thể được cập nhật bất kỳ lúc nào. A
 | Model | Hãng | Kích thước (tỉ tham số) | Giấy phép | Cách train | Bộ nhớ khi train | Nén FP8 | Ghi chú |
 |---|---|---|---|---|---|---|---|
 | **NVIDIA Nemotron Parse v1.1** | NVIDIA | 0,94 | NVIDIA Open Model License | Fine-tune toàn bộ | 20 GB (đã đo) | Thử nghiệm | Dùng cho mẫu Đọc hoá đơn → JSON |
-| **Qwen3.5 2B** | Qwen | 2,3 | Apache-2.0 | LoRA | 16 GB (ước lượng) | Hỗ trợ | Dùng cho mẫu Hiểu ảnh và video |
+| **Qwen3.5 2B** | Qwen | 2,3 | Apache-2.0 | LoRA | 17 GB (đã đo) | Hỗ trợ | Dùng cho mẫu Hiểu ảnh |
 | Qwen3.5 0.8B | Qwen | 0,9 | Apache-2.0 | LoRA | 13 GB (đã đo) | Hỗ trợ | Nhỏ nhất, hợp để thử nhanh |
-| Qwen3.5 4B | Qwen | 5,0 | Apache-2.0 | LoRA | 24 GB (ước lượng) | Hỗ trợ | |
-| Qwen3.5 9B | Qwen | 10,0 | Apache-2.0 | LoRA | 38 GB (ước lượng) | Hỗ trợ | Thường phải chờ máy rảnh |
+| Qwen3.5 4B | Qwen | 5,0 | Apache-2.0 | LoRA | 25 GB (đã đo) | Hỗ trợ | |
+| Qwen3.5 9B | Qwen | 10,0 | Apache-2.0 | LoRA | 34 GB (đã đo) | Hỗ trợ | Thường phải chờ máy rảnh |
 | Qwen3-VL 2B Instruct | Qwen | 2,1 | Apache-2.0 | LoRA | 14 GB (ước lượng) | Hỗ trợ | Model tham chiếu để so sánh |
 | Gemma 4 E2B | Google | 5,1 | Apache-2.0 | LoRA | 20 GB (ước lượng) | Không hỗ trợ | |
 | Gemma 4 E4B | Google | 8,0 | Apache-2.0 | LoRA | 28 GB (ước lượng) | Không hỗ trợ | |
@@ -35,6 +38,10 @@ Model trên Hugging Face có thể được cập nhật bất kỳ lúc nào. A
 | NVIDIA Nemotron Parse 2.0 | NVIDIA | 0,95 | OpenMDW 1.1 | Fine-tune toàn bộ | 14 GB (ước lượng) | Thử nghiệm | Đang so với v1.1, chỉ có trong Nâng cao |
 
 Mọi model trong bảng đều cho phép dùng thương mại theo giấy phép của chúng. Khi bạn lưu model đã train, app tự đính kèm giấy phép và dòng ghi công của model gốc và dữ liệu.
+
+<Hint title="Chạy thử cần bao nhiêu bộ nhớ?">
+Ít hơn nhiều so với lúc train. Ví dụ Nemotron Parse v1.1 sau khi fine-tune dùng khoảng 3,87 GB khi chạy thử ổn định, cao nhất 6,1 GB; bản gốc chưa fine-tune dùng 3,58 GB. Fine-tune không làm model tốn thêm bộ nhớ đáng kể khi chạy.
+</Hint>
 
 <Hint title="&quot;Đã đo&quot; và &quot;ước lượng&quot; khác nhau thế nào?">
 **Đã đo**: chúng tôi đã train thật trên máy và ghi lại mức bộ nhớ cao nhất. **Ước lượng**: tính từ kích thước model, chưa chạy thật; con số có thể lệch. App luôn cộng thêm phần dự phòng, xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
