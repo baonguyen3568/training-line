@@ -74,7 +74,13 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         try:
             result = apply(
-                root, ids, by=args.by, approved_by=args.approved_by, lock_path=lock_path, confirmed=confirmed
+                root,
+                ids,
+                by=args.by,
+                approved_by=args.approved_by,
+                lock_path=lock_path,
+                confirmed=confirmed,
+                manual=bool(args.items),  # an admin's explicit choice may take young eval copies too
             )
         except PermissionError as exc:
             print(f"refused: {exc}", file=sys.stderr)

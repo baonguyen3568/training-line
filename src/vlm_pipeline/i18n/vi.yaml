@@ -56,9 +56,13 @@ storage:
   event_done: Đã xoá lúc {time} bởi {who}
   preflight_hint:
     free_temp: Giải phóng {gb} GB từ kết quả tạm
+  item_note:
+    eval_data_auto_clean: "App sẽ tự dọn sau {days} ngày nếu bạn không xoá trước."
   item:
     temp_result_of_run: Kết quả tạm của run {run_name}
     checkpoint_of_run: Checkpoint {checkpoint} của run {run_name}
+    eval_data_invalid: "Dữ liệu chấm điểm \"{dataset}\" bị lỗi (app cất riêng lúc {stamp})"
+    eval_data_unfinished: "Bản cài dở của dữ liệu chấm điểm \"{dataset}\""
     set_aside_of_run: Bản train cũ đã cất của run {run_name}
   protected_reason:
     TRAINED_MODEL: Model bạn đã train — app không tự xoá. Bạn vẫn xoá được, cần gõ tên để xác nhận.

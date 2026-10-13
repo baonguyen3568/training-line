@@ -68,6 +68,13 @@ Action = Literal["keep", "strip_optim", "delete"]
 
 PLAN_SCHEMA_VERSION = 1
 RUNS_REL = Path("outputs") / "runs"
+EVAL_DATA_REL = (
+    Path("data") / "eval"
+)  # installed eval datasets (G-5): only their set-aside / unfinished copies are items
+EVAL_INVALID_RE = re.compile(r"\.([A-Za-z0-9._-]+)\.invalid-([0-9]{8}-[0-9]{6})-[0-9a-f]{4}", re.ASCII)  # fullmatch
+EVAL_TMP_RE = re.compile(r"\.([A-Za-z0-9._-]+)\.[0-9a-f]{8}\.tmp", re.ASCII)  # fullmatch: an install that crashed
+DOWNLOAD_ACTIVE_REL = Path("outputs") / "system" / "downloads" / "active"  # O_EXCL while a download/install runs
+MANUAL_REASON = "MANUAL_ONLY"  # blocked_by of items a person may delete from the panel, never the scheduler
 GRAPH_RUNS_REL = Path("outputs") / "graph" / "runs"  # node run dirs of the graph executor (set-aside data only)
 SET_ASIDE_RE = re.compile(r"(checkpoints|metrics\.jsonl)\.not-resumable-([0-9]{8}-[0-9]{6})", re.ASCII)  # fullmatch
 CKPT_PREFIX = "epoch_"
@@ -122,6 +129,8 @@ class RetentionPolicy:
     failed_latest_days: float = 7.0  # failed/cancelled: LATEST deleted (not stripped) after this long
     set_aside_days: float = 3.0  # *.not-resumable-<stamp> left by a restarted training (PM 2026-10-13)
     interrupted_days: float = 7.0  # interrupted: resumable this long after the last activity, then like failed
+    invalid_eval_days: float = 7.0  # data/eval/.<name>.invalid-<stamp>-<hex>: kept for investigation, then deleted
+    eval_tmp_days: float = 1.0  # data/eval/.<name>.<hex8>.tmp left by a crashed install
     approval_threshold_gb: float = 20.0  # D7.4: above this the CLI needs --approved-by
     approval_window_s: float = DAY_S  # unapproved deletes are summed over this window (no splitting into batches)
 
@@ -147,6 +156,8 @@ class PlanItem:
 
     @property
     def item_id(self) -> str:
+        if self.runs_rel == EVAL_DATA_REL.as_posix():
+            return f"eval:{self.run_id}"
         prefix = "graph:" if self.runs_rel == GRAPH_RUNS_REL.as_posix() else ""
         return f"{prefix}{self.run_id}/{self.path}"
 
@@ -629,7 +640,59 @@ def plan(
         if set_aside:  # node checkpoints themselves belong to the node cache (cache_retention), not to D3
             status, _ = read_run_status(run_dir)
             runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(set_aside)))
-    return Plan(ts=ts, runs=tuple(runs), policy=policy, lock=lock)
+    eval_items = _plan_eval_data(root, now=ts, policy=policy) if run_ids is None else []
+    eval_run = [RunPlan(EVAL_DATA_REL.as_posix(), "n/a", False, tuple(eval_items))] if eval_items else []
+    return Plan(ts=ts, runs=(*runs, *eval_run), policy=policy, lock=lock)
+
+
+def _plan_eval_data(root: Path, *, now: float, policy: RetentionPolicy) -> list[PlanItem]:
+    """Set-aside (``.invalid-``) and unfinished (``.tmp``) copies directly in ``data/eval`` (G-5).
+
+    Never the dataset in use (no leading dot); nothing while a download/install runs (``downloads/active``).
+
+    An invalid copy is a known-bad one kept for investigation (the good one was installed again from its pinned
+    manifest): a person may delete it from the panel at once, the scheduler after ``invalid_eval_days``.
+    """
+    base = root / EVAL_DATA_REL
+    if os.path.lexists(root / DOWNLOAD_ACTIVE_REL) or base.is_symlink() or not base.is_dir():
+        return []
+    items: list[PlanItem] = []
+    for entry in sorted(base.iterdir()):
+        if entry.is_symlink() or not entry.is_dir():
+            continue
+        invalid = EVAL_INVALID_RE.fullmatch(entry.name)
+        if invalid is not None:
+            try:
+                stamp = time.mktime(time.strptime(invalid.group(2), "%Y%m%d-%H%M%S"))
+            except (ValueError, OverflowError):
+                continue
+            age_days = (now - max(stamp, _newest_mtime(entry))) / DAY_S
+            blocked = MANUAL_REASON if age_days < policy.invalid_eval_days else None
+            if (entry / "KEEP").exists():
+                blocked = "PINNED_OR_KEEP"
+            rule = "EVAL.invalid_after_days" if blocked is None else "EVAL.invalid_wait"
+            reason = "eval data that failed its pinned manifest, kept for investigation"
+        elif EVAL_TMP_RE.fullmatch(entry.name):
+            if (now - _newest_mtime(entry)) / DAY_S < policy.eval_tmp_days:
+                continue  # maybe an install in progress: not even shown
+            blocked, rule, reason = None, "EVAL.tmp_after_days", "unfinished eval data install"
+        else:
+            continue
+        items.append(
+            PlanItem(
+                entry.name,
+                ".",
+                "eval_data",
+                (),
+                "delete",
+                du_bytes(entry),
+                rule,
+                reason,
+                blocked,
+                runs_rel=EVAL_DATA_REL.as_posix(),
+            )
+        )
+    return items
 
 
 def item_path(root: Path, item: PlanItem) -> Path:
@@ -638,7 +701,7 @@ def item_path(root: Path, item: PlanItem) -> Path:
     Raises:
         ValueError: unknown runs root, a symlink, or a path that resolves outside its runs root.
     """
-    if item.runs_rel not in (RUNS_REL.as_posix(), GRAPH_RUNS_REL.as_posix()):
+    if item.runs_rel not in (RUNS_REL.as_posix(), GRAPH_RUNS_REL.as_posix(), EVAL_DATA_REL.as_posix()):
         raise ValueError(f"unknown runs root: {item.runs_rel}")
     runs_dir = (root / item.runs_rel).resolve()
     target = root / item.runs_rel / item.run_id / item.path
@@ -678,7 +741,7 @@ def unapproved_bytes_since(log: Path, since: float) -> int:
     for line in log.read_text(encoding="utf-8").splitlines():
         try:
             rec = json.loads(line)
-            if rec.get("event") != "checkpoint_pruned":
+            if rec.get("event") not in ("checkpoint_pruned", "eval_data_pruned"):
                 continue  # cache evictions / worktree removals free regenerable data; not part of this quota
             if not rec.get("approved_by") and float(rec.get("ts_epoch", 0)) >= since:
                 total += int(rec.get("bytes", 0))
@@ -720,6 +783,8 @@ def apply(
         for i in r.items
         if i.blocked_by == CONFIRM_REASON and i.action == "delete" and i.item_id in confirmed
     }
+    if manual:  # a person chose them in the panel / CLI --items: young eval copies may go too, never the scheduler
+        by_id |= {i.item_id: i for r in fresh.runs for i in r.items if i.blocked_by == MANUAL_REASON}
     result = ApplyResult()
     selected = [by_id[i] for i in sorted(wanted) if i in by_id]
     result.skipped.extend((i, "STATE_CHANGED") for i in sorted(wanted - by_id.keys()))  # no longer planned
@@ -743,8 +808,9 @@ def apply(
                 if sub_path.is_dir() and not sub_path.is_symlink():
                     shutil.rmtree(sub_path)
         result.done.append(item)
+        eval_data = item.runs_rel == EVAL_DATA_REL.as_posix()
         event: dict[str, object] = {
-            "event": "checkpoint_pruned",
+            "event": "eval_data_pruned" if eval_data else "checkpoint_pruned",
             "path": item.path,
             "action": item.action,
             "bytes": item.reclaim_bytes,
@@ -755,7 +821,8 @@ def apply(
             "manual": manual,
             "approved_by": approved_by,
         }
-        append_jsonl(root / item.runs_rel / item.run_id / "events.jsonl", event)
+        if not eval_data:  # an eval copy has no run dir (and is gone now)
+            append_jsonl(root / item.runs_rel / item.run_id / "events.jsonl", event)
         append_jsonl(root / CLEANUP_LOG_REL, {**event, "run_id": item.run_id})
     return result
 

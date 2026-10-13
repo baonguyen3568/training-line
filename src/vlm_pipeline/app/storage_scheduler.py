@@ -146,7 +146,9 @@ class RetentionScheduler:
                 i.item_id
                 for r in ret_plan.runs
                 for i in r.items
-                if i.action != "keep" and i not in safe and (i.blocked_by in (None, retention.CONFIRM_REASON))
+                if i.action != "keep"
+                and i not in safe
+                and (i.blocked_by in (None, retention.CONFIRM_REASON, retention.MANUAL_REASON))
             ],
         }
         if self.mode != "apply":

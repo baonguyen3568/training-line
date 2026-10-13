@@ -56,9 +56,13 @@ storage:
   event_done: Deleted at {time} by {who}
   preflight_hint:
     free_temp: Free {gb} GB from temporary results
+  item_note:
+    eval_data_auto_clean: "The app removes it after {days} days if you don't delete it first."
   item:
     temp_result_of_run: Temporary results of run {run_name}
     checkpoint_of_run: Checkpoint {checkpoint} of run {run_name}
+    eval_data_invalid: "Faulty scoring data \"{dataset}\" (set aside by the app at {stamp})"
+    eval_data_unfinished: "Unfinished install of scoring data \"{dataset}\""
     set_aside_of_run: Earlier training set aside in run {run_name}
   protected_reason:
     TRAINED_MODEL: A model you trained — the app won't delete it automatically. You can still delete it by typing its name to confirm.

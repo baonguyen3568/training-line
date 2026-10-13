@@ -44,7 +44,7 @@ from vlm_pipeline.common.runinfo import read_small_json
 logger = logging.getLogger(__name__)
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 ApprovalPolicy = Literal["none", "threshold"]
-Source = Literal["node_cache", "checkpoint", "set_aside"]
+Source = Literal["node_cache", "checkpoint", "set_aside", "eval_data"]
 CACHE: Source = "node_cache"
 PERMANENT_LOSS = "PERMANENT_LOSS"
 CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
@@ -205,13 +205,41 @@ def _retention_section(item: retention.PlanItem) -> str | None:
     """Auto / manual / kept for a retention item; None = nothing to show (an ordinary keep, e.g. still young)."""
     if item.action != "keep" and item.blocked_by is None:
         return "manual" if item.consequence_code == PERMANENT_LOSS else "auto"
-    if item.action == "delete" and item.blocked_by == retention.CONFIRM_REASON:
+    if item.action == "delete" and item.blocked_by in (retention.CONFIRM_REASON, retention.MANUAL_REASON):
         return "manual"
     return "kept" if item.blocked_by is not None else None
 
 
 def _needs_confirm(item: retention.PlanItem) -> bool:
     return item.blocked_by == retention.CONFIRM_REASON or item.consequence_code == PERMANENT_LOSS
+
+
+def _retention_display_key(item: retention.PlanItem) -> str:
+    if item.kind == "eval_data":
+        invalid = retention.EVAL_INVALID_RE.fullmatch(item.run_id) is not None
+        return "storage.item.eval_data_invalid" if invalid else "storage.item.eval_data_unfinished"
+    return "storage.item.set_aside_of_run" if item.kind == "set_aside" else "storage.item.checkpoint_of_run"
+
+
+def _eval_display(item: retention.PlanItem) -> dict[str, str]:
+    """``{dataset, stamp}`` of ``.<dataset>.invalid-<YYYYmmdd-HHMMSS>-<hex>`` / ``.<dataset>.<hex8>.tmp``."""
+    invalid = retention.EVAL_INVALID_RE.fullmatch(item.run_id)
+    if invalid is not None:
+        stamp = invalid.group(2)
+        return {
+            "dataset": invalid.group(1),
+            "stamp": f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:8]} {stamp[9:11]}:{stamp[11:13]}",
+        }
+    unfinished = retention.EVAL_TMP_RE.fullmatch(item.run_id)
+    return {"dataset": unfinished.group(1) if unfinished else item.run_id, "stamp": ""}
+
+
+def _eval_note(item: retention.PlanItem) -> dict[str, Any]:
+    """A young faulty eval copy says when the app removes it by itself (bao-design); other rows: no note."""
+    if item.kind == "eval_data" and item.blocked_by == retention.MANUAL_REASON:
+        days = retention.DEFAULT_POLICY.invalid_eval_days
+        return {"note_key": "storage.item_note.eval_data_auto_clean", "note_params": {"days": f"{days:g}"}}
+    return {}
 
 
 def _retention_item(
@@ -221,17 +249,16 @@ def _retention_item(
     ckpt = item.path.removeprefix("checkpoints/")
     confirm = section == "manual" and _needs_confirm(item)
     kept = section == "kept"
+    eval_data = item.kind == "eval_data"
     return {
         "item_id": item.item_id,
-        "source": item.kind if item.kind in ("checkpoint", "set_aside") else "checkpoint",
+        "source": item.kind if item.kind in ("checkpoint", "set_aside", "eval_data") else "checkpoint",
         "section": section,
         "auto": section == "auto",
-        "group": "trained_model",
+        "group": "dataset" if eval_data else "trained_model",
         "display_name": None,
-        "display_key": "storage.item.set_aside_of_run"
-        if item.kind == "set_aside"
-        else "storage.item.checkpoint_of_run",
-        "display_params": {"run_name": item.run_id, "checkpoint": ckpt},
+        "display_key": _retention_display_key(item),
+        "display_params": _eval_display(item) if eval_data else {"run_name": item.run_id, "checkpoint": ckpt},
         "node_base": node_reset.node_base_of(item.run_id)
         if item.runs_rel == retention.GRAPH_RUNS_REL.as_posix()
         else None,
@@ -241,7 +268,8 @@ def _retention_item(
         "protected_reason": retention.CONFIRM_REASON if item.blocked_by == retention.CONFIRM_REASON else None,
         "lock_reason": item.blocked_by if kept else None,
         "lock_params": (lock_params or {"run": item.run_id}) if kept else {},
-        "regenerable": False,
+        "regenerable": eval_data,  # the good copy is installed again from its pinned manifest
+        **_eval_note(item),
         "consequence_code": item.consequence_code,
         "consequence_params": dict(item.consequence_params),
         "confirm_required": confirm,

@@ -739,3 +739,28 @@ def test_kept_size_is_zero_for_a_path_outside_its_runs_root(tmp_path: Path) -> N
         "r1", "checkpoints/epoch_0_step_1", "checkpoint", (), "keep", 0, "D7.blocked", "x", "PINNED_OR_KEEP"
     )
     assert api._kept_bytes(item) == 0
+
+
+def test_a_young_faulty_eval_copy_is_a_manual_row_without_typing(
+    env: tuple[TestClient, ArtifactIndex, Path, Clock],
+) -> None:
+    """G-5: shown at once as manual, deleted by a person without typing a name (the good copy was reinstalled)."""
+    client, _, root, _ = env
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    copy = root / "data" / "eval" / f".ocrbench-92a54bd1.invalid-{stamp}-ab12"
+    (copy / "images").mkdir(parents=True)
+    (copy / "images" / "a.png").write_bytes(b"p" * 4 * KB)
+    plan_id, items = _plan_items(client)
+    row = items[f"eval:{copy.name}"]
+    assert (row["source"], row["section"], row["confirm_required"], row["group"]) == (
+        "eval_data",
+        "manual",
+        False,
+        "dataset",
+    )
+    assert row["display_key"] == "storage.item.eval_data_invalid"
+    assert row["display_params"]["dataset"] == "ocrbench-92a54bd1"
+    assert (row["note_key"], row["note_params"]) == ("storage.item_note.eval_data_auto_clean", {"days": "7"})
+    resp = client.post("/api/storage/apply", json={"plan_id": plan_id, "item_ids": [f"eval:{copy.name}"]})
+    assert resp.status_code == 200, resp.text
+    assert not copy.exists()

@@ -667,3 +667,54 @@ def test_symlinked_set_aside_is_never_followed(tmp_path: Path) -> None:
     outside.mkdir()
     (node / "checkpoints.not-resumable-20200101-000000").symlink_to(outside)
     assert plan(tmp_path, now=NOW, lock_reader=no_lock).runs == ()
+
+
+def _eval_copy(root: Path, name: str, *, age_days: float) -> Path:
+    if not (root / "pyproject.toml").exists():
+        (root / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
+    d = root / "data" / "eval" / name
+    (d / "images").mkdir(parents=True)
+    (d / "images" / "a.png").write_bytes(b"p" * 2000)
+    _age_tree(d, age_days)
+    return d
+
+
+def _eval_items(root: Path) -> dict[str, tuple[str, str | None]]:
+    p = plan(root, now=NOW, lock_reader=no_lock)
+    return {i.run_id: (i.action, i.blocked_by) for r in p.runs for i in r.items if i.kind == "eval_data"}
+
+
+def test_eval_data_copies_set_aside_or_unfinished(tmp_path: Path) -> None:
+    """G-5: invalid copies manual for 7 days, then automatic; crashed installs after 1 day; the dataset in use never."""
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(NOW - 9 * DAY))
+    young_stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(NOW - 1 * DAY))
+    _eval_copy(tmp_path, "ocrbench-92a54bd1", age_days=30)  # in use
+    _eval_copy(tmp_path, f".ocrbench-92a54bd1.invalid-{stamp}-ab12", age_days=9)
+    _eval_copy(tmp_path, f".ocrbench-92a54bd1.invalid-{young_stamp}-cd34", age_days=1)
+    _eval_copy(tmp_path, ".ocrbench-92a54bd1.0123abcd.tmp", age_days=2)
+    _eval_copy(tmp_path, ".ocrbench-92a54bd1.4567abcd.tmp", age_days=0.1)  # maybe installing now: not shown
+    _eval_copy(tmp_path, ".ocrbench-92a54bd1.invalid-oops", age_days=30)  # not our name: never touched
+    assert _eval_items(tmp_path) == {
+        f".ocrbench-92a54bd1.invalid-{stamp}-ab12": ("delete", None),
+        f".ocrbench-92a54bd1.invalid-{young_stamp}-cd34": ("delete", "MANUAL_ONLY"),
+        ".ocrbench-92a54bd1.0123abcd.tmp": ("delete", None),
+    }
+    young = f"eval:.ocrbench-92a54bd1.invalid-{young_stamp}-cd34"
+    assert apply(tmp_path, [young], by="scheduler", now=NOW, lock_reader=no_lock).done == []  # never automatic
+    done = apply(tmp_path, [young], by="person", now=NOW, lock_reader=no_lock, manual=True).done
+    assert [i.item_id for i in done] == [young]
+    assert (tmp_path / "data" / "eval" / "ocrbench-92a54bd1").is_dir()
+    assert not (tmp_path / "data" / "eval" / f".ocrbench-92a54bd1.invalid-{young_stamp}-cd34").exists()
+    rec = json.loads((tmp_path / "outputs" / "system" / "cleanup.jsonl").read_text().splitlines()[-1])
+    assert rec["event"] == "eval_data_pruned"
+
+
+def test_eval_data_waits_for_a_running_download_and_honors_keep(tmp_path: Path) -> None:
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(NOW - 9 * DAY))
+    kept = _eval_copy(tmp_path, f".ocrbench-92a54bd1.invalid-{stamp}-ab12", age_days=9)
+    (kept / "KEEP").touch()
+    assert _eval_items(tmp_path) == {kept.name: ("delete", "PINNED_OR_KEEP")}
+    active = tmp_path / "outputs" / "system" / "downloads" / "active"
+    active.parent.mkdir(parents=True)
+    active.touch()
+    assert _eval_items(tmp_path) == {}
