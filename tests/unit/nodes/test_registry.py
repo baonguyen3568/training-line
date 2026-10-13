@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -40,7 +41,9 @@ def test_api_item_matches_frontend_contract(spec: NodeSpec) -> None:
         assert "type" in prop, f"{spec.type_id}.{name}: Optional/union params are not renderable"
         hints = prop.get("x-ui")
         assert hints is not None, f"{spec.type_id}.{name} has no x-ui hints"
-        assert set(hints) <= {"widget", "order", "preset", "advanced", "option_keys", "summary", "option_meta"}
+        assert set(hints) <= {
+            "widget", "order", "preset", "advanced", "option_keys", "summary", "option_meta", "disabled_options",
+        }  # fmt: skip
 
 
 def test_registry_api_lists_port_types() -> None:
@@ -126,3 +129,58 @@ def test_model_pick_offers_the_catalog_with_the_default_first_choice() -> None:
     assert set(prop["x-ui"]["option_meta"]) == set(prop["enum"])
     with pytest.raises(ValidationError):
         spec.validate_params({"model": "not-in-catalog"})
+
+
+def _values_as_strings(prop: dict[str, Any]) -> set[str]:
+    """Every value a param can take, spelled like a ``disabled_options`` key."""
+    if prop["type"] == "boolean":
+        return {"true", "false"}
+    values = prop.get("enum", [prop["const"]] if "const" in prop else [])
+    return {str(v) for v in values}
+
+
+def _disabled_options_problems(spec: NodeSpec) -> list[str]:
+    from vlm_pipeline.i18n import load
+
+    texts = [load("vi"), load("en")]
+    problems: list[str] = []
+    for name, prop in spec.params_schema().get("properties", {}).items():
+        disabled = prop.get("x-ui", {}).get("disabled_options")
+        if disabled is None:
+            continue
+        where = f"{spec.type_id}.{name}"
+        if not isinstance(disabled, dict) or not disabled:
+            problems.append(f"{where}: disabled_options must be a non-empty mapping")
+            continue
+        if unknown := sorted(set(disabled) - _values_as_strings(prop)):
+            problems.append(f"{where}: {unknown} are not values of the param")
+        if str(prop.get("default")).lower() in disabled:
+            problems.append(f"{where}: the default value cannot be disabled")
+        missing = [r for r in disabled.values() if r is not None and not all(r in t for t in texts)]
+        problems += [f"{where}: no vi/en text for {r!r}" for r in missing]
+    return problems
+
+
+@pytest.mark.parametrize("spec", ALL_SPECS, ids=lambda s: s.type_id)
+def test_disabled_options_name_real_values_and_real_reasons(spec: NodeSpec) -> None:
+    assert _disabled_options_problems(spec) == []
+
+
+def test_disabled_options_checker_catches_mistakes() -> None:
+    from typing import Literal
+
+    from pydantic import Field
+
+    from vlm_pipeline.common.params import Params, ui
+
+    class _P(Params):
+        kv: Literal["none", "fp8"] = Field("none", json_schema_extra=ui(disabled_options={"fp8": None}))
+        vision: bool = Field(False, json_schema_extra=ui(disabled_options={"true": "no.such.key"}))
+        size: Literal[128, 512] = Field(512, json_schema_extra=ui(disabled_options={"512": None, "1024": None}))
+
+    spec = NodeSpec(type_id="test.disabled", version="1.0.0", category="util", icon="x", params_model=_P, runner="host")
+    problems = _disabled_options_problems(spec)
+    assert not any(".kv:" in p for p in problems)  # a valid use passes
+    assert any(".vision: no vi/en text" in p for p in problems)
+    assert any(".size: ['1024'] are not values" in p for p in problems)
+    assert any(".size: the default value cannot be disabled" in p for p in problems)

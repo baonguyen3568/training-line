@@ -17,7 +17,9 @@ class Params(BaseModel):
 def ui(**hints: object) -> dict[str, Any]:
     """``json_schema_extra`` carrying editor hints: ``Field(1, json_schema_extra=ui(order=0, advanced=True))``.
 
-    Keys (frontend ``UiHint``): widget, order, preset, advanced, option_keys, summary.
+    Keys (frontend ``UiHint``): widget, order, preset, advanced, option_keys, summary, option_meta,
+    disabled_options. ``disabled_options={"fp8": "i18n.key.of.reason" | None}`` greys out values the worker cannot
+    run yet (key = the value as a string: ``"fp8"``, ``"true"``, ``"512"``; None = generic "not supported yet").
     """
     return {"x-ui": hints}
 
