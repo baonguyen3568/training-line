@@ -5,6 +5,7 @@ sidebar:
   order: 10
 sources:
   - .team/proposals/001a-nvidia-default-model.md
+  - benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json
   - .team/proposals/002-eval-benchmark-protocol.md
   - configs/catalog/models.yaml
   - .team/bugs/BUG-001-parse-native-generate-ignores-kv-cache.md
@@ -21,7 +22,7 @@ Trang này liệt kê thẳng những gì **chưa** dùng được, để bạn 
 
 | Giới hạn | Ảnh hưởng | Trạng thái |
 |---|---|---|
-| **Chưa có điểm chính thức** | Trang mẫu chưa ghi Field F1 và chưa có số epoch mặc định | Đang chấm điểm trên tập kiểm tra |
+| **Điểm mới đo trên một lần train** | Field F1 trên 100 hoá đơn kiểm tra của CORD là 70,97 (khoảng tin cậy 95%: 66,33–75,38), với mặc định 3 lượt | Chưa đo độ dao động giữa các lần train; dữ liệu của bạn có thể cho điểm khác |
 | **Chưa nén được** | Không dùng được node **Nén model** với Parse | Nén FP8 với Parse ở mức thử nghiệm, chưa chạy thật |
 | **Chạy thử còn chậm** | Mỗi hoá đơn mất khoảng 8–9 giây | Đang thử cách chạy nhanh hơn |
 | **Chỉ fine-tune toàn bộ** | Không dùng LoRA với Parse | Có chủ đích; app chặn bằng lỗi CFG-010 |

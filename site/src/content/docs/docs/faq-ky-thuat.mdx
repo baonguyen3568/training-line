@@ -7,6 +7,7 @@ sources:
   - configs/catalog/models.yaml
   - configs/catalog/datasets.yaml
   - .team/proposals/001a-nvidia-default-model.md
+  - benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json
   - .team/proposals/002-eval-benchmark-protocol.md
   - .team/bugs/BUG-003-parse-resume-missing-conditioner-keys.md
   - src/vlm_pipeline/export/notices.py
@@ -42,8 +43,8 @@ Hãng thường đo với cài đặt riêng. Xem [Cách đọc điểm benchmar
 ### Vì sao mẫu hoá đơn tắt "phạt lặp từ"?
 Cấu hình gốc của Nemotron Parse phạt các token lặp lại (`repetition_penalty` 1,1). JSON của hoá đơn lặp thẻ cấu trúc theo bản chất, và trong một phép thử ban đầu, phạt lặp làm hỏng cấu trúc. Mẫu đặt 1,0, áp dụng giống nhau cho cả đo điểm lẫn chạy thử. Model bạn lưu vẫn giữ nguyên cấu hình gốc của NVIDIA.
 
-<Hint title="Ghi chú thận trọng">
-Phép thử ban đầu chỉ có 6 ảnh và đổi hai thứ cùng lúc, nên kết luận đang ở trạng thái tạm. Chúng tôi sẽ cập nhật khi có số đo trên tập validation.
+<Hint title="Đã kiểm lại trên tập validation">
+Sau khi train đủ 3 lượt, chúng tôi so hai cách trên 20 hoá đơn validation: phạt lặp 1,1 cho Field F1 70,64, còn 1,0 cho 74,35. Vì vậy mẫu giữ 1,0. Mẫu thử nhỏ nên chênh lệch chưa chắc chắn, nhưng không có dấu hiệu 1,1 tốt hơn.
 </Hint>
 
 ## Bộ nhớ
