@@ -16,6 +16,8 @@ storage:
     SECURITY_PROTECTED: Được bảo vệ theo quy định an toàn của dự án. Liên hệ quản trị viên nếu cần xoá.
     RUN_NOT_FINISHED: Run "{run}" chưa xong hoặc đang tạm dừng — cần mục này để chạy tiếp.
     WHITELIST: Lịch sử chạy (nhật ký, số đo) luôn được giữ lại.
+    GPU_LOCK_HOLDER: Run này đang dùng GPU (hoặc app chưa đọc được trạng thái GPU) nên chưa xoá được. Thử lại khi run chạy xong.
+    UNKNOWN_STATUS: Không đọc được trạng thái của run "{run}" nên app giữ lại cho an toàn.
   consequence:
     WILL_REDOWNLOAD:
       default: Workflow "{workflow}" sẽ phải tải lại {gb} GB ở lần chạy sau.
@@ -37,6 +39,8 @@ storage:
     free_temp: Giải phóng {gb} GB từ kết quả tạm
   item:
     temp_result_of_run: Kết quả tạm của run {run_name}
+    checkpoint_of_run: Checkpoint {checkpoint} của run {run_name}
+    set_aside_of_run: Bản train cũ đã cất của run {run_name}
   protected_reason:
     TRAINED_MODEL: Model bạn đã train — app không tự xoá. Bạn vẫn xoá được, cần gõ tên để xác nhận.
     MANIFEST_UNREADABLE: Thông tin của lần chạy này bị hỏng nên app không tự xoá. Bạn vẫn xoá tay được, cần gõ tên để xác nhận.

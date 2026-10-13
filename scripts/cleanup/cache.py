@@ -15,6 +15,7 @@ import sys
 
 from vlm_pipeline.artifacts.cache_retention import evict, list_cache, plan_cache
 from vlm_pipeline.artifacts.index import ArtifactIndex, default_index_path
+from vlm_pipeline.artifacts.retention import cleanup_lock
 from vlm_pipeline.common.paths import GIB, project_root
 
 
@@ -43,9 +44,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("use exactly one of --auto or --items")
     keys = [i.cache_key for i in plan.evict] if args.auto else args.items.split(",")
     confirmed = set() if args.auto else set(keys)  # explicit --items is the admin's per-item choice
-    result = evict(
-        root, index, keys, by=args.by, manual=not args.auto, confirmed=confirmed, approved_by=args.approved_by
-    )
+    with cleanup_lock(root) as held:
+        if not held:
+            print("refused: another cleanup pass is running (outputs/system/retention.lock)", file=sys.stderr)
+            return 1
+        result = evict(
+            root, index, keys, by=args.by, manual=not args.auto, confirmed=confirmed, approved_by=args.approved_by
+        )
     for item in result.evicted:
         print(f"evicted  {item.cache_key}  {item.reclaim_bytes / GIB:.3f} GiB")
     for key, why in result.skipped:

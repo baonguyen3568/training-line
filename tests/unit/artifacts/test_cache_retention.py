@@ -152,11 +152,11 @@ def test_symlinked_output_is_not_followed(
 
 
 def test_cache_evictions_do_not_eat_the_checkpoint_quota(root: Path, idx: ArtifactIndex) -> None:
-    from vlm_pipeline.artifacts.retention import _unapproved_bytes_since
+    from vlm_pipeline.artifacts.retention import unapproved_bytes_since
 
     _cached_run(root, idx, "a", out_kb=512)
     evict(root, idx, ["a"], by="app")
-    assert _unapproved_bytes_since(root / "outputs" / "system" / "cleanup.jsonl", 0) == 0
+    assert unapproved_bytes_since(root / "outputs" / "system" / "cleanup.jsonl", 0) == 0
 
 
 @pytest.mark.parametrize("exported", [False, True])

@@ -37,13 +37,15 @@ A run.json status that is not a ``RunStatus`` value is reported as ``UNKNOWN_STA
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
 import shutil
 import time
 import tomllib
-from collections.abc import Callable, Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -67,6 +69,30 @@ FAILED_STATUSES = frozenset({RunStatus.FAILED, RunStatus.CANCELLED})  # cleaned 
 DAY_S = 86_400.0
 PROJECT_NAME = "vlm-pipeline"  # [project].name in pyproject.toml; guards against a wrong VLM_PROJECT_ROOT
 CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
+CLEANUP_LOCK_REL = Path("outputs") / "system" / "retention.lock"  # one deleting pass at a time (CLI, scheduler)
+
+
+@contextmanager
+def cleanup_lock(root: Path) -> Iterator[bool]:
+    """Non-blocking exclusive lock for a deleting pass; yields False when another pass holds it.
+
+    Opened with O_NOFOLLOW so a symlink planted at the lock path is refused, not followed.
+    """
+    path = root / CLEANUP_LOCK_REL
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
 
 
 @dataclass(frozen=True)
@@ -445,7 +471,7 @@ def check_project_root(root: Path) -> None:
         raise ValueError(f"{root} is project {name!r}, expected {PROJECT_NAME!r}")
 
 
-def _unapproved_bytes_since(log: Path, since: float) -> int:
+def unapproved_bytes_since(log: Path, since: float) -> int:
     """Bytes deleted without ``approved_by`` after ``since`` (an unreadable line counts as 0, never as approved).
 
     This guards against accidentally splitting a large cleanup into small batches, not against someone editing or
@@ -478,9 +504,11 @@ def apply(
     lock_reader: Callable[[Path], LockStatus | None] = check_lock,
     lock_path: Path | None = None,
     confirmed: Collection[str] = (),
+    manual: bool = False,
 ) -> ApplyResult:
     """Execute the given planned items after re-planning; items whose plan changed are skipped.
 
+    ``manual``: a person chose these items (storage panel), recorded in the events like cache evictions.
     ``confirmed``: item ids a person confirmed by typing them; only these may remove items blocked by
     ``CONFIRM_REASON`` (set-aside data that may be the only trained weights).
 
@@ -502,7 +530,7 @@ def apply(
     selected = [by_id[i] for i in sorted(wanted) if i in by_id]
     result.skipped.extend((i, "no longer planned (state changed)") for i in sorted(wanted - by_id.keys()))
     if not approved_by:
-        recent = _unapproved_bytes_since(root / CLEANUP_LOG_REL, ts - policy.approval_window_s)
+        recent = unapproved_bytes_since(root / CLEANUP_LOG_REL, ts - policy.approval_window_s)
         total_gb = (recent + sum(i.reclaim_bytes for i in selected)) / GIB
         if total_gb > policy.approval_threshold_gb:
             raise PermissionError(
@@ -530,6 +558,7 @@ def apply(
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(ts)),
             "ts_epoch": ts,
             "by": by,
+            "manual": manual,
             "approved_by": approved_by,
         }
         _append_jsonl(root / item.runs_rel / item.run_id / "events.jsonl", event)
@@ -545,5 +574,7 @@ __all__ = [
     "RetentionPolicy",
     "RunPlan",
     "apply",
+    "cleanup_lock",
     "plan",
+    "unapproved_bytes_since",
 ]

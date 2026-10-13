@@ -1,9 +1,14 @@
-"""Storage panel API (P005 §6 R2, P009 §6): node-cache plan (dry-run) and user-chosen eviction. Owner: bao-cleanup.
+"""Storage panel API (P005 §6 R2, P009 §6, P013 G-1): one dry-run plan over every cleanup source. Owner: bao-cleanup.
 
-- ``GET  /api/storage/plan``  read-only plan with a short-lived ``plan_id``; DISK-003 when the cap cannot be met
-- ``POST /api/storage/apply`` ``{plan_id, item_ids, confirm?}``: re-plans, evicts only items of that plan that are
-  still evictable; protected items (trained models, unreadable manifests) need ``confirm`` = their name; above the
-  deployment's approval threshold answers 403 DISK-002 (an admin approves with the CLI, never from the UI)
+Sources (``item.source``): ``node_cache`` (cache_retention), ``checkpoint`` and ``set_aside`` (retention, ADR-005 D3).
+Each item has a ``section``: ``auto`` (the scheduler may do it; regenerable or D3 without permanent loss), ``manual``
+(only a person, with typed confirmation when protected or PERMANENT_LOSS) or ``kept`` (shown with its reason only).
+
+- ``GET  /api/storage/plan``  read-only plan with a short-lived ``plan_id``; DISK-003 when the cache cap cannot be met
+- ``POST /api/storage/apply`` ``{plan_id, item_ids, confirm?}``: re-plans, applies only items of that plan that are
+  still applicable; protected / PERMANENT_LOSS items need ``confirm[item_id]`` = their run name; above the
+  deployment's approval threshold (both sources and the last 24 h counted together) answers 403 DISK-002 (an admin
+  approves with the CLI, never from the UI)
 
 There is no endpoint that deletes an arbitrary path. Text for the user is rendered here from i18n keys.
 """
@@ -12,6 +17,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import shlex
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -23,13 +29,18 @@ from fastapi import Body, FastAPI, Query
 from fastapi.responses import JSONResponse
 
 from vlm_pipeline import i18n
-from vlm_pipeline.artifacts import cache_retention
+from vlm_pipeline.artifacts import cache_retention, retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
 from vlm_pipeline.common.diskguard import read_disk
+from vlm_pipeline.common.gpu_lock import PATH_ENV as GPU_LOCK_PATH_ENV
 from vlm_pipeline.common.paths import GIB
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 ApprovalPolicy = Literal["none", "threshold"]
+Source = Literal["node_cache", "checkpoint", "set_aside"]
+CACHE: Source = "node_cache"
+PERMANENT_LOSS = "PERMANENT_LOSS"
+CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
 PLAN_TTL_S = 600.0
 MAX_ITEMS = 500
 POLICY_ENV = "VLM_STORAGE_APPROVAL_POLICY"
@@ -74,13 +85,13 @@ class StorageSettings:
 
 @dataclass
 class _Plans:
-    """plan_id -> (created_at, item_ids) kept in memory for ``PLAN_TTL_S``."""
+    """plan_id -> (created_at, {item_id: source}) kept in memory for ``PLAN_TTL_S``."""
 
     clock: Callable[[], float] = time.time
-    _plans: dict[str, tuple[float, frozenset[str]]] = field(default_factory=dict)
+    _plans: dict[str, tuple[float, Mapping[str, Source]]] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def add(self, item_ids: frozenset[str]) -> tuple[str, float]:
+    def add(self, item_ids: Mapping[str, Source]) -> tuple[str, float]:
         now = self.clock()
         plan_id = "pln_" + secrets.token_hex(8)
         with self._lock:
@@ -88,7 +99,7 @@ class _Plans:
             self._plans[plan_id] = (now, item_ids)
         return plan_id, now + PLAN_TTL_S
 
-    def get(self, plan_id: str) -> frozenset[str] | None:
+    def get(self, plan_id: str) -> Mapping[str, Source] | None:
         with self._lock:
             entry = self._plans.get(plan_id)
         if entry is None or self.clock() - entry[0] >= PLAN_TTL_S:
@@ -132,6 +143,50 @@ def _item(item: cache_retention.CacheItem, protected_reason: str | None) -> dict
         "confirm_required": protected_reason is not None,
         "confirm_text": item.run_id if protected_reason is not None else None,
         "event_type": "cache_evicted",
+        "source": CACHE,
+    }
+
+
+def _retention_section(item: retention.PlanItem) -> str | None:
+    """Auto / manual / kept for a retention item; None = nothing to show (an ordinary keep, e.g. still young)."""
+    if item.action != "keep" and item.blocked_by is None:
+        return "manual" if item.consequence_code == PERMANENT_LOSS else "auto"
+    if item.action == "delete" and item.blocked_by == retention.CONFIRM_REASON:
+        return "manual"
+    return "kept" if item.blocked_by is not None else None
+
+
+def _needs_confirm(item: retention.PlanItem) -> bool:
+    return item.blocked_by == retention.CONFIRM_REASON or item.consequence_code == PERMANENT_LOSS
+
+
+def _retention_item(item: retention.PlanItem, section: str) -> dict[str, Any]:
+    ckpt = item.path.removeprefix("checkpoints/")
+    confirm = section == "manual" and _needs_confirm(item)
+    kept = section == "kept"
+    return {
+        "item_id": item.item_id,
+        "source": item.kind if item.kind in ("checkpoint", "set_aside") else "checkpoint",
+        "section": section,
+        "auto": section == "auto",
+        "group": "trained_model",
+        "display_name": None,
+        "display_key": "storage.item.set_aside_of_run"
+        if item.kind == "set_aside"
+        else "storage.item.checkpoint_of_run",
+        "display_params": {"run_name": item.run_id, "checkpoint": ckpt},
+        "size_gb": None if kept else round(item.reclaim_bytes / GIB, 3),
+        "run_id": item.run_id,
+        "action": item.action,
+        "protected_reason": retention.CONFIRM_REASON if item.blocked_by == retention.CONFIRM_REASON else None,
+        "lock_reason": item.blocked_by if kept else None,
+        "lock_params": {"run": item.run_id} if kept else {},
+        "regenerable": False,
+        "consequence_code": item.consequence_code,
+        "consequence_params": dict(item.consequence_params),
+        "confirm_required": confirm,
+        "confirm_text": item.run_id if confirm else None,
+        "event_type": "checkpoint_pruned",
     }
 
 
@@ -141,19 +196,36 @@ class StorageApi:
     index: ArtifactIndex
     settings: StorageSettings
     plans: _Plans = field(default_factory=_Plans)
+    lock_path: Path | None = None  # GPU lock file; default $VLM_GPU_LOCK_PATH or <root>/.team/GPU_LOCK
+
+    def _lock_path(self) -> Path:
+        if self.lock_path is not None:
+            return self.lock_path
+        override = os.environ.get(GPU_LOCK_PATH_ENV)
+        return Path(override) if override else self.root / ".team" / "GPU_LOCK"
+
+    def _retention_items(self) -> list[tuple[retention.PlanItem, str]]:
+        fresh = retention.plan(self.root, lock_path=self._lock_path())
+        found = [(i, _retention_section(i)) for r in fresh.runs for i in r.items]
+        return [(i, section) for i, section in found if section is not None]
 
     def plan(self, locale: str) -> dict[str, Any]:
         p = cache_retention.plan_cache(self.root, self.index, cap_gb=self.settings.node_cache_max_gb)
         auto = {i.cache_key for i in p.evict}
         items = [
-            {**_item(item, reason), "auto": item.cache_key in auto}
+            {
+                **_item(item, reason),
+                "auto": item.cache_key in auto,
+                "section": "auto" if item.cache_key in auto else "manual",
+            }
             for item, reason in cache_retention.list_cache(self.root, self.index)
             if item.reclaim_bytes > 0
         ]
-        plan_id, expires = self.plans.add(frozenset(i["item_id"] for i in items))
+        items += [_retention_item(item, section) for item, section in self._retention_items()]
+        plan_id, expires = self.plans.add({i["item_id"]: i["source"] for i in items if i["section"] != "kept"})
         threshold = self.settings.approval_threshold_gb if self.settings.approval_policy == "threshold" else None
         body: dict[str, Any] = {
-            "schema_version": 2,
+            "schema_version": 3,
             "plan_id": plan_id,
             "expires_at": expires,
             "mode": "dry_run",
@@ -182,10 +254,61 @@ class StorageApi:
             return JSONResponse(status_code=409, content={"code": "PLAN_EXPIRED", "plan_id": plan_id})
         wanted = [i for i in dict.fromkeys(item_ids) if i in planned][:MAX_ITEMS]
         skipped: list[dict[str, str]] = [{"item_id": i, "reason": "NOT_IN_PLAN"} for i in item_ids if i not in planned]
+        cache_keys, cache_confirmed, cache_bytes = self._choose_cache(
+            [k for k in wanted if planned[k] == CACHE], confirm, skipped
+        )
+        pruned, pruned_confirmed = self._choose_retention([k for k in wanted if planned[k] != CACHE], confirm, skipped)
+        log = self.root / CLEANUP_LOG_REL
+        since = time.time() - APPROVAL_WINDOW_S
+        recent = cache_retention.unapproved_manual_bytes_since(log, since) + retention.unapproved_bytes_since(
+            log, since
+        )
+        total_gb = (cache_bytes + sum(i.reclaim_bytes for i in pruned) + recent) / GIB  # no splitting into batches
+        if self.settings.approval_policy == "threshold" and total_gb > self.settings.approval_threshold_gb:
+            return self._approval_required(total_gb, cache_keys, pruned, pruned_confirmed, locale)
+        with retention.cleanup_lock(self.root) as held:
+            if not held:  # the scheduler or a CLI pass is deleting right now; the user retries in a moment
+                return JSONResponse(status_code=409, content={"code": "CLEANUP_IN_PROGRESS", "plan_id": plan_id})
+            return self._apply_chosen(cache_keys, cache_confirmed, pruned, pruned_confirmed, skipped)
+
+    def _apply_chosen(
+        self,
+        cache_keys: list[str],
+        cache_confirmed: set[str],
+        pruned: list[retention.PlanItem],
+        pruned_confirmed: set[str],
+        skipped: list[dict[str, str]],
+    ) -> JSONResponse:
+        result = cache_retention.evict(
+            self.root, self.index, cache_keys, by="app-user", manual=True, confirmed=cache_confirmed
+        )
+        skipped += [{"item_id": k, "reason": why} for k, why in result.skipped]
+        done = retention.apply(
+            self.root,
+            [i.item_id for i in pruned],
+            by="app-user",
+            manual=True,
+            confirmed=pruned_confirmed,
+            policy=retention.RetentionPolicy(approval_threshold_gb=float("inf")),  # checked above for both sources
+            lock_path=self._lock_path(),
+        )
+        skipped += [{"item_id": k, "reason": why} for k, why in done.skipped]
+        return JSONResponse(
+            content={
+                "evicted": [i.as_dict() for i in result.evicted],
+                "pruned": [i.as_dict() for i in done.done],
+                "skipped": skipped,
+                "freed_gb": round((result.freed_bytes + done.freed_bytes) / GIB, 3),
+            }
+        )
+
+    def _choose_cache(
+        self, keys: list[str], confirm: Mapping[str, str], skipped: list[dict[str, str]]
+    ) -> tuple[list[str], set[str], int]:
         by_key = {item.cache_key: (item, why) for item, why in cache_retention.list_cache(self.root, self.index)}
         chosen: list[str] = []
         confirmed: set[str] = set()
-        for key in wanted:
+        for key in keys:
             found = by_key.get(key)
             if found is None:
                 skipped.append({"item_id": key, "reason": "NOT_EVICTABLE"})
@@ -197,38 +320,68 @@ class StorageApi:
                     continue
                 confirmed.add(key)
             chosen.append(key)
-        chosen_bytes = sum(by_key[k][0].reclaim_bytes for k in chosen)
-        recent = cache_retention.unapproved_manual_bytes_since(
-            self.root / "outputs" / "system" / "cleanup.jsonl", time.time() - APPROVAL_WINDOW_S
-        )
-        total_gb = (chosen_bytes + recent) / GIB  # no splitting into small batches on shared hosts
-        if self.settings.approval_policy == "threshold" and total_gb > self.settings.approval_threshold_gb:
-            admin_command = (
-                "uv run python scripts/cleanup/cache.py --items " + ",".join(chosen) + " --apply --by <admin-name>"
+        return chosen, confirmed, sum(by_key[k][0].reclaim_bytes for k in chosen)
+
+    def _choose_retention(
+        self, keys: list[str], confirm: Mapping[str, str], skipped: list[dict[str, str]]
+    ) -> tuple[list[retention.PlanItem], set[str]]:
+        by_id = {i.item_id: (i, section) for i, section in self._retention_items()}
+        chosen: list[retention.PlanItem] = []
+        confirmed: set[str] = set()
+        for key in keys:
+            found = by_id.get(key)
+            if found is None or found[1] == "kept":
+                reason = found[0].blocked_by if found is not None else None
+                skipped.append({"item_id": key, "reason": reason or "NOT_APPLICABLE"})
+                continue
+            item = found[0]
+            if _needs_confirm(item):
+                if confirm.get(key) != item.run_id:
+                    skipped.append({"item_id": key, "reason": "CONFIRM_REQUIRED"})
+                    continue
+                if item.blocked_by == retention.CONFIRM_REASON:
+                    confirmed.add(key)
+            chosen.append(item)
+        return chosen, confirmed
+
+    def _approval_required(
+        self,
+        total_gb: float,
+        cache_keys: list[str],
+        pruned: list[retention.PlanItem],
+        pruned_confirmed: set[str],
+        locale: str,
+    ) -> JSONResponse:
+        commands = []  # ids are directory names an admin copy-pastes into a shell: always shlex.quote them
+        if cache_keys:
+            commands.append(
+                "uv run python scripts/cleanup/cache.py --items "
+                + shlex.quote(",".join(cache_keys))
+                + " --apply --by <admin-name>"
             )
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "error": _error(
-                        "DISK-002",
-                        locale,
-                        gb=round(total_gb, 1),
-                        threshold_gb=self.settings.approval_threshold_gb,
-                        item_count=len(chosen),
-                        item_ids=chosen,
-                        admin_command=admin_command,
-                    ),
-                    "deleted": [],
-                },
+        if pruned:
+            confirm = f" --confirm {shlex.quote(','.join(sorted(pruned_confirmed)))}" if pruned_confirmed else ""
+            commands.append(
+                "uv run python scripts/cleanup/retention.py --items "
+                + shlex.quote(",".join(i.item_id for i in pruned))
+                + confirm
+                + " --apply --by <admin-name> --approved-by <admin-name>"
             )
-        result = cache_retention.evict(self.root, self.index, chosen, by="app-user", manual=True, confirmed=confirmed)
-        skipped += [{"item_id": k, "reason": why} for k, why in result.skipped]
+        chosen = cache_keys + [i.item_id for i in pruned]
         return JSONResponse(
+            status_code=403,
             content={
-                "evicted": [i.as_dict() for i in result.evicted],
-                "skipped": skipped,
-                "freed_gb": round(result.freed_bytes / GIB, 3),
-            }
+                "error": _error(
+                    "DISK-002",
+                    locale,
+                    gb=round(total_gb, 1),
+                    threshold_gb=self.settings.approval_threshold_gb,
+                    item_count=len(chosen),
+                    item_ids=chosen,
+                    admin_command=" && ".join(commands),
+                ),
+                "deleted": [],
+            },
         )
 
 

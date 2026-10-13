@@ -17,7 +17,7 @@ import json
 import sys
 import time
 
-from vlm_pipeline.artifacts.retention import Plan, apply, plan
+from vlm_pipeline.artifacts.retention import Plan, apply, cleanup_lock, plan
 from vlm_pipeline.common.gpu_lock import default_lock_path
 from vlm_pipeline.common.paths import GIB, project_root
 
@@ -68,11 +68,17 @@ def main(argv: list[str] | None = None) -> int:
     confirmed = set(args.confirm.split(",")) if args.confirm else set()
     if confirmed - set(ids):
         parser.error("--confirm ids must also be listed in --items")
-    try:
-        result = apply(root, ids, by=args.by, approved_by=args.approved_by, lock_path=lock_path, confirmed=confirmed)
-    except PermissionError as exc:
-        print(f"refused: {exc}", file=sys.stderr)
-        return 1
+    with cleanup_lock(root) as held:
+        if not held:
+            print("refused: another cleanup pass is running (outputs/system/retention.lock)", file=sys.stderr)
+            return 1
+        try:
+            result = apply(
+                root, ids, by=args.by, approved_by=args.approved_by, lock_path=lock_path, confirmed=confirmed
+            )
+        except PermissionError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 1
     for item in result.done:
         print(f"done     {item.action:11} {item.reclaim_bytes / GIB:8.3f} GiB  {item.item_id}")
     for item_id, why in result.skipped:

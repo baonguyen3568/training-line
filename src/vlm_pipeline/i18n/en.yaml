@@ -16,6 +16,8 @@ storage:
     SECURITY_PROTECTED: Protected by the project's safety rules. Contact an admin if it must be removed.
     RUN_NOT_FINISHED: Run "{run}" is unfinished or paused — it needs this to continue.
     WHITELIST: Run history (logs, metrics) is always kept.
+    GPU_LOCK_HOLDER: This run is using the GPU (or the app can't read the GPU status yet), so it can't be deleted now. Try again after the run finishes.
+    UNKNOWN_STATUS: The status of run "{run}" cannot be read, so the app keeps it to be safe.
   consequence:
     WILL_REDOWNLOAD:
       default: Workflow "{workflow}" will need to download {gb} GB again next time.
@@ -37,6 +39,8 @@ storage:
     free_temp: Free {gb} GB from temporary results
   item:
     temp_result_of_run: Temporary results of run {run_name}
+    checkpoint_of_run: Checkpoint {checkpoint} of run {run_name}
+    set_aside_of_run: Earlier training set aside in run {run_name}
   protected_reason:
     TRAINED_MODEL: A model you trained — the app won't delete it automatically. You can still delete it by typing its name to confirm.
     MANIFEST_UNREADABLE: This run's information is damaged, so the app won't delete it automatically. You can still delete it manually by typing its name.
