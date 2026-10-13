@@ -54,6 +54,15 @@ benchmarks/         # kết quả benchmark tổng hợp (commit git, giữ vĩn
 
 \* Docs AutoModel hiện tại (docs.nvidia.com/nemo/automodel/development/checkpointing) ghi `final | false | every`, trong đó `true` = legacy alias của `every` (export mỗi lần save → tốn gấp đôi). Recipe upstream (qwen3_5_4b.yaml) dùng `true` → **bao-backend xác minh trong container 26.08**; nếu bản 26.08 chỉ có bool thì dùng `true` nhưng tính dung lượng như `every`.
 
+**Run status (PM chốt 2026-10-12, enum chung `common/runinfo.RunStatus`)**: `queued|running|completed|failed|cancelled|interrupted|evicted|discarded`.
+| Status | Retention |
+|--------|-----------|
+| `completed`, `discarded` | theo bảng D3 bên dưới |
+| `failed`, `cancelled` | sau 3 ngày: xoá checkpoint không-LATEST + `.incomplete`; LATEST giữ nguyên 7 ngày rồi **xoá hẳn** (không có weights "tốt" để giữ) |
+| `interrupted`, `queued`, `running` | không đụng (resume được / đang chạy) |
+| `evicted` | bytes đã xoá; history (whitelist) giữ |
+| khác / thiếu run.json | `UNKNOWN_STATUS` — báo trong dry-run, không đụng |
+
 **Checkpoint dở dang (xác nhận bởi bao-backend từ S-3, AutoModel 26.08)**: khi bắt đầu save, AutoModel tạo `<ckpt_dir>/.incomplete`; publish = cập nhật `LATEST` atomic (symlink tmp + `os.replace`) rồi xoá `.incomplete`; resume tự bỏ qua thư mục còn `.incomplete`. ⇒ Retention: `epoch_*_step_*` còn `.incomplete` = **không hợp lệ**, không bao giờ tính là LATEST/BEST; xoá được khi run không còn `running` (memguard có handshake `saving()` để hạn chế trường hợp này). Layout thực tế: `checkpoints/{epoch_E_step_S/, LATEST, training.jsonl, validation.jsonl}` — **`training.jsonl`, `validation.jsonl` thuộc whitelist** (dashboard cần).
 
 **Thứ tự ưu tiên khi một checkpoint trùng nhiều vai trò**: `KEEP` > `LATEST` > `LOWEST_VAL`/best > khác. Ví dụ LATEST == LOWEST_VAL → áp luật LATEST (giữ optim 7 ngày). Script resolve symlink trước rồi gán vai trò cao nhất.
@@ -212,3 +221,4 @@ Nguồn: P001 §3 (bao-research), `docker/IMAGES.lock`. Ước lượng footprin
 - **Image AutoModel (chốt PM + research)**: chỉ giữ 1 image AutoModel (+1 rollback). Probe 26.08 trên driver 580.142 PASS ⇒ dùng 26.08, **không** pull 26.02. FAIL ⇒ pull 26.02, 26.08 vẫn **giữ** (phương án b' cập nhật DGX OS sẽ làm nó chạy được). 26.08 chỉ vào danh sách ứng viên xoá **sau khi user chọn (a) dài hạn**; khi đó xử lý theo D7 mục 10 (IMAGES.lock → kiểm ancestor → PM xác nhận). Disk còn dư nên giữ không tốn đáng kể.
 - **Cập nhật 2026-10-12 (Phase 2 mở)**: probe 26.08 PASS → `nemo-automodel:26.08` là **image mặc định**, không còn là ứng viên xoá; không pull 26.02 → footprint image giảm ~25–30 GB so với ước lượng ở bảng trên.
 - Không full-FT 9B: checkpoint có optim ~90 GB/bản (fp32 Adam), và cũng vượt budget RAM.
+- **Cập nhật 2026-10-13 (research, 001a §10.9)**: template full-SFT Parse v1.1 chuyển sang FusedAdam master fp32 → `optim/` ~1.1 → ~2.7 GB/ckpt (+1.6 GB). Đo thực P-3b-A `epoch_0_step_99`: `model/` 5.4 GB + `optim/` 2.7 GB ≈ 8.1 GB/ckpt. Với `max_recent_checkpoints` 2–3 → ~16–25 GB/run full-SFT Parse; `optim/` bị strip theo D3 (best ngay khi xong, LATEST sau 7 ngày). Không đổi kết luận quota (< warn 500 GB); preflight nên khai `--ckpt-gb 8–9` cho các run này.
