@@ -44,3 +44,4 @@ Nguyên tắc (PM, BOARD M2):
 - [ ] Điểm P-3b (val gate → test 100 ảnh): viết `template-hoa-don`, cập nhật `gioi-han-da-biet`.
 - [ ] Kết luận repetition_penalty trên validation: cập nhật FAQ.
 - [ ] Template còn lại chuyển sang FusedAdam: cập nhật `phan-cung-va-bo-nho`.
+- [ ] OML §3.2: trang docs/site nói về template Cosmos phải có câu "Built on NVIDIA Cosmos" (chờ security chốt cách hiển thị, M2-8).
