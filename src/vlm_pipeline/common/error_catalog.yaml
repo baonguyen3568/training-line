@@ -548,6 +548,20 @@ EXP-002:
     - {id: remove_step, kind: patch, confirm: true}
     - {id: pick_other_asset, kind: navigate, target: "node:model", confirm: false}
 
+EXP-003:
+  slug: EXPORT_CONTAINS_SECRET
+  severity: error
+  prevent_in_preflight: false
+  # The export folder failed the secret scan (common/secret_scan.py) before anything left the run dir (bao-security,
+  # blocking). files = the file NAMES only, joined with ", "; the matched string is never put in params, logs or UI.
+  params: [{name: node, ref: node}, files]
+  match:
+    - {kind: executor, value: "app/export_worker.py secret_scan before publish"}
+  actions:
+    - {id: open_node, kind: navigate, target: "node:self", confirm: false}
+    # Safe to report: the record carries file names and the pattern type only, never the matched value.
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
 SEC-001:
   slug: PATH_OUTSIDE_WORKSPACE
   severity: error

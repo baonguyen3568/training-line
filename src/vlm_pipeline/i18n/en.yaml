@@ -115,6 +115,9 @@ error:
   EXP-002:
     title: This model can't be exported yet
     what: Exporting {model} to a folder for use on another machine isn't supported yet (step "{node}"). You can still train, try out and evaluate it in the app.
+  EXP-003:
+    title: The export may contain a secret
+    what: The export of "{node}" has a string that looks like an access key (token) in {files}, so the app stopped and has written nothing out. Remove the key from those files and export again; if unsure, send a report.
   MEM-001:
     title: Not enough memory for this step
     what: This step needs about {need_gb} GB but only {avail_gb} GB is free, because the machine is shared with other apps.
