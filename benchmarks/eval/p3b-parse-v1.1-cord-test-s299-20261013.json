@@ -1,0 +1,54 @@
+{
+ "purpose": "Published CORD-v2 test score of the 'Đọc hoá đơn' template model: Nemotron-Parse v1.1 full fine-tune (P-3b full), checkpoint chosen on validation (LOWEST_VAL = LATEST = epoch_2_step_299), never on test",
+ "train_run": "20261013-1015-p3b-full-parse-c4f6",
+ "checkpoint": "epoch_2_step_299/model/consolidated",
+ "image": "vlm-automodel:26.08-6",
+ "container_digest": "sha256:dc9da48fb5d79d62654b3594fd4139f28773ea73c832adfcd450f009ffc5a215",
+ "code": {
+  "worktree_commit": "38f622b",
+  "worker": "scripts/qa/eval_cord_worker.py",
+  "worker_sha256": "7c03639e7ae622e589c2f63062e2bdc10587ce38bb8e3a9b0055c6e190089267",
+  "scorer_sha256": "48a6d476581dd695bd7f387030ac28929ba0cbf84a689853a7c20ada9883f617",
+  "cord_py_sha256": "9280f60b178550921d40023f82e733c825585b8bb3d537b97d6c1b08eebf3c2c",
+  "note": "worker ran from a clean git worktree at 38f622b; run.json git_dirty=True describes the shared main tree (jobrun_cli has no --worktree yet), whose dirty files are outside the eval path"
+ },
+ "decoder_prefix_ids": [2, 0, 50004, 50008, 50001],
+ "decoding": {
+  "do_sample": false,
+  "num_beams": 1,
+  "repetition_penalty": 1.0,
+  "max_new_tokens": 1024,
+  "batch_size": 1,
+  "use_cache": true,
+  "generation_config": "base prepared nemotron-parse-v1.1_fd1e3c6b, --require-no-drift; penalty 1.0 = template decode_overrides (001a §10.7)"
+ },
+ "eval_runs": {
+  "clean": "20261013-1318-cordtest-clean-38f622b-p3b-s299-f7f3",
+  "preliminary_shared_tree": "20261013-1311-cordtest-p3b-s299-918f"
+ },
+ "dataset": "naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98, test[0:100] (full test split)",
+ "results": {
+  "test": {
+   "field_f1": 70.97,
+   "field_f1_ci95": [66.33, 75.38],
+   "nted_accuracy": 78.67,
+   "json_exact": 13.0,
+   "parse_fail_rate": 0.0,
+   "truncated_rate": 0.0,
+   "n": 100
+  }
+ },
+ "ci_method": "bootstrap over images, 1000 resamples, seed 0, micro F1 from per-image (tp, errors) counts (cord.field_f1_counts)",
+ "determinism": "clean vs preliminary run: 100/100 identical decoded sequences (score_cord_runs --same), supports 001a §10.7 assumption that greedy bs1 is deterministic on this image",
+ "validation_context": {
+  "split": "validation[0:20], same images as gate P-3b-A",
+  "field_f1": {"step_99": 59.92, "step_199": 70.84, "step_299": 74.35, "step_299_penalty_1.1": 70.64},
+  "paired_ci95": {"299-199": [-1.64, 8.54], "199-99": [4.43, 18.37], "penalty_1.1-1.0_at_299": [-9.24, 1.42]},
+  "scores": "outputs/tester/gate-p3b-full-score.json"
+ },
+ "caveats": [
+  "base model scores 0 F1 on this task (100% parse failure: it emits its native LaTeX/markdown format), so there is no base delta to report",
+  "single fine-tune seed; run-to-run training variance not measured",
+  "not comparable with Donut/other CORD numbers unless they use the same field-F1 and nTED definitions (vlm_pipeline.eval.cord)"
+ ]
+}
