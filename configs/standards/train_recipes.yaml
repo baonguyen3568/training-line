@@ -22,10 +22,10 @@ rules:
 
   - id: TRAIN-EPOCHS-SMALL-DATA
     applies_to: {node: [train.sft_vlm, train.lora_vlm], param: epochs}
-    check: {kind: epochs_vs_samples, max_epochs: 5, small_data_below: 1000}
+    check: {kind: epochs_vs_samples, max_epochs: 3, small_data_below: 1000}  # epochs offers 1|2|3|5: warns on 5
     level: warn
     message: standards.train.overfit_risk
-    source: "team-default: O-1 (20 images x 12 epochs) memorised its train set, .team/proposals/001a-nvidia-default-model.md"
+    source: "team-default: O-1 (20 images x 12 epochs) memorised its train set; P-3b (800 CORD images) measured up to 3 epochs only, .team/proposals/001a-nvidia-default-model.md"
 
   - id: TRAIN-ONE-EPOCH
     applies_to: {node: train.sft_vlm, param: epochs}
