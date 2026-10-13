@@ -1,5 +1,8 @@
 .env
 *.env
+.env.*
+!.env.example
+!.env.local.example
 # Anchored at repo root: src/vlm_pipeline/data/ is code and must be tracked.
 /data/
 /outputs/
