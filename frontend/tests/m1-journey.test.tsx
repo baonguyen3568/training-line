@@ -1,8 +1,14 @@
 // M1 journey on the mock API: blank workflow → add nodes → connect → undo/redo → save/open → run (FakeWorker).
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("VITE_MOCK_API", "1");
+
+// Transform the editor module tree once, under the hook's longer timeout, so the first test does not pay for it
+// and time out on a loaded machine (clean gate).
+beforeAll(async () => {
+  await import("../src/components/Editor");
+}, 60_000);
 
 async function setup() {
   const { useWorkflow } = await import("../src/store/workflow");
@@ -83,7 +89,7 @@ describe("M1 journey (store)", () => {
     s().connect([d, "dataset"], [tr, "train_data"]);
     await s().startRun();
     expect(s().run?.done).toBe(false);
-    await waitFor(() => expect(s().run?.done).toBe(true), { timeout: 3000 });
+    await waitFor(() => expect(s().run?.done).toBe(true));
     expect(Object.values(s().run?.nodes ?? {}).map((n) => n.status)).toEqual([
       "completed",
       "completed",
@@ -110,22 +116,14 @@ describe("M1 journey (UI)", () => {
       expect(container.querySelector('[data-testid="node-model.hf_pick"]')).toBeTruthy(),
     );
     expect(wfStore.getState().workflow?.nodes).toHaveLength(1);
-    await waitFor(
-      () =>
-        expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", false),
-      {
-        timeout: 3000,
-      },
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", false),
     );
     fireEvent.click(screen.getByRole("button", { name: /▶ Chạy/ }));
-    await waitFor(
-      () =>
-        expect(
-          container
-            .querySelector('[data-testid="node-model.hf_pick"]')
-            ?.getAttribute("data-status"),
-        ).toBe("completed"),
-      { timeout: 3000 },
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="node-model.hf_pick"]')?.getAttribute("data-status"),
+      ).toBe("completed"),
     );
   });
 });

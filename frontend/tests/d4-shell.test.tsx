@@ -1,8 +1,14 @@
 // M2-6 D4 shell (?ui=d4): same editor behaviour, icon-first chrome. Design conditions #2-#4 (2026-10-13).
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("VITE_MOCK_API", "1");
+
+// The first test used to pay for transforming the whole editor module tree and timed out on a loaded machine
+// (clean gate, 16 s): import it once here, under the hook's own longer timeout.
+beforeAll(async () => {
+  await import("../src/components/Editor");
+}, 60_000);
 
 async function setup() {
   const { useUi } = await import("../src/store/ui");
@@ -18,15 +24,17 @@ async function setup() {
 describe("D4 shell", () => {
   it("icon-only controls carry their tooltip text as the accessible name", async () => {
     await setup();
-    const undo = screen.getByRole("button", { name: "Hoàn tác" });
+    // role queries scoped to the toolbar: over the whole editor they cost seconds each under load
+    const bar = within(screen.getByRole("toolbar"));
+    const undo = bar.getByRole("button", { name: "Hoàn tác" });
     expect(undo.getAttribute("data-tip")).toBe("Hoàn tác · Ctrl+Z");
-    const mode = screen.getByRole("button", { name: "Bật chế độ Nâng cao" });
+    const mode = bar.getByRole("button", { name: "Bật chế độ Nâng cao" });
     expect(mode.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(mode);
     expect(
-      screen.getByRole("button", { name: "Về chế độ Đơn giản" }).getAttribute("aria-pressed"),
+      (await bar.findByRole("button", { name: "Về chế độ Đơn giản" })).getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(screen.getByRole("button", { name: /Chạy/ })).toBeTruthy(); // the only labelled control
+    expect(bar.getByRole("button", { name: /Chạy/ })).toBeTruthy(); // the only labelled control
   });
 
   it("library flyout: '/' opens it with focus in search, Esc closes and returns focus, adding closes it", async () => {
@@ -46,7 +54,7 @@ describe("D4 shell", () => {
     const { useUi, useWorkflow } = await setup();
     expect(useUi.getState().dockOpen).toBe(false);
     useWorkflow.getState().addNode("train.sft_vlm", { x: 0, y: 0 }); // missing inputs → CFG-003 errors
-    await waitFor(() => expect(useUi.getState().dockOpen).toBe(true), { timeout: 3000 });
+    await waitFor(() => expect(useUi.getState().dockOpen).toBe(true));
   });
 
   it("compact lanes: empty lanes are 56px and a library drag opens the target lane", async () => {
@@ -74,7 +82,7 @@ describe("D4 status bar", () => {
     const { StatusBar } = await import("../src/components/ShellD4");
     render(<StatusBar />);
     await useWorkflow.getState().startRun();
-    await waitFor(() => expect(screen.getByRole("progressbar")).toBeTruthy(), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByRole("progressbar")).toBeTruthy());
     await waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull(), { timeout: 5000 });
   });
 });

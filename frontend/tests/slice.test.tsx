@@ -1,8 +1,14 @@
 // Vertical slice: gallery → open template → canvas → validate overlay → check bar (S-5).
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("VITE_MOCK_API", "1");
+
+// Transform the editor module tree once, under the hook's longer timeout, so the first test does not pay for it
+// and time out on a loaded machine (clean gate).
+beforeAll(async () => {
+  await import("../src/App");
+}, 60_000);
 
 describe("vertical slice", () => {
   it("opens a template from the gallery and shows a clean pre-flight (classic)", async () => {
@@ -10,15 +16,9 @@ describe("vertical slice", () => {
     useUi.setState({ skin: "classic" }); // ?ui=classic; the D4 gallery is covered by pipeline-gallery tests
     const { App } = await import("../src/App");
     render(<App />);
-    const buttons = await screen.findAllByRole(
-      "button",
-      { name: "Dùng mẫu này" },
-      { timeout: 4000 },
-    );
+    const buttons = await screen.findAllByRole("button", { name: "Dùng mẫu này" });
     fireEvent.click(buttons[0] as HTMLElement);
-    await waitFor(() => expect(screen.getByText(/Mọi thứ đã sẵn sàng/)).toBeTruthy(), {
-      timeout: 4000,
-    });
+    await waitFor(() => expect(screen.getByText(/Mọi thứ đã sẵn sàng/)).toBeTruthy());
     expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", false);
   }, 15_000); // full-App integration test: under a parallel full run it can pass 5 s on this shared host
 
