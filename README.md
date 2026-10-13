@@ -28,6 +28,12 @@ Lệnh cài:
 
 Chạy lại lệnh cài bất cứ lúc nào để cập nhật: file đã có sẽ không bị ghi đè.
 
+### Token Hugging Face (chuyển từ bản cũ)
+
+Token nhập trong app: **Cài đặt → Token**. Token được mã hoá bằng `secrets.key`; app không đọc token từ file `.env`.
+Nếu trước đây bạn để `HF_TOKEN=` trong file `.env` của thư mục dự án, hãy dán token đó vào Cài đặt một lần, rồi xoá
+dòng `HF_TOKEN` khỏi `.env` để token không còn nằm dạng chữ thường trên đĩa.
+
 ## Mở app
 
 Sau khi cài, lấy đường link có mã đăng nhập một lần:

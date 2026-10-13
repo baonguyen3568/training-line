@@ -21,13 +21,35 @@ def cmd_app(args: argparse.Namespace) -> int:
     from vlm_pipeline.nodes import REGISTRY
 
     services = DefaultServices(registry=REGISTRY, root=project_root(), worker=args.worker)
-    app = create_app(services, port=args.port, dev=args.dev, secure=True)
+    port = public_port(args.port)  # what the browser uses: the Host allowlist and the printed link (D13)
+    app = create_app(services, port=port, dev=args.dev, secure=True)
     _start_retention_scheduler(app, services)
     token = getattr(app.state, "startup_token", None)
-    url = f"http://127.0.0.1:{args.port}/" + (f"?token={token}" if token else "")
+    url = f"http://127.0.0.1:{port}/" + (f"?token={token}" if token else "")
     print(f"vlm app: open {url}", file=sys.stderr, flush=True)  # shown once, never logged (D13)
     uvicorn.run(app, host=bind_host(), port=args.port, log_level="info", access_log=False)
     return 0
+
+
+PUBLIC_PORT_ENV = "VLM_PUBLIC_PORT"
+
+
+def public_port(listen_port: int) -> int:
+    """The port the browser reaches: ``listen_port``, or in compose the published ``VLM_PUBLIC_PORT``.
+
+    In the compose stack the container always listens on 7870 and compose publishes ``$VLM_PORT`` on the host. Only
+    a plain 1024..65535 number is taken; anything else keeps the listen port (the Host allowlist refuses, never widens).
+    """
+    import os
+
+    raw = os.environ.get(PUBLIC_PORT_ENV, "")
+    if (
+        os.environ.get("VLM_IN_COMPOSE") != "1"
+        or not (raw.isascii() and raw.isdigit())
+        or not 1024 <= int(raw) <= 65535
+    ):
+        return listen_port
+    return int(raw)
 
 
 def bind_host() -> str:

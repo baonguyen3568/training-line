@@ -109,6 +109,11 @@ fi
 
 # ------------------------------------------------------------------------------------------------ build + start
 COMPOSE=(docker compose --project-directory "$ROOT" -f "$ROOT/compose.yaml" --env-file "$COMPOSE_ENV")
+# The port must be free, or already ours (a re-run): another app on it would get the browser's requests.
+ours="$(docker ps --filter label=com.docker.compose.project=ntc-training --format '{{.Ports}}' 2>/dev/null || true)"
+if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && [[ "$ours" != *":$PORT->"* ]]; then
+  fail "port $PORT is already used by another program: set another VLM_PORT in .env.local"
+fi
 run "${COMPOSE[@]}" build
 run "${COMPOSE[@]}" up -d
 say ""

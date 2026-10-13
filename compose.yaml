@@ -25,6 +25,7 @@ services:
       VLM_RUNNER_SOCKET: /run/vlm-runner/runner.sock
       VLM_GPU_LOCK_PATH: /run/vlm-lock/GPU_LOCK
       VLM_PROFILE: "${VLM_PROFILE:-}"
+      VLM_PUBLIC_PORT: "${VLM_PORT:-7870}"  # the published port: the Host allowlist and the link (listens on 7870)
     volumes:  # data only: the image carries the code (no repo mount)
       - "${VLM_DATA_ROOT:?}/outputs:/app/outputs"  # includes outputs/system: the app is trusted for it (security N2)
       - "${VLM_DATA_ROOT}/.cache:/app/.cache"
@@ -42,7 +43,7 @@ services:
     build:
       context: .
       dockerfile: docker/runner.Dockerfile
-      args: {VLM_UID: "${VLM_UID}", VLM_GID: "${VLM_GID}"}
+      args: {VLM_UID: "${VLM_UID}", VLM_GID: "${VLM_GID}", VLM_BUILD_COMMIT: "${VLM_BUILD_COMMIT:-}"}
     image: ntc-training-runner:local
     user: "${VLM_UID}:${VLM_GID}"
     group_add: ["${DOCKER_GID:?}"]  # the host's docker group: the socket, nothing else

@@ -92,3 +92,36 @@ def test_the_image_build_commit_is_used_without_git(monkeypatch: pytest.MonkeyPa
 def test_real_repo_reads_its_head() -> None:
     info: Any = build_info.read_build_info(project_root())
     assert info.commit is None or len(info.commit) == 40
+
+
+@pytest.mark.parametrize(
+    ("compose", "raw", "expected"),
+    [
+        ("1", "7880", 7880),
+        ("1", "", 7870),
+        ("1", "80", 7870),
+        ("1", "7880 ", 7870),
+        ("", "7880", 7870),
+        ("1", "\uff17\uff18\uff18\uff10", 7870),  # fullwidth digits
+        ("1", "\u00b2", 7870),  # superscript two: isdigit() but not int()
+    ],
+)
+def test_public_port_is_the_published_one_in_compose_only(
+    monkeypatch: pytest.MonkeyPatch, compose: str, raw: str, expected: int
+) -> None:
+    """PM smoke: VLM_PORT=7880 -> the Host allowlist and the printed link must say 7880, the app listens on 7870."""
+    from vlm_pipeline.app.server import PUBLIC_PORT_ENV, public_port
+
+    monkeypatch.setenv("VLM_IN_COMPOSE", compose)
+    monkeypatch.setenv(PUBLIC_PORT_ENV, raw)
+    assert public_port(7870) == expected
+
+
+def test_a_published_port_other_than_7870_passes_the_host_check(tmp_path: Path) -> None:
+    from vlm_pipeline.artifacts.testing import seed_demo_runs
+
+    seed_demo_runs(tmp_path / "outputs" / "runs")
+    app = create_app(FakeServices(tmp_path), port=7880, secure=True, token="t" * 32)  # type: ignore[arg-type]
+    client = TestClient(app, base_url="http://127.0.0.1:7880")
+    assert client.get("/?token=" + "t" * 32, follow_redirects=False).status_code == 303
+    assert TestClient(app, base_url="http://127.0.0.1:7870").get("/api/health").status_code == 403
