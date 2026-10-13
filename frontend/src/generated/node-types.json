@@ -43,7 +43,8 @@
                   "license": "nvidia-open-model-license",
                   "ram_gb": 14.0,
                   "ram_source": "estimated",
-                  "tier": "template",
+                  "task_prompt_fixed": false,
+                  "tier": "catalog",
                   "vendor": "nvidia"
                 },
                 "cosmos-reason2-8b": {
@@ -52,6 +53,7 @@
                   "license": "nvidia-open-model-license",
                   "ram_gb": 32.0,
                   "ram_source": "estimated",
+                  "task_prompt_fixed": false,
                   "tier": "catalog",
                   "vendor": "nvidia"
                 },
@@ -61,6 +63,7 @@
                   "license": "apache-2.0",
                   "ram_gb": 20.0,
                   "ram_source": "estimated",
+                  "task_prompt_fixed": false,
                   "tier": "catalog",
                   "vendor": "google"
                 },
@@ -70,6 +73,7 @@
                   "license": "apache-2.0",
                   "ram_gb": 28.0,
                   "ram_source": "estimated",
+                  "task_prompt_fixed": false,
                   "tier": "catalog",
                   "vendor": "google"
                 },
@@ -79,6 +83,7 @@
                   "license": "openmdw-1.1",
                   "ram_gb": 14.0,
                   "ram_source": "estimated",
+                  "task_prompt_fixed": true,
                   "tier": "rnd",
                   "vendor": "nvidia"
                 },
@@ -88,6 +93,7 @@
                   "license": "nvidia-open-model-license",
                   "ram_gb": 20.0,
                   "ram_source": "measured",
+                  "task_prompt_fixed": true,
                   "tier": "default",
                   "vendor": "nvidia"
                 },
@@ -97,6 +103,7 @@
                   "license": "apache-2.0",
                   "ram_gb": 14.0,
                   "ram_source": "estimated",
+                  "task_prompt_fixed": false,
                   "tier": "baseline",
                   "vendor": "qwen"
                 },
@@ -106,6 +113,7 @@
                   "license": "apache-2.0",
                   "ram_gb": 13.0,
                   "ram_source": "measured",
+                  "task_prompt_fixed": false,
                   "tier": "catalog",
                   "vendor": "qwen"
                 },
@@ -115,7 +123,8 @@
                   "license": "apache-2.0",
                   "ram_gb": 16.0,
                   "ram_source": "estimated",
-                  "tier": "catalog",
+                  "task_prompt_fixed": false,
+                  "tier": "template",
                   "vendor": "qwen"
                 },
                 "qwen3.5-4b": {
@@ -124,6 +133,7 @@
                   "license": "apache-2.0",
                   "ram_gb": 24.0,
                   "ram_source": "estimated",
+                  "task_prompt_fixed": false,
                   "tier": "catalog",
                   "vendor": "qwen"
                 },
@@ -133,6 +143,7 @@
                   "license": "apache-2.0",
                   "ram_gb": 38.0,
                   "ram_source": "estimated",
+                  "task_prompt_fixed": false,
                   "tier": "catalog",
                   "vendor": "qwen"
                 }

@@ -28,6 +28,8 @@ def _model_pick_params(catalog: Catalog) -> type[Params]:
             "gated": m.gated,
             "license": m.license,
             "vendor": m.vendor,
+            # The model always runs one fixed task (Nemotron-Parse): "Chạy thử" hides its question box (B-7).
+            "task_prompt_fixed": m.task_prompt_fixed,
         }
         for m in entries
     }
