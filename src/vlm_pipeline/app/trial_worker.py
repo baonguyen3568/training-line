@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -35,6 +36,17 @@ class TrialImageError(VlmPipelineError):
     """The trial image is missing or unusable (reason: missing, not_a_file, too_large, too_many_pixels, unreadable)."""
 
     code: ClassVar[str] = "DATA-005"
+
+
+def check_support(node_id: str, params: object, model: CatalogEntry | None, inputs: Mapping[str, str]) -> None:
+    """Pure support rule of "Chạy thử", run at validate time and again before the job (no disk access).
+
+    The only refusal that needs no file: no image chosen yet (DATA-005 missing). engine=vllm is not refused (it runs on
+    HF and records engine_used); every catalog family can answer. Missing files are runtime checks (``check_image``).
+    """
+    del model, inputs  # every catalog model and wiring the spec allows is supported
+    if isinstance(params, InferenceParams) and not params.image:
+        raise TrialImageError("no image", params={"node": node_id, "reason": "missing"})
 
 
 def check_image(root: Path, node_id: str, upload_id: str) -> Path:
@@ -211,6 +223,7 @@ __all__ = [
     "base_of",
     "build_request",
     "check_image",
+    "check_support",
     "est_peak_gb",
     "run_trial",
     "template_overrides",

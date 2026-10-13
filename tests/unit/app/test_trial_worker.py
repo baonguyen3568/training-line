@@ -210,3 +210,14 @@ def test_model_without_a_catalog_base_is_refused(tmp_path: Path) -> None:
     job = _job({"image": UID}, w.root / "run", ArtifactRef("Model", str(stray), "someone:else"))
     with pytest.raises(UnknownModelError):
         build_request(w, job, w.root / "uploads" / f"{UID}.png")
+
+
+def test_check_support_refuses_only_a_missing_image() -> None:
+    from vlm_pipeline.app.trial_worker import check_support
+
+    spec = REGISTRY.get("serve.vllm")
+    assert spec is not None
+    with pytest.raises(TrialImageError) as ei:
+        check_support("try", spec.validate_params({}), None, {"model": "model"})
+    assert ei.value.params == {"node": "try", "reason": "missing"}
+    check_support("try", spec.validate_params({"image": UID, "engine": "vllm"}), None, {"model": "model"})  # no raise
