@@ -416,3 +416,6 @@ Hiệu paired: s299 − s99 = **+14.4**, CI95 [6.9, 22.3]; s299 − s199 = +3.5,
 - val_loss (100 ảnh val): 299 = 0.052 → 399 = 0.0481 → 499 = 0.0454 → 599 = 0.0433, vẫn đang giảm.
 - Peak run.json 51.6 GB (P-3b: 23.7 GB). torch chỉ ~7 GiB, nên chưa tách được phần do resume (nạp optimizer state) hay do máy chung lúc đó; KHÔNG dùng số này cho catalog.
 - Quyết định (chờ tester): field F1 trên 100 ảnh VALIDATION, paired với s299. Nếu CI (599 − 299) không chứa 0 thì đề xuất preset "Chất lượng cao = 6 lượt" (~3h50), mặc định giữ 3 lượt (PM). E2 (lr 2e-5) chỉ chạy nếu E1 thắng.
+- **Kết quả E1 (tester, 2026-10-13 ~23:20):** CORD VALIDATION 100 ảnh, lệnh eval giống hệt (chỉ khác --model), runs `20261013-2003-e1val-p3b-s299-17b1` / `20261013-2308-e1val-e1-s599-479d`. s299 field F1 72.13; s599 (6 epoch) 73.82. Paired +1.70, CI95 [−1.22, 4.44] chứa 0 ⇒ **6 epoch KHÔNG thắng**, giữ s299 (R0 đã công bố). Không chạy test cho s599, không làm E2, không thêm preset "Chất lượng cao".
+  - Ý nghĩa: ngân sách train không phải nguyên nhân chính của khoảng cách Parse (71.0) với Qwen3.5-2B LoRA (86.4) trên CORD test. Gấp đôi thời gian train chỉ được ≤ ~+1.7 điểm, trong vùng nhiễu. Thông điệp cho docs: "3 lượt là đủ cho mẫu này".
+  - Giả thuyết còn mở (chưa thử): cách đọc output (token CORD qua token2json) so với JSON; encoder RADIO đóng băng. Không đề xuất thí nghiệm thêm trước 1.0.
