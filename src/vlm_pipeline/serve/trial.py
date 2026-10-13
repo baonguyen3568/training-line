@@ -233,6 +233,9 @@ def main(argv: list[str] | None = None) -> int:
     if len(args) != 1:
         print("usage: python -m vlm_pipeline.serve.trial <request.json>", file=sys.stderr)
         return 2
+    from vlm_pipeline.common.cuda_init import ensure_cuda_context
+
+    ensure_cuda_context()  # before the checkpoint is loaded on the CPU: GB10 context creation (KB fixcode §2.2b)
     result = run(Path(args[0]))
     return 3 if "error" in result else 0
 
