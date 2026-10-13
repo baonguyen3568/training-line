@@ -311,6 +311,7 @@ quick_fix:
   apply: Apply
   applied: 'Applied: {action}. Press Undo (Ctrl+Z) to go back.'
 action:
+  check_files: Check files
   migrate_node: Review changes and update
   open_node: Open this step
   review_to_install: Review to install
@@ -1484,3 +1485,4 @@ download:
   installing: Installing into the app's cache…
   completed: Downloaded "{name}" to this machine.
   failed: Could not download "{name}".
+  unverified: Already on this machine, but the app has not checked its files yet. Click "Check files" before using it.

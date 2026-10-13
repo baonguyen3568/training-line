@@ -311,6 +311,7 @@ quick_fix:
   apply: Áp dụng
   applied: 'Đã áp dụng: {action}. Bấm Hoàn tác (Ctrl+Z) để quay lại.'
 action:
+  check_files: Kiểm tra tệp
   migrate_node: Xem thay đổi và cập nhật
   open_node: Mở bước này
   review_to_install: Xem để cài
@@ -1484,3 +1485,4 @@ download:
   installing: Đang cài vào bộ nhớ đệm của app…
   completed: Đã tải "{name}" về máy.
   failed: Chưa tải được "{name}".
+  unverified: Đã có trên máy nhưng app chưa kiểm tra các tệp. Bấm "Kiểm tra tệp" trước khi dùng.
