@@ -34,7 +34,12 @@ interface Pipeline {
   /** i18n key of the one-line "what you get" (design gallery r2 #3). */
   summary_key?: string;
   /** Numbers from a real run on this machine (research), with their source in the data file. */
-  measured?: { train_minutes?: number; peak_ram_gb?: number } | null;
+  measured?: {
+    train_minutes?: number;
+    peak_ram_gb?: number;
+    /** compare_with: another pipeline scored on the same benchmark/metric (checked by the generator). */
+    score?: { metric: string; value: number; compare_with?: string };
+  } | null;
 }
 const pipelines = (data as { pipelines: Pipeline[] }).pipelines;
 type Filter = "all" | Pipeline["kind"];
@@ -68,6 +73,15 @@ function timeText(p: Pipeline, estimate: Range | null | undefined): string {
     m?.train_minutes ? { lo: m.train_minutes, hi: m.train_minutes } : (estimate ?? null),
   );
   return m?.peak_ram_gb ? `${time} · ${t("pipelines.ram_peak", { gb: m.peak_ram_gb })}` : time;
+}
+
+/** 'Trên cùng bộ kiểm tra, pipeline "X" đạt N.' for a pipeline research compared on the same benchmark. */
+function scoreCompare(p: Pipeline): string | undefined {
+  const other = pipelines.find((x) => x.id === p.measured?.score?.compare_with);
+  const value = other?.measured?.score?.value;
+  return other && value !== undefined
+    ? t("pipelines.score_compare", { other: loc(other.title), other_value: value.toFixed(2) })
+    : undefined;
 }
 
 /** "?" + native popover (DESIGN.md "?" Popover): secondary detail never sits on the card itself. */
@@ -276,7 +290,27 @@ export function PipelineGallery() {
                 </div>
                 <div>
                   <dt>{t("pipelines.time")}</dt>
-                  <dd>{timeText(p, p.template_id ? minutes.get(p.template_id) : undefined)}</dd>
+                  <dd>
+                    {timeText(p, p.template_id ? minutes.get(p.template_id) : undefined)}
+                    {p.measured?.score && (
+                      <>
+                        {" · "}
+                        {tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
+                          p.measured.score.metric}{" "}
+                        {p.measured.score.value.toFixed(2)}
+                        <Help
+                          id={`score-${p.id}`}
+                          title={
+                            tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
+                            p.measured.score.metric
+                          }
+                        >
+                          {scoreCompare(p) && <p>{scoreCompare(p)}</p>}
+                          <p>{t("pipelines.score_single_run")}</p>
+                        </Help>
+                      </>
+                    )}
+                  </dd>
                 </div>
               </dl>
               {p.requires_hf_terms && (

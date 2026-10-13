@@ -26,7 +26,14 @@ type Pipe = {
   measured?: {
     train_minutes?: number;
     peak_ram_gb?: number;
-    score?: { benchmark: string; metric: string; value: number; ci95?: [number, number]; n?: number };
+    score?: {
+      benchmark: string;
+      metric: string;
+      value: number;
+      ci95?: [number, number];
+      n?: number;
+      compare_with?: string;
+    };
     config?: string;
     sources?: string[];
   } | null;
@@ -231,6 +238,22 @@ const invoiceMeasured = pipes.find((p) => p.id === "invoice-to-json")?.measured;
                       </>
                     )}
                     .
+                  </>
+                )}
+                {p.measured.score?.compare_with && (() => {
+                  const other = pipes.find((x) => x.id === p.measured?.score?.compare_with)
+                    ?? (copy.pipelines_data as Pipe[]).find((x) => x.id === p.measured?.score?.compare_with);
+                  return other?.measured?.score ? (
+                    <>
+                      {" "}
+                      {fill(pl.score_compare, { other: other.title.vi, other_value: other.measured.score.value.toFixed(2) })}
+                    </>
+                  ) : null;
+                })()}
+                {p.measured.score && (
+                  <>
+                    {" "}
+                    {pl.score_single_run}
                   </>
                 )}
                 {p.measured.config && (

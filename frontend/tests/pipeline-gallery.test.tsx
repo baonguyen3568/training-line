@@ -36,7 +36,12 @@ describe("PipelineGallery", () => {
     }
     const parseTitle = data.pipelines.find((p) => p.id === "invoice-to-json")?.title.vi;
     const invoice = cards.find((c) => c.querySelector("h2")?.textContent === parseTitle);
-    expect(invoice?.textContent).toContain("~1 giờ 56 phút · RAM đỉnh 23.7 GB");
+    expect(invoice?.textContent).toContain(
+      "~1 giờ 56 phút · RAM đỉnh 23.7 GB · F1 theo trường 70.97",
+    );
+    // research compared it with the Qwen LoRA on the same benchmark: the "?" says so, by the other's title
+    expect(invoice?.textContent).toMatch(/Trên cùng bộ kiểm tra, pipeline ".+" đạt 86\.42\./);
+    expect(invoice?.textContent).toContain("một lần chạy");
     const external = within(cards[cards.length - 1] as HTMLElement).getByRole("link", {
       name: /Xem nguồn/,
     });
