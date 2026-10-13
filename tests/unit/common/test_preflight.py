@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.diskguard import DiskSnapshot, LockStatus
 from vlm_pipeline.common.error_catalog import load_catalog
 from vlm_pipeline.common.errors import ExitCode
@@ -131,9 +132,10 @@ def test_preflight_stale_or_corrupt_lock_is_still_busy(status: LockStatus, needl
     assert v.findings[0].params["state"] == {"stale": "stale", "unreadable": "corrupt"}[needle]
 
 
-def test_preflight_reads_lock_file_under_root_without_touching_it(tmp_path: Path) -> None:
-    lock = tmp_path / ".team" / "GPU_LOCK"
-    lock.parent.mkdir()
+@pytest.mark.parametrize("rel", [gpu_lock.LOCK_REL, gpu_lock.LEGACY_REL])  # legacy: a job from before the move
+def test_preflight_reads_lock_file_under_root_without_touching_it(tmp_path: Path, rel: Path) -> None:
+    lock = tmp_path / rel
+    lock.parent.mkdir(parents=True)
     lock.write_text("bao-x | job | 2026-10-12T16:00 | PID 1\n")  # legacy text format -> corrupt -> busy
     before = lock.read_bytes()
     v = preflight(10.0, snapshot=_snap(43.0), disk=DISK_OK, root=tmp_path)

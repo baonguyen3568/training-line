@@ -20,7 +20,7 @@ from typing import ClassVar
 
 from vlm_pipeline.common.diskguard import DiskSnapshot, LockStatus, check_disk, check_lock, read_disk, required_disk_gb
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
-from vlm_pipeline.common.gpu_lock import default_lock_path
+from vlm_pipeline.common.gpu_lock import default_lock_path, lock_path_for
 from vlm_pipeline.common.gpu_mem import (
     MIN_NATIVE_DRIVER_CUDA_13_3,
     GpuInfo,
@@ -231,7 +231,7 @@ def preflight(
     if lock_holder is not None:
         lock = lock_holder()
     else:
-        lock = check_lock(base / ".team" / "GPU_LOCK" if root is not None else default_lock_path())
+        lock = check_lock(lock_path_for(base) if root is not None else default_lock_path())
 
     if gpus is None:
         gpus = query_gpus() if snapshot is None else []

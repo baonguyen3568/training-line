@@ -67,12 +67,41 @@ class LockHandle:
     info: LockInfo
 
 
+LOCK_REL = Path(".team") / "lock" / "GPU_LOCK"  # its own folder: compose mounts exactly it (security, PM 2026-10-13)
+LEGACY_REL = Path(".team") / "GPU_LOCK"  # before 2026-10-13: a lock still there means BUSY (never two locks at once)
+
+
+def lock_path_for(root: Path) -> Path:
+    """The GPU lock of a project/data root. Every module builds the path here (no ``.team/...`` literals elsewhere)."""
+    return root / LOCK_REL
+
+
 def default_lock_path() -> Path:
-    """``$VLM_GPU_LOCK_PATH`` or ``<project_root>/.team/GPU_LOCK`` — the single place that builds this path."""
+    """``$VLM_GPU_LOCK_PATH`` or ``<project_root>/.team/lock/GPU_LOCK``."""
     override = os.environ.get(PATH_ENV)
     if override:
         return Path(override)
-    return project_root() / ".team" / "GPU_LOCK"
+    return lock_path_for(project_root())
+
+
+def _legacy_of(path: Path) -> Path | None:
+    """The pre-move lock file next to a ``.team/lock/GPU_LOCK`` path, when it still exists (transition guard).
+
+    Only a parent named ``lock`` qualifies: compose's ``/run/vlm-lock/GPU_LOCK`` never had a legacy file (by design).
+    """
+    if path.name == "GPU_LOCK" and path.parent.name == "lock":
+        legacy = path.parent.parent / "GPU_LOCK"
+        if os.path.lexists(legacy):
+            return legacy
+    return None
+
+
+def lock_present(path: Path) -> bool:
+    """True when the lock file (or, during the move, the legacy ``.team/GPU_LOCK``) exists, even as a symlink.
+
+    For callers that skip work while the GPU is busy without parsing the lock: same truth as ``acquire``'s guard.
+    """
+    return os.path.lexists(path) or _legacy_of(path) is not None
 
 
 def _pid_alive(pid: int) -> bool:
@@ -135,6 +164,9 @@ def read_lock(path: Path) -> LockInfo | None:
     Raises:
         GpuLockError: the lock exists but is unreadable or malformed (callers must treat the GPU as busy).
     """
+    legacy = _legacy_of(path) if not os.path.lexists(path) else None
+    if legacy is not None:  # a job started before the move still holds the old file: report it, it is the GPU's holder
+        path = legacy
     try:
         raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -167,7 +199,17 @@ def acquire(
     run_dir: str | None = None,
     now: Callable[[], str] = lambda: time.strftime("%Y-%m-%dT%H:%M:%S%z"),
 ) -> LockHandle:
-    """Create the lock atomically or raise ``GpuLockError`` (with the holder's public info) if it already exists."""
+    """Create the lock atomically or raise ``GpuLockError`` (with the holder's public info) if it already exists.
+
+    While a lock still sits at the old path (``.team/GPU_LOCK``), the GPU is busy: never two locks at once.
+    """
+    legacy = _legacy_of(path)
+    if legacy is not None:
+        try:
+            held = read_lock(legacy)
+        except GpuLockError as exc:
+            raise GpuLockError("GPU busy (old lock unreadable)", params=exc.params) from None
+        raise GpuLockError("GPU busy (old lock path)", params=_busy_params(held) if held else dict(_CORRUPT_PARAMS))
     info = LockInfo(
         who=who,
         job=job,

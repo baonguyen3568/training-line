@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from vlm_pipeline.artifacts.retention import RUNS_REL, check_project_root, read_run_status
+from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.diskguard import LockStatus, check_lock
 from vlm_pipeline.common.runinfo import RunStatus
 
@@ -135,7 +136,7 @@ def plan(
 ) -> list[WorktreeItem]:
     """Read-only: one item per git worktree located directly under ``<root>/.worktrees``."""
     git = run if run is not None else git_runner(root)
-    lock = lock_reader(lock_path if lock_path is not None else root / ".team" / "GPU_LOCK")
+    lock = lock_reader(lock_path if lock_path is not None else gpu_lock.lock_path_for(root))
     base = (root / WORKTREES_REL).resolve()
     items: list[WorktreeItem] = []
     for path in _listed_worktrees(git):

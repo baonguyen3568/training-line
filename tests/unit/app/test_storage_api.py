@@ -17,6 +17,7 @@ from vlm_pipeline.app.storage_scheduler import LAST_PASS_REL, RetentionScheduler
 from vlm_pipeline.artifacts.index import ArtifactIndex, OutputRef
 from vlm_pipeline.artifacts.retention import CLEANUP_LOCK_REL
 from vlm_pipeline.artifacts.testing import FakeRunSpec, make_fake_run
+from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.app_config import POLICY_REL, policy_path
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.i18n import load as i18n_load
@@ -478,7 +479,7 @@ def _scheduler(root: Path, settings: StorageSettings | None = None) -> tuple[Ret
     (root / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
     idx = ArtifactIndex(root / "outputs" / "graph" / "app.db")
     settings = settings or StorageSettings(node_cache_max_gb=0.0)
-    return RetentionScheduler(root, idx, settings, lock_path=root / ".team" / "GPU_LOCK"), idx
+    return RetentionScheduler(root, idx, settings, lock_path=gpu_lock.lock_path_for(root)), idx
 
 
 def test_every_pass_reconciles_stale_runs_in_any_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -542,8 +543,21 @@ def test_any_gpu_lock_file_skips_the_pass(tmp_path: Path, lock_text: str) -> Non
     s, _ = _scheduler(tmp_path)
     s.mode = "apply"
     _retention_runs(tmp_path)
+    lock = gpu_lock.lock_path_for(tmp_path)
+    lock.parent.mkdir(parents=True)
+    lock.write_text(lock_text)
+    assert s.run_once()["reason"] == "GPU_LOCK_HELD"
+    assert (tmp_path / "outputs" / "runs" / "r-done" / "checkpoints" / "epoch_0_step_10").exists()
+
+
+def test_legacy_gpu_lock_alone_skips_the_pass(tmp_path: Path) -> None:
+    """A job started before the lock moved still holds ``.team/GPU_LOCK``: the GPU is busy, nothing is cleaned."""
+    s, _ = _scheduler(tmp_path)
+    s.mode = "apply"
+    _retention_runs(tmp_path)
     (tmp_path / ".team").mkdir()
-    (tmp_path / ".team" / "GPU_LOCK").write_text(lock_text)
+    (tmp_path / ".team" / "GPU_LOCK").write_text('{"who": "x"}')
+    assert not gpu_lock.lock_path_for(tmp_path).exists()
     assert s.run_once()["reason"] == "GPU_LOCK_HELD"
     assert (tmp_path / "outputs" / "runs" / "r-done" / "checkpoints" / "epoch_0_step_10").exists()
 

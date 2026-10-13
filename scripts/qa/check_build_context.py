@@ -38,6 +38,7 @@ FORBIDDEN = (
     ".cache/hf/hub/x.safetensors",
     "data/uploads/u1/a.png",
     ".team/GPU_LOCK",
+    ".team/lock/GPU_LOCK",
     ".claude/settings.local.json",
     "frontend/node_modules/x/index.js",
     "secrets/hf_token",

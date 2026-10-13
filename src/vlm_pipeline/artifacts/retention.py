@@ -59,6 +59,7 @@ from pathlib import Path
 from typing import Literal
 
 from vlm_pipeline.artifacts.storage import du_bytes
+from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.diskguard import LockStatus, check_lock
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.common.runinfo import RunStatus, read_small_json  # read_small_json: re-exported
@@ -576,10 +577,10 @@ def plan(
 ) -> Plan:
     """Read-only retention plan for every run (or only ``run_ids``) under ``<root>/outputs/runs``.
 
-    ``lock_path`` defaults to ``<root>/.team/GPU_LOCK``; the CLI passes ``gpu_lock.default_lock_path()``.
+    ``lock_path`` defaults to ``gpu_lock.lock_path_for(root)``; the CLI passes ``gpu_lock.default_lock_path()``.
     """
     ts = time.time() if now is None else now
-    lock = lock_reader(lock_path if lock_path is not None else root / ".team" / "GPU_LOCK")
+    lock = lock_reader(lock_path if lock_path is not None else gpu_lock.lock_path_for(root))
     inputs = resume_inputs(root, now=ts, policy=policy)
     runs_dir = root / RUNS_REL
     runs: list[RunPlan] = []

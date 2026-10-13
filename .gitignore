@@ -14,6 +14,7 @@ __pycache__/
 *.bin
 *.pt
 .team/GPU_LOCK
+/.team/lock/
 # --- added by bao-cleanup (Proposal 005) ---
 .cache/
 .pytest_cache/

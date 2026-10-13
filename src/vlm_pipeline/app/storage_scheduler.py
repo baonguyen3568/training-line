@@ -35,6 +35,7 @@ from typing import Any, Literal
 from vlm_pipeline.app.storage import APPROVAL_WINDOW_S, CLEANUP_LOG_REL, PERMANENT_LOSS, PROFILE_ENV, StorageSettings
 from vlm_pipeline.artifacts import cache_retention, retention, stale_runs
 from vlm_pipeline.artifacts.index import ArtifactIndex
+from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.app_config import effective_profile, read_policy
 from vlm_pipeline.common.paths import GIB
 
@@ -128,7 +129,7 @@ class RetentionScheduler:
             return []
 
     def _pass(self) -> dict[str, Any]:
-        if self.lock_path.exists() or self.lock_path.is_symlink():
+        if gpu_lock.lock_present(self.lock_path):
             return {"status": "skipped", "reason": "GPU_LOCK_HELD"}
         cache_plan = cache_retention.plan_cache(self.root, self.index, cap_gb=self.settings.node_cache_max_gb)
         cache_keys = [i.cache_key for i in cache_plan.evict]

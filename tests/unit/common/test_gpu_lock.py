@@ -124,7 +124,7 @@ def test_default_lock_path_env_override(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.setenv(gpu_lock.PATH_ENV, str(tmp_path / "L"))
     assert gpu_lock.default_lock_path() == tmp_path / "L"
     monkeypatch.delenv(gpu_lock.PATH_ENV)
-    assert gpu_lock.default_lock_path().parts[-2:] == (".team", "GPU_LOCK")
+    assert gpu_lock.default_lock_path().parts[-3:] == (".team", "lock", "GPU_LOCK")  # its own folder (2026-10-13)
 
 
 def test_error_params_never_contain_paths(tmp_path: Path) -> None:
@@ -201,3 +201,14 @@ def test_an_old_lock_without_run_dir_still_reads(tmp_path: Path) -> None:
     info = gpu_lock.read_lock(path)
     assert info is not None
     assert info.run_dir is None
+
+
+def test_a_lock_left_at_the_old_path_keeps_the_gpu_busy(tmp_path: Path) -> None:
+    """Moving to .team/lock/GPU_LOCK: while a job started before the move holds .team/GPU_LOCK, nobody else starts."""
+    old = gpu_lock.acquire(tmp_path / ".team" / "GPU_LOCK", who="old", job="train", run_id="r-old")
+    new = gpu_lock.lock_path_for(tmp_path)
+    assert gpu_lock.read_lock(new) == old.info  # readers see the old holder
+    with pytest.raises(GpuLockError, match="old lock path"):
+        gpu_lock.acquire(new, who="new", job="t", run_id="r-new")
+    gpu_lock.release(old)
+    assert gpu_lock.acquire(new, who="new", job="t", run_id="r-new").info.who == "new"

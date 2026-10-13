@@ -2,7 +2,7 @@
 
 - ``gpu`` tests are skipped when CUDA is unavailable (host venv has no torch) and, when CUDA is present,
   fail fast unless the GPU lock is held by the parent host process: the host writes a random token to
-  ``.team/GPU_LOCK`` and passes it as ``VLM_GPU_LOCK_TOKEN``; tests never acquire the lock themselves
+  ``.team/lock/GPU_LOCK`` and passes it as ``VLM_GPU_LOCK_TOKEN``; tests never acquire the lock themselves
   (PID namespaces differ inside the container).
 - Every test starts from a fixed seed.
 """
@@ -56,7 +56,7 @@ def _gpu_lock_held(request: pytest.FixtureRequest) -> None:
         return
     token = os.environ.get(GPU_LOCK_ENV_VAR)
     if not token:
-        pytest.fail(f"{GPU_LOCK_ENV_VAR} not set: gpu tests must be launched by the host holding .team/GPU_LOCK")
+        pytest.fail(f"{GPU_LOCK_ENV_VAR} not set: gpu tests must be launched by the host holding .team/lock/GPU_LOCK")
     from vlm_pipeline.common.gpu_lock import GpuLockError, default_lock_path, verify_token
 
     try:

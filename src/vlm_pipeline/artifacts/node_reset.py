@@ -29,6 +29,7 @@ from pathlib import Path
 from vlm_pipeline.artifacts import retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
 from vlm_pipeline.artifacts.storage import du_bytes
+from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.diskguard import LockStatus, check_lock
 from vlm_pipeline.common.run_claims import GENERATIONS_REL, MAX_GENERATION, NODE_BASE, GenerationError, node_generation
 from vlm_pipeline.common.runinfo import RunStatus
@@ -137,7 +138,7 @@ def plan_reset(root: Path, index: ArtifactIndex, node: str, *, lock_path: Path |
     statuses = {d.name: retention.read_run_status(d)[0] for d in dirs}
     attempts = tuple(Attempt(d.name, statuses[d.name], du_bytes(d), _has_checkpoint(d)) for d in dirs)
     keys = index.keys_for_run_dirs(dirs)
-    lock = check_lock(lock_path if lock_path is not None else root / ".team" / "GPU_LOCK")
+    lock = check_lock(lock_path if lock_path is not None else gpu_lock.lock_path_for(root))
     try:
         generation = node_generation(root, node)
     except GenerationError:

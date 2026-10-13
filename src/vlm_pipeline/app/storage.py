@@ -37,6 +37,7 @@ from vlm_pipeline.artifacts.storage import du_bytes
 from vlm_pipeline.common.app_config import effective_profile, read_policy
 from vlm_pipeline.common.diskguard import read_disk
 from vlm_pipeline.common.gpu_lock import PATH_ENV as GPU_LOCK_PATH_ENV
+from vlm_pipeline.common.gpu_lock import lock_path_for
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.common.runinfo import read_small_json
 
@@ -321,7 +322,7 @@ class StorageApi:
     index: ArtifactIndex
     settings: StorageSettings
     plans: _Plans = field(default_factory=_Plans)
-    lock_path: Path | None = None  # GPU lock file; default $VLM_GPU_LOCK_PATH or <root>/.team/GPU_LOCK
+    lock_path: Path | None = None  # GPU lock file; default $VLM_GPU_LOCK_PATH or <root>/.team/lock/GPU_LOCK
 
     def lock_file(self) -> Path:
         """The GPU lock file this API checks (also used by the node-reset routes)."""
@@ -344,7 +345,7 @@ class StorageApi:
         if self.lock_path is not None:
             return self.lock_path
         override = os.environ.get(GPU_LOCK_PATH_ENV)
-        return Path(override) if override else self.root / ".team" / "GPU_LOCK"
+        return Path(override) if override else lock_path_for(self.root)
 
     def _kept_bytes(self, item: retention.PlanItem) -> int:
         """On-disk size of a kept item; 0 when its path is not a plain path inside its runs root."""
