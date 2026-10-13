@@ -35,8 +35,10 @@ describe("download target", () => {
     expect(target?.name).not.toBe("qwen3.5-0.8b"); // the catalog label
     expect(downloadTargetOf(net002("not_prepared"), specs)?.catalogId).toBe("qwen3.5-0.8b");
     expect(downloadTargetOf(net002("not_pinned"), specs)).toBeUndefined();
-    // the publisher is never the lowercase slug: catalog vendor_name, else the repo's org
-    expect(target?.publisher).toBe("Qwen");
+    // the publisher is never the lowercase slug: the catalog's vendor_name (393ec98), else the repo's org
+    const meta = specs.get("model.hf_pick")?.params_schema.properties.model?.["x-ui"]?.option_meta;
+    expect(target?.publisher).toBe(meta?.["qwen3.5-0.8b"]?.vendor_name ?? "Qwen");
+    expect(target?.publisher).not.toMatch(/^[a-z]/);
   });
 });
 
