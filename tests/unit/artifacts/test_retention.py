@@ -10,6 +10,7 @@ from string import Formatter
 
 import pytest
 
+from vlm_pipeline.artifacts.cache_retention import RUN_ROOTS
 from vlm_pipeline.artifacts.retention import CONSEQUENCE_CODES, RetentionPolicy, apply, plan
 from vlm_pipeline.common.diskguard import LockStatus
 from vlm_pipeline.common.paths import GIB
@@ -183,6 +184,26 @@ def test_apply_ignores_unknown_and_whitelisted_ids(tmp_path: Path) -> None:
     )
     assert res.done == []
     assert len(res.skipped) == 4
+
+
+def test_runner_claims_survive_every_pass(tmp_path: Path) -> None:
+    """ADR-015: ``outputs/system/runner_claims/<run_id>`` outlives its run dir so a run_id is never reused."""
+    _standard_run(tmp_path)
+    claims = tmp_path / "outputs" / "system" / "runner_claims"
+    claims.mkdir(parents=True)
+    (claims / "r1").write_text('{"run_id": "r1"}')
+    lookalike = claims / "r2" / "checkpoints" / "epoch_0_step_10"  # a claim dir shaped like a run never becomes one
+    lookalike.mkdir(parents=True)
+    os.utime(lookalike, (NOW - 30 * DAY, NOW - 30 * DAY))
+    every = [i.item_id for i in plan(tmp_path, now=NOW, lock_reader=no_lock).actionable]
+    assert every
+    assert not any("runner_claims" in i or i.startswith("r2/") for i in every)
+    forged = ["../system/runner_claims/r1", "../system/runner_claims/r2/checkpoints/epoch_0_step_10"]
+    apply(tmp_path, every + forged, by="t", now=NOW, lock_reader=no_lock)
+    assert (claims / "r1").read_text() == '{"run_id": "r1"}'
+    assert lookalike.is_dir()
+    system = Path("outputs") / "system"  # cache eviction only deletes under RUN_ROOTS: none may cover the claims
+    assert not any(system.is_relative_to(r) or r.is_relative_to(system) for r in RUN_ROOTS)
 
 
 def test_apply_requires_approval_above_threshold(tmp_path: Path) -> None:
