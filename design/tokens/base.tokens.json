@@ -65,6 +65,7 @@
       "ui": {
         "$type": "fontFamily",
         "$value": [
+          "Be Vietnam Pro",
           "system-ui",
           "-apple-system",
           "Segoe UI",
@@ -74,12 +75,13 @@
       "mono": {
         "$type": "fontFamily",
         "$value": [
+          "JetBrains Mono",
           "ui-monospace",
           "SF Mono",
-          "JetBrains Mono",
           "monospace"
         ]
-      }
+      },
+      "$description": "Be Vietnam Pro (UI) + JetBrains Mono (code/numbers only), SIL OFL-1.1, self-hosted (files in design/m2/fonts, copy to site/public/fonts + frontend). System stacks are fallbacks."
     },
     "size": {
       "caption": {

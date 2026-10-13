@@ -1,0 +1,631 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-13T02:56:48+00:00",
+  "title": "Design System: NTC-Training",
+  "extensions": {
+    "tokenSource": [
+      "design/tokens/base.tokens.json",
+      "design/tokens/color.dark.tokens.json",
+      "design/tokens/color.light.tokens.json"
+    ],
+    "defaultMode": "dark",
+    "colorMeta": {
+      "accent-brand": {
+        "role": "primary",
+        "displayName": "NTC Indigo",
+        "canonical": "#6e56cf",
+        "oklch": "oklch(54.2% 0.179 288.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.107 288.0)",
+          "oklch(26.0% 0.179 288.0)",
+          "oklch(37.0% 0.179 288.0)",
+          "oklch(48.0% 0.179 288.0)",
+          "oklch(59.0% 0.179 288.0)",
+          "oklch(70.0% 0.179 288.0)",
+          "oklch(82.0% 0.179 288.0)",
+          "oklch(95.0% 0.107 288.0)"
+        ],
+        "note": "Never #76B900. White text 5.4:1."
+      },
+      "accent-focus": {
+        "role": "primary",
+        "displayName": "Indigo Light",
+        "canonical": "#b3a6ff",
+        "oklch": "oklch(77.0% 0.126 289.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.076 289.8)",
+          "oklch(26.0% 0.126 289.8)",
+          "oklch(37.0% 0.126 289.8)",
+          "oklch(48.0% 0.126 289.8)",
+          "oklch(59.0% 0.126 289.8)",
+          "oklch(70.0% 0.126 289.8)",
+          "oklch(82.0% 0.126 289.8)",
+          "oklch(95.0% 0.076 289.8)"
+        ],
+        "note": "Dark-mode focus/selection; light mode uses #6e56cf."
+      },
+      "action-primary-hover": {
+        "role": "primary",
+        "displayName": "Indigo Pressed",
+        "canonical": "#5f48c6",
+        "oklch": "oklch(49.9% 0.187 285.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.112 285.8)",
+          "oklch(26.0% 0.187 285.8)",
+          "oklch(37.0% 0.187 285.8)",
+          "oklch(48.0% 0.187 285.8)",
+          "oklch(59.0% 0.187 285.8)",
+          "oklch(70.0% 0.187 285.8)",
+          "oklch(82.0% 0.187 285.8)",
+          "oklch(95.0% 0.112 285.8)"
+        ]
+      },
+      "port-dataset": {
+        "role": "secondary",
+        "displayName": "Data Aqua",
+        "canonical": "#199e70",
+        "oklch": "oklch(62.1% 0.128 163.1)",
+        "tonalRamp": [
+          "#196748",
+          "#1b7e58",
+          "#1b9669",
+          "#199e70",
+          "#4eb288",
+          "#74c5a0",
+          "#96d9b9",
+          "#c4ecd8"
+        ],
+        "rampSource": "design/tokens color.variant.* light+dark steps; lightest step synthesized"
+      },
+      "port-model": {
+        "role": "secondary",
+        "displayName": "Model Blue",
+        "canonical": "#3987e5",
+        "oklch": "oklch(62.2% 0.161 255.1)",
+        "tonalRamp": [
+          "#113e74",
+          "#195193",
+          "#2164b4",
+          "#2a78d6",
+          "#3987e5",
+          "#5b9ef2",
+          "#7bb5fe",
+          "#9acbff"
+        ],
+        "rampSource": "design/tokens color.variant.* light+dark steps; lightest step synthesized"
+      },
+      "port-report": {
+        "role": "secondary",
+        "displayName": "Report Orange",
+        "canonical": "#d95926",
+        "oklch": "oklch(62.2% 0.173 40.1)",
+        "tonalRamp": [
+          "#8b3f21",
+          "#aa4c28",
+          "#ca5a2e",
+          "#d95926",
+          "#e9774e",
+          "#f89370",
+          "#ffaf91",
+          "#ffd2bf"
+        ],
+        "rampSource": "design/tokens color.variant.* light+dark steps; lightest step synthesized"
+      },
+      "status-good": {
+        "role": "tertiary",
+        "displayName": "Status Good",
+        "canonical": "#0ca30c",
+        "oklch": "oklch(62.1% 0.207 142.6)",
+        "tonalRamp": [
+          "oklch(15.0% 0.124 142.6)",
+          "oklch(26.0% 0.207 142.6)",
+          "oklch(37.0% 0.207 142.6)",
+          "oklch(48.0% 0.207 142.6)",
+          "oklch(59.0% 0.207 142.6)",
+          "oklch(70.0% 0.207 142.6)",
+          "oklch(82.0% 0.207 142.6)",
+          "oklch(95.0% 0.124 142.6)"
+        ]
+      },
+      "status-warning": {
+        "role": "tertiary",
+        "displayName": "Status Warning",
+        "canonical": "#fab219",
+        "oklch": "oklch(81.1% 0.164 78.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.099 78.5)",
+          "oklch(26.0% 0.164 78.5)",
+          "oklch(37.0% 0.164 78.5)",
+          "oklch(48.0% 0.164 78.5)",
+          "oklch(59.0% 0.164 78.5)",
+          "oklch(70.0% 0.164 78.5)",
+          "oklch(82.0% 0.164 78.5)",
+          "oklch(95.0% 0.099 78.5)"
+        ]
+      },
+      "status-serious": {
+        "role": "tertiary",
+        "displayName": "Status Serious",
+        "canonical": "#ec835a",
+        "oklch": "oklch(71.7% 0.141 41.6)",
+        "tonalRamp": [
+          "oklch(15.0% 0.084 41.6)",
+          "oklch(26.0% 0.141 41.6)",
+          "oklch(37.0% 0.141 41.6)",
+          "oklch(48.0% 0.141 41.6)",
+          "oklch(59.0% 0.141 41.6)",
+          "oklch(70.0% 0.141 41.6)",
+          "oklch(82.0% 0.141 41.6)",
+          "oklch(95.0% 0.084 41.6)"
+        ]
+      },
+      "status-critical": {
+        "role": "tertiary",
+        "displayName": "Status Critical",
+        "canonical": "#d03b3b",
+        "oklch": "oklch(57.5% 0.186 25.2)",
+        "tonalRamp": [
+          "oklch(15.0% 0.112 25.2)",
+          "oklch(26.0% 0.186 25.2)",
+          "oklch(37.0% 0.186 25.2)",
+          "oklch(48.0% 0.186 25.2)",
+          "oklch(59.0% 0.186 25.2)",
+          "oklch(70.0% 0.186 25.2)",
+          "oklch(82.0% 0.186 25.2)",
+          "oklch(95.0% 0.112 25.2)"
+        ]
+      },
+      "page": {
+        "role": "neutral",
+        "displayName": "Page Black",
+        "canonical": "#0d0d0d",
+        "oklch": "oklch(15.9% 0.000 89.9)",
+        "tonalRamp": [
+          "#0d0d0d",
+          "#121211",
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781"
+        ]
+      },
+      "canvas-background": {
+        "role": "neutral",
+        "displayName": "Canvas Black",
+        "canonical": "#121211",
+        "oklch": "oklch(18.2% 0.002 106.6)",
+        "tonalRamp": [
+          "#0d0d0d",
+          "#121211",
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Panel Graphite",
+        "canonical": "#1a1a19",
+        "oklch": "oklch(21.7% 0.002 106.6)",
+        "tonalRamp": [
+          "#0d0d0d",
+          "#121211",
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781"
+        ]
+      },
+      "canvas-placeholder": {
+        "role": "neutral",
+        "displayName": "Raised Graphite",
+        "canonical": "#222220",
+        "oklch": "oklch(25.1% 0.004 106.7)",
+        "tonalRamp": [
+          "#0d0d0d",
+          "#121211",
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781"
+        ]
+      },
+      "grid": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#2c2c2a",
+        "oklch": "oklch(29.2% 0.004 106.6)",
+        "tonalRamp": [
+          "#0d0d0d",
+          "#121211",
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781"
+        ]
+      },
+      "axis": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#383835",
+        "oklch": "oklch(34.0% 0.005 106.7)",
+        "tonalRamp": [
+          "#0d0d0d",
+          "#121211",
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781"
+        ]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#f0efec",
+        "oklch": "oklch(95.2% 0.004 91.4)",
+        "tonalRamp": [
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781",
+          "#c3c2b7",
+          "#f0efec"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "canonical": "#c3c2b7",
+        "oklch": "oklch(81.2% 0.015 102.5)",
+        "tonalRamp": [
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781",
+          "#c3c2b7",
+          "#f0efec"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#898781",
+        "oklch": "oklch(62.3% 0.009 91.5)",
+        "tonalRamp": [
+          "#171716",
+          "#1a1a19",
+          "#222220",
+          "#2c2c2a",
+          "#383835",
+          "#898781",
+          "#c3c2b7",
+          "#f0efec"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing hero only; 60px desktop, 38px ≤760px; text-wrap balance; ≤21ch."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Site section heads; 40px / 30px mobile."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card, inspector node, settings group and error-card heads."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Editor prose and popovers; site lead runs 18px in text-secondary."
+      },
+      "body-table": {
+        "displayName": "Body / Table",
+        "purpose": "Settings rows, dock rows, library items, inputs (token font.size.table)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Inspector param labels, node titles, lane names, tooltips (token font.size.caption is the floor)."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Commands, paths, ids and numbers only; tabular numerals."
+      },
+      "stat": {
+        "displayName": "Stat",
+        "purpose": "Large numeric readouts (token font.size.stat)."
+      }
+    },
+    "portShapes": {
+      "Dataset": "square ■",
+      "Model": "circle ●",
+      "Checkpoint": "circle ● + label chip",
+      "Adapter": "half-circle",
+      "QuantizedModel": "double-circle",
+      "EvalReport": "diamond ◆",
+      "BenchReport": "diamond-outline",
+      "ExportArtifact": "hexagon",
+      "Endpoint": "triangle ▲",
+      "Value": "dot"
+    },
+    "nodeGeometry": {
+      "width": "240px",
+      "radius": "8px",
+      "headerHeight": "32px",
+      "portSize": "10px",
+      "wireWidth": "2px",
+      "thirdPartyRingGap": "2px"
+    },
+    "editorLayout": {
+      "toolbar": "48px",
+      "iconStrip": "48px",
+      "libraryFlyout": "304px (/ to open, Esc to close)",
+      "inspector": "300px",
+      "bottomDock": "176px incl. 34px icon-tab row",
+      "statusBar": "26px",
+      "minWidth": "1280px"
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 1px 0 #ffffff08 inset, 0 12px 32px -8px #000000b0, 0 2px 6px #00000080",
+        "purpose": "Tooltips, popovers, error card."
+      },
+      {
+        "name": "node",
+        "value": "0 6px 18px -6px #000c",
+        "purpose": "Canvas nodes at rest."
+      },
+      {
+        "name": "node-selected",
+        "value": "0 0 0 2px #b3a6ff, 0 10px 26px -8px #000",
+        "purpose": "Selected node ring + lift."
+      },
+      {
+        "name": "flyout-edge",
+        "value": "16px 0 40px -16px #000",
+        "purpose": "Library flyout over the canvas."
+      },
+      {
+        "name": "showcase-frame",
+        "value": "0 40px 120px -40px #000, 0 0 0 1px #00000080",
+        "purpose": "Live editor embedded in the landing hero only."
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid #b3a6ff; outline-offset: 2px",
+      "purpose": "Every interactive element (dark); light mode uses #6e56cf."
+    },
+    "motion": [
+      {
+        "name": "state",
+        "value": "120–150ms ease",
+        "purpose": "Colour, opacity and transform state changes."
+      },
+      {
+        "name": "tooltip-delay",
+        "value": "250ms",
+        "purpose": "Tooltip reveal delay."
+      },
+      {
+        "name": "wire-draw",
+        "value": "700ms cubic-bezier(.16,1,.3,1)",
+        "purpose": "Wire connects (landing hero moment, editor connect)."
+      },
+      {
+        "name": "wire-flow",
+        "value": "1s linear infinite dash",
+        "purpose": "Data flowing through a running wire."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce → animation:none; transition:none",
+        "purpose": "Show the final state immediately."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "760px"
+      },
+      {
+        "name": "site-container",
+        "value": "1200px"
+      },
+      {
+        "name": "editor-min",
+        "value": "1280px"
+      }
+    ],
+    "knownDrift": [
+      "**Neutrals:** the mock uses a cool ramp (`#09090b / #0f1013 / #15171b / #1c1e23 / #24272d`, lines `#23262c / #30343b`, text `#ededf0 / #a7acb6 / #858b95`). The tokens use a warm-neutral dark set (`page #0d0d0d`, `canvas #121211`, `surface #1a1a19`, `placeholder #222220`, `grid #2c2c2a`, `axis #383835`, text `#f0efec / #c3c2b7 / #898781`). The endpoint port uses mock `#a7acb6` vs token `text.secondary`. Canvas dots are mock `#ffffff12` vs `grid_dot #262624`. The node border is mock `#30343b` vs `rgba(255,255,255,0.14)`. If the cooler cast is wanted, change the tokens first (token owner + PM), then this file.",
+      "**Primary hover:** mock `#7d67d9` lightens the button and gives only 4.36:1 with white text, which fails AA. The token `#5f48c6` (6.5:1) is canonical.",
+      "**Off-token status text colours:** the mock adds `--ok-tx #3fc43f` and `--crit-tx #f07070` and uses them as label text on the node \"Chưa đủ\" state, the error rows, the \"✓ Đã kết nối\" pill and the 6/6 count. This breaks the Ink-Not-Label Rule. These colours belong on icons only, and the labels go to text greys.",
+      "**Radius:** mock controls use 6px and cards 10–12px. The tokens have only `radius.sm 4` / `radius.md 8`, so 8 is canonical. The subgraph frame's 12px radius is a one-off.",
+      "**Node size:** mock nodes are 150px wide (small variant 11px text) with a ~30px header. The tokens are `node.width 240`, `node.header_height 32`.",
+      "**Type below the scale:** mock editor text at 10–11.5px (port labels, node summary, lane names, badges, status bar). The smallest token is `font.size.caption 12`. The lane \"empty\" label `#5d626b` is 3.24:1, which fails AA.",
+      "**Font family token lag:** `base.tokens.json` `font.family.ui` is still `system-ui…` and `mono` is led by `ui-monospace`. The binding decision (D4, PRODUCT.md) is Be Vietnam Pro + JetBrains Mono, so the token file should be updated to match. Until then this file records the decision.",
+      "**Panel widths vs the dashboard contract:** the build has a 304px flyout, a 300px inspector and a 176px dock. The surface brief said 280 / 320 / 180. The build values are recorded here."
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one indigo action per screen: install on the site, Run in the editor.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 15V3\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"m7 10 5 5 5-5\"/></svg>Tải về &amp; cài đặt</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;border:1px solid transparent;background:#6e56cf;color:#fff;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;font-weight:600;font-size:14px;line-height:1;cursor:pointer;transition:background .15s} .ds-btn-primary:hover{background:#5f48c6} .ds-btn-primary:focus-visible{outline:2px solid #b3a6ff;outline-offset:2px} .ds-btn-primary:disabled{opacity:.45;cursor:not-allowed}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary actions (Tài liệu, card actions).",
+      "html": "<button class=\"ds-btn-ghost\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 5v16\"/><path d=\"M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z\"/></svg>Tài liệu</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;border:1px solid #383835;background:#1a1a19;color:#f0efec;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;font-weight:600;font-size:14px;line-height:1;cursor:pointer;transition:background .15s} .ds-btn-ghost:hover{background:#222220} .ds-btn-ghost:focus-visible{outline:2px solid #b3a6ff;outline-offset:2px}"
+    },
+    {
+      "name": "Toolbar (icon-first)",
+      "kind": "nav",
+      "refersTo": "toolbar",
+      "description": "48px editor toolbar: icon groups with tooltips, labelled Run is the only text button.",
+      "html": "<div class=\"ds-tb\"><button class=\"ds-ib\" aria-label=\"Hoàn tác\" title=\"Hoàn tác\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 14 4 9l5-5\"/><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/></svg></button><span class=\"ds-sep\"></span><button class=\"ds-ib\" aria-pressed=\"true\" aria-label=\"Chế độ Nâng cao\" title=\"Chế độ Nâng cao\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\"/><path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\"/><path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\"/></svg></button><span class=\"ds-chip\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22V12\"/></svg>74/121 GB</span><span class=\"ds-grow\"></span><button class=\"ds-run\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\" fill=\"currentColor\" stroke=\"none\"/></svg>Chạy</button></div>",
+      "css": ".ds-tb{display:flex;align-items:center;gap:6px;height:48px;padding:0 10px;background:#1a1a19;border-bottom:1px solid #2c2c2a;color:#c3c2b7;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;} .ds-ib{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:#c3c2b7;cursor:pointer} .ds-ib:hover,.ds-ib[aria-pressed=\"true\"]{background:#222220;color:#f0efec} .ds-ib:focus-visible{outline:2px solid #b3a6ff;outline-offset:2px} .ds-sep{width:1px;height:20px;background:#383835;margin:0 6px} .ds-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;font-family:\"JetBrains Mono\",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12.5px;color:#c3c2b7} .ds-grow{flex:1} .ds-run{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 14px 0 12px;border:0;border-radius:8px;background:#6e56cf;color:#fff;font-weight:600;font-size:14px;cursor:pointer} .ds-run:hover{background:#5f48c6} .ds-run:focus-visible{outline:2px solid #b3a6ff;outline-offset:2px}"
+    },
+    {
+      "name": "Left Icon Strip",
+      "kind": "nav",
+      "refersTo": "icon-strip",
+      "description": "48px strip; active item gets an inset indigo-light bar; opens the library flyout.",
+      "html": "<nav class=\"ds-strip\" aria-label=\"Công cụ\"><button class=\"ds-sib\" aria-pressed=\"true\" aria-label=\"Thư viện bước\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m16 6 4 14\"/><path d=\"M12 6v14\"/><path d=\"M8 8v12\"/><path d=\"M4 4v16\"/></svg></button><button class=\"ds-sib\" aria-label=\"Tìm\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg></button></nav>",
+      "css": ".ds-strip{display:flex;flex-direction:column;align-items:center;gap:4px;width:48px;padding:8px 0;background:#1a1a19;border-right:1px solid #2c2c2a} .ds-sib{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:#c3c2b7;cursor:pointer} .ds-sib:hover{background:#222220;color:#f0efec} .ds-sib[aria-pressed=\"true\"]{background:#222220;color:#f0efec;box-shadow:inset 2px 0 0 #b3a6ff} .ds-sib:focus-visible{outline:2px solid #b3a6ff;outline-offset:2px}"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "32px well input used in the library flyout and gallery.",
+      "html": "<label class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg><input placeholder=\"Tìm bước…\" aria-label=\"Tìm bước\"></label>",
+      "css": ".ds-search{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:8px;background:#0d0d0d;border:1px solid #383835;color:#898781;width:260px} .ds-search:focus-within{outline:2px solid #b3a6ff;outline-offset:2px} .ds-search input{flex:1;min-width:0;border:0;background:transparent;color:#f0efec;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;font-size:13px;outline:none} .ds-search input::placeholder{color:#898781}"
+    },
+    {
+      "name": "Inspector Param Row",
+      "kind": "custom",
+      "refersTo": "input",
+      "description": "Param keeps its label; explanation lives behind the ? popover; numeric value in mono.",
+      "html": "<div class=\"ds-field\"><span class=\"ds-fl\">Batch tổng <button class=\"ds-help\" aria-label=\"Giải thích\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg></button></span><span class=\"ds-num\">8</span></div>",
+      "css": ".ds-field{display:flex;align-items:center;justify-content:space-between;width:272px;padding:12px 14px 0;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;} .ds-fl{display:flex;align-items:center;gap:4px;color:#c3c2b7;font-size:12px;font-weight:500} .ds-help{display:inline-grid;place-items:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:#898781;cursor:pointer} .ds-help:hover{background:#222220;color:#f0efec} .ds-help:focus-visible{outline:2px solid #b3a6ff;outline-offset:2px} .ds-help svg{width:14px;height:14px} .ds-num{display:inline-flex;align-items:center;justify-content:flex-end;min-width:64px;height:28px;padding:0 10px;border:1px solid #383835;border-radius:8px;background:#0d0d0d;color:#c3c2b7;font-family:\"JetBrains Mono\",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12px}"
+    },
+    {
+      "name": "Node with typed ports",
+      "kind": "custom",
+      "refersTo": "node",
+      "description": "Signature node: ports are colour + shape + label; state is ink icon + text-grey label.",
+      "html": "<div class=\"ds-node\"><div class=\"ds-hd\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22V12\"/></svg><b>Chọn model gốc</b><span class=\"ds-no\">1</span></div><div class=\"ds-ports\"><div class=\"ds-port ds-in\"><i class=\"ds-pin ds-sq\" style=\"--c:#199e70\"></i>Dữ liệu</div><div class=\"ds-port ds-out\">Model<i class=\"ds-pin ds-ci\" style=\"--c:#3987e5\"></i></div><div class=\"ds-port ds-out\">Điểm benchmark<i class=\"ds-pin ds-di\" style=\"--c:#d95926\"></i></div></div><div class=\"ds-st\"><span class=\"ds-ok\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21.801 10A10 10 0 1 1 17 3.335\"/><path d=\"m9 11 3 3L22 4\"/></svg></span>Xong</div></div>",
+      "css": ".ds-node{position:relative;width:240px;background:#1a1a19;border:1px solid rgba(255,255,255,.14);border-radius:8px;box-shadow:0 6px 18px -6px #000c;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;font-size:12px;color:#f0efec} .ds-node:hover{border-color:#898781} .ds-node:focus-visible{outline:none;box-shadow:0 0 0 2px #b3a6ff,0 10px 26px -8px #000} .ds-hd{display:flex;align-items:center;gap:7px;height:32px;padding:0 10px;color:#c3c2b7} .ds-hd svg{width:14px;height:14px} .ds-hd b{font-weight:600;color:#f0efec} .ds-no{margin-left:auto;min-width:16px;height:16px;font-family:\"JetBrains Mono\",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:10px;line-height:16px;text-align:center;color:#898781;border:1px solid #383835;border-radius:4px} .ds-ports{padding:4px 0 6px;border-top:1px solid #2c2c2a} .ds-port{position:relative;display:flex;align-items:center;height:22px;padding:0 12px;color:#c3c2b7;font-size:12px} .ds-out{justify-content:flex-end} .ds-pin{position:absolute;top:50%;width:10px;height:10px;margin-top:-5px;background:var(--c)} .ds-in .ds-pin{left:-5.5px} .ds-out .ds-pin{right:-5.5px} .ds-ci{border-radius:50%} .ds-sq{border-radius:1.5px} .ds-di{transform:rotate(45deg) scale(.85);border-radius:1.5px} .ds-st{display:flex;align-items:center;gap:6px;padding:6px 10px;border-top:1px solid #2c2c2a;color:#c3c2b7;font-size:12px} .ds-ok{display:inline-grid;color:#0ca30c} .ds-ok svg{width:13px;height:13px}"
+    },
+    {
+      "name": "Check Row (bottom dock)",
+      "kind": "custom",
+      "refersTo": "count-badge",
+      "description": "Pre-run check: status ink on the icon only, label in text greys, unknowns 'chưa có số đo'.",
+      "html": "<div class=\"ds-rows\"><div class=\"ds-row\"><span class=\"ds-ink-ok\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21.801 10A10 10 0 1 1 17 3.335\"/><path d=\"m9 11 3 3L22 4\"/></svg></span><b>Kiểu kết nối giữa các bước</b><span class=\"ds-r\">7 dây</span></div><div class=\"ds-row\"><span class=\"ds-ink-crit\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/></svg></span><b>Thiếu dữ liệu học</b><span class=\"ds-r\">chưa có số đo</span></div></div>",
+      "css": ".ds-rows{width:520px;background:#1a1a19;padding:4px 0;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;} .ds-row{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;height:30px;padding:0 14px;font-size:13px;color:#c3c2b7} .ds-row:hover{background:#222220} .ds-row b{font-weight:500;color:#f0efec} .ds-row svg{width:14px;height:14px} .ds-ink-ok{display:inline-grid;color:#0ca30c} .ds-ink-crit{display:inline-grid;color:#d03b3b} .ds-r{color:#898781;font-size:12px}"
+    },
+    {
+      "name": "Help Popover",
+      "kind": "custom",
+      "refersTo": "popover",
+      "description": "The single mechanism for secondary text: ? trigger opens a ≤320px panel with an optional mono source line.",
+      "html": "<div class=\"ds-pop\">Cổng có <b>màu, hình và nhãn</b>: ■ Dữ liệu, ● Model, ◆ Kết quả đo. Không bao giờ chỉ dựa vào màu.<span class=\"ds-src\">Nguồn: Proposal 010 §4</span></div>",
+      "css": ".ds-pop{max-width:320px;padding:12px 14px;background:#222220;color:#f0efec;border:1px solid #383835;border-radius:8px;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;font-size:13px;line-height:1.5;box-shadow:0 1px 0 #ffffff08 inset,0 12px 32px -8px #000000b0,0 2px 6px #00000080} .ds-pop b{font-weight:600} .ds-src{display:block;margin-top:8px;color:#898781;font-family:\"JetBrains Mono\",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:11.5px}"
+    },
+    {
+      "name": "Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Neutral pill for facts and licence labels; dashed variant marks 'minh hoạ'.",
+      "html": "<span class=\"ds-tag\">Apache-2.0</span> <span class=\"ds-tag ds-mh\">minh hoạ</span>",
+      "css": ".ds-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #383835;border-radius:999px;font-family:\"Be Vietnam Pro\",system-ui,sans-serif;font-weight:500;font-size:12px;line-height:1;color:#898781} .ds-mh{border-style:dashed;border-radius:4px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Standard Instrument",
+    "overview": "NTC-Training plays the enterprise category straight. It has no illustrated hero, no metaphor and no glow. The working product is the hero: on the site the real editor is embedded live, wired up and pre-checked, and on the dashboard every tool is visible in one 1440×900 screen. Each detail is held to a 1px standard. The finish benchmarks are Linear, Vercel and Modal for the site, and Unreal Editor 5 and Figma for the editor. The system's identity comes from precision, the typed-port grammar (colour + shape + label) and the indigo NTC mark. It does not come from decoration.\n\nThe world is dark-first. Near-black neutral elevations are separated by 1px hairlines. One indigo accent is reserved for the primary action, selection and focus. Port and status colours carry the only other saturation, and they always arrive with a shape, an icon or text. The site (Persuade) and the editor (Operate) share the same header grammar, port shapes and \"?\" popover mechanism. The site breathes in large type and long sections. The editor is dense at 12–14px and icon-first, with Lucide glyphs and tooltips instead of words.\n\nThe voice of the interface is Vietnamese with full diacritics. Secondary explanation always sits behind a \"?\" popover, never in the body. Mono type is reserved for commands and numbers.",
+    "keyCharacteristics": [
+      "Dark, cool-neutral tonal elevations with 1px hairline borders; flat at rest.",
+      "One indigo accent (#6e56cf) for primary action, selection and focus only; never NVIDIA green.",
+      "Typed ports: colour + shape (● ■ ◆ ▲) + label, always together.",
+      "Icon-first editor chrome (Lucide), labelled only where a label is truly needed: inspector params and the Run button.",
+      "Be Vietnam Pro everywhere; JetBrains Mono only for commands and numbers.",
+      "WCAG 2.2 AA throughout; `prefers-reduced-motion` shows the final state with no animation."
+    ],
+    "rules": [
+      {
+        "name": "The Never-Colour-Alone Rule",
+        "body": "Every port is colour + shape (● Model, ■ Data, ◆ Report, ▲ Endpoint) + a text label. Every state is ink + Lucide icon + text. A screen rendered in greyscale must lose no meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink-Not-Label Rule",
+        "body": "Status labels are set in `text-primary` / `text-secondary`. `status_ink` colours only icons, borders, bars, dots and LEDs. Status hues fail 4.5:1 as text in at least one mode.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Indigo Rule",
+        "body": "Indigo marks the primary action, selection and focus, and nothing else. On the editor there is exactly one filled indigo control per screen: Run/Chạy.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Green-Brand Rule",
+        "body": "`#76B900` never appears as a brand colour, and nothing resembles the NVIDIA logo or eye. NVIDIA appears only as factual text (\"Chạy trên NVIDIA NeMo AutoModel\").",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono-Means-Machine Rule",
+        "body": "JetBrains Mono is only for commands, paths, ids and numbers. It is never used for headings, labels or decoration.",
+        "section": "typography"
+      },
+      {
+        "name": "The Full-Diacritics Rule",
+        "body": "Every Vietnamese string carries full diacritics (\"Đọc hoá đơn\", not \"Doc hoa don\"). A face is accepted only if it renders stacked marks (ẩ, ồ, ặ) without clipping at the line-heights above.",
+        "section": "typography"
+      },
+      {
+        "name": "The One-Screen Rule",
+        "body": "The whole editor toolset is visible at 1440×900 without scrolling chrome. A new tool earns a glyph in an existing group, not a new bar.",
+        "section": "layout"
+      },
+      {
+        "name": "The No-Stray-Text Rule",
+        "body": "Editor chrome carries no helper sentences. Explanations live behind \"?\" popovers, names live in tooltips. Only one dashed \"minh hoạ\" label is allowed next to illustrative numbers.",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline-First Rule",
+        "body": "Separation is a 1px `grid` or `axis` line before it is ever a shadow. Shadows are reserved for floating layers.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** pair every port colour with its shape (● Model, ■ Data, ◆ Report, ▲ Endpoint) and a text label, and every state colour with a Lucide icon and text.",
+      "**Do** set status labels in `text-primary`/`text-secondary`, and use `status_ink` only for icons, borders, bars and dots.",
+      "**Do** keep the editor icon-first: 48px toolbar, 48px left icon strip with a 304px library flyout (`/`, Esc), icon-only dock tabs with tooltips and counts, and an icon toggle for Simple/Advanced.",
+      "**Do** keep param labels in the inspector, with their explanations behind a \"?\" popover.",
+      "**Do** give every icon-only control a tooltip and an accessible name.",
+      "**Do** use Be Vietnam Pro for all UI and prose, and JetBrains Mono only for commands and numbers. Both are self-hosted under OFL-1.1, and icons come from Lucide only.",
+      "**Do** meet WCAG 2.2 AA: text ≥4.5:1, non-text marks ≥3:1, a visible 2px focus ring, and full keyboard reach. Honour `prefers-reduced-motion` by showing the end state.",
+      "**Do** write Vietnamese with full diacritics, and show unknown numbers as \"chưa có số đo\" rather than inventing them.",
+      "**Do** take every colour, radius, spacing and node dimension from `design/tokens/` through build-tokens."
+    ],
+    "donts": [
+      "**Don't** use `#76B900` or any NVIDIA-green as a brand colour, and don't draw anything resembling the NVIDIA logo or eye.",
+      "**Don't** set a status label's text in a status colour (green \"Đã kết nối\", red \"Chưa đủ\").",
+      "**Don't** add a port hue. Only three pass CVD all-pairs, so subtypes differ by shape + label.",
+      "**Don't** put helper sentences, captions or small notes in editor chrome. Use the \"?\" popover.",
+      "**Don't** add labelled text buttons to the toolbar. Run/Stop is the only one.",
+      "**Don't** use indigo for anything other than the primary action, selection and focus.",
+      "**Don't** use mono for headings or labels, or load fonts and icons from a CDN.",
+      "**Don't** pair a Lucide icon with a duplicate text glyph (an icon followed by \"✓\" or \"✕\")."
+    ]
+  }
+}
