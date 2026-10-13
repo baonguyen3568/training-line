@@ -77,6 +77,8 @@ Write comparison table + decision + risks into `.team/proposals/001-*.md`; send 
 - Catalog image limits must reach the template: Qwen3.5 templates ignored `min/max_pixels` until f95897c (9.8k vs 0.9k
   image tokens on a large receipt). `test_qwen_pixel_limits_reach_the_processor` guards it; any new image_policy needs
   the same catalog = template test.
-- Measure template runs through the real executor from a clean worktree (`git worktree add --detach .cache/wt-research
-  HEAD`, run with `VLM_PROJECT_ROOT=<main tree>`): run.json then records the MAIN tree's git_commit/dirty, so write the
-  worktree commit into the benchmark record yourself.
+- Measure template runs through the real executor from a clean worktree, host AND container (92ef0ee):
+  `WT=.cache/wt-research; git worktree add --detach $WT HEAD`, then
+  `VLM_PROJECT_ROOT=<main tree> VLM_CODE_ROOT=$WT PYTHONPATH=$WT/src <main>/.venv/bin/python <driver>`.
+  Jobs mount src/ + configs/ from $WT, data/outputs/.cache/lock from the main tree; run.json records $WT's commit.
+  Without VLM_CODE_ROOT only the host side is clean (R2 2026-10-13 was like that; its record says so).
