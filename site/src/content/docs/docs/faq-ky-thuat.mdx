@@ -9,6 +9,7 @@ sources:
   - .team/proposals/001a-nvidia-default-model.md
   - .team/proposals/002-eval-benchmark-protocol.md
   - src/vlm_pipeline/common/memguard.py
+  - .team/bugs/BUG-003-parse-resume-missing-conditioner-keys.md
 ---
 import Hint from '~/components/Hint.astro';
 
@@ -28,7 +29,7 @@ Trong một lần train lỗi của team, val loss đạt 0,195 nhưng model v�
 Tuỳ model và dữ liệu. Với template hoá đơn, team đang đo điểm sau 1 epoch và nhiều epoch để chọn mặc định; trang template sẽ ghi số khi có.
 
 ### Tôi bấm Dừng rồi chạy tiếp được không?
-Với Nemotron Parse thì hiện **chưa** (xem [Giới hạn đã biết](/docs/gioi-han-da-biet/)).
+Được. Khi bạn bấm Dừng, app giữ lại checkpoint gần nhất; lần chạy sau tiếp tục từ đó thay vì làm lại từ đầu. Phần đã train sau checkpoint cuối cùng sẽ phải chạy lại.
 
 ### App có dùng dữ liệu kiểm tra để train không?
 Không. Tập test của dataset (ví dụ 100 hoá đơn test của CORD v2) bị khoá, không bao giờ đưa vào train. Mọi quyết định chọn checkpoint hay cài đặt đều dựa trên tập validation; tập test chỉ dùng để báo điểm cuối.
