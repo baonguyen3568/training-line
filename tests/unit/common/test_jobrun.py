@@ -277,3 +277,24 @@ def test_wait_and_preflight_use_the_same_tightened_budget(tmp_path: Path, monkey
     jobrun.run_job(job, manifest, tmp_path / "run", project_root=root, who="t", est_peak_gb=10,  # type: ignore[arg-type]
                    mem_thresholds=tight)  # fmt: skip
     assert seen["wait"] is tight
+
+
+def test_compile_caches_are_kept_per_image_and_follow_the_writable_dir(tmp_path: Path) -> None:
+    from vlm_pipeline.common.jobrun import compile_cache_env
+
+    run = tmp_path / "outputs" / "graph" / "runs" / "n1"
+    rw_env = compile_cache_env(_job(), tmp_path, "sha256:" + "ab" * 32)
+    assert rw_env == {
+        "TORCH_EXTENSIONS_DIR": "/workspace/.cache/torch_extensions/abababababababab",
+        "TORCHINDUCTOR_CACHE_DIR": "/workspace/.cache/inductor/abababababababab",
+        "MAX_JOBS": "2",
+    }
+    ro_env = compile_cache_env(_job(read_only_project=True, rw_dirs=(run,)), tmp_path, "sha256:" + "ef" * 32)
+    assert ro_env["TORCH_EXTENSIONS_DIR"] == "/workspace/outputs/graph/runs/n1/.cache/torch_extensions/efefefefefefefef"
+    unknown = compile_cache_env(_job(), tmp_path, None)["TORCH_EXTENSIONS_DIR"]
+    assert not unknown.startswith("/workspace")  # no image id: rebuilt per job, never a shared "unknown" cache
+    no_rw = compile_cache_env(_job(read_only_project=True), tmp_path, "sha256:" + "ef" * 32)["TORCH_EXTENSIONS_DIR"]
+    assert not no_rw.startswith("/workspace")  # nothing writable in the project: per-job scratch
+    args = docker_args(_job(env={"MAX_JOBS": "4"}), tmp_path, image_id="sha256:" + "cd" * 32)
+    assert "MAX_JOBS=4" in args  # a job's own env wins
+    assert "TORCHINDUCTOR_CACHE_DIR=/workspace/.cache/inductor/cdcdcdcdcdcdcdcd" in args

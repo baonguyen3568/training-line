@@ -115,9 +115,39 @@ def validate_rw_dirs(project_root: Path, dirs: Iterable[Path]) -> list[Path]:
     return resolved
 
 
-def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None = None) -> list[str]:
+_SCRATCH = "/tmp/.cache"  # noqa: S108 - per-container scratch (dies with the container)
+
+
+def compile_cache_env(job: ContainerJob, project_root: Path, image_id: str | None) -> dict[str, str]:
+    """JIT/inductor caches that outlive the container, keyed by the image id (a new image never loads an old .so).
+
+    research: modelopt compiled its CUDA extension (~3 min, many cc1plus) in EVERY job because HOME=/tmp. A
+    read-only project keeps them in the job's own writable dir. ``MAX_JOBS=2`` caps parallel compiler processes.
+    """
+    if not image_id:  # no image identity: never persist a .so another image could load (bao-fixcode)
+        scratch = {"TORCH_EXTENSIONS_DIR": "torch_extensions", "TORCHINDUCTOR_CACHE_DIR": "inductor"}
+        return {**{k: f"{_SCRATCH}/{v}" for k, v in scratch.items()}, "MAX_JOBS": "2"}
+    key = image_id.removeprefix("sha256:")[:16]
+    base = f"{CONTAINER_ROOT}/.cache"
+    # A read-only job (trial runs remote code on a user image) caches in ITS OWN run dir, never in a shared writable
+    # cache: a shared one would let it plant a .so for the next job. Cost: no speed-up across runs for those jobs.
+    if job.read_only_project and job.rw_dirs:
+        rel = job.rw_dirs[0].resolve().relative_to(project_root.resolve()).as_posix()
+        base = f"{CONTAINER_ROOT}/{rel}/.cache"
+    elif job.read_only_project:
+        base = _SCRATCH  # nothing writable in the project: rebuilt per job, as before
+    return {
+        "TORCH_EXTENSIONS_DIR": f"{base}/torch_extensions/{key}",
+        "TORCHINDUCTOR_CACHE_DIR": f"{base}/inductor/{key}",
+        "MAX_JOBS": "2",
+    }
+
+
+def docker_args(
+    job: ContainerJob, project_root: Path, *, lock_token: str | None = None, image_id: str | None = None
+) -> list[str]:
     """Pure: the full ``docker run`` argv for ``job`` (tested; no shell, no user-controlled flags)."""
-    env = {**BASE_ENV, **job.env}
+    env = {**BASE_ENV, **compile_cache_env(job, project_root, image_id), **job.env}  # job.env wins
     for key in env:
         if key in SECRET_ENV_ALLOWLIST:
             continue
@@ -507,7 +537,7 @@ def run_job(
         if cancel is not None:
             threading.Thread(target=_watch_cancel, name=f"cancel-{container}", daemon=True).start()
         _, guard = run_guarded(
-            docker_args(job, project_root, lock_token=handle.info.token),
+            docker_args(job, project_root, lock_token=handle.info.token, image_id=image_digest(job.image)),
             run_dir / "logs" / "stdout.log",
             on_abort=lambda: _docker_stop_async(container),
             hard_exit=lambda: _docker_kill(container),
