@@ -13,7 +13,7 @@ from vlm_pipeline.common.approval import is_security_approved
 from vlm_pipeline.common.errors import VlmPipelineError
 
 # The one place that names the default training image (app worker, smoke CLI, container gates).
-DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-5"
+DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-6"
 
 
 class ImageMismatchError(VlmPipelineError):

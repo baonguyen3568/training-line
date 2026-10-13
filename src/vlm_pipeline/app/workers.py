@@ -34,10 +34,10 @@ from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe
 
 logger = logging.getLogger(__name__)
 PREPARED_DIRS = {"nemotron-parse-v1.1": "nemotron-parse-v1.1_fd1e3c6b"}  # train.prepare outputs (hash-verified)
-# Models whose AutoModel checkpoints cannot be resumed yet. Parse: RADIO drops its input_conditioner buffers at the
-# first forward, so the saved model shard lacks keys that a freshly built model expects ("Missing key in checkpoint
-# state_dict", resume smoke 2026-10-13). A resume of these starts over instead of failing on every retry.
-RESUME_UNSUPPORTED = frozenset({"nemotron-parse-v1.1"})
+# Models whose AutoModel checkpoints cannot be resumed: a resume starts over instead of failing on every retry.
+# Empty since vlm-automodel:26.08-6 (patch 0005, BUG-003 closed: Parse resumes, also from 26.08-5 checkpoints).
+# Run dirs marked .not-resumable earlier stay so (graph.worker.NOT_RESUMABLE_MARKER).
+RESUME_UNSUPPORTED: frozenset[str] = frozenset()
 
 
 class NotCachedError(VlmPipelineError):

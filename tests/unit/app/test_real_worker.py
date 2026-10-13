@@ -291,7 +291,7 @@ def test_resume_of_unresumable_model_starts_over(tmp_path: Path, monkeypatch: py
     w = RealWorker(root)
     entry = w.catalog.get("nemotron-parse-v1.1")
     assert entry is not None
-    assert entry.id in workers.RESUME_UNSUPPORTED
+    monkeypatch.setattr(workers, "RESUME_UNSUPPORTED", frozenset({entry.id}))  # mechanism kept, list empty now
     monkeypatch.setattr("vlm_pipeline.train.recipe_checks.resolve_parse_class_token_start_idx", lambda _path: 50000)
     run_dir = root / "outputs" / "graph" / "g" / "n"
     (run_dir / "checkpoints" / "epoch_0_step_1").mkdir(parents=True)
@@ -311,3 +311,9 @@ def test_resume_of_unresumable_model_starts_over(tmp_path: Path, monkeypatch: py
     kept = sorted(p.name.split(".not-resumable-")[0] for p in run_dir.glob("*.not-resumable-*"))
     assert kept == ["checkpoints", "metrics.jsonl"]
     assert (run_dir / workers.NOT_RESUMABLE_MARKER).exists()  # executor: never offer "resume" for this run dir
+
+
+def test_parse_resumes_since_patch_0005() -> None:
+    """BUG-003 closed (26.08-6): no model starts over anymore; the error card offers "resume" again for Parse."""
+    assert frozenset() == workers.RESUME_UNSUPPORTED
+    assert workers.DEFAULT_TRAIN_IMAGE == "vlm-automodel:26.08-6"
