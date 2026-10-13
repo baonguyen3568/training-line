@@ -119,3 +119,14 @@ Dựa trên recipe chính chủ (`qwen3_5_9b.yaml`, `qwen3_8_27b_lora.yaml`), ch
 
 ## Nguồn
 Xem `.team/knowledge/research.md` §Nguồn; P008 Phụ lục A.1; `.team/security-reviews/2026-10-12-nemotron-3-nano-omni.md`.
+
+### B-4 probe FP8 (research, 2026-10-13): ModelOpt 0.44 trong image 26.08-5 ĐỦ cho Qwen3.5 FP8
+Run `outputs/runs/20261013-0937-b4-fp8-probe-q35-08b-b28b`, script `scripts/research/probe_modelopt_fp8.py`. Qwen3.5-0.8B; calib 32 ảnh CORD train; parity 8 ảnh CORD val, 96 token.
+- `mtq.quantize(FP8_DEFAULT_CFG)` + `export_hf_checkpoint` chạy OK với transformers 5.12.1, dù ModelOpt cảnh báo "transformers>=5.0 support is experimental".
+  - 890 quantizer. Giữ bf16: lm_head, `model.visual*`, `linear_attn.conv1d` (lớp Gated DeltaNet, ModelOpt tự loại).
+- Parity so với bf16 (teacher-forced trên câu trả lời của bf16): top-1 khớp trung bình **96.1%** (thấp nhất 92.5%), KL trung bình **0.0087** (cao nhất 0.013). Greedy exact 0/8 ở 96 token: dự kiến, vì 1 token khác là hai chuỗi tách nhau, nên **không dùng exact-match làm gate**.
+- Dung lượng 1.77 → **1.23 GB**. Model 0.8B có embeddings + vision lớn so với phần còn lại; model 2–4B sẽ giảm nhiều hơn. Peak GPU 6.3 GB. Calib 29 s, export 14 s.
+- **Pitfall:** lần đầu chạy, `modelopt_cuda_ext_fp8` JIT-compile bằng nvcc mất ~3 phút ⇒ image cho node Nén phải build sẵn extension này (hoặc cache TORCH_EXTENSIONS_DIR).
+- **Pitfall:** ModelOpt ≥0.44 có `quant_cfg` dạng **list** (entry sau thắng), không phải dict.
+- ⇒ **Chưa cần image ModelOpt 0.47** cho FP8 Qwen3.5. Còn mở: vLLM 0.31 load checkpoint này (nhờ fixcode trong B-7); Parse (remote code, encoder-decoder) FP8 là spike riêng (P-5).
+- Gate đề xuất cho node: sanity = top-1 ≥ 0.95 và KL ≤ 0.02 trên ảnh val (rẻ); gate người dùng = `quant_gate` (Δ benchmark, configs/eval/gates.yaml).
