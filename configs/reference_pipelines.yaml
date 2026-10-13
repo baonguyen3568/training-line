@@ -44,7 +44,7 @@ pipelines:
     template_id: image_video_understanding
     status: available
     difficulty: basic
-    title: {vi: "Hiểu ảnh và video (Qwen3.5-2B)", en: "Images & video (Qwen3.5-2B)"}
+    title: {vi: "Hiểu ảnh (Qwen3.5-2B)", en: "Image understanding (Qwen3.5-2B)"}  # video: roadmap (PM 2026-10-13)
     source_url: https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/qwen3_5
     publisher: "NVIDIA"
     license: {code: apache-2.0, model: apache-2.0, data: null}
@@ -157,7 +157,8 @@ pipelines:
   - id: curator-image-curation
     kind: external
     template_id: null
-    status: reference_only  # Curator on arm64 / GB10 not verified yet
+    status: reference_only  # 1.0: rebuilt with app CPU nodes (filter + dedupe); Curator itself when its container
+    # and the models it downloads (.pt embedding / aesthetic / NSFW) are vetted (PM + security 2026-10-13)
     difficulty: advanced
     title: {vi: "Lọc và khử trùng ảnh (NVIDIA NeMo Curator)", en: "Image filtering & dedup (NVIDIA NeMo Curator)"}
     source_url: https://github.com/NVIDIA-NeMo/Curator/tree/main/tutorials/image
