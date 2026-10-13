@@ -122,4 +122,35 @@ describe("StoragePanel", () => {
     await waitFor(() => expect(screen.getByText(/scripts\/cleanup\/cache.py/)).toBeTruthy());
     expect(screen.getByRole("alert").textContent).toContain("Cần quản trị viên duyệt");
   });
+
+  it("lists a broken eval dataset (source eval_data, G-5) as a dataset item it can delete", async () => {
+    const { api } = await import("../src/api");
+    const real = await api.storagePlan("vi");
+    const first = real.items.find((i) => i.section === "auto") ?? real.items[0];
+    if (!first) throw new Error("sample plan has no items");
+    const evalItem = {
+      ...first,
+      item_id: "eval:ocrbench",
+      source: "eval_data" as const,
+      section: "auto" as const,
+      group: "dataset",
+      node_base: null,
+      display_name: null,
+      display_key: "storage.item.eval_data_unfinished",
+      display_params: { dataset: "OCRBench" },
+      size_gb: 1.2,
+      confirm_required: false,
+      protected_reason: null,
+      action: "delete" as const,
+    };
+    vi.spyOn(api, "storagePlan").mockResolvedValue({ ...real, items: [...real.items, evalItem] });
+    const { container } = await setup();
+    const r = row(container, "eval:ocrbench");
+    expect(r).toBeTruthy();
+    expect(r.querySelector("input[type=checkbox]")).not.toBeNull(); // regenerable, no typed confirmation
+    expect(r.textContent).toContain("Dữ liệu"); // storage.group.dataset
+    // copy or not, the row names the dataset and never shows the internal id (design)
+    expect(r.textContent).toContain("OCRBench");
+    expect(r.textContent).not.toContain("eval:ocrbench");
+  });
 });

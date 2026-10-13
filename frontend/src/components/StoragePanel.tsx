@@ -28,7 +28,11 @@ function filled(path: string[], params: Params): string | undefined {
 
 function itemLabel(item: StorageItem): string {
   if (item.display_name) return untrustedText(item.display_name, 80);
-  return filled(item.display_key.split("."), item.display_params) ?? item.item_id;
+  const copy = filled(item.display_key.split("."), item.display_params);
+  if (copy) return copy;
+  // no copy for this key yet: the thing's own name (e.g. an eval dataset), never an internal id like "eval:<name>"
+  const named = item.display_params.dataset ?? item.display_params.name;
+  return named !== undefined ? untrustedText(String(named), 80) : item.item_id;
 }
 
 function consequence(item: StorageItem): string | undefined {
