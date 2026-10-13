@@ -11,8 +11,11 @@ Pure Python, host-safe.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 HME = "HME100k"
@@ -96,3 +99,50 @@ def score_samples(rows: Sequence[dict[str, Any]], *, fold_fullwidth: bool = Fals
         recognition=sum(by_type[t] for t in RECOGNITION_TYPES),
         by_type=by_type,
     )
+
+
+SUBSET_PATH = Path(__file__).resolve().parents[3] / "configs" / "eval" / "subsets" / "regression_500" / "ocrbench.json"
+
+
+def load_subset(questions: Sequence[str], path: Path = SUBSET_PATH) -> list[int]:
+    """Row indices of the committed regression subset (P002 B5: 500 questions, stratified by question_type, seeded).
+
+    Level "quick". Each row's question must hash to the stored ``q_sha256`` (first 16 hex of sha256): a reordered or
+    different dataset revision fails instead of silently scoring other questions. Not comparable with model cards.
+    """
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    rows = [int(s["row"]) for s in spec["samples"]]
+    for sample in spec["samples"]:
+        row = int(sample["row"])
+        if row >= len(questions):
+            raise ValueError(f"subset row {row} beyond the dataset ({len(questions)} rows)")
+        if hashlib.sha256(questions[row].encode()).hexdigest()[:16] != sample["q_sha256"]:
+            raise ValueError(f"subset row {row}: question differs from the pinned revision (reordered dataset?)")
+    return rows
+
+
+def paired_accuracy(
+    candidate: Sequence[int], reference: Sequence[int], *, resamples: int = 1000, seed: int = 0
+) -> dict[str, Any]:
+    """Accuracy(candidate) - accuracy(reference) in points (0-100) on the same samples, 95% bootstrap CI over samples.
+
+    For the quant gate (FP8 vs its bf16 parent, P002 B3): per-sample 0/1 scores of both runs, in the same order.
+    """
+    import random
+
+    if len(candidate) != len(reference) or not candidate:
+        raise ValueError("paired comparison needs two non-empty score lists of the same length")
+    n = len(candidate)
+    rng = random.Random(seed)  # noqa: S311 - statistics, seeded for reproducibility
+    diffs = []
+    for _ in range(resamples):
+        idx = [rng.randrange(n) for _ in range(n)]
+        diffs.append(100 * (sum(candidate[i] for i in idx) - sum(reference[i] for i in idx)) / n)
+    diffs.sort()
+    return {
+        "delta": round(100 * (sum(candidate) - sum(reference)) / n, 2),
+        "ci95": [round(diffs[int(0.025 * resamples)], 2), round(diffs[int(0.975 * resamples) - 1], 2)],
+        "n": n,
+        "resamples": resamples,
+        "seed": seed,
+    }

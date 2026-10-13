@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -53,3 +54,47 @@ def test_score_samples_aggregates_like_the_reference() -> None:
 def test_unknown_question_type_is_refused() -> None:
     with pytest.raises(ValueError, match="question_type"):
         score_samples([{"prediction": "a", "answer": "a", "dataset": "x", "question_type": "Riddles"}])
+
+
+def test_committed_subset_is_500_rows_stratified_like_the_set() -> None:
+    import json
+    from collections import Counter
+
+    from vlm_pipeline.eval.ocrbench import SUBSET_PATH
+
+    spec = json.loads(SUBSET_PATH.read_text())
+    assert spec["revision"] == "92a54bd1384387c178d5a07140a2d85e0a3d12e1"  # the catalog pin
+    assert len({s["row"] for s in spec["samples"]}) == 500
+    assert Counter({t: v["sampled"] for t, v in spec["strata"].items()}) == {t: n // 2 for t, n in TYPE_TOTALS.items()}
+
+
+def test_subset_detects_a_reordered_dataset(tmp_path: Path) -> None:
+    import hashlib
+    import json
+
+    from vlm_pipeline.eval.ocrbench import load_subset
+
+    questions = ["what is written?", "what is the total?", "read the number"]
+    sample = [{"row": 1, "q_sha256": hashlib.sha256(questions[1].encode()).hexdigest()[:16]}]
+    path = tmp_path / "subset.json"
+    path.write_text(json.dumps({"samples": sample}))
+    assert load_subset(questions, path) == [1]
+    with pytest.raises(ValueError, match="differs"):
+        load_subset(questions[1:] + questions[:1], path)  # rotated: row 1 is now another question
+    with pytest.raises(ValueError, match="beyond"):
+        load_subset(questions[:1], path)
+
+
+def test_paired_accuracy_delta_and_ci() -> None:
+    from vlm_pipeline.eval.ocrbench import paired_accuracy
+
+    ref = [1] * 80 + [0] * 20  # 80%
+    cand = [1] * 75 + [0] * 25  # 75%: 5 regressions, no gain
+    result = paired_accuracy(cand, ref)
+    assert result["delta"] == -5.0
+    low, high = result["ci95"]
+    assert low <= -5.0 <= high
+    assert high <= 0  # only regressions: the CI cannot reach a gain
+    assert paired_accuracy(ref, ref)["ci95"] == [0.0, 0.0]
+    with pytest.raises(ValueError, match="same length"):
+        paired_accuracy([1], [1, 0])
