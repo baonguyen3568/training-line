@@ -68,7 +68,7 @@ def test_hub_dataset_pinned(tmp_path: Path) -> None:
     ref = limited.outputs["dataset"]
     assert ref.hash.endswith("#limit=100")
     snapshot = f"/workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/{rev}"
-    got = w._dataset_input(ref)
+    got = w.dataset_input(ref)
     assert (got.path, got.split, got.limit) == (snapshot, "train", 100)
 
 
@@ -81,7 +81,7 @@ def test_split_uses_the_official_validation_split_and_keeps_cache_keys(tmp_path:
     w = RealWorker(root)
     src = w.run(_job("data.hf_load", {"repo": "naver-clova-ix/cord-v2", "max_samples": 100}, root / "a"))
     out = w.run(_job("data.split", {}, root / "b", {"dataset": src.outputs["dataset"]})).outputs
-    train, val = w._dataset_input(out["train"]), w._dataset_input(out["val"])
+    train, val = w.dataset_input(out["train"]), w.dataset_input(out["val"])
     assert (train.split, train.limit, val.split, val.limit) == ("train", 100, "validation", 0)
     assert out["train"].hash == src.outputs["dataset"].hash  # train split = the loaded data: same cache key
     assert out["val"].hash == f"naver-clova-ix/cord-v2@{rev}#split=validation"
@@ -419,3 +419,42 @@ def test_eval_of_an_untraceable_checkpoint_runs_nothing(tmp_path: Path, monkeypa
     with pytest.raises(workers.UnknownModelError):
         w.run(_job("eval.benchmarks", {}, root / "outputs" / "graph" / "runs" / "e-3",
                    {"model": ArtifactRef("Checkpoint", str(ckpt), "lost:cfg")}))  # fmt: skip
+
+
+def test_local_folder_split_and_train_use_meta_datasets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pil = pytest.importorskip("PIL.Image")
+    root = _root(tmp_path)
+    data = root / "data" / "mine"
+    data.mkdir(parents=True)
+    lines = []
+    for i in range(40):
+        pil.new("RGB", (32, 24)).save(data / f"r{i}.png")
+        lines.append(json.dumps({"image": f"r{i}.png", "target": {"total": str(i)}}))
+    (data / "labels.jsonl").write_text("\n".join(lines) + "\n")
+    w = RealWorker(root)
+    src = w.run(_job("data.local_folder", {"path": "data/mine"}, root / "outputs" / "graph" / "runs" / "lf"))
+    parts = w.run(_job("data.split", {"val_fraction": 0.2, "seed": 3}, root / "outputs" / "graph" / "runs" / "sp",
+                       {"dataset": src.outputs["dataset"]})).outputs  # fmt: skip
+    assert parts["train"].hash.startswith("local:")
+    assert "#split=train#val=0.2#seed=3" in parts["train"].hash
+    monkeypatch.setattr("vlm_pipeline.train.recipe_checks.resolve_parse_class_token_start_idx", lambda _p: 50000)
+    monkeypatch.setattr(
+        workers, "run_job", lambda job, m, d, **kw: m.model_copy(update={"status": RunStatus.COMPLETED, "exit_code": 0})
+    )
+    parse = w.catalog.get("nemotron-parse-v1.1")
+    assert parse is not None
+    base = ArtifactRef("Model", str(root / "m"), f"{parse.repo}@{parse.revision}")
+    run_dir = root / "outputs" / "graph" / "runs" / "t"
+    w.run(
+        _job("train.sft_vlm", {}, run_dir, {"base_model": base, "train_data": parts["train"], "val_data": parts["val"]})
+    )
+    cfg = (run_dir / "config.yaml").read_text()
+    assert cfg.count("make_meta_dataset") == 2
+    assert "/workspace/outputs/graph/runs/t/data/train.meta.json" in cfg
+    train_lines = (run_dir / "data" / "train.jsonl").read_text().splitlines()
+    val_lines = (run_dir / "data" / "validation.jsonl").read_text().splitlines()
+    assert len(train_lines) + len(val_lines) == 40
+    first = json.loads(train_lines[0])
+    assert first["messages"][1]["content"].startswith("<s_total>")  # Parse: json2token target
+    meta = json.loads((run_dir / "data" / "train.meta.json").read_text())
+    assert meta["train"]["media_dir"] == "/workspace/data/mine"

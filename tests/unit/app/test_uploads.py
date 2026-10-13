@@ -13,8 +13,8 @@ from fastapi.testclient import TestClient
 from vlm_pipeline.app import uploads
 from vlm_pipeline.app.main import create_app
 from vlm_pipeline.app.services import DefaultServices
+from vlm_pipeline.common.image_rules import MAX_IMAGE_BYTES
 from vlm_pipeline.graph.testing import make_test_registry
-from vlm_pipeline.serve.trial import MAX_IMAGE_BYTES
 
 PIL = pytest.importorskip("PIL")
 from PIL import Image  # noqa: E402

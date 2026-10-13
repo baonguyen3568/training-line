@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -45,6 +46,12 @@ class NotCachedError(VlmPipelineError):
     """A model or dataset is not in the project cache; jobs run offline, so it must be downloaded first."""
 
     code: ClassVar[str] = "NET-001"
+
+
+class LocalDatasetInvalidError(VlmPipelineError):
+    """The user's dataset folder has lines/images that cannot be used (all problems listed in problems.json)."""
+
+    code: ClassVar[str] = "DATA-006"
 
 
 class TrainModeUnsupportedError(VlmPipelineError):
@@ -100,10 +107,10 @@ class RealWorker:
         return image_digest(self.image) or "unknown"
 
     # ------------------------------------------------------------------------------------------ helpers
-    def _container_path(self, host_path: Path) -> str:
+    def container_path(self, host_path: Path) -> str:
         return f"{CONTAINER_ROOT}/{host_path.resolve().relative_to(self.root).as_posix()}"
 
-    def _host_path(self, path: str) -> Path:
+    def host_path(self, path: str) -> Path:
         """Artifact paths are host paths; container paths (older entries) are mapped back."""
         if path.startswith(CONTAINER_ROOT + "/"):
             return self.root / path.removeprefix(CONTAINER_ROOT + "/")
@@ -123,6 +130,7 @@ class RealWorker:
             "model.hf_pick": self._model_pick,
             "data.hf_load": self._hub_dataset,
             "data.split": self._split,
+            "data.local_folder": self._local_folder,
             "train.lora_vlm": self._train,
             "train.sft_vlm": self._train,
             "train.merge_lora": self._merge_lora,
@@ -160,11 +168,11 @@ class RealWorker:
             return path
         return _hub_snapshot(self.root, entry.repo, entry.revision, "model")
 
-    def _base_of(self, model: ArtifactRef) -> CatalogEntry:
+    def base_of(self, model: ArtifactRef) -> CatalogEntry:
         """Catalog model a Model/Checkpoint artifact comes from: itself, or the base recorded in its run.json."""
         if "@" in model.hash.split(":", 1)[0]:
             return self._entry_for(model)
-        path = self._host_path(model.path).resolve()
+        path = self.host_path(model.path).resolve()
         outputs = self.root / "outputs"
         within = [d for d in (path, *path.parents) if d.is_relative_to(outputs) and d != outputs]  # never above
         run_dir = next((d for d in within if (d / "run.json").is_file()), None)
@@ -179,11 +187,11 @@ class RealWorker:
         from vlm_pipeline.eval.node_worker import EvalJobFailed, EvalRequest, ModelRef, run_eval_benchmarks
 
         model = job.inputs["model"]
-        entry = self._base_of(model)
+        entry = self.base_of(model)
         base_path = self._catalog_model_path(entry)
         request = EvalRequest(
             root=self.root, node_id=job.node_id, params=job.params,  # type: ignore[arg-type]
-            model=ModelRef(self._host_path(model.path), model.hash),
+            model=ModelRef(self.host_path(model.path), model.hash),
             base=ModelRef(base_path.resolve(), f"{entry.repo}@{entry.revision}"),
             entry=entry, run_dir=job.run_dir.resolve(), image=self.image, who=self.who,
             cancel=job.cancel, on_wait=job.on_wait,
@@ -206,18 +214,47 @@ class RealWorker:
         path = _hub_snapshot(self.root, repo, revision, "dataset")
         limit = int(getattr(job.params, "max_samples", 0) or 0)
         # The artifact is a small descriptor (snapshot + split + sample limit), so "quick run" sizes cost no copy.
-        ref = DatasetRef(repo=repo, revision=revision, path=self._container_path(path), limit=limit)
+        ref = DatasetRef(repo=repo, revision=revision, path=self.container_path(path), limit=limit)
         return NodeResult(outputs={"dataset": self._dataset_artifact(job.run_dir / "dataset.json", ref)})
 
     def _dataset_artifact(self, path: Path, ref: DatasetRef) -> ArtifactRef:
         write_dataset_ref(path, ref)
         return ArtifactRef(type="Dataset", path=str(path.resolve()), hash=ref.hash)
 
-    def _dataset_input(self, ref: ArtifactRef) -> DatasetRef:
+    def dataset_input(self, ref: ArtifactRef) -> DatasetRef:
         """The descriptor behind a Dataset artifact (a plain folder reads as all of it, train split)."""
         if ref.path.endswith(".json"):
-            return read_dataset_ref(self._host_path(ref.path))
-        return DatasetRef(path=self._container_path(self._host_path(ref.path)))
+            return read_dataset_ref(self.host_path(ref.path))
+        return DatasetRef(path=self.container_path(self.host_path(ref.path)))
+
+    def _local_folder(self, job: NodeJob) -> NodeResult:
+        """User folder of images + labels.jsonl -> checked, normalized records (B-3b). Host, CPU only."""
+        from vlm_pipeline.common.local_records import write_records
+        from vlm_pipeline.data.local_folder import scan_folder
+
+        params = job.params
+        folder = (self.root / str(getattr(params, "path"))).resolve()  # noqa: B009 - LocalPath (SEC-001 validated)
+        if not folder.is_relative_to(self.root) or not folder.is_dir():
+            missing = {"node": job.node_id, "problem_count": 1, "first_line": 0, "first_reason": "labels_missing"}
+            raise LocalDatasetInvalidError("dataset folder missing", params=missing)
+        scan = scan_folder(folder, max_samples=int(getattr(params, "max_samples", 0) or 0),
+                           max_image_side_px=int(getattr(params, "max_image_side_px", 4096)))  # fmt: skip
+        job.run_dir.mkdir(parents=True, exist_ok=True)
+        if scan.problem_count:
+            (job.run_dir / "problems.json").write_text(json.dumps(scan.problems, ensure_ascii=False, indent=1))
+            first = scan.problems[0]
+            raise LocalDatasetInvalidError(
+                f"{scan.problem_count} unusable line(s) in labels.jsonl",
+                params={"node": job.node_id, "problem_count": scan.problem_count, "first_line": first["line"],
+                        "first_reason": first["reason"]},
+            )  # fmt: skip
+        records = job.run_dir / "records.jsonl"
+        sha = write_records(records, scan.records)
+        ref = DatasetRef(
+            path=self.container_path(folder), split="all", records=self.container_path(records), records_sha256=sha,
+            seed=int(getattr(params, "seed", 0)),
+        )  # fmt: skip
+        return NodeResult(outputs={"dataset": self._dataset_artifact(job.run_dir / "dataset.json", ref)})
 
     def _split(self, job: NodeJob) -> NodeResult:
         """Train / val of a dataset; held-out test splits never appear.
@@ -225,7 +262,18 @@ class RealWorker:
         Hub datasets with an official validation split use it (results stay comparable with published numbers);
         ``val_fraction`` applies to data without one.
         """
-        src = self._dataset_input(job.inputs["dataset"])
+        src = self.dataset_input(job.inputs["dataset"])
+        if src.records:  # local data: stable hash split, recorded so run.json can reproduce it
+            fraction, seed = float(getattr(job.params, "val_fraction")), int(getattr(job.params, "seed"))  # noqa: B009
+            rule = {"val_fraction": fraction, "seed": seed}
+            return NodeResult(
+                outputs={
+                    "train": self._dataset_artifact(job.run_dir / "train.json",
+                                                    src.model_copy(update={"split": "train", **rule})),
+                    "val": self._dataset_artifact(job.run_dir / "val.json",
+                                                  src.model_copy(update={"split": "validation", "limit": 0, **rule})),
+                }
+            )  # fmt: skip
         entry = next((d for d in load_dataset_catalog().datasets if src.repo and d.repo == src.repo), None)
         if entry is None or "validation" not in entry.splits or "validation" in entry.heldout_splits:
             raise NodeNotRunnableError(  # local folders: fraction split comes with data.local_folder (B-3)
@@ -257,31 +305,34 @@ class RealWorker:
         if entry.loss == "nemotron_parse":
             from vlm_pipeline.train.recipe_checks import resolve_parse_class_token_start_idx
 
-            class_token = resolve_parse_class_token_start_idx(self._host_path(base.path))
+            class_token = resolve_parse_class_token_start_idx(self.host_path(base.path))
         run_dir = job.run_dir.resolve()
         if entry.id in RESUME_UNSUPPORTED:
             _set_aside_checkpoints(run_dir, entry.id)
         (run_dir / "logs").mkdir(parents=True, exist_ok=True)
         if entry.id in RESUME_UNSUPPORTED:
             (run_dir / NOT_RESUMABLE_MARKER).touch()  # executor: no "resume" offer, warn on the next run
-        train = self._dataset_input(data)
-        val = self._dataset_input(job.inputs["val_data"]) if "val_data" in job.inputs else None
+        train = self.dataset_input(data)
+        val = self.dataset_input(job.inputs["val_data"]) if "val_data" in job.inputs else None
         template = load_template(template_path(self.root, entry))
         if val is not None and "validation_dataset" not in template:
             logger.warning("%s: template has no validation_dataset; the wired val_data is not used", entry.id)
         source = next((d for d in load_dataset_catalog().datasets if train.repo and d.repo == train.repo), None)
         no_val_split = source is None or "validation" not in source.splits or "validation" in source.heldout_splits
+        train_meta, val_meta = self._local_meta(run_dir, entry, train, val)
         recipe = build_recipe(
             template,
             params,
-            model_dir=self._container_path(self._host_path(base.path)),
+            model_dir=self.container_path(self.host_path(base.path)),
             dataset_dir=train.path,
             train_limit=train.limit or None,
             train_split=train.split,
             val_dataset_dir=val.path if val else None,
             val_split=val.split if val else None,
             drop_validation=val is None and no_val_split,
-            run_dir=self._container_path(run_dir),
+            train_meta=train_meta,
+            val_meta=val_meta,
+            run_dir=self.container_path(run_dir),
             class_token_start_idx=class_token,
         )
         text = render_recipe(recipe)
@@ -296,7 +347,7 @@ class RealWorker:
             base_model=entry.repo,
             base_model_revision=entry.revision,
             dataset=data.hash,
-            config_path=self._container_path(run_dir / "config.yaml"),
+            config_path=self.container_path(run_dir / "config.yaml"),
             config_hash=config_hash,
             seed=params.seed,
             container_image=self.image,
@@ -304,7 +355,7 @@ class RealWorker:
         container = ContainerJob(
             name=run_id,
             image=self.image,
-            argv=("automodel", self._container_path(run_dir / "config.yaml"), "--nproc-per-node", "1"),
+            argv=("automodel", self.container_path(run_dir / "config.yaml"), "--nproc-per-node", "1"),
             workdir="/opt/Automodel",
             env=_trainable_env(entry, params),
         )
@@ -338,9 +389,31 @@ class RealWorker:
             from vlm_pipeline.train.ckpt_complete import complete_from_base
 
             # BUG-002: consolidation drops buffers (RADIO input conditioner) -> restore them from the base model.
-            complete_from_base(self._host_path(base.path), out)
+            complete_from_base(self.host_path(base.path), out)
         ref = ArtifactRef(type=out_type.type, path=str(out), hash=f"{run_id}:{config_hash}")
         return NodeResult(outputs={port: ref})
+
+    def _local_meta(
+        self, run_dir: Path, entry: CatalogEntry, train: DatasetRef, val: DatasetRef | None
+    ) -> tuple[str | None, str | None]:
+        """Local data -> model-specific make_meta_dataset files in the train run dir (container paths), else None."""
+        if not train.records:
+            return None, None
+        from vlm_pipeline.common.local_records import Family, read_records, select, write_meta_dataset
+
+        family: Family = "nemotron_parse" if entry.loss == "nemotron_parse" else "chat"
+        out = run_dir / "data"
+
+        def meta(ref: DatasetRef, name: str) -> str:
+            records = list(read_records(self.host_path(str(ref.records))))
+            chosen = select(records, part=ref.split, seed=ref.seed or 0, val_fraction=ref.val_fraction or 0.0,
+                            limit=ref.limit)  # fmt: skip
+            if not chosen:
+                empty = {"node": run_dir.name, "problem_count": 0, "first_line": 0, "first_reason": "no_samples"}
+                raise LocalDatasetInvalidError(f"no {name} samples after the split", params=empty)
+            return self.container_path(write_meta_dataset(out, name, chosen, family, media_dir=ref.path))
+
+        return meta(train, "train"), (meta(val, "validation") if val is not None and val.records else None)
 
     def _merge_lora(self, job: NodeJob) -> NodeResult:
         """LoRA adapter + its base -> one HF checkpoint (CPU job in the training image; B-1)."""
@@ -366,11 +439,11 @@ class RealWorker:
                 "-m",
                 "vlm_pipeline.train.merge_lora",
                 "--base",
-                self._container_path(self._host_path(base.path)),
+                self.container_path(self.host_path(base.path)),
                 "--adapter",
-                self._container_path(self._host_path(adapter.path)),
+                self.container_path(self.host_path(adapter.path)),
                 "--out",
-                self._container_path(out),
+                self.container_path(out),
                 "--auto-class",
                 entry.auto_class,
                 "--dtype",
@@ -394,7 +467,7 @@ class RealWorker:
         from vlm_pipeline.train.ckpt_complete import complete_from_base
 
         # Keys the HF class does not build (e.g. Qwen3.5 MTP head) are dropped on save: restore them from the base.
-        complete_from_base(self._host_path(base.path), out)
+        complete_from_base(self.host_path(base.path), out)
         return NodeResult(
             outputs={"model": ArtifactRef(type="Checkpoint", path=str(out), hash=f"{run_id}:{adapter.hash}")}
         )

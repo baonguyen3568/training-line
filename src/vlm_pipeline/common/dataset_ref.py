@@ -21,8 +21,13 @@ class DatasetRef(BaseModel):
     repo: str | None = None  # hub repo id; None for local data
     revision: str | None = None  # pinned hub revision
     path: str  # container path of the dataset snapshot / folder
-    split: str = "train"  # split of that dataset this artifact stands for
+    split: str = "train"  # split of that dataset this artifact stands for (local data: all | train | validation)
     limit: int = Field(0, ge=0)  # first N samples (0 = all)
+    # Local folder (data.local_folder): normalized records + the split rule (common.local_records), else None.
+    records: str | None = None  # container path of records.jsonl (written by the data node)
+    records_sha256: str | None = None  # identity of the content: same records = same data, whatever the path
+    val_fraction: float | None = None
+    seed: int | None = None
 
     @property
     def hash(self) -> str:
@@ -31,6 +36,11 @@ class DatasetRef(BaseModel):
         ``repo@rev[#split=x][#limit=n]``: the train split keeps the pre-split format (existing cache keys stay valid),
         and everything after the revision follows ``#`` (RunManifest reads the revision as ``@<40 hex>(#|$)``).
         """
+        if self.records_sha256:  # local data: content, split rule and size
+            rule = "" if self.split == "all" else f"#val={self.val_fraction}#seed={self.seed}"
+            return f"local:{self.records_sha256}#split={self.split}{rule}" + (
+                f"#limit={self.limit}" if self.limit else ""
+            )
         origin = f"{self.repo}@{self.revision}" if self.repo else self.path
         return (
             origin

@@ -121,8 +121,8 @@ def test_lora_output_is_loaded_on_its_base_with_the_run_pixels(tmp_path: Path) -
     )
     job = _job({"image": UID}, w.root / "run", ArtifactRef("Model", str(adapter), "ft-1:abc"))
     req, _ = build_request(w, job, w.root / "uploads" / f"{UID}.png")
-    assert req.model_dir == w._container_path(Path(base.path))
-    assert req.adapter_dir == w._container_path(adapter)
+    assert req.model_dir == w.container_path(Path(base.path))
+    assert req.adapter_dir == w.container_path(adapter)
     assert (req.min_pixels, req.max_pixels) == (100, 400)
     assert req.prompt == "Describe this image."
 

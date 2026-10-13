@@ -1,7 +1,7 @@
 """Images for the trial node ("Chạy thử", B-7): upload, fetch, and the node's result (bao-security + frontend contract).
 
 ``POST /api/uploads``: RAW body (no multipart parser). Content-Type is only a hint from an allowlist; the real format
-is decided by Pillow with a format allowlist at open (``serve.trial.open_image``: the same rules as the container).
+is decided by Pillow with a format allowlist at open (``common.image_rules.open_image``: the same rules everywhere).
 The image is decoded, EXIF-oriented, converted to RGB and RE-ENCODED as PNG (metadata dropped) into
 ``<root>/uploads/<uuid4 hex>.png`` (dir 0700, file 0600, temp files O_EXCL + O_NOFOLLOW, then ``os.replace``).
 The client's file name is only a display label (cleaned, never a path, never logged). Decoding runs in a thread pool,
@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from vlm_pipeline.common.errors import VlmPipelineError
-from vlm_pipeline.serve.trial import MAX_IMAGE_BYTES, TrialInputError, open_image
+from vlm_pipeline.common.image_rules import MAX_IMAGE_BYTES, ImageRuleError, open_image
 
 UPLOADS_DIR = "uploads"
 CONTENT_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
@@ -98,7 +98,7 @@ async def _receive(chunks: AsyncIterator[bytes], raw_tmp: Path) -> int:
 def _reencode(raw_tmp: Path, png_tmp: Path, final: Path) -> tuple[int, int, int]:
     try:
         img = open_image(raw_tmp)
-    except TrialInputError as exc:
+    except ImageRuleError as exc:
         raise UploadRejectedError(exc.reason) from None
     with os.fdopen(_open_excl(png_tmp), "wb") as fh:
         img.save(fh, format="PNG")  # a fresh PNG: no EXIF, no text chunks, no ICC

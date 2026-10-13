@@ -30,11 +30,46 @@ def template_path(project_root: Path, entry: CatalogEntry) -> Path:
     return path
 
 
+META_DATASET = "nemo_automodel.components.datasets.vlm.datasets.make_meta_dataset"
+
+
 def _section(recipe: dict[str, Any], key: str) -> dict[str, Any]:
     value = recipe.get(key)
     if not isinstance(value, dict):
         raise RecipeError(f"template has no {key!r} section")
     return value
+
+
+def _apply_data(
+    r: dict[str, Any], *, dataset_dir: str, train_limit: int | None, train_split: str | None,
+    val_dataset_dir: str | None, val_split: str | None, drop_validation: bool, train_meta: str | None,
+    val_meta: str | None,
+) -> None:  # fmt: skip
+    """Point the recipe's dataset sections at the wired data (see ``build_recipe``)."""
+    for key in ("dataset", "validation_dataset"):
+        if isinstance(r.get(key), dict):
+            r[key]["path_or_dataset"] = dataset_dir
+
+    if train_split and not train_meta:
+        _section(r, "dataset")["split"] = train_split
+    if train_meta:
+        r["dataset"] = {"_target_": META_DATASET, "path_or_dataset": train_meta}
+        if val_meta and isinstance(r.get("validation_dataset"), dict):
+            r["validation_dataset"] = {"_target_": META_DATASET, "path_or_dataset": val_meta}
+        elif not val_meta:
+            drop_validation = True
+    if drop_validation:
+        r.pop("validation_dataset", None)
+        r.pop("validation_dataloader", None)
+    sched = _section(r, "step_scheduler")
+    if "validation_dataset" in r and "ckpt_every_steps" in sched:
+        sched["val_every_steps"] = sched["ckpt_every_steps"]  # nodes count epochs, not steps: validate per checkpoint
+    if not train_meta and val_dataset_dir is not None and isinstance(r.get("validation_dataset"), dict):
+        r["validation_dataset"]["path_or_dataset"] = val_dataset_dir
+        if val_split:
+            r["validation_dataset"]["split"] = val_split
+    if train_limit and not train_meta:  # local data: the worker already cut the records
+        _section(r, "dataset")["limit_dataset_samples"] = train_limit  # "quick run" sizes of the data node
 
 
 def build_recipe(
@@ -50,6 +85,8 @@ def build_recipe(
     val_dataset_dir: str | None = None,
     val_split: str | None = None,
     drop_validation: bool = False,
+    train_meta: str | None = None,
+    val_meta: str | None = None,
 ) -> dict[str, Any]:
     """Return a new recipe dict (the template is not modified).
 
@@ -57,6 +94,9 @@ def build_recipe(
     ``data.split`` node); without them the template's own splits of ``dataset_dir`` are used.
     ``drop_validation``: no val data wired and the dataset has no validation split -> no validation at all (a
     template split that does not exist would crash the job).
+    ``train_meta`` / ``val_meta``: local data (container paths of ``make_meta_dataset`` meta files written by the
+    train worker from the data node's records); they replace the template's dataset sections, whatever their
+    loader (research: templates stay neutral about the data source).
     """
     import copy
 
@@ -64,24 +104,10 @@ def build_recipe(
     r.pop(DECODE_OVERRIDES_KEY, None)  # ours, not an AutoModel key: applied by the Eval / "Try it" nodes
     _section(r, "model")["pretrained_model_name_or_path"] = model_dir
     _section(r, "processor")["pretrained_model_name_or_path"] = model_dir
-    for key in ("dataset", "validation_dataset"):
-        if isinstance(r.get(key), dict):
-            r[key]["path_or_dataset"] = dataset_dir
-
-    if train_split:
-        _section(r, "dataset")["split"] = train_split
-    if drop_validation:
-        r.pop("validation_dataset", None)
-        r.pop("validation_dataloader", None)
-    sched = _section(r, "step_scheduler")
-    if "validation_dataset" in r and "ckpt_every_steps" in sched:
-        sched["val_every_steps"] = sched["ckpt_every_steps"]  # nodes count epochs, not steps: validate per checkpoint
-    if val_dataset_dir is not None and isinstance(r.get("validation_dataset"), dict):
-        r["validation_dataset"]["path_or_dataset"] = val_dataset_dir
-        if val_split:
-            r["validation_dataset"]["split"] = val_split
-    if train_limit:
-        _section(r, "dataset")["limit_dataset_samples"] = train_limit  # "quick run" sizes of the data node
+    _apply_data(
+        r, dataset_dir=dataset_dir, train_limit=train_limit, train_split=train_split, val_dataset_dir=val_dataset_dir,
+        val_split=val_split, drop_validation=drop_validation, train_meta=train_meta, val_meta=val_meta,
+    )  # fmt: skip
     sched = _section(r, "step_scheduler")
     sched["global_batch_size"] = params.global_batch_size
     sched["local_batch_size"] = params.local_batch_size

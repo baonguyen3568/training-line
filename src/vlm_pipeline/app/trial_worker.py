@@ -74,11 +74,11 @@ def _base_snapshot(worker: RealWorker, entry: CatalogEntry) -> Path:
     return _hub_snapshot(worker.root, entry.repo, entry.revision, "model").resolve()
 
 
-def _base_of(worker: RealWorker, ref: ArtifactRef) -> tuple[CatalogEntry, Path]:
+def base_of(worker: RealWorker, ref: ArtifactRef) -> tuple[CatalogEntry, Path]:
     """Catalog entry + host base snapshot of a model artifact (a catalog base, or the output of a fine-tune run)."""
     from vlm_pipeline.app.workers import UnknownModelError
 
-    model_path = worker._host_path(ref.path)
+    model_path = worker.host_path(ref.path)
     for entry in worker.catalog.models:
         if ref.hash == f"{entry.repo}@{entry.revision}":
             return entry, model_path
@@ -94,7 +94,7 @@ def _pixels(worker: RealWorker, entry: CatalogEntry, ref: ArtifactRef) -> tuple[
     """Processor min/max pixels exactly as the model was (or would be) trained."""
     import yaml
 
-    model_path = worker._host_path(ref.path)
+    model_path = worker.host_path(ref.path)
     run_cfg = next(
         (p / "config.yaml" for p in _parents_in(worker.root, model_path) if (p / "config.yaml").is_file()), None
     )
@@ -127,22 +127,22 @@ def build_request(worker: RealWorker, job: NodeJob, image: Path) -> tuple[TrialR
     params = job.params
     assert isinstance(params, InferenceParams)  # noqa: S101 - registry guarantees the params model
     ref = job.inputs["model"]
-    entry, base = _base_of(worker, ref)
-    model_path = worker._host_path(ref.path)
+    entry, base = base_of(worker, ref)
+    model_path = worker.host_path(ref.path)
     adapter = model_path if (model_path / "adapter_config.json").is_file() else None
     min_px, max_px = _pixels(worker, entry, ref)
     family = "nemotron_parse" if entry.loss == "nemotron_parse" else "chat"
     request = TrialRequest(
-        model_dir=worker._container_path(base if adapter else model_path),
-        generation_config_dir=worker._container_path(base),
-        processor_dir=worker._container_path(base),
+        model_dir=worker.container_path(base if adapter else model_path),
+        generation_config_dir=worker.container_path(base),
+        processor_dir=worker.container_path(base),
         family=family,
-        image=worker._container_path(image),
+        image=worker.container_path(image),
         prompt="" if entry.task_prompt_fixed else (params.prompt or "Describe this image."),
         max_new_tokens=params.max_tokens,
         temperature=params.temperature,
         top_p=params.top_p,
-        adapter_dir=worker._container_path(adapter) if adapter else None,
+        adapter_dir=worker.container_path(adapter) if adapter else None,
         min_pixels=min_px,
         max_pixels=max_px,
         attn=entry.attn,
@@ -179,7 +179,7 @@ def run_trial(worker: RealWorker, job: NodeJob) -> NodeResult:
     container = ContainerJob(
         name=run_id,
         image=worker.image,
-        argv=("python", "-m", "vlm_pipeline.serve.trial", worker._container_path(request_path)),
+        argv=("python", "-m", "vlm_pipeline.serve.trial", worker.container_path(request_path)),
         # bao-security: remote model code runs on a user's image -> the project is read-only, only this run's dir is
         # writable (result.json), and caches the job would write to the project go to the container's /tmp.
         read_only_project=True,
