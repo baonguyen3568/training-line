@@ -92,7 +92,7 @@ def test_latest_and_best_same_checkpoint_latest_wins(tmp_path: Path) -> None:
     assert item.action == "keep"  # LATEST rule (kept whole for 7 days) beats best-strip
 
 
-@pytest.mark.parametrize("status", ["queued", "running", "interrupted", "evicted"])
+@pytest.mark.parametrize("status", ["queued", "running", "evicted"])  # interrupted: its own 7-day rule (below)
 def test_unfinished_runs_are_never_touched(tmp_path: Path, status: str) -> None:
     _standard_run(tmp_path, status=status)
     assert set(_actions(tmp_path).values()) == {("keep", "RUN_NOT_FINISHED")}
@@ -283,6 +283,41 @@ def test_failed_and_cancelled_runs(
     _age_tree(run / "checkpoints", ended_days_ago)
     got = {k: action for k, (action, _blocked) in _actions(tmp_path).items()}
     assert got == expected
+
+
+@pytest.mark.parametrize(
+    ("ended_days_ago", "expected"),
+    [
+        (2, {"epoch_0_step_10": ("keep", "RUN_INTERRUPTED"), "epoch_0_step_30": ("keep", "RUN_INTERRUPTED")}),
+        (8, {"epoch_0_step_10": ("delete", None), "epoch_0_step_30": ("delete", None)}),  # then like failed
+    ],
+)
+def test_interrupted_run_is_resumable_for_seven_days_then_like_failed(
+    tmp_path: Path, ended_days_ago: float, expected: dict[str, tuple[str, str | None]]
+) -> None:
+    run = _run(tmp_path, "r1", status="interrupted", ended_days_ago=ended_days_ago)
+    for name in ("epoch_0_step_10", "epoch_0_step_30"):
+        _ckpt(run, name, age_days=ended_days_ago)
+    (run / "checkpoints" / "LATEST").symlink_to("epoch_0_step_30")
+    _age_tree(run / "checkpoints", ended_days_ago)
+    os.utime(run / "run.json", (NOW - ended_days_ago * DAY, NOW - ended_days_ago * DAY))
+    p = plan(tmp_path, now=NOW, lock_reader=no_lock)
+    items = {i.path.split("/")[-1]: i for r in p.runs for i in r.items}
+    assert {k: (i.action, i.blocked_by) for k, i in items.items()} == expected
+    assert items["epoch_0_step_10"].resume_until == NOW + (7 - ended_days_ago) * DAY
+    latest = items["epoch_0_step_30"]
+    if latest.action == "delete":  # the last checkpoint is never auto-deleted: a person confirms it
+        assert latest.consequence_code == "PERMANENT_LOSS"
+        assert items["epoch_0_step_10"].consequence_code is None
+
+
+def test_keep_still_wins_over_an_expired_interrupted_run(tmp_path: Path) -> None:
+    run = _run(tmp_path, "r1", status="interrupted", ended_days_ago=30)
+    _ckpt(run, "epoch_0_step_10", age_days=30)
+    _age_tree(run / "checkpoints", 30)
+    os.utime(run / "run.json", (NOW - 30 * DAY, NOW - 30 * DAY))
+    (run / "KEEP").touch()
+    assert _actions(tmp_path) == {"epoch_0_step_10": ("keep", "PINNED_OR_KEEP")}
 
 
 def _age_tree(path: Path, days: float) -> None:

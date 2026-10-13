@@ -19,6 +19,7 @@ from vlm_pipeline.artifacts.retention import CLEANUP_LOCK_REL
 from vlm_pipeline.artifacts.testing import FakeRunSpec, make_fake_run
 from vlm_pipeline.common.app_config import POLICY_REL, policy_path
 from vlm_pipeline.common.paths import GIB
+from vlm_pipeline.i18n import load as i18n_load
 
 KB = 1024
 
@@ -343,13 +344,55 @@ def test_threshold_counts_checkpoints_and_cache_together(tmp_path: Path) -> None
     assert (tmp_path / "outputs" / "runs" / "r-done" / "checkpoints" / "epoch_0_step_10").exists()
 
 
+def _interrupted(root: Path, run_id: str, days_ago: float, name: str = "") -> None:
+    run = root / "outputs" / "runs" / run_id
+    _ckpt(run, "epoch_0_step_10", days_ago)
+    (run / "checkpoints" / "LATEST").symlink_to("epoch_0_step_10")
+    (run / "run.json").write_text(
+        json.dumps({"run_id": run_id, "name": name, "status": "interrupted", "ended_at": time.time() - days_ago * DAY})
+    )
+    _aged(run, days_ago)
+
+
+def test_interrupted_run_is_kept_until_a_date_and_warned_a_day_before(
+    env: tuple[TestClient, ArtifactIndex, Path, Clock],
+) -> None:
+    client, _, root, _ = env
+    _interrupted(root, "r-soon", 6.5, name="train.lora_vlm Qwen3.5 2B")  # ~12 h left; app runs: "<node type> <entry>"
+    _interrupted(root, "r-script", 6.6, name="smoke p3b")  # not a node: its name is shown
+    _interrupted(root, "r-fresh", 1)  # 6 days left
+    body = client.get("/api/storage/plan", params={"locale": "vi"}).json()
+    items = {i["item_id"]: i for i in body["items"]}
+    soon = items["r-soon/checkpoints/epoch_0_step_10"]
+    assert (soon["section"], soon["lock_reason"]) == ("kept", "RUN_INTERRUPTED")
+    assert set(soon["lock_params"]) == {"run", "until"}
+    assert items["r-fresh/checkpoints/epoch_0_step_10"]["section"] == "kept"
+    script, soon = body["attention"]
+    title = i18n_load("vi")["node.train.lora_vlm.title"]
+    assert (soon["code"], soon["run_id"], soon["node"]) == ("RUN_INTERRUPTED_EXPIRING", "r-soon", title)
+    assert f'"{title}"' in soon["message"]
+    assert '"r-soon"' in soon["message"]
+    assert soon["resume_until"][11:16] in soon["message"]  # same HH:MM as the date the panel shows
+    assert script["node"] == "smoke p3b"
+
+
+def test_expired_interrupted_run_latest_needs_a_person(env: tuple[TestClient, ArtifactIndex, Path, Clock]) -> None:
+    client, _, root, _ = env
+    _interrupted(root, "r-old", 8)
+    body = client.get("/api/storage/plan", params={"locale": "en"}).json()
+    (item,) = [i for i in body["items"] if i["run_id"] == "r-old"]
+    assert (item["section"], item["consequence_code"], item["confirm_text"]) == ("manual", "PERMANENT_LOSS", "r-old")
+    assert body["attention"] == []
+
+
 @pytest.mark.parametrize("locale", ["vi", "en"])
 def test_every_retention_lock_reason_and_item_has_copy(locale: str) -> None:
     from vlm_pipeline.i18n import load
 
     texts = load(locale)
-    for reason in ("PINNED_OR_KEEP", "GPU_LOCK_HOLDER", "UNKNOWN_STATUS", "RUN_NOT_FINISHED"):
+    for reason in ("PINNED_OR_KEEP", "GPU_LOCK_HOLDER", "UNKNOWN_STATUS", "RUN_NOT_FINISHED", "RUN_INTERRUPTED"):
         assert f"storage.lock_reason.{reason}" in texts
+    assert "storage.attention.RUN_INTERRUPTED_EXPIRING" in texts
     for key in ("checkpoint_of_run", "set_aside_of_run"):
         assert f"storage.item.{key}" in texts
 

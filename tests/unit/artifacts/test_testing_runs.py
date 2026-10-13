@@ -49,6 +49,6 @@ def test_retention_understands_fixture_runs(tmp_path: Path) -> None:
     p = plan(tmp_path, lock_reader=lambda _p: None)
     blocked = {r.run_id: {i.blocked_by for i in r.items} for r in p.runs if r.items}
     assert blocked["demo-lora-running"] == {"RUN_NOT_FINISHED"}
-    assert blocked["demo-lora-interrupted"] == {"RUN_NOT_FINISHED"}
+    assert blocked["demo-lora-interrupted"] == {"RUN_INTERRUPTED"}  # resumable for 7 days (ADR-005, PM 2026-10-13)
     assert "UNKNOWN_STATUS" not in {b for v in blocked.values() for b in v}
     assert not (tmp_path / "outputs" / "runs" / "demo-lora-evicted" / "checkpoints").exists()

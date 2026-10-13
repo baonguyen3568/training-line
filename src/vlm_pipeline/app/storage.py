@@ -15,9 +15,11 @@ There is no endpoint that deletes an arbitrary path. Text for the user is render
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import shlex
+import stat
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -52,6 +54,7 @@ THRESHOLD_ENV = "VLM_STORAGE_APPROVAL_THRESHOLD_GB"
 
 PROFILE_ENV = "VLM_PROFILE"
 APPROVAL_WINDOW_S = 24 * 3600.0
+RESUME_WARN_S = 24 * 3600.0  # PM: warn a day before an interrupted run stops being kept for a resume
 
 
 @dataclass(frozen=True)
@@ -185,7 +188,7 @@ def _retention_item(item: retention.PlanItem, section: str, kept_bytes: int = 0)
         "action": item.action,
         "protected_reason": retention.CONFIRM_REASON if item.blocked_by == retention.CONFIRM_REASON else None,
         "lock_reason": item.blocked_by if kept else None,
-        "lock_params": {"run": item.run_id} if kept else {},
+        "lock_params": _lock_params(item) if kept else {},
         "regenerable": False,
         "consequence_code": item.consequence_code,
         "consequence_params": dict(item.consequence_params),
@@ -193,6 +196,62 @@ def _retention_item(item: retention.PlanItem, section: str, kept_bytes: int = 0)
         "confirm_text": item.run_id if confirm else None,
         "event_type": "checkpoint_pruned",
     }
+
+
+def _local_time(ts: float) -> str:
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(ts))
+
+
+def _lock_params(item: retention.PlanItem) -> dict[str, str]:
+    if item.blocked_by == retention.INTERRUPTED_REASON and item.resume_until is not None:
+        return {"run": item.run_id, "until": _local_time(item.resume_until)}
+    return {"run": item.run_id}
+
+
+RUN_JSON_MAX = 1 << 20
+_UNTIL_FORMAT = {"vi": "%H:%M %d/%m", "en": "%b %d, %H:%M"}  # short date + time in a sentence (bao-design)
+
+
+def _step_title(root: Path, item: retention.PlanItem, locale: str) -> str:
+    """Node title of the run (app runs are named ``"<node type> <entry>"``), else the run's name, else its id."""
+    run_json = root / item.runs_rel / item.run_id / "run.json"
+    name = ""
+    try:  # a job can rewrite its own run.json: a regular file only, read at most RUN_JSON_MAX bytes
+        st = run_json.lstat()
+        if stat.S_ISREG(st.st_mode) and st.st_size <= RUN_JSON_MAX:
+            name = str(json.loads(run_json.read_text(encoding="utf-8")).get("name") or "")[:200]
+    except (OSError, ValueError, AttributeError):
+        name = ""
+    key = f"node.{name.split(' ', 1)[0]}.title" if name else ""
+    return i18n.t(key, locale) if key in i18n.load(locale) else (name or item.run_id)
+
+
+def _resume_warnings(root: Path, items: list[retention.PlanItem], now: float, locale: str) -> list[dict[str, Any]]:
+    """One notice per interrupted run whose resume window ends within ``RESUME_WARN_S`` (ADR-005, PM 2026-10-13)."""
+    expiring = {
+        i.run_id: i
+        for i in items
+        if i.blocked_by == retention.INTERRUPTED_REASON
+        and i.resume_until is not None
+        and 0 < i.resume_until - now <= RESUME_WARN_S
+    }
+    notices = []
+    for run_id, item in sorted(expiring.items()):
+        until = item.resume_until or now
+        node = _step_title(root, item, locale)
+        text_until = time.strftime(_UNTIL_FORMAT.get(locale, _UNTIL_FORMAT["en"]), time.localtime(until))
+        notices.append(
+            {
+                "code": "RUN_INTERRUPTED_EXPIRING",
+                "run_id": run_id,
+                "node": node,
+                "resume_until": _local_time(until),
+                "message": i18n.t(
+                    "storage.attention.RUN_INTERRUPTED_EXPIRING", locale, node=node, run=run_id, until=text_until
+                ),
+            }
+        )
+    return notices
 
 
 @dataclass
@@ -233,9 +292,10 @@ class StorageApi:
             for item, reason in cache_retention.list_cache(self.root, self.index)
             if item.reclaim_bytes > 0
         ]
+        kept_or_actionable = self._retention_items()
         items += [
             _retention_item(item, section, self._kept_bytes(item) if section == "kept" else 0)
-            for item, section in self._retention_items()
+            for item, section in kept_or_actionable
         ]
         plan_id, expires = self.plans.add({i["item_id"]: i["source"] for i in items if i["section"] != "kept"})
         threshold = self.settings.approval_threshold_gb if self.settings.approval_policy == "threshold" else None
@@ -251,6 +311,7 @@ class StorageApi:
             "auto_reclaim_gb": round(p.reclaim_bytes / GIB, 3),
             "shortfall_gb": round(p.shortfall_bytes / GIB, 3),
             "items": items,
+            "attention": _resume_warnings(self.root, [i for i, _ in kept_or_actionable], time.time(), locale),
             "error": None,
         }
         if p.shortfall_bytes > 0:

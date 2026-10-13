@@ -9,7 +9,10 @@ planned the same way (no time-of-check/time-of-use gap), then logs ``checkpoint_
 Rules (first match wins, per checkpoint; statuses are ``common.runinfo.RunStatus``):
 1. run has a ``KEEP`` file, or is the run holding the GPU lock, or the lock is unreadable -> keep (blocked);
    a ``KEEP`` file inside one checkpoint directory pins only that checkpoint
-2. status is queued/running/interrupted/evicted -> keep (blocked); missing/unknown status -> keep (UNKNOWN_STATUS)
+2. status is queued/running/evicted -> keep (blocked); missing/unknown status -> keep (UNKNOWN_STATUS);
+   interrupted -> keep (``RUN_INTERRUPTED``, resumable) for ``interrupted_days`` after the run's last activity
+   (``resume_until`` on its items, the panel warns a day before), then handled like failed (rule 3: LATEST becomes
+   a PERMANENT_LOSS delete, by hand only) (PM 2026-10-13)
 3. failed/cancelled: nothing before ``failed_grace_days`` after the run's last activity; then ``.incomplete`` and
    non-LATEST checkpoints are deleted, and LATEST is deleted ``failed_latest_days`` after the last activity.
    Last activity = max(run.json ``ended_at``, run.json mtime, newest mtime under ``checkpoints/``), so a wrong or
@@ -104,6 +107,7 @@ class RetentionPolicy:
     failed_grace_days: float = 3.0  # failed/cancelled: untouched for this long after the run ended
     failed_latest_days: float = 7.0  # failed/cancelled: LATEST deleted (not stripped) after this long
     set_aside_days: float = 3.0  # *.not-resumable-<stamp> left by a restarted training (PM 2026-10-13)
+    interrupted_days: float = 7.0  # interrupted: resumable this long after the last activity, then like failed
     approval_threshold_gb: float = 20.0  # D7.4: above this the CLI needs --approved-by
     approval_window_s: float = DAY_S  # unapproved deletes are summed over this window (no splitting into batches)
 
@@ -125,6 +129,7 @@ class PlanItem:
     consequence_code: str | None = None  # i18n key storage.consequence.<code> (CONSEQUENCE_CODES)
     consequence_params: Mapping[str, str] = field(default_factory=dict)  # fills that text's placeholders
     runs_rel: str = RUNS_REL.as_posix()  # runs root the run dir lives in (GRAPH_RUNS_REL for node run dirs)
+    resume_until: float | None = None  # interrupted run: epoch seconds until which it is kept for a resume
 
     @property
     def item_id(self) -> str:
@@ -271,14 +276,18 @@ def _plan_checkpoint(  # noqa: PLR0911, PLR0912 - flat ADR-005 D3 decision table
     failed_ended_at: float | None,
     now: float,
     policy: RetentionPolicy,
+    resume_until: float | None = None,
 ) -> PlanItem:
-    """``failed_ended_at`` is the run's last activity, set only for failed/cancelled runs."""
+    """``failed_ended_at`` is the run's last activity, set only for failed/cancelled (and expired interrupted) runs."""
     rel = f"checkpoints/{ckpt.name}"
     age_days = (now - ckpt.lstat().st_mtime) / DAY_S
 
     def item(action: Action, nbytes: int, rule: str, reason: str, blocked_by: str | None = None) -> PlanItem:
         code, params = _consequence(run_id, ckpt.name, roles, action)
-        return PlanItem(run_id, rel, "checkpoint", tuple(roles), action, nbytes, rule, reason, blocked_by, code, params)
+        return PlanItem(
+            run_id, rel, "checkpoint", tuple(roles), action, nbytes, rule, reason, blocked_by, code, params,
+            resume_until=resume_until,
+        )  # fmt: skip
 
     if blocked is not None:
         return item("keep", 0, "D7.blocked", f"protected: {blocked}", blocked)
@@ -313,6 +322,7 @@ def _plan_checkpoint(  # noqa: PLR0911, PLR0912 - flat ADR-005 D3 decision table
 
 
 CONFIRM_REASON = "TRAINED_MODEL"  # blocked_by of items a person may still delete with a typed confirmation
+INTERRUPTED_REASON = "RUN_INTERRUPTED"  # blocked_by while an interrupted run may still be resumed
 
 
 def _superseded_at(run_dir: Path) -> float | None:
@@ -407,11 +417,17 @@ def plan(
             continue
         status, ended_at = read_run_status(run_dir)
         blocked = _blocked_reason(run_dir, run_dir.name, status, lock)
-        failed_ended_at = None
-        if status in FAILED_STATUSES:
+        failed_ended_at = resume_until = None
+        if status in FAILED_STATUSES or status == RunStatus.INTERRUPTED:
             failed_ended_at = max(
                 ended_at or 0.0, _newest_mtime(run_dir / "run.json"), _newest_mtime(run_dir / "checkpoints")
             )
+        if status == RunStatus.INTERRUPTED and failed_ended_at is not None:
+            resume_until = failed_ended_at + policy.interrupted_days * DAY_S
+            if blocked == "RUN_NOT_FINISHED":  # KEEP / the GPU lock still win
+                blocked = INTERRUPTED_REASON if ts < resume_until else None
+            if blocked is not None:
+                failed_ended_at = None  # still resumable (or protected): no failed rule applies
         ckpt_root = run_dir / "checkpoints"
         items: list[PlanItem] = []
         if ckpt_root.is_dir() and not ckpt_root.is_symlink():
@@ -428,6 +444,7 @@ def plan(
                         failed_ended_at=failed_ended_at,
                         now=ts,
                         policy=policy,
+                        resume_until=resume_until,
                     )
                 )
         items += _plan_set_aside(run_dir, RUNS_REL, lock, now=ts, policy=policy)

@@ -54,7 +54,9 @@ Sau khi lần chạy **thất bại hoặc bị huỷ**:
 
 - **3 ngày** đầu: không xoá gì, để bạn kiểm tra hoặc chạy tiếp.
 - Sau 3 ngày: xoá checkpoint lưu dở và các checkpoint không phải mới nhất.
-- Sau **7 ngày**: xoá cả checkpoint mới nhất.
+- Sau **7 ngày**: checkpoint mới nhất chuyển sang mục "Cần bạn chọn" trong panel Dung lượng. App không tự xoá nó, vì xoá rồi là mất vĩnh viễn.
+
+Lần chạy **bị gián đoạn** (mất điện, app tắt giữa chừng, thiếu bộ nhớ) được giữ nguyên **7 ngày** để bạn chạy tiếp từ checkpoint cuối. Trước khi hết hạn 1 ngày, panel Dung lượng nhắc bạn. Sau 7 ngày, app xử lý như lần chạy thất bại: dọn các checkpoint cũ, còn checkpoint mới nhất chỉ bị xoá khi bạn chọn.
 
 Thời gian được tính từ hoạt động cuối của lần chạy. Khi không chắc, app chọn **giữ lâu hơn**.
 

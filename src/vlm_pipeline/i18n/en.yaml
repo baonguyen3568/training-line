@@ -18,6 +18,9 @@ storage:
     WHITELIST: Run history (logs, metrics) is always kept.
     GPU_LOCK_HOLDER: This run is using the GPU (or the app can't read the GPU status yet), so it can't be deleted now. Try again after the run finishes.
     UNKNOWN_STATUS: The status of run "{run}" cannot be read, so the app keeps it to be safe.
+    RUN_INTERRUPTED: Run "{run}" was interrupted. Its checkpoints are kept until {until} so you can resume it; after that only the last one is kept.
+  attention:
+    RUN_INTERRUPTED_EXPIRING: Step "{node}" (run "{run}") was interrupted. Resume it before {until}; after that the app cleans up older checkpoints and keeps only the last one.
   consequence:
     WILL_REDOWNLOAD:
       default: Workflow "{workflow}" will need to download {gb} GB again next time.

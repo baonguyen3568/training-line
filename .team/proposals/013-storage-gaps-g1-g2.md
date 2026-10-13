@@ -70,6 +70,10 @@
   - `manual`: cần người chọn, gõ xác nhận khi `confirm_required`;
   - `kept`: chỉ hiển thị, kèm `lock_reason` + `lock_params` và `size_gb` (dung lượng đang bị giữ, đo bằng du), không nằm trong `plan_id`.
 
+- `attention[]` (2026-10-13, ADR-005 bổ sung interrupted): mỗi run bị gián đoạn còn ≤ 24 giờ để chạy tiếp có 1 mục
+  `{code: "RUN_INTERRUPTED_EXPIRING", run_id, resume_until, hours_left, message}`. Item `kept` của run đó có
+  `lock_reason: "RUN_INTERRUPTED"`, `lock_params: {run, until}`.
+
 Frontend tự nhóm theo `section`. Ví dụ thật lấy từ code: `013-annex-storage-plan.v3.sample.json`.
 
 Trường theo nguồn (khác v2):
