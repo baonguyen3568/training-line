@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from vlm_pipeline.common.image_rules import ImageRuleError, probe_image
-from vlm_pipeline.common.local_records import Record
+from vlm_pipeline.common.local_records import Record, image_name_ok
 
 LABELS_FILE = "labels.jsonl"
 MAX_LABELS_BYTES = 50 * 1024 * 1024
@@ -44,9 +45,20 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def normalize_image_name(name: str) -> str | None:
+    """The image name as stored: ``./a.png`` -> ``a.png``, ``a//b.png`` -> ``a/b.png`` (how people write names).
+
+    None if the result still breaks the Record rule (``../x``, ``/etc/x``, ``a/../../x``...).
+    """
+    if not name or name.startswith(("/", "~")) or "\\" in name:
+        return None
+    norm = posixpath.normpath(name)
+    return norm if image_name_ok(norm) else None
+
+
 def _image_path(folder: Path, name: str) -> Path | None:
-    """The file ``name`` inside ``folder`` (no absolute path, no ``..``, no escape through a symlinked dir)."""
-    if not name or name.startswith(("/", "~")) or "\\" in name or ".." in Path(name).parts:
+    """The file ``name`` (already normalized) inside ``folder`` (no escape through a symlinked dir either)."""
+    if not image_name_ok(name):  # the Record rule: what fails here would fail Record validation later
         return None
     path = folder / name
     return path if path.resolve().is_relative_to(folder) else None
@@ -78,8 +90,9 @@ def _check_line(  # noqa: PLR0911 - flat check table, one early return per rule 
         return "not_json", None
     if not isinstance(item, dict) or set(item) - {"image", "target", "prompt"}:
         return "bad_keys", None
-    name, target, prompt = item.get("image"), item.get("target"), item.get("prompt")
-    if not isinstance(name, str) or (path := _image_path(folder, name)) is None:
+    raw_name, target, prompt = item.get("image"), item.get("target"), item.get("prompt")
+    name = normalize_image_name(raw_name) if isinstance(raw_name, str) else None
+    if name is None or (path := _image_path(folder, name)) is None:
         return "bad_image_name", None
     if not _target_ok(target):
         return "empty_target", name

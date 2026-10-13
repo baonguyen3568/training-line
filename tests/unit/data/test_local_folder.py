@@ -100,3 +100,18 @@ def test_non_utf8_labels_are_line_problems_not_a_crash(tmp_path: Path, encoding:
     assert res.records == []
     assert {p["reason"] for p in res.problems} == {"not_json"}
     assert res.problems[0]["line"] == 1
+
+
+def test_names_are_normalized_or_refused_never_a_crash(tmp_path: Path) -> None:
+    """ "./a.png" / "a//b.png" are how people write names (backend): stored normalized. Escapes stay refused (R1)."""
+    names = ["./a.png", "sub//b.png", "a.png", "../a.png", "sub/../../a.png"]
+    lines = [{"image": n, "target": "t"} for n in names]
+    d = _folder(tmp_path, lines)
+    _img(d / "a.png")
+    (d / "sub").mkdir()
+    _img(d / "sub" / "b.png")
+    res = scan_folder(d)
+    assert [r.image for r in res.records] == ["a.png", "sub/b.png"]
+    assert [(p["line"], p["reason"]) for p in res.problems] == [
+        (3, "duplicate_image"), (4, "bad_image_name"), (5, "bad_image_name")
+    ]  # fmt: skip

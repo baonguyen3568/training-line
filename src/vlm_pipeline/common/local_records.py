@@ -19,27 +19,71 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 DEFAULT_PROMPT = "Describe this image."  # same as make_cord_v2_dataset: train and eval see the same prompt
 Family = Literal["nemotron_parse", "chat"]
 
 
+def image_name_ok(name: str) -> bool:
+    r"""A plain relative POSIX path: no leading "/" or "~", no "\\", no empty / "." / ".." part, no control char.
+
+    The one rule for image names: the folder scan (data.local_folder) and every records.jsonl read use it.
+    """
+    parts = name.split("/")
+    return not (
+        not name
+        or len(name) > 512
+        or name.startswith(("/", "~"))
+        or "\\" in name
+        or any(part in {"", ".", ".."} for part in parts)
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in name)
+    )
+
+
 class Record(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    image: str = Field(min_length=1)  # file name relative to the dataset folder
+    image: str = Field(min_length=1, max_length=512)  # file name relative to the dataset folder
     target: Any
     prompt: str | None = None
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    # Provenance of a machine-made target ("<catalog model id>@<revision>", data.caption_vlm); None = from the user's
+    # labels. Kept per record so mix/filter never lose it: licence, "human labels only" eval sets (bao-security).
+    generated_by: str | None = Field(None, max_length=200)
+
+    @field_validator("image")
+    @classmethod
+    def _relative_inside(cls, value: str) -> str:
+        """A plain relative POSIX path inside the dataset folder (bao-security R1: records.jsonl may be tampered with).
+
+        Callers still check ``(folder / image).resolve()`` stays in the folder (a link inside it could point out).
+        """
+        if not image_name_ok(value):
+            raise ValueError("image must be a relative path inside the dataset folder")
+        return value
+
+
+def _dump(record: Record) -> dict[str, Any]:
+    """Record as written; ``generated_by`` only when set, so user-labelled data keeps its bytes (and its sha256)."""
+    return record.model_dump(exclude={"generated_by"} if record.generated_by is None else set())
 
 
 def write_records(path: Path, records: Iterable[Record]) -> str:
     """Write records.jsonl; returns its sha256 (part of the dataset's identity)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = "".join(json.dumps(r.model_dump(), ensure_ascii=False, sort_keys=True) + "\n" for r in records)
+    text = "".join(json.dumps(_dump(r), ensure_ascii=False, sort_keys=True) + "\n" for r in records)
     path.write_text(text, encoding="utf-8")
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+def image_path(folder: Path, record: Record) -> Path:
+    """Host path of ``record.image``; ValueError if it resolves outside ``folder`` (e.g. through a link)."""
+    root = folder.resolve()
+    path = (root / record.image).resolve()
+    if not path.is_relative_to(root):
+        raise ValueError(f"{record.image!r} resolves outside the dataset folder")
+    return path
 
 
 def read_records(path: Path) -> Iterator[Record]:
@@ -116,6 +160,8 @@ __all__ = [
     "DEFAULT_PROMPT",
     "Record",
     "conversations_for",
+    "image_name_ok",
+    "image_path",
     "in_validation",
     "json2token",
     "read_records",
