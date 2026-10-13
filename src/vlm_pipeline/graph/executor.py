@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import os
+import stat
 import threading
 import time
 import uuid
@@ -164,6 +165,53 @@ def _saved_warnings(state_dir: Path, key: str) -> list[UserError]:
         and (entry := catalog.get(item["code"])) is not None
         and entry.severity != "error"
     ]
+
+
+ALLOC_RETRY_REASON = "gpu_alloc_transient"
+ALLOC_RETRY_WAIT_S = 120.0  # tester 2026-10-13: the failure lasted ~70-90 s once (s599, 3 tries)
+_TRANSIENT_PEAK_FRACTION = 0.5  # used under half the estimate: the job never got to its real working set
+_TRANSIENT_MAX_RUN_S = 300.0  # a load-time failure: eval/quantize jobs have no metrics file to tell it apart
+
+
+def _has_rows(path: Path) -> bool:
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    return stat.S_ISREG(st.st_mode) and st.st_size > 0
+
+
+def _transient_alloc_failure(run_dir: Path, error: UserError) -> bool:
+    """A CUDA allocation failure while loading, worth one retry; anything doubtful is not (fail closed).
+
+    All of: MEM-003 from the job's own log (not a kernel OOM kill), no training step (no metrics, no checkpoint), the
+    container stopped within 5 minutes, and a peak far below the job's estimate (a real "batch too big" OOM reaches
+    its working set first).
+    """
+    if error.code != "MEM-003":
+        return False
+    try:
+        manifest = read_manifest(run_dir)
+    except (OSError, ValueError):
+        return False
+    peak, est = manifest.peak_mem_gb, manifest.est_peak_gb
+    if manifest.error_code != "MEM-003" or manifest.oom_killed or peak is None or est is None or est <= 0:
+        return False
+    if peak >= _TRANSIENT_PEAK_FRACTION * est or read_checkpoint_step(run_dir) is not None:
+        return False
+    started, ended = manifest.container_started_at, manifest.ended_at
+    if started is None or ended is None or ended - started > _TRANSIENT_MAX_RUN_S:
+        return False
+    metrics = (run_dir / "metrics.jsonl", run_dir / "checkpoints" / "training.jsonl")
+    return not any(_has_rows(path) for path in metrics)
+
+
+def _mark_retried(run_dir: Path, reason: str) -> None:
+    try:
+        manifest = read_manifest(run_dir)
+    except (OSError, ValueError):
+        return
+    write_manifest(run_dir, manifest.model_copy(update={"retried_after": reason}))
 
 
 def _write_node_manifest(
@@ -405,7 +453,7 @@ class Executor:
         with self._lock:
             key_lock = self._key_locks.setdefault(key, threading.Lock())
         with key_lock:
-            self._compute(run, node, key=key, inputs=inputs, upstream=upstream, keys=keys, cancel=cancel)
+            self._compute(run, node, key=key, inputs=inputs, upstream=upstream, keys=keys, cancel=cancel, retry_ok=True)
 
     def _used(self, run_dir: Path) -> bool:
         """A container job ran here or under it (run_claims), or a dir from before claims existed (it has job logs)."""
@@ -477,6 +525,7 @@ class Executor:
         upstream: list[tuple[str, str, str]],
         keys: dict[str, str],
         cancel: threading.Event,
+        retry_ok: bool = False,
     ) -> None:
         nid = node.node_id
         if node.spec.cacheable and self._try_cache(run, node, key):
@@ -514,6 +563,9 @@ class Executor:
             # A try that failed before saving keeps the earlier attempt's checkpoint as its resume point.
             saved = read_checkpoint_step(run_dir) if resume_from is None else (read_checkpoint_step(run_dir) or step)
             outcome = classify(exc, cancelled=cancel.is_set(), checkpoint_step=saved)
+            if retry_ok and self._paused_for_retry(run, node, run_dir, outcome.error, started=started, cancel=cancel):
+                self._compute(run, node, key=key, inputs=inputs, upstream=upstream, keys=keys, cancel=cancel)
+                return
             if outcome.error is not None:
                 run.errors[nid] = outcome.error
             logger.info("node %s %s: %s", nid, outcome.status, outcome.error.code if outcome.error else "cancelled")
@@ -555,6 +607,35 @@ class Executor:
         )  # fmt: skip
         self._set(run, nid, "completed", cache_key=key)
         self._drop_lease(run_dir)
+
+    def _paused_for_retry(
+        self,
+        run: GraphRun,
+        node: _Node,
+        run_dir: Path,
+        error: UserError | None,
+        *,
+        started: float,
+        cancel: threading.Event,
+    ) -> bool:
+        """True after the pause before the one retry of a load-time CUDA allocation failure (tester/fixcode 2026-10-13).
+
+        Another process can hold GB10's shared pool for a moment: the retry is a new attempt dir, through the memory
+        wait and the GPU lock again. False (the failure stands) when it does not qualify or a cancel came first.
+        """
+        if error is None or not _transient_alloc_failure(run_dir, error):
+            return False
+        nid = node.node_id
+        _mark_retried(run_dir, ALLOC_RETRY_REASON)
+        _write_node_manifest(run_dir, node_id=nid, spec=node.spec, gid=run.graph_run_id, status=RunStatus.FAILED,
+                             error_code=error.code, started=started)  # fmt: skip
+        self._drop_lease(run_dir)
+        event = {"type": "node_state", "node_id": nid, "state": "waiting_memory", "reason": ALLOC_RETRY_REASON}
+        self._emit(run.graph_run_id, {**event, "retry_in_s": ALLOC_RETRY_WAIT_S})
+        if cancel.wait(ALLOC_RETRY_WAIT_S):
+            return False
+        logger.info("node %s: CUDA allocation failed while loading, retrying once", nid)
+        return True
 
     def _drop_lease(self, run_dir: Path) -> None:
         """End of the node: its resume lease (if any) goes; a crash leaves it to stale_runs (never to retention)."""

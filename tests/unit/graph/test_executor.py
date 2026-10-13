@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from vlm_pipeline.graph import executor as executor_mod
 from vlm_pipeline.graph.errors import InterruptedByMemguard
@@ -427,3 +430,103 @@ def test_a_fresh_result_without_warnings_clears_the_kept_ones(tmp_path: Path) ->
     assert [w.code for w in _saved_warnings(tmp_path, "k")] == ["QNT-002"]
     _save_warnings(tmp_path, "k", ())
     assert _saved_warnings(tmp_path, "k") == []
+
+
+def _load_oom_worker(fail_times: int, **manifest: Any) -> Any:
+    """A train job that dies with a CUDA allocation failure while loading, the first ``fail_times`` tries."""
+    from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
+    from vlm_pipeline.graph.errors import ContainerExit
+
+    class LoadOom(FakeWorker):
+        tries = 0
+
+        def run(self, job: NodeJob) -> NodeResult:
+            if job.node_id != "t":
+                return super().run(job)
+            LoadOom.tries += 1
+            if LoadOom.tries > fail_times:
+                return super().run(job)
+            fields = {"peak_mem_gb": 3.0, "est_peak_gb": 40.0, "container_started_at": 100.0, "ended_at": 160.0,
+                      "error_code": "MEM-003", "oom_killed": False, **manifest}  # fmt: skip
+            write_manifest(job.run_dir, RunManifest(run_id=job.run_dir.name, name="t", stage="train", task="lora",
+                                                    status=RunStatus.FAILED, **fields))  # fmt: skip
+            raise ContainerExit(1, log_tail="torch.AcceleratorError: CUDA error: out of memory")
+
+    return LoadOom()
+
+
+def test_a_cuda_allocation_failure_at_load_is_retried_once(tmp_path: Path, monkeypatch: Any) -> None:
+    monkeypatch.setattr(executor_mod, "ALLOC_RETRY_WAIT_S", 0.0)
+    worker = _load_oom_worker(fail_times=1)
+    events: list[dict[str, Any]] = []
+    run = Executor(make_test_registry(), worker, tmp_path, on_event=events.append).run(_wf())
+    assert run.status["t"] == "completed"
+    assert type(worker).tries == 2
+    [pause] = [e for e in events if e.get("reason") == executor_mod.ALLOC_RETRY_REASON]
+    assert (pause["type"], pause["state"], pause["node_id"]) == ("node_state", "waiting_memory", "t")
+    # frontend: the retried try never reports "failed" (no error card for something the app is handling)
+    seen = [e.get("status") or e.get("reason") for e in events if e.get("node_id") == "t" and e["type"] != "warning"]
+    assert seen == ["running", executor_mod.ALLOC_RETRY_REASON, "running", "completed"]
+    failed = [json.loads(p.read_text()) for p in (tmp_path / "runs").glob("t-*/run.json")]
+    assert [m["retried_after"] for m in failed if m.get("status") == "failed"] == ["gpu_alloc_transient"]
+
+
+def test_a_second_allocation_failure_stands(tmp_path: Path, monkeypatch: Any) -> None:
+    monkeypatch.setattr(executor_mod, "ALLOC_RETRY_WAIT_S", 0.0)
+    worker = _load_oom_worker(fail_times=5)
+    run = Executor(make_test_registry(), worker, tmp_path).run(_wf())
+    assert run.status["t"] == "failed"
+    assert run.errors["t"].code == "MEM-003"
+    assert type(worker).tries == 2  # one retry, never a loop
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        {"oom_killed": True},  # the kernel killed it: real host pressure
+        {"peak_mem_gb": 30.0},  # reached most of its working set: a real "too big" OOM
+        {"peak_mem_gb": None},  # unknown: fail closed
+        {"est_peak_gb": None},
+        {"ended_at": 100.0 + 600},  # ran 10 minutes: not a load failure
+        {"error_code": "SYS-003"},
+    ],
+)
+def test_other_failures_are_never_retried(tmp_path: Path, monkeypatch: Any, manifest: dict[str, Any]) -> None:
+    monkeypatch.setattr(executor_mod, "ALLOC_RETRY_WAIT_S", 0.0)
+    worker = _load_oom_worker(fail_times=5, **manifest)
+    run = Executor(make_test_registry(), worker, tmp_path).run(_wf())
+    assert run.status["t"] == "failed"
+    assert type(worker).tries == 1
+
+
+def test_a_load_failure_after_training_started_is_not_retried(tmp_path: Path, monkeypatch: Any) -> None:
+    monkeypatch.setattr(executor_mod, "ALLOC_RETRY_WAIT_S", 0.0)
+    worker = _load_oom_worker(fail_times=5)
+    real_run = type(worker).run
+
+    def run_with_metrics(self: Any, job: NodeJob) -> NodeResult:
+        if job.node_id == "t":
+            (job.run_dir / "metrics.jsonl").write_text('{"step": 1}\n')
+        return real_run(self, job)
+
+    monkeypatch.setattr(type(worker), "run", run_with_metrics)
+    assert Executor(make_test_registry(), worker, tmp_path).run(_wf()).status["t"] == "failed"
+    assert type(worker).tries == 1
+
+
+def test_a_cancel_during_the_pause_ends_the_node(tmp_path: Path, monkeypatch: Any) -> None:
+    monkeypatch.setattr(executor_mod, "ALLOC_RETRY_WAIT_S", 30.0)
+    worker = _load_oom_worker(fail_times=1)
+    ex = Executor(make_test_registry(), worker, tmp_path)
+    started = time.time()
+    holder: dict[str, Any] = {}
+
+    def on_event(e: dict[str, Any]) -> None:
+        if e.get("reason") == executor_mod.ALLOC_RETRY_REASON:
+            ex.cancel(e["graph_run_id"])
+
+    ex.on_event = on_event
+    holder["run"] = ex.run(_wf())
+    assert time.time() - started < 10
+    assert holder["run"].status["t"] in ("failed", "interrupted", "cancelled")
+    assert type(worker).tries == 1

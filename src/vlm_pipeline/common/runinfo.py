@@ -84,6 +84,9 @@ class RunManifest(BaseModel):
     # still need it. None: not a resume.
     resumed_from: dict[str, str] | None = None
     peak_mem_gb: float | None = None  # host MemAvailable drop during the job (UMA: includes CUDA)
+    est_peak_gb: float | None = None  # what the job was expected to need (preflight / memory queue input)
+    # This attempt failed in a way the executor retried once in a new attempt dir, e.g. "gpu_alloc_transient".
+    retried_after: str | None = None
     host_min_available_gb: float | None = None
     trainable_pct: float | None = None  # "Trainable parameters percentage" from the engine log
     # Known-bad engine warnings (jobrun.ENGINE_WARNINGS). None = log never scanned (older runs, runner failure).
