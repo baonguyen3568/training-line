@@ -383,3 +383,6 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - ⇒ Sát ngưỡng, đi đúng hướng. 2 ảnh lặp (val 5, val 11) đều là thoái hoá do chưa học đủ (val 5 ảo giác item rồi lặp, val 11 lặp token trong tên món); nhiều item giống nhau thật không phải nguyên nhân.
   - P-3 không so trực tiếp được (P-3 chỉ có số test: F1 8.9, truncated 86%).
 - **PM duyệt P-3b đầy đủ** (300 step, `nemotron_parse_v1_1_p3b_full.yaml`). Chọn preset dựa trên ckpt 100/200/300 chấm trên đúng 20 ảnh val đó (paired với s99), áp quy tắc 90% của §10.1. Số test chỉ để báo.
+- **Kết luận MEM-002 của smoke validation LoRA (Qwen3.5-0.8B, 2026-10-13):** đỉnh 31.3 GB lần đầu (fast-fall) **không do validation**. Chạy lại với Triton cache đã ấm và ảnh 200k–400k px thì PASS: run 20261013-1012-val-a-qwen35-08b-493f, peak 11.9 GB, val_loss ghi ở step 3/7.
+  - Lần lạnh, step 0 mất 88 s, so với 12 s khi cache đã ấm ⇒ thủ phạm chính là **JIT compile lúc cache lạnh** (Triton; ninja/nvcc với extension), cộng ảnh to.
+  - Hệ quả cho preflight: est_peak của một model/image **lần chạy đầu** phải tính cả đỉnh compile lạnh. Giải pháp gốc là persist cache theo image id + `MAX_JOBS=2` (backend đồng ý, BASE_ENV).
