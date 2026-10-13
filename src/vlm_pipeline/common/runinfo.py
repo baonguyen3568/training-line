@@ -11,6 +11,7 @@ import math
 import os
 import re
 import secrets
+import stat
 import threading
 import time
 from collections.abc import Iterable, Iterator, Mapping
@@ -115,8 +116,31 @@ def write_manifest(run_dir: Path, manifest: RunManifest) -> None:
     _atomic_write(run_dir / "run.json", manifest.model_dump_json(indent=2) + "\n")
 
 
+RUN_JSON_MAX = 1 << 20  # run.json is written by the job too: never read more than this, never a fifo or a symlink
+
+
+def read_small_json(path: Path, max_bytes: int = RUN_JSON_MAX) -> object:
+    """JSON of a small regular file a job may have written (run.json). Never blocks, never follows a symlink.
+
+    Raises:
+        FileNotFoundError: no file.
+        OSError: a symlink (ELOOP) or unreadable.
+        ValueError: not a regular file (fifo, device...), larger than ``max_bytes``, or not JSON.
+    """
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with os.fdopen(fd, "rb") as fh:
+        st = os.fstat(fh.fileno())
+        if not stat.S_ISREG(st.st_mode) or st.st_size > max_bytes:
+            raise ValueError("not a small regular file")
+        data = fh.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError("file grew past the limit")
+    return json.loads(data.decode("utf-8"))
+
+
 def read_manifest(run_dir: Path) -> RunManifest:
-    return RunManifest.model_validate_json((run_dir / "run.json").read_text(encoding="utf-8"))
+    """The run.json of ``run_dir`` (a job may write it: bounded, no symlink, no fifo - see ``read_small_json``)."""
+    return RunManifest.model_validate(read_small_json(run_dir / "run.json"))
 
 
 _REPRO_REQUIRED = ("git_commit", "container_digest", "config_hash", "seed", "base_model_revision")

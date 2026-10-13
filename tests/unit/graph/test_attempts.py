@@ -183,3 +183,55 @@ def test_an_unreadable_checkpoint_dir_is_not_trusted(tmp_path: Path) -> None:
         assert checkpoint_tree_problem(ckpt) is not None
     finally:
         locked.chmod(0o700)
+
+
+def test_a_reset_generation_gives_fresh_dir_names(tmp_path: Path) -> None:
+    """G-4: claims are never removed; after "Reset this step" (generation 1) the node runs under <base>-g1."""
+    import json as _json
+
+    from vlm_pipeline.common.run_claims import GENERATIONS_REL
+
+    first = _failed_once(tmp_path)
+    gen = tmp_path / GENERATIONS_REL / f"{first.name}.json"
+    gen.parent.mkdir(parents=True)
+    gen.write_text(_json.dumps({"gen": 1}))
+    worker = Recorder(tmp_path)
+    _executor(tmp_path, worker).run(_wf())
+    assert worker.jobs[0].run_dir.name == f"{first.name}-g1"
+    assert worker.jobs[0].resume_from is None  # a reset starts over
+
+
+@pytest.mark.parametrize("content", ['{"gen": -1}', '{"gen": "1"}', "[]", "not json", '{"gen": 1000}'])
+def test_an_unreadable_generation_fails_the_node_closed(tmp_path: Path, content: str) -> None:
+    from vlm_pipeline.common.run_claims import GENERATIONS_REL
+
+    first = _failed_once(tmp_path)
+    gen = tmp_path / GENERATIONS_REL / f"{first.name}.json"
+    gen.parent.mkdir(parents=True)
+    gen.write_text(content)
+    worker = Recorder(tmp_path)
+    run = _executor(tmp_path, worker).run(_wf())
+    assert worker.jobs == []
+    assert run.status["t"] == "failed"
+
+
+def test_the_resume_source_is_leased_while_the_node_runs(tmp_path: Path) -> None:
+    """C6: the host lease exists from the pick until the node ends (the job's run.json says it only once started)."""
+    import json as _json
+
+    from vlm_pipeline.common.run_claims import LEASES_REL
+
+    first = _failed_once(tmp_path)
+    ckpt = _ckpt(first, 9)
+    seen: list[dict[str, Any]] = []
+
+    class Peek(Recorder):
+        def run(self, job: NodeJob) -> NodeResult:
+            if job.node_id == "t":
+                seen.append(_json.loads((tmp_path / LEASES_REL / f"{job.run_dir.name}.json").read_text()))
+            return super().run(job)
+
+    _executor(tmp_path, Peek(tmp_path)).run(_wf())
+    assert seen[0]["run"] == first.name
+    assert seen[0]["checkpoint"] == ckpt.name
+    assert list((tmp_path / LEASES_REL).iterdir()) == []  # dropped when the node ended

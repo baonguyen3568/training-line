@@ -14,6 +14,7 @@ saying why. A run is left alone while ANY sign of life remains:
   ``QUIET_S`` (longer than the longest memory wait, 30 min).
 
 ``interrupted`` keeps checkpoints for a resume and retention never deletes it (runinfo.RunStatus).
+Each pass also removes resume leases (P017 C6) whose executor process is gone (``reap_resume_leases``).
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import stat
 import subprocess
 import time
 from collections.abc import Callable, Iterator
@@ -28,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from vlm_pipeline.common import gpu_lock
+from vlm_pipeline.common.run_claims import LEASES_REL, holder_gone
 from vlm_pipeline.common.runinfo import RunStatus, read_manifest, write_manifest
 
 logger = logging.getLogger(__name__)
@@ -123,6 +126,7 @@ def reconcile(
             continue
         _mark(run_dir, manifest, now)
         fixed.append(manifest.run_id)
+    reap_resume_leases(root)
     return fixed
 
 
@@ -142,6 +146,40 @@ def _live_runs(root: Path) -> Iterator[tuple[Path, Any]]:
                 yield run_dir, manifest
 
 
+def reap_resume_leases(root: Path, *, gone: Callable[[dict[str, object]], bool | None] = holder_gone) -> list[str]:
+    """Remove resume leases (P017 C6) whose executor process is certainly gone; returns the attempt names.
+
+    "Certainly" (security L1): judged by boot id + PID namespace + process start time, never by a bare pid; a lease
+    from another PID namespace or without those fields is kept (holding disk longer is the safe side).
+
+    Retention only reads leases and honours every valid one; a lease outlives its node only when the executor died.
+    The attempt's own run.json (``resumed_from``) keeps protecting the source while that attempt may still resume.
+    A lease that cannot be read is left alone (retention fails closed on it).
+    """
+    leases = root / LEASES_REL
+    if leases.is_symlink() or not leases.is_dir():
+        return []
+    reaped = []
+    for path in sorted(leases.glob("*.json")):
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+        except OSError:
+            continue
+        with os.fdopen(fd, "rb") as fh:
+            st = os.fstat(fh.fileno())
+            if not stat.S_ISREG(st.st_mode) or st.st_size > 4096:
+                continue
+            try:
+                body = json.loads(fh.read(4097))
+            except ValueError:
+                continue
+        if isinstance(body, dict) and gone(body) is True:
+            path.unlink(missing_ok=True)
+            reaped.append(path.stem)
+            logger.warning("resume lease %s: its executor (pid %s) is gone, removed", path.stem, body.get("pid"))
+    return reaped
+
+
 def _mark(run_dir: Path, manifest: Any, now: float) -> None:
     reason = "process_gone" if manifest.pid is not None else "no_activity"
     was = str(manifest.status)
@@ -159,4 +197,4 @@ def _mark(run_dir: Path, manifest: Any, now: float) -> None:
     logger.warning("run %s was %s but its process is gone (%s): marked interrupted", manifest.run_id, was, reason)
 
 
-__all__ = ["QUIET_S", "LockUnreadableError", "lock_run", "reconcile"]
+__all__ = ["QUIET_S", "LockUnreadableError", "lock_run", "reap_resume_leases", "reconcile"]

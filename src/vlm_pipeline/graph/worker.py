@@ -149,7 +149,7 @@ MAX_ATTEMPTS = 10  # PM 2026-10-13: an 11th try of the same node is a configurat
 
 
 def attempt_dirs(base: Path) -> list[Path]:
-    """``<nid>-<key16>``, then ``-a2`` .. ``-a10``: one run dir per job attempt of a node (P017)."""
+    """``<nid>-<key16>[-g<N>]``, then ``-a2`` .. ``-a10``: one run dir per job attempt of a node (P017)."""
     return [base, *(base.with_name(f"{base.name}-a{n}") for n in range(2, MAX_ATTEMPTS + 1))]
 
 

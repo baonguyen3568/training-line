@@ -27,6 +27,7 @@ from starlette.concurrency import run_in_threadpool
 
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.image_rules import MAX_IMAGE_BYTES, ImageRuleError, open_image
+from vlm_pipeline.common.runinfo import read_small_json
 
 UPLOADS_DIR = "uploads"
 CONTENT_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
@@ -149,8 +150,9 @@ def node_result(state_dir: Path, graph_run_id: str, node_id: str) -> dict[str, A
     runs = (state_dir / "runs").resolve()
     for run_dir in sorted(runs.glob(f"{node_id}-*")):
         try:
-            manifest = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
-            if f"graph:{graph_run_id}" not in manifest.get("tags", []):
+            manifest = read_small_json(run_dir / "run.json")  # job-written: bounded, no symlink/fifo
+            tags = manifest.get("tags") if isinstance(manifest, dict) else None
+            if not isinstance(tags, list) or f"graph:{graph_run_id}" not in tags:
                 continue
             result = run_dir / "result.json"
             st = result.lstat()  # written by the container (remote code on a user image): untrusted input

@@ -24,7 +24,13 @@ from pydantic import BaseModel
 
 from vlm_pipeline.artifacts.index import ArtifactIndex, CacheEntry, OutputRef
 from vlm_pipeline.common.errors import VlmPipelineError
-from vlm_pipeline.common.run_claims import node_dir_used
+from vlm_pipeline.common.run_claims import (
+    GenerationError,
+    drop_resume_lease,
+    node_dir_used,
+    node_generation,
+    write_resume_lease,
+)
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, Stage, read_manifest, write_manifest
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
@@ -357,6 +363,25 @@ class Executor:
             return free, ckpt, step
         return free, None, None
 
+    def _pick_dir(self, run: GraphRun, node: _Node, key: str) -> tuple[Path, Path | None, int | None] | None:
+        """This try's run dir (generation + attempt, P017) and resume source, its C6 lease taken; None = node failed."""
+        nid = node.node_id
+        base_name = f"{nid}-{key.split('-', 1)[1][:16]}"
+        try:
+            gen = node_generation(self.workspace, base_name) if self.workspace is not None else 0
+            base = self.state_dir / "runs" / (f"{base_name}-g{gen}" if gen else base_name)
+            run_dir, resume_from, resume_step = self._attempt(node, base)
+        except (AttemptsExhaustedError, GenerationError) as exc:
+            error = classify(exc, cancelled=False, checkpoint_step=None).error
+            assert error is not None  # noqa: S101 - a catalog error, never "cancelled"
+            run.errors[nid] = error
+            self._set(run, nid, "failed", error=_error_dict(error))
+            return None
+        if resume_from is not None and self.workspace is not None:  # C6: keep the source from now on (host side)
+            write_resume_lease(self.workspace, run_dir.name, run=resume_from.parent.parent.name,
+                               checkpoint=resume_from.name, node=nid)  # fmt: skip
+        return run_dir, resume_from, resume_step
+
     def _compute(
         self,
         run: GraphRun,
@@ -372,16 +397,10 @@ class Executor:
         if node.spec.cacheable and self._try_cache(run, nid, key):
             return
 
-        try:
-            run_dir, resume_from, resume_step = self._attempt(
-                node, self.state_dir / "runs" / f"{nid}-{key.split('-', 1)[1][:16]}"
-            )
-        except AttemptsExhaustedError as exc:
-            error = classify(exc, cancelled=False, checkpoint_step=None).error
-            assert error is not None  # noqa: S101 - a catalog error, never "cancelled"
-            run.errors[nid] = error
-            self._set(run, nid, "failed", error=_error_dict(error))
+        picked = self._pick_dir(run, node, key)
+        if picked is None:
             return
+        run_dir, resume_from, resume_step = picked
         run_dir.mkdir(parents=True, exist_ok=True)
         if (run_dir / NOT_RESUMABLE_MARKER).exists() and os.path.lexists(run_dir / CHECKPOINT_MARKER):
             # The worker will start over: tell the user instead of silently redoing the steps (CACHE-001 text:
@@ -424,6 +443,7 @@ class Executor:
                 started=started,
             )
             self._set(run, nid, outcome.status, **({"error": _error_dict(outcome.error)} if outcome.error else {}))
+            self._drop_lease(run_dir)  # an interrupted attempt's run.json says resumed_from: retention takes over
             return
         run.outputs[nid] = dict(result.outputs)
         if node.spec.cacheable:
@@ -442,6 +462,12 @@ class Executor:
             started=started,
         )  # fmt: skip
         self._set(run, nid, "completed", cache_key=key)
+        self._drop_lease(run_dir)
+
+    def _drop_lease(self, run_dir: Path) -> None:
+        """End of the node: its resume lease (if any) goes; a crash leaves it to stale_runs (never to retention)."""
+        if self.workspace is not None:
+            drop_resume_lease(self.workspace, run_dir.name)
 
     def _try_cache(self, run: GraphRun, nid: str, key: str) -> bool:
         # Lease FIRST: retention never begins evicting a leased key, and a key whose eviction already began is no

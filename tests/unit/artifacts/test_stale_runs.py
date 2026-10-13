@@ -101,3 +101,33 @@ def test_the_event_is_never_written_through_a_symlink(tmp_path: Path) -> None:
     assert _reconcile(tmp_path, containers=set()) == ["r-dead"]  # status fixed, pass not stopped
     assert victim.read_text() == ""
     assert read_manifest(run_dir).status == RunStatus.INTERRUPTED
+
+
+def test_leases_of_a_dead_executor_are_reaped(tmp_path: Path) -> None:
+    from vlm_pipeline.artifacts.stale_runs import reap_resume_leases
+    from vlm_pipeline.common.run_claims import LEASES_REL
+
+    leases = tmp_path / LEASES_REL
+    leases.mkdir(parents=True)
+    for n, verdict in ((2, True), (3, False), (4, None)):
+        (leases / f"t-0123456789abcdef-a{n}.json").write_text(json.dumps({"run": "r", "verdict": verdict}))
+    (leases / "t-0123456789abcdef-a5.json").write_text("garbage")  # unreadable: left for retention to fail closed
+    reaped = reap_resume_leases(tmp_path, gone=lambda body: body["verdict"])  # type: ignore[arg-type,return-value]
+    assert reaped == ["t-0123456789abcdef-a2"]  # only "certainly gone"; "cannot tell" is kept
+    assert len(list(leases.iterdir())) == 3
+
+
+def test_holder_identity_beyond_the_pid(monkeypatch: pytest.MonkeyPatch) -> None:
+    """security L1: another boot -> gone; another PID namespace -> cannot tell; reused pid -> gone."""
+    import os
+
+    from vlm_pipeline.common import run_claims
+
+    me = {"pid": os.getpid(), **run_claims.process_identity()}
+    assert run_claims.holder_gone(me) is False  # this very process
+    assert run_claims.holder_gone({**me, "boot_id": "another-boot"}) is True
+    assert run_claims.holder_gone({**me, "pidns": "pid:[1]"}) is None
+    assert run_claims.holder_gone({**me, "starttime": "1"}) is True  # same pid, other start: reused
+    assert run_claims.holder_gone({"pid": os.getpid()}) is None  # an older lease without the fields
+    monkeypatch.setattr(run_claims, "_boot_id", lambda: None)  # /proc hidden here: never fail open
+    assert run_claims.holder_gone({**me, "boot_id": "another-boot"}) is None

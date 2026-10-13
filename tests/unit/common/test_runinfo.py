@@ -137,3 +137,23 @@ def test_dataset_revision_contradicting_dataset_ref_is_rejected() -> None:
         RunManifest(
             run_id="r", name="n", stage="train", task="sft", dataset="x/y@" + "d" * 40, dataset_revision="e" * 40
         )
+
+
+@pytest.mark.parametrize("kind", ["fifo", "symlink", "big"])
+def test_a_job_written_run_json_never_hangs_or_floods(tmp_path: Path, kind: str) -> None:
+    """security: run.json is job-writable; read_manifest refuses a fifo, a symlink or > 1 MB at once."""
+    import os
+
+    from vlm_pipeline.common.runinfo import RUN_JSON_MAX, read_manifest
+
+    path = tmp_path / "run.json"
+    if kind == "fifo":
+        os.mkfifo(path)
+    elif kind == "symlink":
+        target = tmp_path / "elsewhere.json"
+        target.write_text("{}")
+        path.symlink_to(target)
+    else:
+        path.write_text('{"run_id": "' + "x" * (RUN_JSON_MAX + 10) + '"}')
+    with pytest.raises((OSError, ValueError)):
+        read_manifest(tmp_path)

@@ -37,6 +37,7 @@ from vlm_pipeline.common.app_config import effective_profile, read_policy
 from vlm_pipeline.common.diskguard import read_disk
 from vlm_pipeline.common.gpu_lock import PATH_ENV as GPU_LOCK_PATH_ENV
 from vlm_pipeline.common.paths import GIB
+from vlm_pipeline.common.runinfo import read_small_json
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 ApprovalPolicy = Literal["none", "threshold"]
@@ -249,7 +250,7 @@ def _cache_title(root: Path, item: cache_retention.CacheItem, locale: str) -> st
 
 def _title_of(run_json: Path, fallback: str, locale: str) -> str:
     try:  # a job can rewrite its own run.json: read safely, shown as a clean label (no bidi/control chars, short)
-        data = retention.read_small_json(run_json)
+        data = read_small_json(run_json)
         name = clean_label(str(data.get("name") or "")) if isinstance(data, dict) else ""
     except (OSError, ValueError):
         name = ""

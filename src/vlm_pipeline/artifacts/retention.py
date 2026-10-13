@@ -61,7 +61,7 @@ from typing import Literal
 from vlm_pipeline.artifacts.storage import du_bytes
 from vlm_pipeline.common.diskguard import LockStatus, check_lock
 from vlm_pipeline.common.paths import GIB
-from vlm_pipeline.common.runinfo import RunStatus
+from vlm_pipeline.common.runinfo import RunStatus, read_small_json  # read_small_json: re-exported
 
 Action = Literal["keep", "strip_optim", "delete"]
 
@@ -78,7 +78,6 @@ DAY_S = 86_400.0
 PROJECT_NAME = "vlm-pipeline"  # [project].name in pyproject.toml; guards against a wrong VLM_PROJECT_ROOT
 CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
 CLEANUP_LOCK_REL = Path("outputs") / "system" / "retention.lock"  # one deleting pass at a time (CLI, scheduler)
-RUN_JSON_MAX = 1 << 20  # run.json is written by the job too: never read more than this, never a fifo or a symlink
 INPUT_REASON = "INPUT_OF_RUNNING_ATTEMPT"  # P017 C6: a later attempt resumes from this run dir; nothing overrides it
 _NAME_RE = re.compile(r"[A-Za-z0-9._-]+", re.ASCII)  # fullmatch: a run dir / checkpoint name, never a path
 # fullmatch: <node id>-<key16>[-gN][-aM] (P017 attempts, G-4 generations); group 1 = every attempt of one node
@@ -210,25 +209,6 @@ class ApplyResult:
     @property
     def freed_bytes(self) -> int:
         return sum(i.reclaim_bytes for i in self.done)
-
-
-def read_small_json(path: Path, max_bytes: int = RUN_JSON_MAX) -> object:
-    """JSON of a small regular file a job may have written (run.json). Never blocks, never follows a symlink.
-
-    Raises:
-        FileNotFoundError: no file.
-        OSError: a symlink (ELOOP) or unreadable.
-        ValueError: not a regular file (fifo, device...), larger than ``max_bytes``, or not JSON.
-    """
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
-    with os.fdopen(fd, "rb") as fh:
-        st = os.fstat(fh.fileno())
-        if not stat.S_ISREG(st.st_mode) or st.st_size > max_bytes:
-            raise ValueError("not a small regular file")
-        data = fh.read(max_bytes + 1)
-    if len(data) > max_bytes:
-        raise ValueError("file grew past the limit")
-    return json.loads(data.decode("utf-8"))
 
 
 def read_run_status(run_dir: Path) -> tuple[str, float | None]:
