@@ -13,6 +13,14 @@ lấy & xử lý data → setup → train / fine-tune → chạy thử model →
 - Người dùng no-tech ⇒ UI phải **chặn lỗi trước khi chạy**: kiểm tra kiểu kết nối giữa node, ước lượng RAM/thời gian/disk,
   mặc định an toàn, thông báo lỗi dễ hiểu (không phải stack trace).
 
+### Định hướng cốt lõi (user nhấn mạnh 2026-10-13)
+- User **tự tay xây pipeline**: xử lý dữ liệu → train/fine-tune → đánh giá → nén → xuất. Mức tự do phải **cực sâu**: node "to" cho người mới,
+  nhưng mở được tới từng bước nhỏ (subgraph, tham số Advanced, node chi tiết) cho người giỏi.
+- Mọi node phải **theo chuẩn mực hiện tại** (2025–2026) về: định dạng/chất lượng dữ liệu, chọn model, cách build, cách train, cách nén.
+  App phải hướng dẫn và kiểm tra theo chuẩn đó (validate, gợi ý, cảnh báo), không chỉ chạy lệnh.
+- Có sẵn **5–10 pipeline tham chiếu** lấy từ công bố của các bên lớn (NVIDIA, Qwen, Hugging Face…) hoặc pipeline mới nổi trong cộng đồng,
+  dựng lại bằng chính node của app, có ghi nguồn + license, và tái lập được số công bố khi có thể.
+
 ## Mục tiêu kỹ thuật
 Engine phía sau là pipeline **fine-tune / train Vision-Language Model (VLM) mới nhất** bằng stack NVIDIA mới nhất,
 end-to-end:

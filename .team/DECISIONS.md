@@ -48,3 +48,4 @@
 - 2026-10-13 USER: (1) dọn dẹp + xoá rác LIÊN TỤC → bật xoá thật cho item AN TOÀN trên máy này (vẫn cấm PERMANENT_LOSS tự động, vẫn chỉ trong phạm vi dự án, vẫn quota 20GB/24h); (2) hỗ trợ amd64 + arm64; (3) đóng Docker toàn bộ, docker compose, cấu hình 1 file .env.local (đã gitignore .env.*). → MILESTONE M3.
 - 2026-10-13 USER: cấu hình phân tầng env (.env.local) vs DB, có trang Cài đặt trong dashboard để chỉnh → D-7.
 - 2026-10-13 PM tạo ~/.config/vlm-app/policy.toml (profile=shared_dev, storage.schedule=apply) theo yêu cầu dọn rác liên tục của user. Tắt nhanh: VLM_RETENTION_SCHEDULE=dry_run|off.
+- 2026-10-13 USER định hướng cốt lõi: user tự xây pipeline cực sâu, theo chuẩn mực hiện tại (data/model/build/train/nén), có 5–10 pipeline tham chiếu của các bên lớn/cộng đồng → CLAUDE.md + MILESTONE M4. Điều chỉnh P010 'node to': giữ node to cho Simple, thêm subgraph + node chi tiết cho Advanced.

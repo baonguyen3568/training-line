@@ -31,6 +31,15 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | P1-9 | Spike NVIDIA containers trên GB10 (AutoModel 26.08 VLM, ModelOpt, vLLM) + Proposal 008: backend runtime (host orchestrator ↔ container worker, job runner, GPU lock/memguard, RunManifest) | bao-backend | PAUSED (RESET: spike hoãn; P008 giữ hướng, chờ ghép vào P009) |
 | P1-7 | PM tổng hợp → ADR-001..00N, chốt với user | bao-pm | TODO |
 
+## 🧩 MILESTONE M4 — Pipeline tự do sâu + chuẩn mực + thư viện 5–10 pipeline tham chiếu (user định hướng cốt lõi 2026-10-13)
+| ID | Task | Owner | Status |
+|----|------|-------|--------|
+| P4-1 | Khảo sát + chọn 5–10 pipeline tham chiếu (vd NVIDIA AutoModel VLM SFT, DGX Spark VLM playbook (GRPO), NeMo-RL GRPO/DPO VLM, Cosmos-Reason post-training, Qwen3-VL official fine-tune, HF TRL SFT/DPO VLM, LLaMA-Factory VLM LoRA, NeMo Curator data pipeline, ModelOpt PTQ/QAT…): nguồn, license, chạy được trên GB10 không, số công bố để tái lập | bao-research | TODO |
+| P4-2 | "Chuẩn mực" thành dữ liệu: định dạng dữ liệu VLM chuẩn (HF datasets/chat template, LLaVA/ShareGPT, WebDataset/Energon), kiểm chất lượng (dedupe, leak train/test, kích thước ảnh, độ dài token), chọn model, recipe train/nén → rule validate + gợi ý trong node | bao-research + bao-tester + bao-fixcode (error catalog) | TODO |
+| P4-3 | Hệ node sâu: thêm node chi tiết (data: filter/dedupe/resize/format-convert/caption/augment/mix; train: SFT/LoRA/QLoRA/DPO/GRPO; eval; quantize FP8/NVFP4/AWQ/QAT; export HF/TRT-LLM), subgraph/group (node to bung thành node nhỏ), tham số Advanced đầy đủ từ engine | bao-backend + bao-cleancode (nodes/ registry) | TODO |
+| P4-4 | UX tự do sâu: subgraph expand/collapse, thư viện node lớn có tìm kiếm/nhóm, Simple/Advanced, gallery pipeline tham chiếu có nhãn nguồn/license/độ khó/thời gian | bao-design + bao-frontend | TODO |
+| P4-5 | Dựng lại từng pipeline tham chiếu bằng node của app + test tái lập (smoke + số công bố khi khả thi) | bao-research + bao-tester + bao-backend | TODO |
+
 ## 📦 MILESTONE M3 — Đóng gói Docker đa kiến trúc + dọn rác liên tục (user yêu cầu 2026-10-13)
 YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được cả **amd64 và arm64**; (3) MỌI thứ đóng thành Docker, quản lý bằng
 **docker compose**, cấu hình bằng **1 file `.env.local`** (đã gitignore; mẫu `.env.local.example` được commit).
@@ -40,9 +49,9 @@ YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được c�
 | D-2 | Dockerfile đa kiến trúc (buildx linux/amd64,linux/arm64): app (FastAPI + frontend dist), site tĩnh, image train dẫn xuất; kiểm NGC/vLLM base có manifest amd64 | bao-backend + bao-research (xác minh base image) | TODO |
 | D-3 | `.env.local.example` + loader: gộp mọi cấu hình (HF_TOKEN, ports, paths, profile, quota); bỏ .env cũ; secrets không vào image/layer | bao-backend + bao-security | TODO |
 | D-4 | Memguard/preflight cho GPU rời (amd64: VRAM riêng + RAM host) bên cạnh UMA (GB10) | bao-fixcode | TODO |
-| D-5 | CI local: build cả 2 arch (amd64 qua QEMU = build-only), smoke compose up/down trên arm64 thật; ghi rõ amd64 CHƯA test GPU | bao-tester + bao-cleancode | TODO |
+| D-5 | CI local: build cả 2 arch (amd64 qua QEMU = build-only), smoke compose up/down trên arm64 thật; ghi rõ amd64 CHƯA test GPU | bao-tester + bao-cleancode | WAITING D-1/D-2 (khung `check.sh --docker` đã gửi tester: buildx 2 arch, compose smoke arm64, amd64 build-only) |
 | D-7 | Phân tầng cấu hình (user yêu cầu): `.env.local` = hạ tầng/khởi động (port, đường dẫn volume, profile, URL nội bộ, khoá mã hoá secret); **DB (SQLite app.db)** = mọi thứ user chỉnh được (quota, cache cap, lịch dọn, preset mặc định, ngôn ngữ/theme, HF token mã hoá…); policy admin (shared_dev, chặn plugin) KHÔNG chỉnh qua UI. + **Trang Cài đặt trong dashboard** (icon-first, popover) để chỉnh config trong DB, có validate + lịch sử thay đổi | bao-backend (schema/API) + bao-security (secret, phân quyền) + bao-design (UX) + bao-frontend (UI) | TODO |
-| D-6 | Dọn rác liên tục: scheduler bật xoá THẬT item an toàn trên máy này (user yêu cầu), + dọn repo (file rác, worktree, outputs smoke, image/container/build-cache vlm-* cũ), báo cáo định kỳ | bao-cleanup (+ bao-cleancode: code chết, file thừa trong repo) | TODO |
+| D-6 | Dọn rác liên tục: scheduler bật xoá THẬT item an toàn trên máy này (user yêu cầu), + dọn repo (file rác, worktree, outputs smoke, image/container/build-cache vlm-* cũ), báo cáo định kỳ | bao-cleanup (+ bao-cleancode: code chết, file thừa trong repo) | DOING (cleancode: vulture → bug require_approved_image; 12 script không ai tham chiếu, đang hỏi owner giữ/xoá; xfail 134 đều còn lý do) |
 
 ## 🔧 MILESTONE M1b — Mọi node chạy THẬT (2026-10-13). RealWorker hiện chỉ có model.hf_pick, data.hf_load, train.lora_vlm/sft_vlm
 Ưu tiên ngang M2 với backend/research/tester/fixcode. Node chưa có worker thật → báo lỗi LÚC VALIDATE ("bước này chưa chạy thật được"), không fail giữa chừng.
@@ -54,7 +63,7 @@ YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được c�
 | B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | TODO |
 | B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | DOING (probe 0.44 trên Qwen3.5-0.8B) |
 | B-5 | eval.benchmarks (từ CORD worker + lmms-eval, ADR-002) | bao-tester | DOING (thiết kế gửi backend/research 09:25; CORD trước, lmms-eval sau) |
-| B-6 | bench.perf (latency/throughput/peak mem theo tester-perf-bench) | bao-tester | TODO |
+| B-6 | bench.perf (latency/throughput/peak mem theo tester-perf-bench) | bao-tester | DOING (thiết kế: Parse HF in-process trước, vLLM theo B-7) |
 | B-7 | serve.vllm = node "Chạy thử" (vLLM ≥0.31, mem-util ≤0.3, prefix parity) | bao-fixcode | TODO |
 DoD: cả 3 template chạy thật end-to-end trên canvas (template 2 cần user accept Cosmos trên HF).
 
@@ -76,7 +85,7 @@ RÀNG BUỘC CỨNG (PM):
 - Không đổi dist 7870 khi user đang thử app; build dashboard mới ở nhánh/route riêng tới khi user duyệt.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | TODO (API sẵn 10-13: GET /api/storage/plan, POST /api/storage/apply; frontend làm sau khung site M2-3) |
+| G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | REVIEW (UI xong 10-13 trên plan v3, chờ security review xoá file + cleanup contract + design copy) |
 | G-2 | GAP: retention chạy theo lịch trong app (hiện chỉ CLI) | bao-cleanup + bao-backend | scheduler DONE (3f6c1bd); còn wiring app + policy loader (backend) |
 | G-3 | GAP: nút "Sửa nhanh" theo error_catalog actions trên UI | bao-frontend + bao-fixcode | TODO |
 | M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | TODO |
