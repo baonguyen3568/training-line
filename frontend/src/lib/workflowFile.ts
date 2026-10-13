@@ -121,8 +121,14 @@ function parseGraph(rawNodes: unknown, rawEdges: unknown, at: string): GraphResu
   return { nodes, edges };
 }
 
+// Server caps (P016, eb5c017): ≤ 2000 edges per group, ≤ 100 names per inputs/outputs/params, ≤ 500 input targets.
+const MAX_GROUP_EDGES = 2000;
+const MAX_GROUP_NAMES = 100;
+const MAX_INPUT_TARGETS = 500;
+
 const isEndMap = (v: unknown, many: boolean): boolean =>
   isObj(v) &&
+  Object.keys(v).length <= MAX_GROUP_NAMES &&
   Object.entries(v).every(
     ([k, x]) =>
       ID.test(k) && (many ? Array.isArray(x) && x.length <= 64 && x.every(isEnd) : isEnd(x)),
@@ -153,7 +159,12 @@ function parseGroup(g: unknown): { group: GroupDefinition } | { field: string } 
     return { field: "groups.description" };
   const graph = parseGraph(g.nodes, g.edges ?? [], "groups."); // edges optional, as on the server
   if ("field" in graph) return graph;
-  if (!isEndMap(g.inputs, true)) return { field: "groups.inputs" };
+  if (Array.isArray(g.edges) && g.edges.length > MAX_GROUP_EDGES) return { field: "groups.edges" };
+  if (
+    !isEndMap(g.inputs, true) ||
+    Object.values(g.inputs as Record<string, unknown[]>).flat().length > MAX_INPUT_TARGETS
+  )
+    return { field: "groups.inputs" };
   if (!isEndMap(g.outputs, false)) return { field: "groups.outputs" };
   if (!isEndMap(g.params, false)) return { field: "groups.params" };
   return {

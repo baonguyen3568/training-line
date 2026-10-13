@@ -54,6 +54,32 @@ describe("workflow file (untrusted)", () => {
         "groups.nodes.install_url",
       ],
       [[{ ...group, inputs: { data: "a" } }], "groups.inputs"],
+      [
+        [{ ...group, edges: Array(2001).fill({ from: ["a", "x"], to: ["b", "y"] }) }],
+        "groups.edges",
+      ],
+      [
+        [
+          {
+            ...group,
+            params: Object.fromEntries(
+              Array.from({ length: 101 }, (_, i) => [`p${i}`, ["a", "x"]]),
+            ),
+          },
+        ],
+        "groups.params",
+      ],
+      [
+        [
+          {
+            ...group,
+            inputs: Object.fromEntries(
+              Array.from({ length: 8 }, (_, i) => [`i${i}`, Array(64).fill(["a", "x"])]),
+            ),
+          },
+        ],
+        "groups.inputs",
+      ],
     ];
     for (const [groups, field] of rejected)
       expect(parseWorkflowFile(JSON.stringify({ ...wf, groups }))).toEqual({ ok: false, field });
