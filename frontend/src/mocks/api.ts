@@ -428,6 +428,7 @@ export function mockValidate(
       duration_min: est?.minutes ?? null,
       gpu_exclusive: heavy,
       source: est?.source ?? "unknown",
+      duration: null, // like the server's fake worker: no measured runs behind the demo
     },
   };
 }

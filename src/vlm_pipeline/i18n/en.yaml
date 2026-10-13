@@ -366,9 +366,20 @@ estimate:
     unknown: no measurement yet
     unknown_all: no measurements yet for time, RAM, disk
   range_minutes: ~{lo}–{hi} min
-  range_hours: ~{lo}–{hi} h
   range_ram_gb: RAM ~{lo}–{hi} GB
   range_disk_gb: Disk ~{lo}–{hi} GB
+  range_duration: ~{lo} – {hi}
+  dur_m: '{m} min'
+  dur_h: '{h} h'
+  dur_hm: '{h} h {m} min'
+  duration_scope: The time covers training steps only.
+  duration_basis: 'Measured on this machine (earlier runs used: {run_count}).'
+  duration_unmeasured: 'Time not counted yet for: {nodes}.'
+  missing: 'No measurement yet: {names}'
+  name:
+    time: time
+    ram: RAM
+    disk: disk
 app:
   name: NTC-Training
   demo_mode: Demo mode (simulated data) — nothing is actually being trained.
@@ -495,7 +506,7 @@ preflight:
   show_details: Show details
   show_me: Show me
   run_blocked: Fix the errors before running
-  estimate_line: 'Estimated: {time} · {ram} · {disk}'
+  estimate_known: 'Estimated: {parts}'
   queue_when_busy: Queue — runs automatically when the GPU is free
   empty: Add a step to get started
 error_card:

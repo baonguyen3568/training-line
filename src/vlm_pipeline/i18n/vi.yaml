@@ -366,9 +366,20 @@ estimate:
     unknown: chưa có số đo
     unknown_all: chưa có số đo thời gian, RAM, ổ đĩa
   range_minutes: ~{lo}–{hi} phút
-  range_hours: ~{lo}–{hi} giờ
   range_ram_gb: RAM ~{lo}–{hi} GB
   range_disk_gb: Ổ đĩa ~{lo}–{hi} GB
+  range_duration: ~{lo} – {hi}
+  dur_m: '{m} phút'
+  dur_h: '{h} giờ'
+  dur_hm: '{h} giờ {m} phút'
+  duration_scope: Thời gian chỉ tính các bước huấn luyện.
+  duration_basis: Đã đo trên máy này, từ {run_count} lần chạy trước.
+  duration_unmeasured: 'Chưa tính thời gian của: {nodes}.'
+  missing: 'Chưa có số đo: {names}'
+  name:
+    time: thời gian
+    ram: RAM
+    disk: ổ đĩa
 app:
   name: NTC-Training
   demo_mode: Chế độ demo (dữ liệu giả lập) — chưa có gì được train thật.
@@ -495,7 +506,7 @@ preflight:
   show_details: Xem chi tiết
   show_me: Chỉ cho tôi
   run_blocked: Sửa các lỗi trước khi chạy
-  estimate_line: 'Dự kiến: {time} · {ram} · {disk}'
+  estimate_known: 'Dự kiến: {parts}'
   queue_when_busy: Xếp hàng — tự chạy khi GPU rảnh
   empty: Thêm bước để bắt đầu
 error_card:

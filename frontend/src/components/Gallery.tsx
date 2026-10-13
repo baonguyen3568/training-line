@@ -2,14 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import type { TemplateMeta } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
-import { formatEstimate } from "../lib/format";
+import { formatEstimate, formatMinutesRange } from "../lib/format";
 
 /** One "no measurement yet" instead of repeating it per field (design review r4). */
 function estimateLine(it: TemplateMeta): string {
   const e = it.estimate;
-  if (e.source === "unknown" || (e.minutes == null && e.ram_gb == null))
+  // Template minutes are measured runs (backend), so they show even while RAM is still unknown.
+  if (e.minutes == null && (e.source === "unknown" || e.ram_gb == null))
     return `⏱ ${t("estimate.source.unknown")}`;
-  return `⏱ ${formatEstimate(e.minutes, "minutes", e.source)} · ${formatEstimate(e.ram_gb, "ram_gb", e.source)}`;
+  const time = formatMinutesRange(e.minutes);
+  return e.source === "unknown" || e.ram_gb == null
+    ? `⏱ ${time}`
+    : `⏱ ${time} · ${formatEstimate(e.ram_gb, "ram_gb", e.source)}`;
 }
 
 type Filter = "all" | "finetune" | "quantize" | "eval";

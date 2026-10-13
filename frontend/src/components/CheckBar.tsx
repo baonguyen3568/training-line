@@ -1,7 +1,7 @@
 import { useReactFlow } from "@xyflow/react";
 import { useState } from "react";
 import { t } from "../i18n";
-import { formatDuration, formatEstimate } from "../lib/format";
+import { estimateLine, formatDuration } from "../lib/format";
 import { nodeTitle, SEVERITY_GLYPH } from "../lib/nodeText";
 import { runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
@@ -125,20 +125,7 @@ export function CheckBar() {
                 })}
               </span>
             )}
-            {est && (
-              <span className="muted">
-                {" "}
-                ·{" "}
-                {est.source === "unknown" ||
-                (est.duration_min == null && est.ram_gb_peak == null && est.disk_gb == null)
-                  ? t("estimate.source.unknown_all")
-                  : t("preflight.estimate_line", {
-                      time: formatEstimate(est.duration_min, "minutes", est.source),
-                      ram: formatEstimate(est.ram_gb_peak, "ram_gb", est.source),
-                      disk: formatEstimate(est.disk_gb, "disk_gb", est.source),
-                    })}
-              </span>
-            )}
+            {est && <span className="muted"> · {estimateLine(est)}</span>}
             {(errors.length > 0 || warnings.length > 0 || infos.length > 0) && (
               <button
                 type="button"

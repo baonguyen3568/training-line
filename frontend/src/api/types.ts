@@ -198,8 +198,20 @@ export interface ValidationResult {
     disk_gb: Range | null;
     duration_min: Range | null;
     gpu_exclusive: boolean;
+    /** Provenance of RAM/disk only; `duration` carries its own (measured runs). */
     source: EstimateSource;
+    /** Measured training time; null on the fake worker; absent on servers that predate it. */
+    duration?: DurationEstimate | null;
   };
+}
+
+/** Train-node time measured from earlier runs on this machine; never summed past a missing node. */
+export interface DurationEstimate {
+  /** Train nodes only; null as soon as one train node has no measurement. */
+  duration_min: Range | null;
+  per_node: Record<string, { steps: number | null; minutes: Range | null; based_on: string[] }>;
+  /** Heavy non-train nodes (eval/quantize/bench/serve/merge) whose time is not counted yet. */
+  unmeasured: string[];
 }
 
 export interface SystemStatus {

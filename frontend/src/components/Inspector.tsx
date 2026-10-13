@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { NodeSpec, OptionMeta, ParamSchema, PortType, Workflow } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
-import { formatEstimate } from "../lib/format";
+import { durationRunCount, formatEstimate, workflowDurationText } from "../lib/format";
 import { nodeDesc, nodeTitle, SEVERITY_GLYPH, workflowTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
@@ -301,19 +301,50 @@ function upstreamModelMeta(
  * estimate with its source; unknown numbers read "chưa có số đo", never a guess.
  */
 function WorkflowSummary() {
-  const { workflow, validation } = useWorkflow();
+  const { workflow, validation, specs } = useWorkflow();
   if (!workflow) return null;
   const errors = validation?.errors.filter((e) => e.severity === "error").length ?? 0;
   const warnings = validation?.errors.filter((e) => e.severity === "warn").length ?? 0;
   const est = validation?.estimate;
   const unknown = !est || est.source === "unknown";
-  const rows: [string, string, string][] = [
+  const duration = est?.duration;
+  const runCount = durationRunCount(est);
+  const unmeasured = (duration?.unmeasured ?? []).map((id) => {
+    const type = workflow.nodes.find((n) => n.id === id)?.type ?? id;
+    return nodeTitle(specs.get(type), type);
+  });
+  const rows: [string, string, ReactNode][] = [
     [
       "timer",
       t("d4.est_time"),
-      unknown
-        ? t("estimate.source.unknown")
-        : formatEstimate(est.duration_min, "minutes", est.source),
+      <>
+        {workflowDurationText(est)}
+        {duration && (
+          <>
+            <button
+              type="button"
+              className="help-btn inline"
+              popoverTarget="est-duration-help"
+              aria-label={t("d4.explain")}
+            >
+              <Icon name="circle-question-mark" size={14} />
+            </button>
+            <span id="est-duration-help" popover="auto" className="pop">
+              <span className="pop-p">{t("estimate.duration_scope")}</span>
+              {runCount > 0 && (
+                <span className="pop-p">
+                  {t("estimate.duration_basis", { run_count: runCount })}
+                </span>
+              )}
+              {unmeasured.length > 0 && (
+                <span className="pop-p">
+                  {t("estimate.duration_unmeasured", { nodes: unmeasured.join(", ") })}
+                </span>
+              )}
+            </span>
+          </>
+        )}
+      </>,
     ],
     [
       "memory-stick",
