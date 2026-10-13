@@ -6,7 +6,13 @@ import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test as base, expect } from "@playwright/test";
 
-export const test = base.extend<{ external: string[] }>({
+declare global {
+  interface Window {
+    __csp?: string[];
+  }
+}
+
+export const test = base.extend<{ external: string[]; pageHealth: string[] }>({
   external: [
     async ({ page, baseURL }, use) => {
       const external: string[] = [];
@@ -14,12 +20,36 @@ export const test = base.extend<{ external: string[] }>({
       page.on("websocket", (ws) => external.push(ws.url()));
       await page.route("**/*", (route) => {
         const url = route.request().url();
-        if (url.startsWith(origin) || url.startsWith("data:")) return route.continue();
+        if (url.startsWith("data:") || new URL(url).origin === origin) return route.continue();
         external.push(url);
         return route.abort("blockedbyclient");
       });
       await use(external);
       expect(external, "requests outside the local site").toEqual([]);
+    },
+    { auto: true },
+  ],
+  // CSP violations (the policy is a <meta>, so it applies on the static server too), uncaught JS errors and console
+  // errors fail the page: axe cannot see an inline script blocked by CSP or a sidebar broken by a blocked style="".
+  pageHealth: [
+    async ({ page }, use) => {
+      const problems: string[] = [];
+      page.on("pageerror", (err) => problems.push(`pageerror: ${err.message}`));
+      page.on("console", (msg) => {
+        if (msg.type() === "error") problems.push(`console: ${msg.text()}`);
+      });
+      await page.addInitScript(() =>
+        document.addEventListener("securitypolicyviolation", (e) => {
+          window.__csp ??= [];
+          window.__csp.push(`${e.violatedDirective} ${e.blockedURI}`);
+        }),
+      );
+      await use(problems);
+      if (page.url().startsWith("http")) {
+        const csp = await page.evaluate(() => window.__csp ?? []);
+        problems.push(...csp.map((c) => `csp: ${c}`));
+      }
+      expect(problems, "CSP violations / JS errors on the page").toEqual([]);
     },
     { auto: true },
   ],
@@ -35,6 +65,7 @@ export function sitePages(): string[] {
       const path = join(dir, name);
       if (statSync(path).isDirectory()) walk(path);
       else if (name === "index.html") out.push(`/${relative(root, dir).split(sep).join("/")}/`.replace("//", "/"));
+      else if (name === "404.html" && dir === root) out.push("/404.html"); // error page: users land here too
     }
   };
   walk(root);

@@ -20,6 +20,8 @@ for (const path of sitePages()) {
         .filter((a) => a.duration > 10 || a.iterations === Infinity),
     );
     expect(moving, "animations still running under reduced motion").toEqual([]);
+    const smooth = await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior);
+    expect(smooth, "smooth scrolling under reduced motion").not.toBe("smooth");
     const autoplay = await page.locator("video[autoplay]:not([paused])").count();
     expect(autoplay, "autoplaying video under reduced motion").toBe(0);
     const hidden = await page.evaluate(() =>
