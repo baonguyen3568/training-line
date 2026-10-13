@@ -62,30 +62,28 @@
 
 ## G-1: API panel Dung lượng (schema v3)
 
-`GET /api/storage/plan` trả thêm `sections` (giữ các trường cũ của v2 để frontend chuyển dần):
+`GET /api/storage/plan` (schema_version 3) giữ nguyên các trường v2. Thay đổi:
+- `items[]` gồm **mọi nguồn**.
+- Mỗi item có thêm `source`: `node_cache` | `checkpoint` | `set_aside`.
+- Mỗi item có thêm `section`:
+  - `auto`: scheduler sẽ tự làm;
+  - `manual`: cần người chọn, gõ xác nhận khi `confirm_required`;
+  - `kept`: chỉ hiển thị, kèm `lock_reason` + `lock_params`, `size_gb=null`, không nằm trong `plan_id`.
 
-```json
-{
-  "schema_version": 3,
-  "plan_id": "pln_…",
-  "sections": {
-    "auto":   [ /* item app sẽ tự dọn ở lượt scheduler tới */ ],
-    "manual": [ /* item cần người chọn: protected / PERMANENT_LOSS / blocked-but-confirmable */ ],
-    "kept":   [ /* item đang được giữ kèm lý do (KEEP, đang chạy, chưa đủ ngày…) — chỉ để hiển thị */ ]
-  }
-}
-```
+Frontend tự nhóm theo `section`. Ví dụ thật lấy từ code: `013-annex-storage-plan.v3.sample.json`.
 
-Mỗi item thêm các trường:
-- `source`: `node_cache` | `checkpoint` | `set_aside`;
-- `item_id`: dùng nguyên id của module tương ứng. Cache key; `run/path`; `graph:node/entry`.
-
-Các trường giữ nguyên như v2: `consequence_code`, `consequence_params`, `confirm_text`, `protected_reason`.
+Trường theo nguồn (khác v2):
+- `item_id`: cache key; `run/checkpoints/epoch_…`; `graph:<node>/<entry>`.
+- `display_key`: `storage.item.checkpoint_of_run` | `storage.item.set_aside_of_run` (params `run_name`, `checkpoint`).
+- `action`: `delete` | `strip_optim` (retention).
+- `confirm_text` = tên run (giống node cache).
 
 `POST /api/storage/apply` không đổi hình dạng body:
 - Server tách `item_ids` theo `source` của plan rồi gọi `cache_retention.evict` hoặc `retention.apply(confirmed=…)`.
   Phần retention gọi với `by="app-user"`.
 - Quota DISK-002 tính chung cả hai nguồn.
+- Response 200 thêm `pruned[]` (item retention đã làm) cạnh `evicted[]` (cache).
+- DISK-002 `admin_command` có thể gồm 2 lệnh nối bằng ` && ` (cache.py, retention.py `--confirm … --approved-by`).
 
 Hai chỗ cần sửa nhỏ để làm được G-1:
 - `retention.apply` cần tham số `manual=True` để log giống cache. Hiện quota của retention đếm

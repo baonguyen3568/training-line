@@ -1,0 +1,181 @@
+{
+  "schema_version": 3,
+  "plan_id": "pln_23c375ff1de63c5d",
+  "expires_at": 1791858182.482832,
+  "mode": "dry_run",
+  "approval_policy": "none",
+  "threshold_gb": null,
+  "cap_gb": 0.0,
+  "cache_gb": 0.0,
+  "auto_reclaim_gb": 0.0,
+  "shortfall_gb": 0.0,
+  "items": [
+    {
+      "item_id": "eval-1",
+      "group": "temp_result",
+      "display_name": null,
+      "display_key": "storage.item.temp_result_of_run",
+      "display_params": {
+        "run_name": "eval-1"
+      },
+      "size_gb": 0.0,
+      "last_used": 1791857582.4413304,
+      "run_id": "eval-1",
+      "node_type": "vlm/eval.benchmark",
+      "action": "delete",
+      "protected_reason": null,
+      "regenerable": true,
+      "consequence_code": "WILL_RECOMPUTE",
+      "consequence_params": {},
+      "confirm_required": false,
+      "confirm_text": null,
+      "event_type": "cache_evicted",
+      "source": "node_cache",
+      "auto": true,
+      "section": "auto"
+    },
+    {
+      "item_id": "train-1",
+      "group": "trained_model",
+      "display_name": null,
+      "display_key": "storage.item.temp_result_of_run",
+      "display_params": {
+        "run_name": "train-1"
+      },
+      "size_gb": 0.0,
+      "last_used": 1791857582.445296,
+      "run_id": "train-1",
+      "node_type": "vlm/train.lora",
+      "action": "delete",
+      "protected_reason": "TRAINED_MODEL",
+      "regenerable": false,
+      "consequence_code": "PERMANENT_LOSS",
+      "consequence_params": {
+        "name": "train-1"
+      },
+      "confirm_required": true,
+      "confirm_text": "train-1",
+      "event_type": "cache_evicted",
+      "source": "node_cache",
+      "auto": false,
+      "section": "manual"
+    },
+    {
+      "item_id": "r-done/checkpoints/epoch_0_step_10",
+      "source": "checkpoint",
+      "section": "auto",
+      "auto": true,
+      "group": "trained_model",
+      "display_name": null,
+      "display_key": "storage.item.checkpoint_of_run",
+      "display_params": {
+        "run_name": "r-done",
+        "checkpoint": "epoch_0_step_10"
+      },
+      "size_gb": 0.0,
+      "run_id": "r-done",
+      "action": "delete",
+      "protected_reason": null,
+      "lock_reason": null,
+      "lock_params": {},
+      "regenerable": false,
+      "consequence_code": null,
+      "consequence_params": {},
+      "confirm_required": false,
+      "confirm_text": null,
+      "event_type": "checkpoint_pruned"
+    },
+    {
+      "item_id": "r-fail/checkpoints/epoch_0_step_10",
+      "source": "checkpoint",
+      "section": "manual",
+      "auto": false,
+      "group": "trained_model",
+      "display_name": null,
+      "display_key": "storage.item.checkpoint_of_run",
+      "display_params": {
+        "run_name": "r-fail",
+        "checkpoint": "epoch_0_step_10"
+      },
+      "size_gb": 0.0,
+      "run_id": "r-fail",
+      "action": "delete",
+      "protected_reason": null,
+      "lock_reason": null,
+      "lock_params": {},
+      "regenerable": false,
+      "consequence_code": "PERMANENT_LOSS",
+      "consequence_params": {
+        "name": "r-fail/epoch_0_step_10"
+      },
+      "confirm_required": true,
+      "confirm_text": "r-fail",
+      "event_type": "checkpoint_pruned"
+    },
+    {
+      "item_id": "r-keep/checkpoints/epoch_0_step_10",
+      "source": "checkpoint",
+      "section": "kept",
+      "auto": false,
+      "group": "trained_model",
+      "display_name": null,
+      "display_key": "storage.item.checkpoint_of_run",
+      "display_params": {
+        "run_name": "r-keep",
+        "checkpoint": "epoch_0_step_10"
+      },
+      "size_gb": null,
+      "run_id": "r-keep",
+      "action": "keep",
+      "protected_reason": null,
+      "lock_reason": "PINNED_OR_KEEP",
+      "lock_params": {
+        "run": "r-keep"
+      },
+      "regenerable": false,
+      "consequence_code": null,
+      "consequence_params": {},
+      "confirm_required": false,
+      "confirm_text": null,
+      "event_type": "checkpoint_pruned"
+    },
+    {
+      "item_id": "graph:n1/checkpoints.not-resumable-20261008-091302",
+      "source": "set_aside",
+      "section": "manual",
+      "auto": false,
+      "group": "trained_model",
+      "display_name": null,
+      "display_key": "storage.item.set_aside_of_run",
+      "display_params": {
+        "run_name": "n1",
+        "checkpoint": "checkpoints.not-resumable-20261008-091302"
+      },
+      "size_gb": 0.0,
+      "run_id": "n1",
+      "action": "delete",
+      "protected_reason": "TRAINED_MODEL",
+      "lock_reason": null,
+      "lock_params": {},
+      "regenerable": false,
+      "consequence_code": "PERMANENT_LOSS",
+      "consequence_params": {
+        "name": "n1/checkpoints.not-resumable-20261008-091302"
+      },
+      "confirm_required": true,
+      "confirm_text": "n1",
+      "event_type": "checkpoint_pruned"
+    }
+  ],
+  "error": {
+    "code": "DISK-003",
+    "params": {
+      "gb_over": 0.0,
+      "cap_gb": 0.0,
+      "protected_count": 1
+    },
+    "title": "Bộ nhớ đệm đầy, cần bạn chọn mục xoá",
+    "what": "Kết quả lưu tạm đã vượt mức 0.0 GB thêm 0.0 GB, nhưng 1 mục còn lại đều được bảo vệ (model đã train, mục đã ghim, bản xuất) nên app không tự xoá. Bạn chọn mục muốn xoá trong panel Dung lượng.",
+    "why": null
+  }
+}
