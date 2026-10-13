@@ -16,7 +16,7 @@ import signal
 import subprocess
 import threading
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
@@ -82,6 +82,22 @@ _SECRET_NAME = re.compile(r"(?:^|_)(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD|CREDENTIA
 SECRET_ENV_ALLOWLIST: frozenset[str] = frozenset()
 
 
+def validate_rw_dirs(project_root: Path, dirs: Iterable[Path]) -> list[Path]:
+    """Resolved writable dirs, each strictly under <project>/outputs/ and not in outputs/system (host logs, locks).
+
+    Call it BEFORE creating any of them: a rejected dir must never be created (bao-security).
+    """
+    outputs = (project_root / "outputs").resolve()
+    system = outputs / "system"
+    resolved = []
+    for rw in dirs:
+        host = rw.resolve()
+        if outputs not in host.parents or host == system or system in host.parents:
+            raise ValueError(f"rw dir {rw} must be inside {outputs} (not outputs/system: host logs, locks)")
+        resolved.append(host)
+    return resolved
+
+
 def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None = None) -> list[str]:
     """Pure: the full ``docker run`` argv for ``job`` (tested; no shell, no user-controlled flags)."""
     env = {**BASE_ENV, **job.env}
@@ -94,11 +110,7 @@ def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None
         env[gpu_lock.TOKEN_ENV] = lock_token
     mount = f"{project_root}:{CONTAINER_ROOT}" + (":ro" if job.read_only_project else "")
     overlays: list[str] = []
-    outputs = (project_root / "outputs").resolve()
-    for rw in job.rw_dirs:
-        host = rw.resolve()
-        if outputs not in host.parents or host == outputs / "system" or (outputs / "system") in host.parents:
-            raise ValueError(f"rw dir {rw} must be inside {outputs} (not outputs/system: host logs, locks)")
+    for host in validate_rw_dirs(project_root, job.rw_dirs):
         overlays += ["-v", f"{host}:{CONTAINER_ROOT}/{host.relative_to(project_root.resolve()).as_posix()}"]
     # SEC-005: the project mount must not expose secrets files (.env holds the HF token; jobs run as the same uid).
     # Each root-level .env* is covered by an empty read-only file. Narrower mounts (P015) are the long-term fix.

@@ -5,18 +5,35 @@
 
 ``RUN_DIR`` in the command is replaced by the run directory as seen in the container. Network none, HF offline,
 non-root, repo mounted at /workspace (same baseline as every job). Exit code 0 only if the run completed.
+``--read-only-project`` mounts the repo read-only; the run dir and each ``--rw-dir`` (under outputs/) stay writable.
+An image bao-security has not approved yet (``--allow-unapproved-image``) ALWAYS runs read-only: its code is not
+trusted to write to src/, scripts/ or .git/ (bao-security, vLLM probe). ``--unapproved-image-rw`` opts out, logged.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import secrets
 import time
+from pathlib import Path
 
-from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job, tightened_thresholds
+from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job, tightened_thresholds, validate_rw_dirs
 from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
+
+logger = logging.getLogger(__name__)
+
+
+def build_job(a: argparse.Namespace, root: Path, run_id: str, run_dir: Path, argv_c: tuple[str, ...]) -> ContainerJob:
+    """The container job for parsed ``a``: an unapproved image is read-only unless explicitly opted out."""
+    read_only = a.read_only_project or (a.allow_unapproved_image and not a.unapproved_image_rw)
+    if a.allow_unapproved_image and a.unapproved_image_rw:
+        logger.warning("unapproved image %s runs with the project mounted READ-WRITE (--unapproved-image-rw)", a.image)
+    rw_dirs = (run_dir, *(root / d for d in a.rw_dir)) if read_only else ()
+    return ContainerJob(name=run_id, image=a.image, argv=argv_c, gpu=not a.no_gpu,
+                        read_only_project=read_only, rw_dirs=rw_dirs)  # fmt: skip
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,6 +47,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--who", default="cli")
     p.add_argument("--allow-unapproved-image", action="store_true",
                    help="team probes only: run on a pinned image that bao-security has not approved yet")  # fmt: skip
+    p.add_argument("--read-only-project", action="store_true", help="mount the repo read-only (run dir stays rw)")
+    p.add_argument("--rw-dir", action="append", default=[], type=Path, metavar="PATH",
+                   help="extra writable dir under outputs/ (with a read-only project), repeatable")  # fmt: skip
+    p.add_argument("--unapproved-image-rw", action="store_true",
+                   help="with --allow-unapproved-image: keep the repo writable (not recommended, logged)")  # fmt: skip
     p.add_argument("cmd", nargs=argparse.REMAINDER, help="-- command ...")
     a = p.parse_args(argv)
     cmd = a.cmd[1:] if a.cmd[:1] == ["--"] else a.cmd
@@ -45,7 +67,13 @@ def main(argv: list[str] | None = None) -> int:
     manifest = RunManifest(run_id=run_id, name=f"{a.stage} {a.tag}", stage=a.stage, task=a.stage,
                            container_image=a.image, tags=["cli"])  # fmt: skip
     write_manifest(run_dir, manifest)
-    job = ContainerJob(name=run_id, image=a.image, argv=argv_c, gpu=not a.no_gpu)
+    job = build_job(a, root, run_id, run_dir, argv_c)
+    try:
+        rw_dirs = validate_rw_dirs(root, job.rw_dirs)  # before creating anything: a rejected dir is never created
+    except ValueError as exc:
+        p.error(str(exc))
+    for d in rw_dirs:  # docker would create a missing bind source as root
+        d.mkdir(parents=True, exist_ok=True)
     final = run_job(job, manifest, run_dir, project_root=root, who=a.who, est_peak_gb=a.est_peak_gb,
                     mem_thresholds=tightened_thresholds(a.abort_gb),
                     require_approved_image=not a.allow_unapproved_image)  # fmt: skip
