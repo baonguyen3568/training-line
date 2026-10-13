@@ -66,6 +66,7 @@ PM = `bao-trainning-1` (điều phối, giải quyết mâu thuẫn, chốt quy�
 - Chỉ ghi/xoá file **bên trong** `/home/ntcai/Trainning-model`, data root cấu hình trong `.env.local`, và `~/.config/ntc-training` (chỉ PM/user tạo file policy). Ngoại lệ: cache pip/uv/HF/docker image pull.
 - **KHÔNG**: `docker system prune`, xoá/stop container/image không thuộc dự án, `git push`, sửa `~/.claude/settings.json`,
   `sudo` thay đổi hệ thống, `rm -rf` ngoài project. Cần những việc đó → hỏi PM, PM hỏi user.
+- **Không đọc/in/cat** `.env`, `.env.local` hay bất kỳ `.env*` (trừ file `*.example`). Cần biết có key hay không → hỏi PM/security.
 - Không commit secrets (HF token, NGC key, W&B key) — dùng `.env` (đã gitignore).
 - Download model/dataset lớn (>20GB) → báo PM trước (disk còn ~2TB nhưng dùng chung).
 - Container dự án đặt tên prefix `vlm-` để dễ nhận diện/dọn dẹp.

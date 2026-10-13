@@ -13,3 +13,9 @@
 - **Cấu hình user (D-7):** lưu trong DB app, chỉnh qua trang Cài đặt. Secret mã hoá AEAD, chỉ ghi (trả last4), có audit log. `admin_policy` chỉ đọc qua API.
 - **Data root:** mặc định trong thư mục dự án (`.cache/`, `outputs/`, `data/`), đổi được qua `.env.local`. Quy tắc an toàn của team áp dụng cho repo + data root đã cấu hình + `~/.config/ntc-training`.
 - Bắt buộc 6 nhóm gate + 5 bảo vệ token có test hồi quy (P015 §6.1).
+
+## Điều kiện bắt buộc vì `.env.local` nằm trong repo (bao-security, chấp nhận)
+1. Mỗi Dockerfile có `.dockerignore` chứa `.env*` + `**/.env*`. check.sh kiểm build context không chứa file env. Security kiểm `docker history`/layer sau mỗi build.
+2. Không service compose nào bind gốc repo (kể cả compose dev); chỉ bind thư mục con. Có test parse `docker compose config`.
+3. Git: `.gitignore` `.env.*` (đã có) + gitleaks + scan_tokens tracked.
+4. Người/agent: không đọc/in `.env*`. README cảnh báo không zip/chia sẻ thư mục dự án khi còn `.env.local`.
