@@ -123,4 +123,53 @@ def neutralize_name_or_path(folder: Path, value: str) -> list[str]:
     return changed
 
 
-__all__ = ["absolute_path_findings", "neutralize_name_or_path", "remote_code_findings"]
+_CACHE_FILES = ("config.json", "generation_config.json")
+# Top level + a VLM's language-model config. A model that keeps use_cache elsewhere (e.g. Parse's "decoder",
+# "language_config") needs its scope added here.
+_CACHE_SCOPES = ("", "text_config")
+
+
+def _scope(data: Any, name: str) -> dict[str, Any] | None:
+    node = data if not name else (data.get(name) if isinstance(data, dict) else None)
+    return node if isinstance(node, dict) else None
+
+
+def follow_base_use_cache(folder: Path, upstream: Path | None) -> list[str]:
+    """``use_cache`` in the export's configs as the base model has it (set, or removed); returns changed keys.
+
+    Training may save ``use_cache: false`` (e.g. the Parse decoder patch, needed to train and resume): an export is
+    for inference, where false makes HF generate ~3x slower without a word (fixcode / tester 2026-10-13).
+    """
+    changed: list[str] = []
+    for name in _CACHE_FILES:
+        cfg = folder / name
+        if not cfg.is_file():
+            continue
+        base_file = upstream / name if upstream is not None else None
+        try:
+            base = json.loads(base_file.read_text(encoding="utf-8")) if base_file and base_file.is_file() else {}
+        except (OSError, ValueError):
+            base = {}
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+        hits: list[str] = []
+        for scope in _CACHE_SCOPES:
+            node, base_node = _scope(data, scope), _scope(base, scope)
+            if node is None or "use_cache" not in node:
+                continue
+            where = f"{scope}.use_cache" if scope else "use_cache"
+            if base_node is not None and "use_cache" in base_node:
+                if node["use_cache"] != base_node["use_cache"]:
+                    node["use_cache"] = base_node["use_cache"]
+                    hits.append(where)
+            else:
+                del node["use_cache"]  # the library default (true for generation)
+                hits.append(where)
+        if hits:
+            tmp = cfg.with_name(cfg.name + ".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            tmp.replace(cfg)
+            changed += [f"{name}: {h}" for h in hits]
+    return changed
+
+
+__all__ = ["absolute_path_findings", "follow_base_use_cache", "neutralize_name_or_path", "remote_code_findings"]

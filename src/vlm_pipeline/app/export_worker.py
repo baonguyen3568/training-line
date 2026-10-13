@@ -184,6 +184,7 @@ def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
         _copy_allowed(src, tmp, blobs=_hub_blobs(worker.root, src))
         _check_complete(tmp, job)
         portable.neutralize_name_or_path(tmp, f"{entry.repo}@{entry.revision}")
+        portable.follow_base_use_cache(tmp, upstream)  # an export is for inference: never a training-time false
         if portable.remote_code_findings(tmp) or portable.absolute_path_findings(tmp, upstream=upstream):
             raise ExportUnsupportedError("export is not portable", params=unsupported)
         base_ref = model.hash if "@" in model.hash.split(":", 1)[0] else None

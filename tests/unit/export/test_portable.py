@@ -79,3 +79,34 @@ def test_files_identical_to_upstream_are_not_marker_scanned(tmp_path: Path) -> N
     assert findings == ["README.md: contains a machine path (/home/)"]
     (out / "vocab.json").write_text('{"/workspace": 2}')  # changed here: scanned again
     assert "vocab.json: contains a machine path (/workspace)" in portable.absolute_path_findings(out, upstream=up)
+
+
+def _cfg(folder: Path, name: str, data: dict[str, object]) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / name).write_text(json.dumps(data))
+
+
+def test_an_export_takes_use_cache_from_its_base(tmp_path: Path) -> None:
+    """fixcode/tester 2026-10-13: a training-time use_cache=false made HF generate ~3x slower for the user."""
+    base, export = tmp_path / "base", tmp_path / "export"
+    _cfg(base, "config.json", {"model_type": "x", "text_config": {"use_cache": True}})
+    _cfg(base, "generation_config.json", {"max_length": 9})
+    _cfg(export, "config.json", {"model_type": "x", "use_cache": False, "text_config": {"use_cache": False}})
+    _cfg(export, "generation_config.json", {"max_length": 9, "use_cache": False})
+    changed = portable.follow_base_use_cache(export, base)
+    config = json.loads((export / "config.json").read_text())
+    assert config["text_config"]["use_cache"] is True  # the base's value
+    assert "use_cache" not in config  # the base has none: the library default
+    assert "use_cache" not in json.loads((export / "generation_config.json").read_text())
+    assert sorted(changed) == ["config.json: text_config.use_cache", "config.json: use_cache",
+                               "generation_config.json: use_cache"]  # fmt: skip
+    assert portable.follow_base_use_cache(export, base) == []  # nothing left to change
+
+
+def test_use_cache_already_like_the_base_is_untouched(tmp_path: Path) -> None:
+    base, export = tmp_path / "base", tmp_path / "export"
+    _cfg(base, "config.json", {"use_cache": True})
+    _cfg(export, "config.json", {"use_cache": True})
+    before = (export / "config.json").read_bytes()
+    assert portable.follow_base_use_cache(export, base) == []
+    assert (export / "config.json").read_bytes() == before
