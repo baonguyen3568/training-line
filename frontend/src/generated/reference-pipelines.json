@@ -240,7 +240,7 @@
       "summary_key": "reference_pipeline.quantize-fp8-benchmark.summary",
       "kind": "app_template",
       "template_id": "quantize_bench",
-      "status": "planned",
+      "status": "available",
       "difficulty": "basic",
       "title": {
         "vi": "Nén FP8 và đo lại điểm (ModelOpt)",
@@ -266,10 +266,11 @@
           ],
           "n": 500
         },
-        "config": "Qwen3.5-2B, ModelOpt FP8 per-tensor, 128 CORD train images for calibration, vision tower and lm_head kept BF16; 4.57 GB -> 3.07 GB. Only the difference to BF16 is meaningful, not the absolute score",
+        "config": "Qwen3.5-2B, ModelOpt FP8 per-tensor, 128 CORD train images for calibration, vision tower and lm_head kept BF16; 4.57 GB -> 3.07 GB. Only the difference to BF16 is meaningful, not the absolute score. Repeated runs of the same models moved it between -0.4 and -1.2 (vLLM batch noise), right at the -1 limit: a run may show a warning",
         "sources": [
           "benchmarks/eval/r3-qwen3.5-2b-fp8-ocrbench-gate-20261013.json",
-          ".team/proposals/001-stack-model-catalog.md"
+          ".team/proposals/001-stack-model-catalog.md",
+          ".team/release/1.0-checklist.md"
         ]
       },
       "steps": [

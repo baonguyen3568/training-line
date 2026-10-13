@@ -95,7 +95,7 @@ pipelines:
     summary_key: reference_pipeline.quantize-fp8-benchmark.summary
     kind: app_template
     template_id: quantize_bench
-    status: planned  # becomes available when the quantize worker (B-4), a Qwen eval suite and FP8 serving land
+    status: available  # template unhidden 2026-10-13 after the real app smoke (tester, graph g-20261013-232342-fbcb95)
     difficulty: basic
     title: {vi: "Nén FP8 và đo lại điểm (ModelOpt)", en: "FP8 quantization + re-score (ModelOpt)"}
     source_url: https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/hf_ptq
@@ -105,8 +105,8 @@ pipelines:
       train_minutes: null  # no training; the quantize step itself took 11 min (Qwen3.5-2B, calib 128)
       peak_ram_gb: 17.8
       score: {benchmark: "OCRBench regression_500 (in-app, vLLM)", metric: accuracy_delta_fp8_minus_bf16, value: -0.6, ci95: [-1.8, 0.4], n: 500}
-      config: "Qwen3.5-2B, ModelOpt FP8 per-tensor, 128 CORD train images for calibration, vision tower and lm_head kept BF16; 4.57 GB -> 3.07 GB. Only the difference to BF16 is meaningful, not the absolute score"
-      sources: [benchmarks/eval/r3-qwen3.5-2b-fp8-ocrbench-gate-20261013.json, .team/proposals/001-stack-model-catalog.md]
+      config: "Qwen3.5-2B, ModelOpt FP8 per-tensor, 128 CORD train images for calibration, vision tower and lm_head kept BF16; 4.57 GB -> 3.07 GB. Only the difference to BF16 is meaningful, not the absolute score. Repeated runs of the same models moved it between -0.4 and -1.2 (vLLM batch noise), right at the -1 limit: a run may show a warning"
+      sources: [benchmarks/eval/r3-qwen3.5-2b-fp8-ocrbench-gate-20261013.json, .team/proposals/001-stack-model-catalog.md, .team/release/1.0-checklist.md]
     steps:
       - {node: model.hf_pick, label: {vi: "Model gốc", en: "Base model"}}
       - {node: data.hf_load, label: {vi: "Dữ liệu hiệu chỉnh", en: "Calibration data"}}
