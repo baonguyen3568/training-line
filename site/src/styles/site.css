@@ -1,0 +1,107 @@
+/* Marketing layout skeleton: tokens only, no hard-coded colors. bao-design owns the look (M2-1). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+}
+a {
+  color: var(--color-action-link);
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+.skip:focus {
+  left: var(--space-16);
+  top: var(--space-8);
+}
+.site-header,
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-16) var(--space-24);
+  background: var(--color-surface);
+}
+.site-header ul,
+.site-footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--color-text-primary);
+}
+[aria-current="page"] {
+  font-weight: 600;
+}
+main {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-32) var(--space-16);
+}
+.prose {
+  max-width: 44rem;
+}
+.site-footer p {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.hint {
+  display: inline-block;
+  position: relative;
+}
+.hint summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.25em;
+  height: 1.25em;
+  border-radius: 50%;
+  border: 1px solid var(--color-text-muted);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.hint summary::-webkit-details-marker {
+  display: none;
+}
+.hint-body {
+  position: absolute;
+  z-index: 10;
+  width: min(20rem, 80vw);
+  padding: var(--space-12);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+}
+.hint-body strong {
+  display: block;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

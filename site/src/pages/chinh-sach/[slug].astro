@@ -1,0 +1,22 @@
+---
+// Policy pages imported from docs/legal (see src/data/legal.ts). The markdown carries its own <h1>.
+// set:html is safe ONLY because docs/legal is trusted, security-reviewed repo content: never point the `legal`
+// collection (or this route) at user-provided or remote content.
+import { getCollection } from "astro:content";
+import Marketing from "~/layouts/Marketing.astro";
+import { withProductName, withSiteLinks } from "~/lib/legal-html";
+
+export async function getStaticPaths() {
+  const pages = await getCollection("legal");
+  return pages.map((page) => ({ params: { slug: page.id }, props: { page } }));
+}
+const { page } = Astro.props;
+const html = withSiteLinks(withProductName(page.rendered?.html ?? ""));
+---
+
+<Marketing title={withProductName(page.data.title)} description={withProductName(page.data.description)}>
+  <article class="prose">
+    {page.data.effective_date && <p class="effective">Hiệu lực từ: {page.data.effective_date}</p>}
+    <Fragment set:html={html} />
+  </article>
+</Marketing>

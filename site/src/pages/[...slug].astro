@@ -1,0 +1,19 @@
+---
+// Marketing-layout MDX pages from the `pages` collection (policies, changelog, FAQ, ...).
+import { getCollection, render } from "astro:content";
+import Marketing from "~/layouts/Marketing.astro";
+
+export async function getStaticPaths() {
+  const pages = await getCollection("pages");
+  return pages.map((page) => ({ params: { slug: page.id }, props: { page } }));
+}
+const { page } = Astro.props;
+const { Content } = await render(page);
+---
+
+<Marketing title={page.data.title} description={page.data.description}>
+  <article class="prose">
+    <h1>{page.data.title}</h1>
+    <Content />
+  </article>
+</Marketing>

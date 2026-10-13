@@ -1,0 +1,14 @@
+/* Starlight docs follow the shared design tokens (same source as the app). */
+:root {
+  --sl-font: var(--font-family-ui);
+  --sl-font-mono: var(--font-family-mono);
+  --sl-color-accent: var(--color-accent-brand);
+  --sl-color-accent-high: var(--color-action-link);
+  --sl-color-text-accent: var(--color-action-link);
+  --sl-color-bg: var(--color-page);
+  --sl-color-bg-nav: var(--color-surface);
+  --sl-color-bg-sidebar: var(--color-surface);
+  --sl-color-white: var(--color-text-primary);
+  --sl-color-gray-2: var(--color-text-secondary);
+  --sl-color-gray-3: var(--color-text-muted);
+}

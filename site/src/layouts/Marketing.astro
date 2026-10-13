@@ -1,0 +1,51 @@
+---
+import "~/generated/tokens.css";
+import "~/styles/site.css";
+import { footer, nav, productName } from "~/data/nav";
+
+interface Props {
+  title: string;
+  description: string;
+}
+const { title, description } = Astro.props;
+const path = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="referrer" content="no-referrer" />
+    <title>{title === productName ? title : `${title} · ${productName}`}</title>
+  </head>
+  <body>
+    <a class="skip" href="#main">Bỏ qua tới nội dung</a>
+    <header class="site-header">
+      <a class="brand" href="/">{productName}</a>
+      <nav aria-label="Chính">
+        <ul>
+          {
+            nav.map((item) => (
+              <li>
+                <a href={item.href} aria-current={path.startsWith(item.href) ? "page" : undefined}>
+                  {item.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </header>
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <nav aria-label="Chân trang">
+        <ul>{footer.map((item) => <li><a href={item.href}>{item.label}</a></li>)}</ul>
+      </nav>
+      <p>Miễn phí, mã nguồn mở Apache-2.0. Built on NVIDIA software.</p>
+    </footer>
+  </body>
+</html>

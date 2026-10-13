@@ -1,6 +1,7 @@
 // Build CSS custom properties from the DTCG design tokens owned by bao-design.
 // Input:  ../design/tokens/{base,color.light,color.dark}.tokens.json
-// Output: src/generated/tokens.css  (generated, git-ignored, do not edit)
+// Output: src/generated/tokens.css  (generated, git-ignored, do not edit); `--out <path>` (relative to the cwd)
+//         lets site/ reuse the same tokens without a second copy.
 // Deliberately dependency-free (no Style Dictionary) to keep the supply chain small.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -8,7 +9,11 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const tokensDir = resolve(here, "../../design/tokens");
-const outFile = resolve(here, "../src/generated/tokens.css");
+const outArg = process.argv.indexOf("--out");
+const outFile =
+  outArg > 0 && process.argv[outArg + 1]
+    ? resolve(process.argv[outArg + 1])
+    : resolve(here, "../src/generated/tokens.css");
 
 const load = (name) => JSON.parse(readFileSync(resolve(tokensDir, `${name}.tokens.json`), "utf8"));
 

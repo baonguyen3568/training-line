@@ -473,6 +473,4500 @@ assets:
     commercial: "yes"
     derivatives: "yes"
     obligations: "dev/test only (E2E), not shipped in dist; keep LICENSE + NOTICE if ever redistributed"
-    scope: [dev]
+    scope: [dev, site-dev]
     reviewer: bao-security  # approved 2026-10-12; LICENSE + NOTICE read by bao-tester; dev-only (chromium headless shell + ffmpeg-1011 in .cache/ms-playwright, not distributed)
     date: 2026-10-12
+
+# site/ runtime + build deps (astro 7.3.5, @astrojs/starlight 0.42.5, M2-3), bao-frontend 2026-10-13.
+# Generated from site/package-lock.json (non-dev, installed on linux-arm64); notice = first Copyright line of LICENSE.
+# scope site = may ship client JS in site/dist (to verify); site-build = static generator only. DRAFT: awaiting bao-security.
+  - repo_id: npm:@astrojs/compiler-binding
+    kind: code
+    version: 0.5.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/compiler-binding/v/0.5.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2026 [Astro contributors](https://github.com/withastro/compiler/graphs/contributors)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/compiler-binding-linux-arm64-gnu
+    kind: code
+    version: 0.5.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/compiler-binding-linux-arm64-gnu/v/0.5.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/compiler-rs
+    kind: code
+    version: 0.5.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/compiler-rs/v/0.5.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2026 [Astro contributors](https://github.com/withastro/compiler/graphs/contributors)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/internal-helpers
+    kind: code
+    version: 0.11.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/internal-helpers/v/0.11.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Fred K. Schott"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/markdown-satteri
+    kind: code
+    version: 0.4.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/markdown-satteri/v/0.4.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Fred K. Schott"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/mdx
+    kind: code
+    version: 8.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/mdx/v/8.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Fred K. Schott"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/prism
+    kind: code
+    version: 4.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/prism/v/4.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Fred K. Schott"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/sitemap
+    kind: code
+    version: 3.7.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/sitemap/v/3.7.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Fred K. Schott"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/starlight
+    kind: code
+    version: 0.42.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/starlight/v/0.42.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2023 [Astro contributors](https://github.com/withastro/starlight/graphs/contributors)"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@astrojs/telemetry
+    kind: code
+    version: 3.3.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/@astrojs/telemetry/v/3.3.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Fred K. Schott"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@babel/helper-string-parser
+    kind: code
+    version: 7.29.7
+    license: MIT
+    license_url: https://www.npmjs.com/package/@babel/helper-string-parser/v/7.29.7
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014-present Sebastian McKenzie and other contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@babel/helper-validator-identifier
+    kind: code
+    version: 7.29.7
+    license: MIT
+    license_url: https://www.npmjs.com/package/@babel/helper-validator-identifier/v/7.29.7
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014-present Sebastian McKenzie and other contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@babel/parser
+    kind: code
+    version: 7.29.9
+    license: MIT
+    license_url: https://www.npmjs.com/package/@babel/parser/v/7.29.9
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (C) 2012-2014 by various contributors (see AUTHORS)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@babel/types
+    kind: code
+    version: 7.29.8
+    license: MIT
+    license_url: https://www.npmjs.com/package/@babel/types/v/7.29.8
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014-present Sebastian McKenzie and other contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@bruits/satteri-linux-arm64-gnu
+    kind: code
+    version: 0.10.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/@bruits/satteri-linux-arm64-gnu/v/0.10.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@capsizecss/unpack
+    kind: code
+    version: 4.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@capsizecss/unpack/v/4.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 SEEK"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@clack/core
+    kind: code
+    version: 1.5.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@clack/core/v/1.5.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "MIT License Copyright (c) 2025-Present [Bombshell contributors](https://bomb.sh/team)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@clack/prompts
+    kind: code
+    version: 1.8.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@clack/prompts/v/1.8.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "MIT License Copyright (c) 2025-Present [Bombshell contributors](https://bomb.sh/team)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@ctrl/tinycolor
+    kind: code
+    version: 4.2.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@ctrl/tinycolor/v/4.2.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Scott Cooper <scttcper@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@emnapi/core
+    kind: code
+    version: 1.11.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/@emnapi/core/v/1.11.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021-present Toyobayashi"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@emnapi/runtime
+    kind: code
+    version: 1.11.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/@emnapi/runtime/v/1.11.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021-present Toyobayashi"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@emnapi/wasi-threads
+    kind: code
+    version: 1.2.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/@emnapi/wasi-threads/v/1.2.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021-present Toyobayashi"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@esbuild/linux-arm64
+    kind: code
+    version: 0.28.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@esbuild/linux-arm64/v/0.28.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@expressive-code/core
+    kind: code
+    version: 0.44.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@expressive-code/core/v/0.44.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2023 Tibor Schiemann"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@expressive-code/plugin-frames
+    kind: code
+    version: 0.44.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@expressive-code/plugin-frames/v/0.44.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2023 Tibor Schiemann"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@expressive-code/plugin-shiki
+    kind: code
+    version: 0.44.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@expressive-code/plugin-shiki/v/0.44.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2023 Tibor Schiemann"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@expressive-code/plugin-text-markers
+    kind: code
+    version: 0.44.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@expressive-code/plugin-text-markers/v/0.44.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2023 Tibor Schiemann"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@img/colour
+    kind: code
+    version: 1.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@img/colour/v/1.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2012 Heather Arthur"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@img/sharp-libvips-linux-arm64
+    kind: code
+    version: 1.3.4
+    license: LGPL-3.0-or-later
+    license_url: https://www.npmjs.com/package/@img/sharp-libvips-linux-arm64/v/1.3.4
+    commercial: "yes"
+    derivatives: "conditional"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist; LGPL native lib: dynamically loaded by sharp, unused (passthrough image service), never distributed"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@img/sharp-linux-arm64
+    kind: code
+    version: 0.35.5
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@img/sharp-linux-arm64/v/0.35.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@img/sharp-wasm32
+    kind: code
+    version: 0.35.5
+    license: "Apache-2.0 AND LGPL-3.0-or-later AND MIT"
+    license_url: https://www.npmjs.com/package/@img/sharp-wasm32/v/0.35.5
+    commercial: "yes"
+    derivatives: "conditional"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist; LGPL native lib: dynamically loaded by sharp, unused (passthrough image service), never distributed"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@jridgewell/sourcemap-codec
+    kind: code
+    version: 1.6.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@jridgewell/sourcemap-codec/v/1.6.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2024 Justin Ridgewell <justin@ridgewell.name>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@napi-rs/wasm-runtime
+    kind: code
+    version: 1.2.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/@napi-rs/wasm-runtime/v/1.2.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@oslojs/encoding
+    kind: code
+    version: 1.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@oslojs/encoding/v/1.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024 pilcrowOnPaper"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@oxc-project/types
+    kind: code
+    version: 0.152.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@oxc-project/types/v/0.152.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024-present VoidZero Inc. & Contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@pagefind/default-ui
+    kind: code
+    version: 1.5.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@pagefind/default-ui/v/1.5.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "no copyright line in LICENSE file"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@pagefind/linux-arm64
+    kind: code
+    version: 1.5.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@pagefind/linux-arm64/v/1.5.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@rolldown/binding-linux-arm64-gnu
+    kind: code
+    version: 1.2.12
+    license: MIT
+    license_url: https://www.npmjs.com/package/@rolldown/binding-linux-arm64-gnu/v/1.2.12
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@rolldown/pluginutils
+    kind: code
+    version: 1.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/@rolldown/pluginutils/v/1.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2026-present, rolldown/plugins repository contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/core
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/core/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/engine-javascript
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/engine-javascript/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/engine-oniguruma
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/engine-oniguruma/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/langs
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/langs/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/primitive
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/primitive/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/themes
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/themes/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/types
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/types/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@shikijs/vscode-textmate
+    kind: code
+    version: 10.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@shikijs/vscode-textmate/v/10.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Microsoft Corporation"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@tybys/wasm-util
+    kind: code
+    version: 0.10.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/@tybys/wasm-util/v/0.10.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2022-present Toyobayashi"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@ungap/structured-clone
+    kind: code
+    version: 1.4.0
+    license: ISC
+    license_url: https://www.npmjs.com/package/@ungap/structured-clone/v/1.4.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021, Andrea Giammarchi, @WebReflection"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:am-i-vibing
+    kind: code
+    version: 0.4.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/am-i-vibing/v/0.4.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:anymatch
+    kind: code
+    version: 3.1.3
+    license: ISC
+    license_url: https://www.npmjs.com/package/anymatch/v/3.1.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2019 Elan Shanker, Paul Miller (https://paulmillr.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:picomatch
+    kind: code
+    version: 2.3.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/picomatch/v/2.3.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2017-present, Jon Schlinkert."
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:arg
+    kind: code
+    version: 5.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/arg/v/5.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Vercel, Inc."
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:argparse
+    kind: code
+    version: 2.0.1
+    license: Python-2.0
+    license_url: https://www.npmjs.com/package/argparse/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "i.e., \"Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:aria-query
+    kind: code
+    version: 5.3.2
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/aria-query/v/5.3.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2020 A11yance"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:astro
+    kind: code
+    version: 7.3.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/astro/v/7.3.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2021 Fred K. Schott"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:astro-expressive-code
+    kind: code
+    version: 0.44.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/astro-expressive-code/v/0.44.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2023 Tibor Schiemann"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:axobject-query
+    kind: code
+    version: 4.1.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/axobject-query/v/4.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2020 A11yance"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:bail
+    kind: code
+    version: 2.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/bail/v/2.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:bcp-47
+    kind: code
+    version: 2.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/bcp-47/v/2.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:bcp-47-match
+    kind: code
+    version: 2.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/bcp-47-match/v/2.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2018 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:boolbase
+    kind: code
+    version: 1.0.0
+    license: ISC
+    license_url: https://www.npmjs.com/package/boolbase/v/1.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ccount
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/ccount/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:character-entities
+    kind: code
+    version: 2.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/character-entities/v/2.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:character-entities-html4
+    kind: code
+    version: 2.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/character-entities-html4/v/2.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:character-entities-legacy
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/character-entities-legacy/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:character-reference-invalid
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/character-reference-invalid/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:chokidar
+    kind: code
+    version: 5.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/chokidar/v/5.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2012 Paul Miller (https://paulmillr.com), Elan Shanker"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ci-info
+    kind: code
+    version: 4.4.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/ci-info/v/4.4.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Thomas Watson Steen"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:clsx
+    kind: code
+    version: 2.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/clsx/v/2.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:comma-separated-tokens
+    kind: code
+    version: 2.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/comma-separated-tokens/v/2.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:commander
+    kind: code
+    version: 11.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/commander/v/11.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2011 TJ Holowaychuk <tj@vision-media.ca>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:common-ancestor-path
+    kind: code
+    version: 2.0.0
+    license: BlueOak-1.0.0
+    license_url: https://www.npmjs.com/package/common-ancestor-path/v/2.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:cookie
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/cookie/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2012-2014 Roman Shtylman <shtylman@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:cookie-es
+    kind: code
+    version: 1.2.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/cookie-es/v/1.2.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Cookie-es copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:crossws
+    kind: code
+    version: 0.3.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/crossws/v/0.3.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:css-select
+    kind: code
+    version: 6.0.0
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/css-select/v/6.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Felix B\u00f6hm"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:css-selector-parser
+    kind: code
+    version: 3.3.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/css-selector-parser/v/3.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2013 Dulin Marat"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:css-tree
+    kind: code
+    version: 3.2.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/css-tree/v/3.2.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (C) 2016-2026 by Roman Dvornov"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:css-what
+    kind: code
+    version: 7.0.0
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/css-what/v/7.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Felix B\u00f6hm"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:cssesc
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/cssesc/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:csso
+    kind: code
+    version: 5.0.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/csso/v/5.0.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (C) 2015-2021 by Roman Dvornov"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:css-tree
+    kind: code
+    version: 2.2.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/css-tree/v/2.2.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (C) 2016-2022 by Roman Dvornov"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdn-data
+    kind: code
+    version: 2.0.28
+    license: CC0-1.0
+    license_url: https://www.npmjs.com/package/mdn-data/v/2.0.28
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:debug
+    kind: code
+    version: 4.4.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/debug/v/4.4.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014-2017 TJ Holowaychuk <tj@vision-media.ca>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:decode-named-character-reference
+    kind: code
+    version: 1.3.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/decode-named-character-reference/v/1.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:defu
+    kind: code
+    version: 6.1.7
+    license: MIT
+    license_url: https://www.npmjs.com/package/defu/v/6.1.7
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:dequal
+    kind: code
+    version: 2.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/dequal/v/2.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:destr
+    kind: code
+    version: 2.0.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/destr/v/2.0.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:detect-libc
+    kind: code
+    version: 2.1.2
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/detect-libc/v/2.1.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:devalue
+    kind: code
+    version: 5.9.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/devalue/v/5.9.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2018-19 [these people](https://github.com/rich-harris/devalue/graphs/contributors)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:devlop
+    kind: code
+    version: 1.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/devlop/v/1.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2023 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:diff
+    kind: code
+    version: 9.0.0
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/diff/v/9.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2009-2015, Kevin Decker <kpdecker@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:direction
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/direction/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:dom-serializer
+    kind: code
+    version: 2.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/dom-serializer/v/2.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014 The cheeriojs contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:domelementtype
+    kind: code
+    version: 2.3.0
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/domelementtype/v/2.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Felix B\u00f6hm"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:domhandler
+    kind: code
+    version: 5.0.3
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/domhandler/v/5.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Felix B\u00f6hm"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:domutils
+    kind: code
+    version: 3.2.2
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/domutils/v/3.2.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Felix B\u00f6hm"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:dset
+    kind: code
+    version: 3.1.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/dset/v/3.1.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:entities
+    kind: code
+    version: 4.5.0
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/entities/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Felix B\u00f6hm"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:es-module-lexer
+    kind: code
+    version: 2.3.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/es-module-lexer/v/2.3.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (C) 2018-2022 Guy Bedford"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:esbuild
+    kind: code
+    version: 0.28.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/esbuild/v/0.28.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2020 Evan Wallace"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:eventemitter3
+    kind: code
+    version: 5.0.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/eventemitter3/v/5.0.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014 Arnout Kazemier"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:expressive-code
+    kind: code
+    version: 0.44.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/expressive-code/v/0.44.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2023 Tibor Schiemann"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:extend
+    kind: code
+    version: 3.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/extend/v/3.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014 Stefan Thomas"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fast-string-truncated-width
+    kind: code
+    version: 3.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/fast-string-truncated-width/v/3.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024-present Fabio Spampinato"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fast-string-width
+    kind: code
+    version: 3.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/fast-string-width/v/3.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024-present Fabio Spampinato"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fast-wrap-ansi
+    kind: code
+    version: 0.2.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/fast-wrap-ansi/v/0.2.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2025 James Garbutt"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fdir
+    kind: code
+    version: 6.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/fdir/v/6.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2023 Abdullah Atta"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:find-proc
+    kind: code
+    version: 0.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/find-proc/v/0.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2026 Roman A"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:flattie
+    kind: code
+    version: 1.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/flattie/v/1.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fontace
+    kind: code
+    version: 0.4.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/fontace/v/0.4.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Chris Swithinbank"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fontkitten
+    kind: code
+    version: 1.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/fontkitten/v/1.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright \u00a9 2025 Chris Swithinbank"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:get-tsconfig
+    kind: code
+    version: 5.0.0-beta.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/get-tsconfig/v/5.0.0-beta.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Hiroki Osame <hiroki.osame@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:github-slugger
+    kind: code
+    version: 2.0.0
+    license: ISC
+    license_url: https://www.npmjs.com/package/github-slugger/v/2.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015, Dan Flettre <fletd01@yahoo.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:h3
+    kind: code
+    version: 1.15.11
+    license: MIT
+    license_url: https://www.npmjs.com/package/h3/v/1.15.11
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-embedded
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-embedded/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-format
+    kind: code
+    version: 1.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-format/v/1.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-has-property
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-has-property/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-is-body-ok-link
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-is-body-ok-link/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-is-element
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-is-element/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-minify-whitespace
+    kind: code
+    version: 1.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-minify-whitespace/v/1.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-parse-selector
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-parse-selector/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-phrasing
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-phrasing/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-select
+    kind: code
+    version: 6.0.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-select/v/6.0.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-to-html
+    kind: code
+    version: 9.0.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-to-html/v/9.0.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-to-string
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-to-string/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-to-text
+    kind: code
+    version: 4.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-to-text/v/4.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2019 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hast-util-whitespace
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/hast-util-whitespace/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:hastscript
+    kind: code
+    version: 9.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/hastscript/v/9.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:html-escaper
+    kind: code
+    version: 3.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/html-escaper/v/3.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (C) 2017-present by Andrea Giammarchi - @WebReflection"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:html-void-elements
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/html-void-elements/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:html-whitespace-sensitive-tag-names
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/html-whitespace-sensitive-tag-names/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:http-cache-semantics
+    kind: code
+    version: 4.3.0
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/http-cache-semantics/v/4.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2016-2018 Kornel Lesi\u0144ski"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:i18next
+    kind: code
+    version: 26.4.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/i18next/v/26.4.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only (Starlight UI strings); not in site/dist (grep 2026-10-13)"
+    notice: "Copyright (c) 2011-present i18next"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:iron-webcrypto
+    kind: code
+    version: 1.2.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/iron-webcrypto/v/1.2.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Divyansh Singh"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-alphabetical
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-alphabetical/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-alphanumerical
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-alphanumerical/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-decimal
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-decimal/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-docker
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-docker/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-hexadecimal
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-hexadecimal/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-plain-obj
+    kind: code
+    version: 4.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-plain-obj/v/4.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:js-yaml
+    kind: code
+    version: 4.3.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/js-yaml/v/4.3.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (C) 2011-2015 by Vitaly Puzrin"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:jsonc-parser
+    kind: code
+    version: 3.3.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/jsonc-parser/v/3.3.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Microsoft"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:klona
+    kind: code
+    version: 2.0.6
+    license: MIT
+    license_url: https://www.npmjs.com/package/klona/v/2.0.6
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lightningcss
+    kind: code
+    version: 1.33.0
+    license: MPL-2.0
+    license_url: https://www.npmjs.com/package/lightningcss/v/1.33.0
+    commercial: "yes"
+    derivatives: "conditional"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lightningcss-linux-arm64-gnu
+    kind: code
+    version: 1.33.0
+    license: MPL-2.0
+    license_url: https://www.npmjs.com/package/lightningcss-linux-arm64-gnu/v/1.33.0
+    commercial: "yes"
+    derivatives: "conditional"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:longest-streak
+    kind: code
+    version: 3.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/longest-streak/v/3.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <mailto:tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lru-cache
+    kind: code
+    version: 11.5.3
+    license: BlueOak-1.0.0
+    license_url: https://www.npmjs.com/package/lru-cache/v/11.5.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:magic-string
+    kind: code
+    version: 1.4.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/magic-string/v/1.4.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2018 Rich Harris"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:magicast
+    kind: code
+    version: 0.5.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/magicast/v/0.5.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io> and Anthony Fu <https://github.com/antfu>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdast-util-directive
+    kind: code
+    version: 3.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/mdast-util-directive/v/3.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdast-util-from-markdown
+    kind: code
+    version: 2.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/mdast-util-from-markdown/v/2.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdast-util-phrasing
+    kind: code
+    version: 4.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/mdast-util-phrasing/v/4.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2017 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdast-util-to-hast
+    kind: code
+    version: 13.2.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/mdast-util-to-hast/v/13.2.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdast-util-to-markdown
+    kind: code
+    version: 2.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/mdast-util-to-markdown/v/2.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdast-util-to-string
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/mdast-util-to-string/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mdn-data
+    kind: code
+    version: 2.27.1
+    license: CC0-1.0
+    license_url: https://www.npmjs.com/package/mdn-data/v/2.27.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark
+    kind: code
+    version: 4.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark/v/4.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-core-commonmark
+    kind: code
+    version: 2.0.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-core-commonmark/v/2.0.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-extension-directive
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-extension-directive/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-factory-destination
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-factory-destination/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-factory-label
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-factory-label/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-factory-space
+    kind: code
+    version: 2.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-factory-space/v/2.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-factory-title
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-factory-title/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-factory-whitespace
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-factory-whitespace/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-character
+    kind: code
+    version: 2.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-character/v/2.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-chunked
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-chunked/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-classify-character
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-classify-character/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-combine-extensions
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-combine-extensions/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-decode-numeric-character-reference
+    kind: code
+    version: 2.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-decode-numeric-character-reference/v/2.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-decode-string
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-decode-string/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-edit-map
+    kind: code
+    version: 1.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-edit-map/v/1.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-encode
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-encode/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-html-tag-name
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-html-tag-name/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-normalize-identifier
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-normalize-identifier/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-resolve-all
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-resolve-all/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-sanitize-uri
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-sanitize-uri/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-subtokenize
+    kind: code
+    version: 2.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-subtokenize/v/2.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-symbol
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-symbol/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:micromark-util-types
+    kind: code
+    version: 2.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/micromark-util-types/v/2.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mrmime
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/mrmime/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (https://lukeed.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ms
+    kind: code
+    version: 2.1.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/ms/v/2.1.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2020 Vercel, Inc."
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:nanoid
+    kind: code
+    version: 3.3.20
+    license: MIT
+    license_url: https://www.npmjs.com/package/nanoid/v/3.3.20
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2017 Andrey Sitnik <andrey@sitnik.ru>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:neotraverse
+    kind: code
+    version: 1.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/neotraverse/v/1.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Puru Vijay"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:nlcst-to-string
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/nlcst-to-string/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:node-fetch-native
+    kind: code
+    version: 1.6.7
+    license: MIT
+    license_url: https://www.npmjs.com/package/node-fetch-native/v/1.6.7
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:node-mock-http
+    kind: code
+    version: 1.0.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/node-mock-http/v/1.0.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:normalize-path
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/normalize-path/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014-2018, Jon Schlinkert."
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:nth-check
+    kind: code
+    version: 2.1.1
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/nth-check/v/2.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Felix B\u00f6hm"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:obug
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/obug/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright \u00a9 2025-PRESENT Kevin Deng (https://github.com/sxzz)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ofetch
+    kind: code
+    version: 1.5.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/ofetch/v/1.5.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ohash
+    kind: code
+    version: 2.0.12
+    license: MIT
+    license_url: https://www.npmjs.com/package/ohash/v/2.0.12
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:oniguruma-parser
+    kind: code
+    version: 0.12.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/oniguruma-parser/v/0.12.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2025-2026 Steven Levithan"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:oniguruma-to-es
+    kind: code
+    version: 4.3.6
+    license: MIT
+    license_url: https://www.npmjs.com/package/oniguruma-to-es/v/4.3.6
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024-2026 Steven Levithan"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:p-limit
+    kind: code
+    version: 7.3.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/p-limit/v/7.3.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:p-queue
+    kind: code
+    version: 9.3.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/p-queue/v/9.3.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:p-timeout
+    kind: code
+    version: 7.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/p-timeout/v/7.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:package-manager-detector
+    kind: code
+    version: 1.9.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/package-manager-detector/v/1.9.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2020-PRESENT Anthony Fu <https://github.com/antfu>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:pagefind
+    kind: code
+    version: 1.5.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/pagefind/v/1.5.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
+    notice: "no copyright line in LICENSE file"
+    scope: [site]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: vendored:mark.js
+    kind: code
+    version: 8.11.1
+    license: MIT
+    license_url: https://github.com/julmot/mark.js/blob/8.11.1/LICENSE
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "bundled by pagefind 1.5.2 into site/dist/pagefind/pagefind-highlight.js; banner kept in the file; list in THIRD_PARTY_LICENSES"
+    notice: "Copyright (c) 2014-2018, Julian Kühnel"
+    scope: [site]
+    reviewer: bao-security  # found by grepping license banners in site/dist 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:parse-entities
+    kind: code
+    version: 4.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/parse-entities/v/4.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:piccolore
+    kind: code
+    version: 0.1.3
+    license: ISC
+    license_url: https://www.npmjs.com/package/piccolore/v/0.1.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:picocolors
+    kind: code
+    version: 1.1.1
+    license: ISC
+    license_url: https://www.npmjs.com/package/picocolors/v/1.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021-2024 Oleksii Raspopov, Kostiantyn Denysov, Anton Verinov"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:picomatch
+    kind: code
+    version: 4.0.7
+    license: MIT
+    license_url: https://www.npmjs.com/package/picomatch/v/4.0.7
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2017-present, Jon Schlinkert."
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:postcss
+    kind: code
+    version: 8.5.29
+    license: MIT
+    license_url: https://www.npmjs.com/package/postcss/v/8.5.29
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2013 Andrey Sitnik <andrey@sitnik.es>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:postcss-nested
+    kind: code
+    version: 6.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/postcss-nested/v/6.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright 2014 Andrey Sitnik <andrey@sitnik.ru>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:postcss-selector-parser
+    kind: code
+    version: 7.1.6
+    license: MIT
+    license_url: https://www.npmjs.com/package/postcss-selector-parser/v/7.1.6
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Ben Briggs <beneb.info@gmail.com> (http://beneb.info)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:prismjs
+    kind: code
+    version: 1.30.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/prismjs/v/1.30.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2012 Lea Verou"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:process-ancestry
+    kind: code
+    version: 0.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/process-ancestry/v/0.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:property-information
+    kind: code
+    version: 7.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/property-information/v/7.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <mailto:tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:radix3
+    kind: code
+    version: 1.1.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/radix3/v/1.1.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:readdirp
+    kind: code
+    version: 5.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/readdirp/v/5.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2012-2019 Thorsten Lorenz, Paul Miller (https://paulmillr.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:regex
+    kind: code
+    version: 6.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/regex/v/6.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Steven Levithan"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:regex-recursion
+    kind: code
+    version: 6.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/regex-recursion/v/6.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Steven Levithan"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:regex-utilities
+    kind: code
+    version: 2.3.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/regex-utilities/v/2.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024 Steven Levithan"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:rehype-expressive-code
+    kind: code
+    version: 0.44.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/rehype-expressive-code/v/0.44.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2023 Tibor Schiemann"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:remark-directive
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/remark-directive/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:resolve-pkg-maps
+    kind: code
+    version: 1.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/resolve-pkg-maps/v/1.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Hiroki Osame <hiroki.osame@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:retext-smartypants
+    kind: code
+    version: 6.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/retext-smartypants/v/6.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:rolldown
+    kind: code
+    version: 1.2.12
+    license: MIT
+    license_url: https://www.npmjs.com/package/rolldown/v/1.2.12
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024-present VoidZero Inc. & Contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:satteri
+    kind: code
+    version: 0.10.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/satteri/v/0.10.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2026 Bruits"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:sax
+    kind: code
+    version: 1.6.1
+    license: BlueOak-1.0.0
+    license_url: https://www.npmjs.com/package/sax/v/1.6.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:semver
+    kind: code
+    version: 7.8.5
+    license: ISC
+    license_url: https://www.npmjs.com/package/semver/v/7.8.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Isaac Z. Schlueter and Contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:sharp
+    kind: code
+    version: 0.35.5
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/sharp/v/0.35.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "no copyright line in LICENSE file"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:shiki
+    kind: code
+    version: 4.5.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/shiki/v/4.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Pine Wu"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:sisteransi
+    kind: code
+    version: 1.0.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/sisteransi/v/1.0.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2018 Terkel Gjervig Nielsen"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:sitemap
+    kind: code
+    version: 9.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/sitemap/v/9.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2011 Eugene Kalinin"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:smol-toml
+    kind: code
+    version: 1.9.0
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/smol-toml/v/1.9.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Squirrel Chat et al., All rights reserved."
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:source-map-js
+    kind: code
+    version: 1.2.2
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/source-map-js/v/1.2.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2009-2011, Mozilla Foundation and contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:space-separated-tokens
+    kind: code
+    version: 2.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/space-separated-tokens/v/2.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:stringify-entities
+    kind: code
+    version: 4.0.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/stringify-entities/v/4.0.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <mailto:tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:svgo
+    kind: code
+    version: 4.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/svgo/v/4.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Kir Belevich"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:tiny-inflate
+    kind: code
+    version: 1.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/tiny-inflate/v/1.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015-present Devon Govett"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:tinyclip
+    kind: code
+    version: 1.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/tinyclip/v/1.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2026 Tinylibs"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:tinyexec
+    kind: code
+    version: 1.3.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/tinyexec/v/1.3.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024 Tinylibs"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:tinyglobby
+    kind: code
+    version: 0.2.17
+    license: MIT
+    license_url: https://www.npmjs.com/package/tinyglobby/v/0.2.17
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024 Madeline Gurriar\u00e1n"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:trim-lines
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/trim-lines/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <mailto:tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:trough
+    kind: code
+    version: 2.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/trough/v/2.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:tslib
+    kind: code
+    version: 2.8.1
+    license: 0BSD
+    license_url: https://www.npmjs.com/package/tslib/v/2.8.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Microsoft Corporation."
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ufo
+    kind: code
+    version: 1.6.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/ufo/v/1.6.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ultrahtml
+    kind: code
+    version: 1.7.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/ultrahtml/v/1.7.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "MIT License Copyright (c) 2022 Nate Moore"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:uncrypto
+    kind: code
+    version: 0.1.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/uncrypto/v/0.1.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:undici
+    kind: code
+    version: 8.11.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/undici/v/8.11.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Matteo Collina and Undici contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:undici-types
+    kind: code
+    version: 7.24.6
+    license: MIT
+    license_url: https://www.npmjs.com/package/undici-types/v/7.24.6
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Matteo Collina and Undici contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unified
+    kind: code
+    version: 11.0.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/unified/v/11.0.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unifont
+    kind: code
+    version: 0.7.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/unifont/v/0.7.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2024 Daniel Roe"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unist-util-find-after
+    kind: code
+    version: 5.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/unist-util-find-after/v/5.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unist-util-is
+    kind: code
+    version: 6.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/unist-util-is/v/6.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unist-util-position
+    kind: code
+    version: 5.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/unist-util-position/v/5.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unist-util-stringify-position
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/unist-util-stringify-position/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unist-util-visit
+    kind: code
+    version: 5.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/unist-util-visit/v/5.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unist-util-visit-parents
+    kind: code
+    version: 6.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/unist-util-visit-parents/v/6.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:unstorage
+    kind: code
+    version: 1.17.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/unstorage/v/1.17.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Pooya Parsa <pooya@pi0.io>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:url-extras
+    kind: code
+    version: 0.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/url-extras/v/0.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:util-deprecate
+    kind: code
+    version: 1.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/util-deprecate/v/1.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2014 Nathan Rajlich <nathan@tootallnate.net>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:verkit
+    kind: code
+    version: 0.4.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/verkit/v/0.4.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright \u00a9 2026-PRESENT Kevin Deng (https://github.com/sxzz)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:vfile
+    kind: code
+    version: 6.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/vfile/v/6.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:vfile-message
+    kind: code
+    version: 4.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/vfile-message/v/4.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:vite
+    kind: code
+    version: 8.3.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/vite/v/8.3.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2019-present, VoidZero Inc. and Vite contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:vitefu
+    kind: code
+    version: 1.1.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/vitefu/v/1.1.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2026 Bjorn and Dominik"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:xxhash-wasm
+    kind: code
+    version: 1.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/xxhash-wasm/v/1.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright \u00a9 2017 Michael Jungo"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:yargs-parser
+    kind: code
+    version: 22.0.0
+    license: ISC
+    license_url: https://www.npmjs.com/package/yargs-parser/v/22.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016, Contributors"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:yocto-queue
+    kind: code
+    version: 1.2.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/yocto-queue/v/1.2.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:zod
+    kind: code
+    version: 4.6.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/zod/v/4.6.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Colin McDonnell"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:zwitch
+    kind: code
+    version: 2.0.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/zwitch/v/2.0.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "build-time only for site/ (static generator), not shipped in site/dist"
+    notice: "Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>"
+    scope: [site-build]
+    reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
+    date: 2026-10-13
+
+
+# site-dev QA deps (bao-tester 2026-10-13, P011 G3/G5) (lighthouse 13.5.0 + @axe-core/playwright 4.13.0 in site/).
+# Generated from site/package-lock.json (new entries vs the pre-install lock, grouped by name@version);
+# notice = first Copyright line of the package's LICENSE file. Approved by bao-security 2026-10-13.
+
+  - repo_id: npm:@axe-core/playwright
+    kind: code
+    version: 4.13.0
+    license: MPL-2.0
+    license_url: https://www.npmjs.com/package/@axe-core/playwright/v/4.13.0
+    commercial: "yes"
+    derivatives: "conditional"
+    obligations: "dev/test only (site QA: a11y tree), not shipped in site/dist; MPL-2.0: unmodified, file-level copyleft only if modified files are distributed"
+    notice: "Copyright (c) 2015 - 2026 Deque Systems, Inc."
+    note: "MPL-2.0 LICENSE has no copyright line; notice from source header"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@formatjs/ecma402-abstract
+    kind: code
+    version: 2.3.6
+    license: MIT
+    license_url: https://www.npmjs.com/package/@formatjs/ecma402-abstract/v/2.3.6
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023 FormatJS"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@formatjs/fast-memoize
+    kind: code
+    version: 2.2.7
+    license: MIT
+    license_url: https://www.npmjs.com/package/@formatjs/fast-memoize/v/2.2.7
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023 FormatJS"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@formatjs/icu-messageformat-parser
+    kind: code
+    version: 2.11.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/@formatjs/icu-messageformat-parser/v/2.11.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023 FormatJS"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@formatjs/icu-skeleton-parser
+    kind: code
+    version: 1.8.16
+    license: MIT
+    license_url: https://www.npmjs.com/package/@formatjs/icu-skeleton-parser/v/1.8.16
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023 FormatJS"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@formatjs/intl-localematcher
+    kind: code
+    version: 0.6.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/@formatjs/intl-localematcher/v/0.6.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023 FormatJS"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/api
+    kind: code
+    version: 1.9.1
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/api/v/1.9.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/api-logs
+    kind: code
+    version: 0.220.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/api-logs/v/0.220.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/core
+    kind: code
+    version: 2.11.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/core/v/2.11.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/instrumentation
+    kind: code
+    version: 0.220.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/instrumentation/v/0.220.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/resources
+    kind: code
+    version: 2.11.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/resources/v/2.11.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/sdk-trace
+    kind: code
+    version: 2.11.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/sdk-trace/v/2.11.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/sdk-trace-base
+    kind: code
+    version: 2.11.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/sdk-trace-base/v/2.11.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@opentelemetry/semantic-conventions
+    kind: code
+    version: 1.43.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/@opentelemetry/semantic-conventions/v/1.43.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@paulirish/trace_engine
+    kind: code
+    version: 0.0.65
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/@paulirish/trace_engine/v/0.0.65
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright 2014 The Chromium Authors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@puppeteer/browsers
+    kind: code
+    version: 3.2.3
+    license: Apache-2.0
+    license_url: https://github.com/puppeteer/puppeteer/blob/browsers-v3.2.3/LICENSE
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: ""
+    note: "LICENSE file not in npm tarball; license from package.json + upstream repo at tag"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@sentry/conventions
+    kind: code
+    version: 0.16.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@sentry/conventions/v/0.16.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023-2025 Functional Software, Inc. dba Sentry"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@sentry/core
+    kind: code
+    version: 10.76.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@sentry/core/v/10.76.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2019 Functional Software, Inc. dba Sentry"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@sentry/node
+    kind: code
+    version: 10.76.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@sentry/node/v/10.76.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023 Functional Software, Inc. dba Sentry"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@sentry/node-core
+    kind: code
+    version: 10.76.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@sentry/node-core/v/10.76.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Functional Software, Inc. dba Sentry"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@sentry/opentelemetry
+    kind: code
+    version: 10.76.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/@sentry/opentelemetry/v/10.76.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023 Functional Software, Inc. dba Sentry"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:@sentry/server-utils
+    kind: code
+    version: 10.76.0
+    license: MIT
+    license_url: https://github.com/getsentry/sentry-javascript/blob/10.76.0/LICENSE
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: ""
+    note: "LICENSE file not in npm tarball; license from package.json + upstream repo at tag"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ajv
+    kind: code
+    version: 8.20.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/ajv/v/8.20.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2015-2021 Evgeny Poberezkin"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ajv-formats
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/ajv-formats/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2020 Evgeny Poberezkin"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ansi-colors
+    kind: code
+    version: 4.1.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/ansi-colors/v/4.1.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2015-present, Brian Woodward."
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ansi-regex
+    kind: code
+    version: 5.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/ansi-regex/v/5.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ansi-regex
+    kind: code
+    version: 6.4.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/ansi-regex/v/6.4.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ansi-styles
+    kind: code
+    version: 4.3.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/ansi-styles/v/4.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ansi-styles
+    kind: code
+    version: 6.2.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/ansi-styles/v/6.2.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:atomically
+    kind: code
+    version: 2.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/atomically/v/2.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2020-present Fabio Spampinato"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:axe-core
+    kind: code
+    version: 4.13.0
+    license: MPL-2.0
+    license_url: https://www.npmjs.com/package/axe-core/v/4.13.0
+    commercial: "yes"
+    derivatives: "conditional"
+    obligations: "dev/test only (site QA: a11y tree), not shipped in site/dist; MPL-2.0: unmodified, file-level copyleft only if modified files are distributed"
+    notice: "Copyright (c) 2015 - 2026 Deque Systems, Inc."
+    note: "MPL-2.0 LICENSE has no copyright line; notice from source header; bundles MIT/BSD third-party code listed in LICENSE-3RD-PARTY.txt"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:chrome-launcher
+    kind: code
+    version: 1.2.2
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/chrome-launcher/v/1.2.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:chromium-bidi
+    kind: code
+    version: 17.0.2
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/chromium-bidi/v/17.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:cjs-module-lexer
+    kind: code
+    version: 2.3.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/cjs-module-lexer/v/2.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (C) 2018-2020 Guy Bedford"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:cliui
+    kind: code
+    version: 8.0.1
+    license: ISC
+    license_url: https://www.npmjs.com/package/cliui/v/8.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2015, Contributors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:cliui
+    kind: code
+    version: 9.0.1
+    license: ISC
+    license_url: https://www.npmjs.com/package/cliui/v/9.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2015, Contributors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:color-convert
+    kind: code
+    version: 2.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/color-convert/v/2.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2011-2016 Heather Arthur <fayearthur@gmail.com>"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:color-name
+    kind: code
+    version: 1.1.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/color-name/v/1.1.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Dmitry Ivanov"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:configstore
+    kind: code
+    version: 7.1.0
+    license: BSD-2-Clause
+    license_url: https://www.npmjs.com/package/configstore/v/7.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Google"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:csp_evaluator
+    kind: code
+    version: 1.1.8
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/csp_evaluator/v/1.1.8
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:decimal.js
+    kind: code
+    version: 10.6.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/decimal.js/v/10.6.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Michael Mclaughlin"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:define-lazy-prop
+    kind: code
+    version: 2.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/define-lazy-prop/v/2.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:devtools-protocol
+    kind: code
+    version: 0.0.1687809
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/devtools-protocol/v/0.0.1687809
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright 2014 The Chromium Authors. All rights reserved."
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:dot-prop
+    kind: code
+    version: 9.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/dot-prop/v/9.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:emoji-regex
+    kind: code
+    version: 10.6.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/emoji-regex/v/10.6.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright Mathias Bynens <https://mathiasbynens.be/>"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:emoji-regex
+    kind: code
+    version: 8.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/emoji-regex/v/8.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright Mathias Bynens <https://mathiasbynens.be/>"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:enquirer
+    kind: code
+    version: 2.4.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/enquirer/v/2.4.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2016-present, Jon Schlinkert."
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:es-module-lexer
+    kind: code
+    version: 3.0.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/es-module-lexer/v/3.0.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (C) 2018-2022 Guy Bedford"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:escalade
+    kind: code
+    version: 3.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/escalade/v/3.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:escape-string-regexp
+    kind: code
+    version: 4.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/escape-string-regexp/v/4.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fast-deep-equal
+    kind: code
+    version: 3.1.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/fast-deep-equal/v/3.1.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2017 Evgeny Poberezkin"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:fast-uri
+    kind: code
+    version: 3.1.8
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/fast-uri/v/3.1.8
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:get-caller-file
+    kind: code
+    version: 2.0.5
+    license: ISC
+    license_url: https://www.npmjs.com/package/get-caller-file/v/2.0.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright 2018 Stefan Penner"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:get-east-asian-width
+    kind: code
+    version: 1.7.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/get-east-asian-width/v/1.7.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:graceful-fs
+    kind: code
+    version: 4.2.11
+    license: ISC
+    license_url: https://www.npmjs.com/package/graceful-fs/v/4.2.11
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2011-2022 Isaac Z. Schlueter, Ben Noordhuis, and Contributors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:http-link-header
+    kind: code
+    version: 1.1.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/http-link-header/v/1.1.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2016-2026 Jonas Hermsmeier, and contributors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:image-ssim
+    kind: code
+    version: 0.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/image-ssim/v/0.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2015 Igor Bezkrovny"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:import-in-the-middle
+    kind: code
+    version: 3.5.2
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/import-in-the-middle/v/3.5.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:intl-messageformat
+    kind: code
+    version: 10.7.18
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/intl-messageformat/v/10.7.18
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2023, Oath Inc."
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-docker
+    kind: code
+    version: 2.2.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-docker/v/2.2.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-fullwidth-code-point
+    kind: code
+    version: 3.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-fullwidth-code-point/v/3.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:is-wsl
+    kind: code
+    version: 2.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/is-wsl/v/2.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:jpeg-js
+    kind: code
+    version: 0.4.4
+    license: BSD-3-Clause
+    license_url: https://www.npmjs.com/package/jpeg-js/v/0.4.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2014, Eugene Ware"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:js-library-detector
+    kind: code
+    version: 6.7.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/js-library-detector/v/6.7.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2010-2016 Andrew Bredow, John Michel, and other contributors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:json-schema-traverse
+    kind: code
+    version: 1.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/json-schema-traverse/v/1.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2017 Evgeny Poberezkin"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:legacy-javascript
+    kind: code
+    version: 0.0.1
+    license: Apache-2.0
+    license_url: https://github.com/GoogleChrome/lighthouse/blob/v13.5.0/LICENSE
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: ""
+    note: "LICENSE file not in npm tarball; license from package.json + upstream repo at tag"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lighthouse
+    kind: code
+    version: 13.5.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/lighthouse/v/13.5.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lighthouse-logger
+    kind: code
+    version: 2.0.2
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/lighthouse-logger/v/2.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lighthouse-stack-packs
+    kind: code
+    version: 1.12.3
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/lighthouse-stack-packs/v/1.12.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lodash-es
+    kind: code
+    version: 4.18.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/lodash-es/v/4.18.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright OpenJS Foundation and other contributors <https://openjsf.org/>"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:lookup-closest-locale
+    kind: code
+    version: 6.2.0
+    license: MIT
+    license_url: https://github.com/format-message/format-message/blob/v6.2.0/LICENSE-MIT
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: ""
+    note: "LICENSE file not in npm tarball; license from package.json + upstream repo at tag"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:marky
+    kind: code
+    version: 1.3.0
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/marky/v/1.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright owner that is granting the License."
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:mitt
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/mitt/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2021 Jason Miller"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:modern-tar
+    kind: code
+    version: 0.8.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/modern-tar/v/0.8.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Ayuhito"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:module-details-from-path
+    kind: code
+    version: 1.0.4
+    license: MIT
+    license_url: https://www.npmjs.com/package/module-details-from-path/v/1.0.4
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2016-2025 Thomas Watson Steen"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:open
+    kind: code
+    version: 8.4.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/open/v/8.4.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:puppeteer-core
+    kind: code
+    version: 25.12.0
+    license: Apache-2.0
+    license_url: https://github.com/puppeteer/puppeteer/blob/puppeteer-core-v25.12.0/LICENSE
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: ""
+    note: "LICENSE file not in npm tarball; license from package.json + upstream repo at tag"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:require-directory
+    kind: code
+    version: 2.1.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/require-directory/v/2.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2011 Troy Goode <troygoode@gmail.com>"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:require-from-string
+    kind: code
+    version: 2.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/require-from-string/v/2.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Vsevolod Strukchinsky <floatdrop@gmail.com> (github.com/floatdrop)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:require-in-the-middle
+    kind: code
+    version: 8.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/require-in-the-middle/v/8.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2016-2019, Thomas Watson Steen"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:robots-parser
+    kind: code
+    version: 3.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/robots-parser/v/3.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2014 Sam Clarke"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:speedline-core
+    kind: code
+    version: 1.4.3
+    license: MIT
+    license_url: https://github.com/paulirish/speedline/blob/v1.4.3/license
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: ""
+    note: "LICENSE file not in npm tarball; license from package.json + upstream repo at tag"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:string-width
+    kind: code
+    version: 4.2.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/string-width/v/4.2.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:string-width
+    kind: code
+    version: 7.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/string-width/v/7.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:string-width
+    kind: code
+    version: 8.3.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/string-width/v/8.3.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:strip-ansi
+    kind: code
+    version: 6.0.1
+    license: MIT
+    license_url: https://www.npmjs.com/package/strip-ansi/v/6.0.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:strip-ansi
+    kind: code
+    version: 7.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/strip-ansi/v/7.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:stubborn-fs
+    kind: code
+    version: 2.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/stubborn-fs/v/2.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2022-present Fabio Spampinato"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:stubborn-utils
+    kind: code
+    version: 1.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/stubborn-utils/v/1.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2025-present Fabio Spampinato"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:third-party-web
+    kind: code
+    version: 0.30.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/third-party-web/v/0.30.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2019 Patrick Hulce"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:tldts-core
+    kind: code
+    version: 7.4.16
+    license: MIT
+    license_url: https://www.npmjs.com/package/tldts-core/v/7.4.16
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2017 Thomas Parisot, 2018 R\u00e9mi Berson"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:tldts-icann
+    kind: code
+    version: 7.4.16
+    license: MIT
+    license_url: https://www.npmjs.com/package/tldts-icann/v/7.4.16
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2017 Thomas Parisot, 2018 R\u00e9mi Berson"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:type-fest
+    kind: code
+    version: 4.41.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/type-fest/v/4.41.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist (dual MIT OR CC0-1.0, MIT chosen)"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:typed-query-selector
+    kind: code
+    version: 2.12.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/typed-query-selector/v/2.12.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2020-present Pig Fang"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:web-features
+    kind: code
+    version: 3.40.1
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/web-features/v/3.40.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:webdriver-bidi-protocol
+    kind: code
+    version: 0.4.3
+    license: Apache-2.0
+    license_url: https://www.npmjs.com/package/webdriver-bidi-protocol/v/0.4.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "copyright license to reproduce, prepare Derivative Works of,"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:when-exit
+    kind: code
+    version: 2.1.5
+    license: MIT
+    license_url: https://www.npmjs.com/package/when-exit/v/2.1.5
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2022-present Fabio Spampinato"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:wrap-ansi
+    kind: code
+    version: 7.0.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/wrap-ansi/v/7.0.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:wrap-ansi
+    kind: code
+    version: 9.0.2
+    license: MIT
+    license_url: https://www.npmjs.com/package/wrap-ansi/v/9.0.2
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ws
+    kind: code
+    version: 7.5.13
+    license: MIT
+    license_url: https://www.npmjs.com/package/ws/v/7.5.13
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com>"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:ws
+    kind: code
+    version: 8.22.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/ws/v/8.22.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com>"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:xdg-basedir
+    kind: code
+    version: 5.1.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/xdg-basedir/v/5.1.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:y18n
+    kind: code
+    version: 5.0.8
+    license: ISC
+    license_url: https://www.npmjs.com/package/y18n/v/5.0.8
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2015, Contributors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:yargs
+    kind: code
+    version: 17.7.3
+    license: MIT
+    license_url: https://www.npmjs.com/package/yargs/v/17.7.3
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright 2010 James Halliday (mail@substack.net); Modified work Copyright 2014 Contributors (ben@npmjs.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:yargs
+    kind: code
+    version: 18.2.0
+    license: MIT
+    license_url: https://www.npmjs.com/package/yargs/v/18.2.0
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright 2010 James Halliday (mail@substack.net); Modified work Copyright 2014 Contributors (ben@npmjs.com)"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:yargs-parser
+    kind: code
+    version: 21.1.1
+    license: ISC
+    license_url: https://www.npmjs.com/package/yargs-parser/v/21.1.1
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2016, Contributors"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
+  - repo_id: npm:zod
+    kind: code
+    version: 3.25.76
+    license: MIT
+    license_url: https://www.npmjs.com/package/zod/v/3.25.76
+    commercial: "yes"
+    derivatives: "yes"
+    obligations: "dev/test only (site QA: lighthouse tree), not shipped in site/dist"
+    notice: "Copyright (c) 2025 Colin McDonnell"
+    scope: [site-dev]
+    reviewer: bao-security  # verified against site/package-lock.json 2026-10-13
+    date: 2026-10-13
