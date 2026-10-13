@@ -22,7 +22,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 FORMATS = ("fp8",)
 AUTO_CLASS = "AutoModelForImageTextToText"  # remote-code models (Nemotron Parse) are not supported yet (P-5)
@@ -114,13 +114,26 @@ def parity_stats(agree: list[float], kls: list[float]) -> dict[str, Any]:
     }
 
 
-def quant_cfg(fmt: str) -> dict[str, Any]:
+# FP8 scaling recipes (research A/B, not a node param yet): per_tensor = ModelOpt FP8_DEFAULT_CFG (static amax per
+# tensor, what the node runs); per_channel = FP8_PER_CHANNEL_PER_TOKEN_CFG (weight scale per output channel,
+# activation scale per token, dynamic). The 0.8B per-tensor export drifted on receipt digits under vLLM (fixcode).
+# block = FP8_2D_BLOCKWISE_WEIGHT_ONLY_CFG (128x128 weight blocks, like Qwen's own FP8 releases); weight-only here, so
+# its in-container parity misses activation error, but vLLM serves it W8A8 (FP8_PB_WO, dynamic per-block activations).
+FP8Scaling = Literal["per_tensor", "per_channel", "block"]
+FP8_SCALINGS: dict[FP8Scaling, str] = {
+    "per_tensor": "FP8_DEFAULT_CFG",
+    "per_channel": "FP8_PER_CHANNEL_PER_TOKEN_CFG",
+    "block": "FP8_2D_BLOCKWISE_WEIGHT_ONLY_CFG",
+}
+
+
+def quant_cfg(fmt: str, scaling: FP8Scaling = "per_tensor") -> dict[str, Any]:
     """ModelOpt config for ``fmt`` with SKIP_PATTERNS disabled (ModelOpt >= 0.44: ordered list, later entries win)."""
     import modelopt.torch.quantization as mtq
 
     if fmt not in FORMATS:
         raise ValueError(f"unsupported format {fmt!r}")
-    cfg = copy.deepcopy(mtq.FP8_DEFAULT_CFG)
+    cfg = copy.deepcopy(getattr(mtq, FP8_SCALINGS[scaling]))
     for pattern in SKIP_PATTERNS:
         if isinstance(cfg["quant_cfg"], list):
             cfg["quant_cfg"].append({"quantizer_name": pattern, "enable": False})
@@ -133,13 +146,17 @@ def dir_gb(path: Path) -> float:
     return round(sum(p.stat().st_size for p in path.rglob("*") if p.is_file()) / 1e9, 3)
 
 
-def run(model_dir: Path, data_dir: Path, out: Path, *, fmt: str, calib_size: int) -> dict[str, Any]:
+def run(
+    model_dir: Path, data_dir: Path, out: Path, *, fmt: str, calib_size: int, scaling: FP8Scaling = "per_tensor"
+) -> dict[str, Any]:
     import modelopt
     import modelopt.torch.quantization as mtq
     import torch
     import transformers
     from modelopt.torch.export import export_hf_checkpoint
 
+    if not hasattr(mtq, FP8_SCALINGS[scaling]):  # fail before loading the model while holding the GPU lock
+        raise ValueError(f"ModelOpt {modelopt.__version__} has no {FP8_SCALINGS[scaling]}")
     t0 = time.time()
     out.mkdir(parents=True, exist_ok=True)
     processor = transformers.AutoProcessor.from_pretrained(model_dir, local_files_only=True)
@@ -150,7 +167,8 @@ def run(model_dir: Path, data_dir: Path, out: Path, *, fmt: str, calib_size: int
         raise ValueError("no calibration images in the train split")
     held = load_images(data_dir, "validation", PARITY_SAMPLES)
     report: dict[str, Any] = {
-        "format": fmt, "modelopt": modelopt.__version__, "transformers": transformers.__version__,
+        "format": fmt, "fp8_scaling": scaling,
+        "modelopt": modelopt.__version__, "transformers": transformers.__version__,
         "model_class": type(model).__name__, "calib_split": "train", "calib_samples": len(calib),
         "parity_split": "validation" if held else None, "skip_patterns": list(SKIP_PATTERNS),
     }  # fmt: skip
@@ -166,7 +184,7 @@ def run(model_dir: Path, data_dir: Path, out: Path, *, fmt: str, calib_size: int
                 m(**_encode(processor, img))
 
         t1 = time.time()
-        model = mtq.quantize(model, quant_cfg(fmt), forward_loop)
+        model = mtq.quantize(model, quant_cfg(fmt, scaling), forward_loop)
         report["calib_s"] = round(time.time() - t1, 1)
         summary = io.StringIO()
         with contextlib.redirect_stdout(summary):
@@ -198,8 +216,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--format", default="fp8", choices=FORMATS)
     ap.add_argument("--calib-size", type=int, default=128)
+    ap.add_argument("--fp8-scaling", default="per_tensor", choices=get_args(FP8Scaling))
     a = ap.parse_args(argv)
-    report = run(a.model, a.data, a.out, fmt=a.format, calib_size=a.calib_size)
+    report = run(a.model, a.data, a.out, fmt=a.format, calib_size=a.calib_size, scaling=a.fp8_scaling)
     print(json.dumps(report, indent=2))
     from vlm_pipeline.common.errors import ExitCode
 
