@@ -126,6 +126,15 @@ test("a node dragged from the library lands in its own lane, without a snap noti
     .getByTestId("library-item-quantize.modelopt_ptq")
     .dragTo(page.locator(".react-flow__pane"), { targetPosition: { x: 400, y: 250 } });
   await expect(node(page, "quantize.modelopt_ptq")).toBeInViewport();
+  // It sits in its own lane, and that lane opened up (it was compact while empty).
+  const lane = page.locator('.lane[data-lane="quantize"]');
+  await expect(lane).not.toHaveClass(/\bcompact\b/);
+  const box = await node(page, "quantize.modelopt_ptq").boundingBox();
+  const laneBox = await lane.boundingBox();
+  if (!box || !laneBox) throw new Error("node or lane not visible");
+  const cx = box.x + box.width / 2;
+  expect(cx).toBeGreaterThanOrEqual(laneBox.x);
+  expect(cx).toBeLessThanOrEqual(laneBox.x + laneBox.width);
   // The notice has {node}/{lane} placeholders: match its fixed words, else the check could never fail.
   const snapped = tr("library.snapped_to_lane")
     .split(/\{[^}]*\}/)
