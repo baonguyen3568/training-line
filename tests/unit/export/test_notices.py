@@ -200,3 +200,21 @@ def test_stray_braces_in_a_notice_never_break_the_export() -> None:
                           notices=("Weights {unbalanced and {repo} at {revision}}",))  # fmt: skip
     [filled] = notices.fill_notices([c], tool="t", date="d")
     assert filled.notices == ("Weights {unbalanced and org/q at abc}",)
+
+
+def test_graph_node_runs_chain_through_siblings_and_stop_at_the_graph_run(tmp_path: Path) -> None:
+    runs = tmp_path / "outputs" / "graph" / "runs"
+    for d in ("t-1", "m-1"):
+        (runs / d).mkdir(parents=True)
+    gid, data = "g-20261013-101500-abc123", "local:" + "a" * 64 + "#split=train#val=0.1#seed=1"
+    train = RunManifest(run_id="t-1", name="t", stage="train", task="lora", base_model=PARSE.repo,
+                        base_model_revision=PARSE.revision, parent_run_id=gid, dataset=data)  # fmt: skip
+    write_manifest(runs / "t-1", train)
+    write_manifest(runs / "m-1", RunManifest(run_id="m-1", name="m", stage="train", task="merge_lora",
+                                             base_model=PARSE.repo, base_model_revision=PARSE.revision,
+                                             parent_run_id="t-1"))  # fmt: skip
+    components, mods, gaps = _lineage(tmp_path, runs / "m-1" / "merged")
+    assert [m.run_id for m in mods] == ["m-1", "t-1"]
+    assert gaps == ["training data local data (your own folder): licence not recorded"]  # no "parent not found"
+    assert [c.name for c in components if c.role == "training_data"] == ["local data (your own folder)"]
+    assert all("aaaa" not in (m.dataset or "") for m in mods)  # the content hash is not shared either

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from collections.abc import Iterable
 from pathlib import Path
@@ -29,6 +30,7 @@ from vlm_pipeline.common.licenses import license_text
 from vlm_pipeline.common.runinfo import RunManifest, read_manifest
 
 ATTRIBUTION_SCHEMA_VERSION = 1
+_GRAPH_RUN = re.compile(r"^g-\d{8}-\d{6}-[0-9a-f]{6}$")  # executor / app graph run ids
 
 
 class Component(BaseModel):
@@ -124,12 +126,17 @@ def _is_local_path(ref: str) -> bool:
 
 def public_dataset_ref(ref: str | None) -> str | None:
     """What may appear in a shared export: hub refs as-is, local paths reduced to their last name (privacy)."""
+    if ref is not None and ref.startswith("local:"):
+        return "local data (your own folder)"
     if ref is None or not _is_local_path(ref):
         return ref
     return f"local data '{Path(ref.split('#', 1)[0]).name}' (path not recorded)"
 
 
 def _dataset_component(ref: str, datasets: DatasetCatalog) -> Component:
+    if ref.startswith("local:"):  # DatasetRef of a user folder: content hash only, no path (privacy)
+        return Component(role="training_data", name="local data (your own folder)", repo=None, revision=None,
+                         license=None)  # fmt: skip
     if _is_local_path(ref):
         return Component(role="training_data", name=public_dataset_ref(ref) or "local data", repo=None, revision=None,
                          license=None)  # fmt: skip
@@ -176,11 +183,13 @@ def lineage(
             components.append(_dataset_component(manifest.dataset, datasets))
         if manifest.base_model:
             base = f"{manifest.base_model}@{manifest.base_model_revision or ''}"
-        if manifest.parent_run_id is None:
+        parent_id = manifest.parent_run_id
+        if parent_id is None or _GRAPH_RUN.match(parent_id):  # a graph run groups nodes; it is not a training step
             break
-        parent = root / "outputs" / "runs" / manifest.parent_run_id
-        if not (parent / "run.json").is_file():
-            gaps.append(f"run {manifest.run_id}: parent run {manifest.parent_run_id} not found")
+        candidates = (run_dir.parent / parent_id, root / "outputs" / "runs" / parent_id)  # node run dirs: siblings
+        parent = next((c for c in candidates if (c / "run.json").is_file()), None)
+        if parent is None:
+            gaps.append(f"run {manifest.run_id}: parent run {parent_id} not found")
             break
         run_dir = parent
     if base is None:
