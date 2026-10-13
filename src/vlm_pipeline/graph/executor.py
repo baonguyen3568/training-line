@@ -9,6 +9,8 @@ run dir is derived from its cache key.
 from __future__ import annotations
 
 import functools
+import hashlib
+import json
 import logging
 import os
 import threading
@@ -23,6 +25,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel
 
 from vlm_pipeline.artifacts.index import ArtifactIndex, CacheEntry, OutputRef
+from vlm_pipeline.common.error_catalog import load_catalog as load_error_catalog
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.run_claims import (
     GenerationError,
@@ -31,7 +34,14 @@ from vlm_pipeline.common.run_claims import (
     node_generation,
     write_resume_lease,
 )
-from vlm_pipeline.common.runinfo import RunManifest, RunStatus, Stage, read_manifest, write_manifest
+from vlm_pipeline.common.runinfo import (
+    RunManifest,
+    RunStatus,
+    Stage,
+    read_manifest,
+    read_small_json,
+    write_manifest,
+)
 from vlm_pipeline.graph.actions import issue_actions
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
@@ -105,6 +115,55 @@ def _manifest_digest(run_dir: Path) -> str | None:
         return read_manifest(run_dir).container_digest
     except (OSError, ValueError):
         return None
+
+
+WARNINGS_DIR = "node_warnings"  # under the state dir, never in a run dir (a job can write there; fixcode B1)
+# Relies on every graph job being narrow (sees only its run dir). A job mounting the project rw (team CLI jobs,
+# CLI-N on the BOARD) could write here: keep graph jobs narrow, or move this out of the project.
+_WARNINGS_MAX_BYTES = 64 * 1024
+
+
+def _warnings_path(state_dir: Path, key: str) -> Path:
+    return state_dir / WARNINGS_DIR / f"{hashlib.sha256(key.encode()).hexdigest()}.json"
+
+
+def _save_warnings(state_dir: Path, key: str, warnings: tuple[tuple[str, Mapping[str, object]], ...]) -> None:
+    """A completed node's catalog warnings, kept with its cache key: shown again when the result is reused.
+
+    Always rewritten (or removed) for a fresh result, so a key never shows an older result's warnings.
+    """
+    path = _warnings_path(state_dir, key)
+    if not warnings:
+        path.unlink(missing_ok=True)
+        return
+    try:
+        body = json.dumps([{"code": code, "params": dict(params)} for code, params in warnings])
+    except (TypeError, ValueError):
+        logger.warning("node warnings for %s are not JSON: not kept for cache hits", key[:12])
+        path.unlink(missing_ok=True)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}")
+    tmp.write_text(body, encoding="utf-8")
+    tmp.replace(path)
+
+
+def _saved_warnings(state_dir: Path, key: str) -> list[UserError]:
+    """The warnings kept for a cached result: catalog warn/info codes only; nothing if absent or unreadable."""
+    try:
+        raw = read_small_json(_warnings_path(state_dir, key), max_bytes=_WARNINGS_MAX_BYTES)
+    except (OSError, ValueError):
+        return []
+    catalog = load_error_catalog()
+    return [
+        UserError(item["code"], dict(item["params"]))
+        for item in (raw if isinstance(raw, list) else [])
+        if isinstance(item, dict)
+        and isinstance(item.get("code"), str)
+        and isinstance(item.get("params"), dict)
+        and (entry := catalog.get(item["code"])) is not None
+        and entry.severity != "error"
+    ]
 
 
 def _write_node_manifest(
@@ -420,7 +479,7 @@ class Executor:
         cancel: threading.Event,
     ) -> None:
         nid = node.node_id
-        if node.spec.cacheable and self._try_cache(run, nid, key):
+        if node.spec.cacheable and self._try_cache(run, node, key):
             return
 
         picked = self._pick_dir(run, node, key)
@@ -479,6 +538,7 @@ class Executor:
             run.warnings.setdefault(nid, []).append(warning)
             self._emit(run.graph_run_id, {"type": "warning", "node_id": nid, "error": _error_dict(warning, node)})
         if node.spec.cacheable:
+            _save_warnings(self.state_dir, key, result.warnings)  # before the index row: a hit always finds them
             self.index.record(
                 key,
                 run_id=run_dir.name,  # the node run dir (outputs/graph/runs/<run_id>), not the graph run
@@ -501,7 +561,8 @@ class Executor:
         if self.workspace is not None:
             drop_resume_lease(self.workspace, run_dir.name)
 
-    def _try_cache(self, run: GraphRun, nid: str, key: str) -> bool:
+    def _try_cache(self, run: GraphRun, node: _Node, key: str) -> bool:
+        nid = node.node_id
         # Lease FIRST: retention never begins evicting a leased key, and a key whose eviction already began is no
         # longer `completed`, so lookup() then reports a miss. Only after that are the files worth verifying.
         self.index.lease([key], run.graph_run_id)
@@ -516,6 +577,9 @@ class Executor:
             return False
         self.index.mark_hit(key)
         run.outputs[nid] = {p: ArtifactRef(o.type, o.path, o.hash) for p, o in entry.outputs.items()}
+        for warning in _saved_warnings(self.state_dir, key):  # e.g. QNT-002 still holds for the reused output
+            run.warnings.setdefault(nid, []).append(warning)
+            self._emit(run.graph_run_id, {"type": "warning", "node_id": nid, "error": _error_dict(warning, node)})
         cached_from = {"run_id": entry.run_id, "completed_at": entry.completed_at}
         self._set(run, nid, "cached", cache_key=key, cached_from=cached_from)
         return True

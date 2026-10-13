@@ -227,3 +227,37 @@ def test_a_parent_run_id_is_never_used_as_a_path(tmp_path: Path, bad: str) -> No
     _, mods, gaps = _lineage(tmp_path, run)
     assert [m.run_id for m in mods] == ["r1"]
     assert gaps == ["run r1: invalid parent run id"]
+
+
+def _quant_run(root: Path, parent: str, verdict: str | None) -> Path:
+    run_dir = root / "outputs" / "runs" / "q1"
+    run_dir.mkdir(parents=True)
+    write_manifest(run_dir, RunManifest(run_id="q1", name="q1", stage="quantize", task="fp8", parent_run_id=parent))
+    if verdict is not None:
+        (run_dir / "ptq").mkdir()
+        (run_dir / "ptq" / "report.json").write_text(json.dumps({"parity": {"verdict": verdict}}))
+    return run_dir
+
+
+@pytest.mark.parametrize(("verdict", "expected"), [("warn", "warn"), ("pass", "pass"), (None, None), ("odd", None)])
+def test_a_quantization_runs_parity_verdict_is_in_the_lineage(tmp_path: Path, verdict: str | None,
+                                                                 expected: str | None) -> None:  # fmt: skip
+    _run(tmp_path, "r1", base_model=PARSE.repo, base_model_revision=PARSE.revision, ended_at=0.0)
+    _components, mods, _gaps = _lineage(tmp_path, _quant_run(tmp_path, "r1", verdict))
+    assert [(m.run_id, m.quant_check) for m in mods] == [("q1", expected), ("r1", None)]
+
+
+def test_a_parity_warning_reaches_the_notice_and_the_model_card(tmp_path: Path) -> None:
+    """PM/research 2026-10-13: a warn-quantized model is handed over, and the export says it was not measured."""
+    _run(tmp_path, "r1", base_model=PARSE.repo, base_model_revision=PARSE.revision, ended_at=0.0)
+    components, mods, gaps = _lineage(tmp_path, _quant_run(tmp_path, "r1", "warn"))
+    _vendor(tmp_path, PARSE.license, *(part.license for part in PARSE.model_parts))  # tokenizer: CC-BY-4.0
+    dest = tmp_path / "export"
+    dest.mkdir()
+    (dest / "model.safetensors").write_bytes(b"w")
+    notices.write_notices(dest, root=tmp_path, components=components, modifications=mods, gaps=gaps,
+                          catalog=load_catalog())  # fmt: skip
+    assert "accuracy after quantization was not measured" in (dest / "NOTICE").read_text()
+    card = (dest / "README.md").read_text()
+    assert "Quantized model, quantization check" in card
+    assert "not measured" in card.split("Known limitations", 1)[1]

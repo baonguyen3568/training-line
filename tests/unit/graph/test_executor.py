@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 from typing import Any
 
+from vlm_pipeline.graph import executor as executor_mod
 from vlm_pipeline.graph.errors import InterruptedByMemguard
-from vlm_pipeline.graph.executor import Executor
+from vlm_pipeline.graph.executor import Executor, _save_warnings, _saved_warnings
 from vlm_pipeline.graph.testing import FakeWorker, make_test_registry
 from vlm_pipeline.graph.worker import NOT_RESUMABLE_MARKER, NodeJob, NodeResult
 
@@ -367,3 +369,61 @@ def test_a_completed_node_warning_reaches_the_events(tmp_path: Path) -> None:
     assert warning["node_id"] == "t"
     assert (warning["error"]["code"], warning["error"]["params"]["reason"]) == ("QNT-002", "top1")
     assert "actions" in warning["error"]
+
+
+def test_a_cached_node_shows_its_warning_again(tmp_path: Path) -> None:
+    """QNT-002 on a reused quantized model: the result did not change, so neither did the warning."""
+
+    class Warns(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            result = super().run(job)
+            if job.node_id != "t":
+                return result
+            return NodeResult(outputs=result.outputs, warnings=(("QNT-002", {"node": "t", "reason": "top1"}),))
+
+    Executor(make_test_registry(), Warns(), tmp_path).run(_wf())
+    events: list[dict[str, Any]] = []
+    again = Executor(make_test_registry(), FakeWorker(), tmp_path, on_event=events.append).run(_wf())
+    assert again.status["t"] == "cached"
+    [warning] = [e for e in events if e.get("type") == "warning"]
+    assert (warning["node_id"], warning["error"]["code"], warning["error"]["params"]["reason"]) == (
+        "t",
+        "QNT-002",
+        "top1",
+    )
+    assert [w.code for w in again.warnings["t"]] == ["QNT-002"]
+
+
+def test_a_cached_node_without_warnings_reports_none(tmp_path: Path) -> None:
+    Executor(make_test_registry(), FakeWorker(), tmp_path).run(_wf())
+    events: list[dict[str, Any]] = []
+    again = Executor(make_test_registry(), FakeWorker(), tmp_path, on_event=events.append).run(_wf())
+    assert set(again.status.values()) == {"cached"}
+    assert not [e for e in events if e.get("type") == "warning"]
+
+
+def test_kept_warnings_live_outside_the_run_dir_and_only_catalog_codes_return(tmp_path: Path) -> None:
+    """fixcode B1: a job writes in its run dir, so nothing it plants there can surface as a warning."""
+
+    class Plants(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            (job.run_dir / "node_warnings.json").write_text(json.dumps([{"code": "QNT-002", "params": {}}]))
+            return super().run(job)
+
+    Executor(make_test_registry(), Plants(), tmp_path).run(_wf())
+    events: list[dict[str, Any]] = []
+    again = Executor(make_test_registry(), FakeWorker(), tmp_path, on_event=events.append).run(_wf())
+    assert set(again.status.values()) == {"cached"}
+    assert not [e for e in events if e.get("type") == "warning"]
+    for kept in (tmp_path / executor_mod.WARNINGS_DIR).glob("*.json"):
+        kept.write_text(json.dumps([{"code": "NOT-A-CODE", "params": {}}, {"code": "SYS-000", "params": {}}]))
+    events.clear()
+    Executor(make_test_registry(), FakeWorker(), tmp_path, on_event=events.append).run(_wf())
+    assert not [e for e in events if e.get("type") == "warning"]  # unknown and error-severity codes are dropped
+
+
+def test_a_fresh_result_without_warnings_clears_the_kept_ones(tmp_path: Path) -> None:
+    _save_warnings(tmp_path, "k", (("QNT-002", {"node": "t", "reason": "top1"}),))
+    assert [w.code for w in _saved_warnings(tmp_path, "k")] == ["QNT-002"]
+    _save_warnings(tmp_path, "k", ())
+    assert _saved_warnings(tmp_path, "k") == []

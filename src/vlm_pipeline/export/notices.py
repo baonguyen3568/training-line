@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from vlm_pipeline.common.catalog import Catalog, CatalogEntry, DatasetCatalog, DatasetEntry
 from vlm_pipeline.common.licenses import license_text
-from vlm_pipeline.common.runinfo import RunManifest, read_manifest
+from vlm_pipeline.common.runinfo import RunManifest, read_manifest, read_small_json
 
 ATTRIBUTION_SCHEMA_VERSION = 1
 _RUN_ID = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,119}$")  # a run dir name, never a path (".", "..", "/")
@@ -56,9 +56,11 @@ class Modification(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     run_id: str
-    task: str  # lora | sft | ...
+    task: str  # lora | sft | ... ; fp8 | nvfp4 | ... for a quantization run
     dataset: str | None
     ended_at: float | None
+    # A quantization run's parity check (ptq/report.json): "warn" = handed over with QNT-002, quality not measured.
+    quant_check: Literal["pass", "warn"] | None = None
 
 
 class Attribution(BaseModel):
@@ -179,6 +181,7 @@ def lineage(
                 task=manifest.task,
                 dataset=public_dataset_ref(manifest.dataset),
                 ended_at=manifest.ended_at,
+                quant_check=_quant_check(run_dir) if manifest.stage == "quantize" else None,
             )
         )
         if manifest.dataset:
@@ -236,6 +239,23 @@ def fill_notices(components: list[Component], *, tool: str, date: str) -> list[C
     return [c.model_copy(update={"notices": tuple(fill(c, n) for n in c.notices)}) for c in components]
 
 
+def _quant_check(run_dir: Path) -> Literal["pass", "warn"] | None:
+    """The parity verdict a quantization job wrote (job output: read no-follow, bounded); None if not readable."""
+    try:
+        report = read_small_json(run_dir / "ptq" / "report.json")
+    except (OSError, ValueError):
+        return None
+    parity = report.get("parity") if isinstance(report, dict) else None
+    verdict = parity.get("verdict") if isinstance(parity, dict) else None
+    return verdict if verdict in ("pass", "warn") else None
+
+
+QUANT_WARN_NOTE = (
+    "quantization check: its outputs differ from the original model more than the warning limit, and accuracy "
+    "after quantization was not measured; evaluate it on your own data before use"
+)
+
+
 def _notice(components: list[Component], modifications: list[Modification], gaps: list[str]) -> str:
     out = ["This model folder contains a model derived from the components below.", ""]
     for c in components:
@@ -252,10 +272,12 @@ def _notice(components: list[Component], modifications: list[Modification], gaps
             out.append("  Commercial use: NOT permitted by this licence.")
         out.append("")
     if modifications:
-        out.append("Changes made (fine-tuning runs, oldest last):")
+        out.append("Changes made (training and quantization runs, oldest last):")
         for m in modifications:
             when = time.strftime("%Y-%m-%d", time.gmtime(m.ended_at)) if m.ended_at else "unknown date"
             out.append(f"  - {m.task} run {m.run_id} on {m.dataset or 'unrecorded data'} ({when})")
+            if m.quant_check == "warn":
+                out.append(f"    Warning - {QUANT_WARN_NOTE}.")
         out.append("")
     if gaps:
         out.append("Provenance that could not be established:")
@@ -315,6 +337,8 @@ def _limitations(base: CatalogEntry | None, modifications: list[Modification]) -
         lines.append(f"FP8 quantization: {base.quant_fp8}.")
     if base.remote_code != "none":
         lines.append("Loading runs model code from this folder (trust_remote_code).")
+    if any(m.quant_check == "warn" for m in modifications):
+        lines.append(f"Quantized model, {QUANT_WARN_NOTE}.")
     if modifications:
         lines.append("Quality depends on the fine-tuning data; evaluate on your own documents before use.")
     return lines
