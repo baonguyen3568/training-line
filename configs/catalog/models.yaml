@@ -21,6 +21,8 @@
 #   quant_fp8           official | experimental | unsupported   (Quantize node hidden unless official)
 #   serve_engine        vllm | hf | unknown   (default engine for the "Chạy thử" node)
 #   remote_code         none | pinned_prepared   (pinned_prepared = runs only from the hash-verified prepared snapshot)
+#   auto_class          AutoModelForImageTextToText | AutoModel   (transformers class that loads an export; AutoModel only
+#                       with remote_code pinned_prepared, i.e. the repo's auto_map; checked at the pinned revision)
 #   security            approved | approved_with_conditions | conditional | rejected
 schema_version: 1
 budget_note: "RAM budget on the shared GB10 is ~40GB; preflight = ram_gb_train + 10GB headroom vs MemAvailable."
@@ -33,6 +35,7 @@ models:
     tier: default
     gated: false
     remote_code: pinned_prepared   # config/processor .py + C-RADIOv2-H@0d8f4c18 (configs/models/pinned/)
+    auto_class: AutoModel          # auto_map -> NemotronParseForConditionalGeneration (not in the image-text-to-text mapping)
     license: nvidia-open-model-license
     commercial: "yes"
     attribution: "NVIDIA Open Model License; tokenizer CC-BY-4.0"
@@ -69,6 +72,7 @@ models:
     tier: template
     gated: true                    # user must accept on HF + read-only fine-grained token (wizard)
     remote_code: none              # Qwen3VLForConditionalGeneration native (config unread until gate accepted)
+    auto_class: AutoModelForImageTextToText   # from the model card (Qwen3-VL); config gated: re-check when the gate is accepted
     license: nvidia-open-model-license
     commercial: "yes"
     attribution: "Built on NVIDIA Cosmos"
@@ -105,6 +109,7 @@ models:
     tier: catalog
     gated: true
     remote_code: none
+    auto_class: AutoModelForImageTextToText   # same: re-check when the gate is accepted
     license: nvidia-open-model-license
     commercial: "yes"
     attribution: "Built on NVIDIA Cosmos"
@@ -141,6 +146,7 @@ models:
     tier: baseline                 # N-4 baseline + G1-harness; selectable in Advanced only
     gated: false
     remote_code: none
+    auto_class: AutoModelForImageTextToText
     license: apache-2.0
     commercial: "yes"
     attribution: ""
@@ -177,6 +183,7 @@ models:
     tier: catalog
     gated: false
     remote_code: none
+    auto_class: AutoModelForImageTextToText
     license: apache-2.0
     commercial: "yes"
     attribution: ""
@@ -213,6 +220,7 @@ models:
     tier: catalog
     gated: false
     remote_code: none
+    auto_class: AutoModelForImageTextToText
     license: apache-2.0
     commercial: "yes"
     attribution: ""
@@ -249,6 +257,7 @@ models:
     tier: catalog
     gated: false
     remote_code: none
+    auto_class: AutoModelForImageTextToText
     license: apache-2.0
     commercial: "yes"
     attribution: ""
@@ -285,6 +294,7 @@ models:
     tier: catalog
     gated: false
     remote_code: none
+    auto_class: AutoModelForImageTextToText
     license: apache-2.0
     commercial: "yes"
     attribution: ""
@@ -321,6 +331,7 @@ models:
     tier: catalog
     gated: false
     remote_code: none
+    auto_class: AutoModelForImageTextToText
     license: apache-2.0
     commercial: "yes"
     attribution: ""
@@ -358,6 +369,7 @@ models:
     tier: catalog
     gated: false
     remote_code: none
+    auto_class: AutoModelForImageTextToText
     license: apache-2.0
     commercial: "yes"
     attribution: ""
@@ -394,6 +406,7 @@ models:
     tier: rnd                      # v1.1 vs 2.0 comparison (001a §8) decides promotion
     gated: false
     remote_code: pinned_prepared
+    auto_class: AutoModel          # auto_map -> NemotronParseForConditionalGeneration (not in the image-text-to-text mapping)
     license: openmdw-1.1
     commercial: "yes"
     attribution: "OpenMDW-1.1 notice; tokenizer CC-BY-4.0"

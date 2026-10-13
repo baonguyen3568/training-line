@@ -120,3 +120,21 @@ def test_one_security_mark_for_every_lock(verdict: str, ok: bool) -> None:
     from vlm_pipeline.common.approval import is_security_approved
 
     assert is_security_approved(verdict) is ok
+
+
+@pytest.mark.parametrize(
+    ("remote_code", "auto_class", "ok"),
+    [
+        ("pinned_prepared", "AutoModel", True),
+        ("none", "AutoModelForImageTextToText", True),
+        ("none", "AutoModel", False),  # AutoModel resolves only through the repo's auto_map
+        ("pinned_prepared", "AutoModelForImageTextToText", False),
+    ],
+)
+def test_auto_class_matches_remote_code(remote_code: str, auto_class: str, ok: bool) -> None:
+    raw = _model(remote_code=remote_code, auto_class=auto_class)
+    if ok:
+        CatalogEntry.model_validate(raw)
+    else:
+        with pytest.raises(ValidationError, match="auto_class"):
+            CatalogEntry.model_validate(raw)

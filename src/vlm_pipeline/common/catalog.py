@@ -57,6 +57,8 @@ class CatalogEntry(BaseModel):
     tier: Tier
     gated: bool
     remote_code: Literal["none", "pinned_prepared"]
+    # transformers class that loads the model (export model card, P012); AutoModel = the repo's auto_map (remote code)
+    auto_class: Literal["AutoModelForImageTextToText", "AutoModel"]
     license: str
     commercial: Literal["yes", "no", "conditional"]
     attribution: str
@@ -107,6 +109,15 @@ class CatalogEntry(BaseModel):
         low, high = self.sft_trainable_pct_min, self.sft_trainable_pct_max
         if (low, high) != (0, 0) and not 0 < low < high <= 100:
             raise ValueError(f"{self.id}: sft_trainable_pct must be 0/0 (unknown) or 0 < min < max <= 100")
+        return self
+
+    @model_validator(mode="after")
+    def _auto_class_matches_remote_code(self) -> Self:
+        # AutoModel only resolves through the repo's auto_map, i.e. pinned remote code; native classes need none.
+        if (self.auto_class == "AutoModel") != (self.remote_code == "pinned_prepared"):
+            raise ValueError(
+                f"{self.id}: auto_class AutoModel goes with remote_code pinned_prepared (and only with it)"
+            )
         return self
 
     @model_validator(mode="after")
