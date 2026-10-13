@@ -639,6 +639,34 @@ class PreflightRefusedError(VlmPipelineError):
 GPU_POLL_S = 10.0
 
 
+def _queue_info(since: float, *, busy: bool, short: Any) -> dict[str, float]:
+    """What a queued job reports on every poll: GPU busy, and/or the numbers of the memory budget that blocks it."""
+    info: dict[str, float] = {"since": since, "waited_s": time.time() - since}
+    if busy:
+        info["gpu_busy"] = 1.0
+    if short is not None:  # the UI shows "waiting for free memory" (host) or the VRAM figures (discrete GPU)
+        prefix = "vram_" if short.params.get("memory") == "vram" else ""
+        for key in ("need_gb", "avail_gb"):
+            value = short.params.get(key)
+            if isinstance(value, int | float):
+                info[prefix + key] = float(value)
+    return info
+
+
+def _memory_timeout(finding: Any, waited_s: float) -> Any:
+    """The SYS-002 finding of a memory shortage that outlasted the wait (bao-design text variants memory / vram)."""
+    from vlm_pipeline.common.preflight import Finding
+
+    vram = finding.params.get("memory") == "vram"
+    params = {
+        "minutes": math.ceil(waited_s / 60),
+        "waiting_for": "vram" if vram else "memory",
+        "need_gb": round(float(finding.params.get("need_gb", 0.0)), 1),
+        "avail_gb": round(float(finding.params.get("avail_gb", 0.0)), 1),
+    }
+    return Finding("SYS-002", ExitCode.NO_MEM, f"still short of memory after the wait: {finding.reason}", params)
+
+
 def _wait_for_gpu(
     manifest: RunManifest,
     run_dir: Path,
@@ -652,28 +680,39 @@ def _wait_for_gpu(
     on_wait: Callable[[dict[str, float]], None] | None,
     timeout_s: float,
     thresholds: MemThresholds,
+    memory_wait_s: float = 1800.0,
 ) -> gpu_lock.LockHandle | RunManifest:
     """Preflight, then take the lock; QUEUE while another live job holds it (research R2: never SYS-000 for "busy").
 
-    A busy lock with a live holder is waited for (``on_wait({"gpu_busy": 1, ...})``, cancel stops the wait); a stale
-    or unreadable lock and every other refusal fail at once with the finding's own catalog code and params (a lock is
-    never removed here). A lost race on ``acquire`` just waits again. Returns the lock, or the CANCELLED manifest.
+    A busy lock with a live holder is waited for (``on_wait({"gpu_busy": 1, ...})``, cancel stops the wait). Not
+    enough free memory (MEM-001, host or VRAM) is waited for too: on a shared host the memory free when the job
+    queued has often changed by the time the lock frees up (PM 2026-10-13: queue, never fail); ``on_wait`` then
+    carries need/avail, and after ``memory_wait_s`` of continuous shortage the job fails with SYS-002
+    (waiting_for memory | vram). A stale or unreadable lock and every other refusal fail at once with the finding's
+    own catalog code and params (a lock is never removed here). A lost race on ``acquire`` just waits again.
+    Returns the lock, or the CANCELLED manifest.
     """
     from vlm_pipeline.common.diskguard import check_lock
     from vlm_pipeline.common.preflight import preflight
 
     since = time.time()
+    short_since: float | None = None  # start of the current memory shortage
     while True:
         verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb, thresholds=thresholds, lock_holder=lambda: check_lock(path))
         busy = [f for f in verdict.findings if f.code == "SYS-001" and f.params.get("state") == "busy"]
-        refused = next((f for f in verdict.findings if f not in busy), None)
+        short = [f for f in verdict.findings if f.code == "MEM-001"]  # transient on a shared host: wait
+        refused = next((f for f in verdict.findings if f not in busy and f not in short), None)
         if refused is None and busy and time.time() - since > timeout_s:
             refused = busy[0]
+        # Only a shortage while the GPU is FREE counts: behind a busy lock the memory is mostly the holder's (backend)
+        short_since = (short_since or time.time()) if short and not busy else None
+        if refused is None and short and short_since is not None and time.time() - short_since > memory_wait_s:
+            refused = _memory_timeout(short[0], time.time() - short_since)
         if refused is not None:
             failed = {"status": RunStatus.FAILED, "error_code": refused.code, "ended_at": time.time()}
             write_manifest(run_dir, manifest.model_copy(update=failed))
             raise PreflightRefusedError(refused.code, refused.reason, refused.params)
-        if not busy:
+        if not busy and not short:
             try:
                 return gpu_lock.acquire(path, who=who, job=manifest.name, run_id=manifest.run_id,
                                         host_pid=os.getpid(), run_dir=_relative(run_dir, project_root))  # fmt: skip
@@ -681,7 +720,7 @@ def _wait_for_gpu(
                 pass  # another job took it between the check and here: wait for that one too
         if on_wait is not None:
             try:
-                on_wait({"gpu_busy": 1.0, "since": since, "waited_s": time.time() - since})
+                on_wait(_queue_info(since, busy=bool(busy), short=short[0] if short else None))
             except Exception:  # a broken UI callback must never stop the wait
                 logger.exception("on_wait callback failed")
         if cancel is not None and cancel.wait(GPU_POLL_S):
@@ -866,7 +905,7 @@ def run_job(
     queue = (manifest, run_dir, lock_path or gpu_lock.default_lock_path(), est_peak_gb, ckpt_gb)
     taken = _gpu_turn(
         job, queue, take=take_gpu_lock, who=who, project_root=project_root, cancel=cancel, on_wait=on_wait,
-        timeout_s=lock_wait_s, thresholds=mem_thresholds,
+        timeout_s=lock_wait_s, thresholds=mem_thresholds, memory_wait_s=memory_wait_s,
     )  # fmt: skip
     if isinstance(taken, RunManifest):  # cancelled while queued for the GPU
         return taken

@@ -489,6 +489,60 @@ def test_a_busy_gpu_is_waited_for_not_an_unknown_error(tmp_path: Path, monkeypat
     assert all(s["gpu_busy"] == 1.0 for s in seen)
 
 
+def _short(memory: str | None = None) -> object:
+    from vlm_pipeline.common.errors import ExitCode
+    from vlm_pipeline.common.preflight import Finding
+
+    params: dict[str, object] = {"need_gb": 32.9, "avail_gb": 31.9, "est_peak_gb": 24.9, "max_free_pct": 80}
+    if memory:
+        params["memory"] = memory
+    return SimpleNamespace(ok=False, findings=(Finding("MEM-001", ExitCode.NO_MEM, "short", params),))
+
+
+def test_memory_short_when_the_lock_frees_up_is_waited_for(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """GB10 2026-10-13 (run ...-q08-bf16-kv8-b353): the job queued for the lock 33 min, then FAILED MEM-001 because
+    the shared host's free memory had changed meanwhile. Queue, never fail (PM): it waits and then runs."""
+    (_, jobrun), (manifest, run_dir) = _gpu_wait_setup(
+        tmp_path, monkeypatch, [_busy(), _short(), _short("vram"), SimpleNamespace(ok=True, findings=())]
+    )
+    seen: list[dict[str, float]] = []
+    handle = jobrun._wait_for_gpu(
+        manifest, run_dir, tmp_path / "GPU_LOCK", 1.0, 0.0, who="t", project_root=tmp_path,
+        cancel=None, on_wait=seen.append, timeout_s=60, thresholds=jobrun.DEFAULT_THRESHOLDS,
+    )  # fmt: skip
+    assert handle.info.run_id == "n4-0123456789abcdef"
+    assert seen[0]["gpu_busy"] == 1.0
+    assert (seen[1]["need_gb"], seen[1]["avail_gb"]) == (32.9, 31.9)
+    assert "gpu_busy" not in seen[1]
+    assert seen[2]["vram_need_gb"] == 32.9
+
+
+def test_a_memory_shortage_past_the_wait_is_sys002(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.common.runinfo import read_manifest
+
+    (_, jobrun), (manifest, run_dir) = _gpu_wait_setup(tmp_path, monkeypatch, [_short()] * 5)
+    with pytest.raises(jobrun.PreflightRefusedError) as err:
+        jobrun._wait_for_gpu(manifest, run_dir, tmp_path / "GPU_LOCK", 1.0, 0.0, who="t", project_root=tmp_path,
+                             cancel=None, on_wait=None, timeout_s=60, thresholds=jobrun.DEFAULT_THRESHOLDS,
+                             memory_wait_s=0.0)  # fmt: skip
+    assert err.value.code == "SYS-002"
+    assert err.value.params == {"minutes": 1, "waiting_for": "memory", "need_gb": 32.9, "avail_gb": 31.9}
+    assert read_manifest(run_dir).error_code == "SYS-002"
+
+
+def test_a_shortage_behind_a_busy_lock_does_not_count(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Behind a long training run the memory is mostly the holder's: only a shortage with a FREE GPU times out."""
+    both = SimpleNamespace(ok=False, findings=(*_busy().findings, *_short().findings))  # type: ignore[attr-defined]
+    (_, jobrun), (manifest, run_dir) = _gpu_wait_setup(
+        tmp_path, monkeypatch, [both, both, SimpleNamespace(ok=True, findings=())]
+    )
+    handle = jobrun._wait_for_gpu(
+        manifest, run_dir, tmp_path / "GPU_LOCK", 1.0, 0.0, who="t", project_root=tmp_path,
+        cancel=None, on_wait=None, timeout_s=60, thresholds=jobrun.DEFAULT_THRESHOLDS, memory_wait_s=0.0,
+    )  # fmt: skip
+    assert handle.info.run_id == "n4-0123456789abcdef"
+
+
 @pytest.mark.parametrize("state", ["stale", "corrupt"])
 def test_a_stale_lock_fails_at_once_with_its_own_code(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str
