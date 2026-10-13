@@ -41,6 +41,7 @@ YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được c�
 | D-3 | `.env.local.example` + loader: gộp mọi cấu hình (HF_TOKEN, ports, paths, profile, quota); bỏ .env cũ; secrets không vào image/layer | bao-backend + bao-security | TODO |
 | D-4 | Memguard/preflight cho GPU rời (amd64: VRAM riêng + RAM host) bên cạnh UMA (GB10) | bao-fixcode | TODO |
 | D-5 | CI local: build cả 2 arch (amd64 qua QEMU = build-only), smoke compose up/down trên arm64 thật; ghi rõ amd64 CHƯA test GPU | bao-tester + bao-cleancode | TODO |
+| D-7 | Phân tầng cấu hình (user yêu cầu): `.env.local` = hạ tầng/khởi động (port, đường dẫn volume, profile, URL nội bộ, khoá mã hoá secret); **DB (SQLite app.db)** = mọi thứ user chỉnh được (quota, cache cap, lịch dọn, preset mặc định, ngôn ngữ/theme, HF token mã hoá…); policy admin (shared_dev, chặn plugin) KHÔNG chỉnh qua UI. + **Trang Cài đặt trong dashboard** (icon-first, popover) để chỉnh config trong DB, có validate + lịch sử thay đổi | bao-backend (schema/API) + bao-security (secret, phân quyền) + bao-design (UX) + bao-frontend (UI) | TODO |
 | D-6 | Dọn rác liên tục: scheduler bật xoá THẬT item an toàn trên máy này (user yêu cầu), + dọn repo (file rác, worktree, outputs smoke, image/container/build-cache vlm-* cũ), báo cáo định kỳ | bao-cleanup (+ bao-cleancode: code chết, file thừa trong repo) | TODO |
 
 ## 🔧 MILESTONE M1b — Mọi node chạy THẬT (2026-10-13). RealWorker hiện chỉ có model.hf_pick, data.hf_load, train.lora_vlm/sft_vlm

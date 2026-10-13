@@ -46,3 +46,4 @@
 - 2026-10-13 P013 (storage scheduler): tự áp D3 + evict cache; không tự làm PERMANENT_LOSS; tính quota 20GB/24h; bỏ qua lượt khi GPU lock held; bản cá nhân bật mặc định, shared_dev chỉ dry-run tới khi PM bật.
 - 2026-10-13 M1b: mọi node phải chạy thật (8/12 node thiếu worker). Node chưa hỗ trợ → lỗi lúc validate. fixcode chuyển từ M2-4 sang B-7.
 - 2026-10-13 USER: (1) dọn dẹp + xoá rác LIÊN TỤC → bật xoá thật cho item AN TOÀN trên máy này (vẫn cấm PERMANENT_LOSS tự động, vẫn chỉ trong phạm vi dự án, vẫn quota 20GB/24h); (2) hỗ trợ amd64 + arm64; (3) đóng Docker toàn bộ, docker compose, cấu hình 1 file .env.local (đã gitignore .env.*). → MILESTONE M3.
+- 2026-10-13 USER: cấu hình phân tầng env (.env.local) vs DB, có trang Cài đặt trong dashboard để chỉnh → D-7.
