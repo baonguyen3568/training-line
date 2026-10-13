@@ -464,6 +464,7 @@
               "option_keys": "lr_preset",
               "order": 1,
               "preset": true,
+              "summary": true,
               "widget": "segmented"
             }
           },
@@ -604,6 +605,7 @@
               "option_keys": "lr_preset",
               "order": 1,
               "preset": true,
+              "summary": true,
               "widget": "segmented"
             }
           },

@@ -28,7 +28,7 @@ class _FinetuneParams(Params):
         3, json_schema_extra=ui(order=0, widget="segmented", summary=True, option_keys="epoch_count")
     )
     lr_preset: LrPreset = Field(
-        "medium", json_schema_extra=ui(order=1, widget="segmented", preset=True, option_keys="lr_preset")
+        "medium", json_schema_extra=ui(order=1, widget="segmented", preset=True, summary=True, option_keys="lr_preset")
     )
     global_batch_size: int = Field(8, ge=4, le=64, json_schema_extra=ui(advanced=True))
     local_batch_size: int = Field(1, ge=1, le=4, json_schema_extra=ui(advanced=True))
