@@ -27,6 +27,13 @@ rules:
     message: standards.train.overfit_risk
     source: "team-default: O-1 (20 images x 12 epochs) memorised its train set, .team/proposals/001a-nvidia-default-model.md"
 
+  - id: TRAIN-ONE-EPOCH
+    applies_to: {node: train.sft_vlm, param: epochs}
+    check: {kind: range, min: 2}
+    level: info
+    message: standards.train.one_epoch
+    source: "P-3b (Parse v1.1 + CORD, full fine-tune): 1 epoch reached 80.6% of the 3-epoch field F1 on validation, .team/proposals/001a-nvidia-default-model.md §10.10"
+
   - id: TRAIN-FREEZE-VISION
     applies_to: {node: train.sft_vlm, param: freeze_vision_tower}
     check: {kind: equals, value: true}
