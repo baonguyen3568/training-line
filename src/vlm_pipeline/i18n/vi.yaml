@@ -985,3 +985,16 @@ engine_warning:
   bf16_adam_params:
     title: Model có thể học được ít hơn mong đợi
     what: Trọng số được train ở bf16 mà không giữ bản fp32, nên các bước cập nhật quá nhỏ bị làm tròn mất. Model có thể học được ít hơn nhiều so với số bước đã chạy. Hãy so điểm với model gốc trước khi dùng.
+error_group:
+  CACHE: Kết quả đã lưu của các bước
+  CFG: Cách ghép workflow (nối dây, thiết lập)
+  DATA: Dữ liệu đầu vào
+  DISK: Ổ đĩa
+  ENV: Môi trường cài đặt
+  EXP: Xuất model
+  GPU: GPU
+  MEM: Bộ nhớ
+  MODEL: Tải và dùng model
+  NET: Kết nối mạng
+  SEC: An toàn và giấy phép
+  SYS: Hệ thống và tiến trình chạy

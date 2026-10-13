@@ -985,3 +985,16 @@ engine_warning:
   bf16_adam_params:
     title: The model may have learned less than expected
     what: Weights were trained in bf16 without an fp32 copy, so very small updates were rounded away. The model may have learned much less than the number of steps suggests. Compare its score with the base model before using it.
+error_group:
+  CACHE: Saved step results
+  CFG: Workflow setup (wires, settings)
+  DATA: Input data
+  DISK: Disk
+  ENV: Installed environment
+  EXP: Model export
+  GPU: GPU
+  MEM: Memory
+  MODEL: Downloading and using models
+  NET: Network
+  SEC: Safety and licenses
+  SYS: System and running processes
