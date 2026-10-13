@@ -6,6 +6,7 @@ Text for the user is rendered here (the edge) from i18n keys; domain objects onl
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import sys
 import threading
@@ -47,6 +48,9 @@ def _labels(workflow: Mapping[str, Any], registry: Any, locale: str) -> Labels:
     )
 
 
+_STD_MESSAGE = re.compile(r"^standards\.[a-z0-9_.]+$")  # only standards.* keys may replace error.STD-001.what
+
+
 def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None = None) -> dict[str, Any]:
     code = str(issue.get("code", "SYS-000"))
     raw = dict(issue.get("params") or {})
@@ -59,6 +63,8 @@ def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None =
         key = f"error.{code}.{part}"
         if part == "what" and variant:
             key = f"{key}.{variant}"
+        if part == "what" and code == "STD-001" and _STD_MESSAGE.match(str(raw.get("message", ""))):
+            key = str(raw["message"])  # the standard's own sentence (configs/standards/*.yaml -> i18n standards.*)
         if part == "why" and key not in texts:  # "why" is optional in the catalog
             out[part] = None
             continue
