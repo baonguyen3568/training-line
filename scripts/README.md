@@ -15,6 +15,5 @@ Gates and entrypoints wired into `scripts/check.sh` or the app are documented wh
 | `scripts/dev/run_workflow.py` | bao-backend | Runs one workflow file through the app's executor without HTTP (dev / E2E of the real worker). |
 | `scripts/dev/seed_runs.py` | bao-backend | Writes fake run dirs covering all 8 `RunStatus` values, for frontend and tester work. |
 | `scripts/probe/gpu_probe.py` | bao-backend | GPU environment probe inside the NGC container, no training (G0 / S-2). |
-| `scripts/probe/run_spike_s3.sh` | bao-backend | **To delete** (temporary S-3 launcher, replaced by `common/jobrun_cli` + the smoke): removed with the `-1` image clean-up. |
 | `scripts/team/start-team.sh` | PM | Starts the team agents in tmux sessions `bao-trainning-2..10` (idempotent). |
 | `scripts/team/stop-team.sh` | PM | Stops tmux sessions `bao-trainning-2..10`; never touches `bao-trainning-1` (PM). |
