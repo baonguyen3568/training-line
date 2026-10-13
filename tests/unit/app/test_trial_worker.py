@@ -204,9 +204,11 @@ def test_temperature_turns_on_sampling_with_top_p() -> None:
     from vlm_pipeline.serve.trial import TrialRequest, decoding_overrides
 
     req = TrialRequest("m", "g", "p", "chat", "i.png", "q", max_new_tokens=256, temperature=0.0, top_p=0.9)
-    assert decoding_overrides(req) == {"max_new_tokens": 256, "do_sample": False}  # greedy beats a sampling base
+    assert decoding_overrides(req) == {"max_new_tokens": 256, "use_cache": True, "do_sample": False}  # greedy wins
     hot = TrialRequest("m", "g", "p", "chat", "i.png", "q", max_new_tokens=256, temperature=0.7, top_p=0.9)
-    assert decoding_overrides(hot) == {"max_new_tokens": 256, "do_sample": True, "temperature": 0.7, "top_p": 0.9}
+    assert decoding_overrides(hot) == {
+        "max_new_tokens": 256, "use_cache": True, "do_sample": True, "temperature": 0.7, "top_p": 0.9
+    }  # fmt: skip
 
 
 def test_model_without_a_catalog_base_is_refused(tmp_path: Path) -> None:

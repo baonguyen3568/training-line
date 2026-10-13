@@ -65,7 +65,11 @@ def decoding_overrides(req: TrialRequest) -> dict[str, Any]:
     Temperature 0 sets ``do_sample=False`` EXPLICITLY: a base generation_config.json may ship ``do_sample: true`` +
     temperature 0.7 (many chat models), and "temperature 0" must still mean greedy and repeatable (tester).
     """
-    out: dict[str, Any] = {"max_new_tokens": req.max_new_tokens}
+    # use_cache pinned on: a fine-tuned export carries use_cache=false (training, patch 0003 / BUG-001) in its
+    # generation config, and transformers 5 fills every key the base config leaves unset from the model's own generation
+    # config, so the export decoded with no KV cache, ~3x slower per token (tester bench R0, 2026-10-13). The remote
+    # code class run here has a working cache; eval_cord_worker pins use_cache the same way.
+    out: dict[str, Any] = {"max_new_tokens": req.max_new_tokens, "use_cache": True}
     if req.temperature > 0:
         out.update(do_sample=True, temperature=req.temperature, top_p=req.top_p)
     else:

@@ -189,7 +189,8 @@ def vllm_sampling(worker: RealWorker, request: TrialRequest) -> tuple[dict[str, 
     if resolved.get("repetition_penalty") not in (None, 1.0):
         sampling["repetition_penalty"] = float(resolved["repetition_penalty"])
     source = "base generation_config.json" if base else "model defaults (no generation_config.json)"
-    return sampling, {"_source": source, "_template": dict(request.decode_overrides), **decoding_overrides(request)}
+    node = {k: v for k, v in decoding_overrides(request).items() if k != "use_cache"}  # an HF generate() key only
+    return sampling, {"_source": source, "_template": dict(request.decode_overrides), **node}
 
 
 def _write_result(path: Path, result: Mapping[str, Any]) -> None:
