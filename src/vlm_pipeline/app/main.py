@@ -217,6 +217,18 @@ def _register_storage(app: FastAPI, services: Services) -> None:
     storage.register_storage_routes(app, api)
 
 
+def _register_settings(app: FastAPI, services: Services, key_file: Path | None) -> None:
+    """Settings page (D-7): write-only secrets in outputs/system/settings.db, admin policy read-only."""
+    root = getattr(services, "root", None)
+    if root is None:
+        return  # test doubles without a project root
+    from vlm_pipeline.app.secret_store import SecretStore
+    from vlm_pipeline.app.settings_api import register_settings_routes
+
+    app.state.secret_store = store = SecretStore(root, key_file=key_file)
+    register_settings_routes(app, store)
+
+
 def _register_uploads(app: FastAPI, services: Services) -> None:
     """Trial-node images + result (app/uploads.py); errors render like validate issues."""
     root, state_dir = getattr(services, "root", None), getattr(services, "_state_dir", None)
@@ -255,8 +267,12 @@ def create_app(
     ws_auth_timeout_s: float = 5.0,
     secure: bool = True,
     static_dir: Path | None = None,
+    secret_key_file: Path | None = None,
 ) -> FastAPI:
-    """Build the app (D13 security on by default). ``secure=False`` only for unit tests of the API itself."""
+    """Build the app (D13 security on by default). ``secure=False`` only for unit tests of the API itself.
+
+    ``secret_key_file``: tests only; the app uses ``~/.config/ntc-training/secrets.key`` (no env override, D-7).
+    """
     if not secure and "pytest" not in sys.modules:
         raise RuntimeError("create_app(secure=False) is only allowed under pytest")
     if services is None:
@@ -290,6 +306,7 @@ def create_app(
 
     _register_storage(app, services)
     _register_uploads(app, services)
+    _register_settings(app, services, secret_key_file)
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
     _register_template_routes(app, services)
