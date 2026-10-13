@@ -5,6 +5,7 @@ import { t, tp, tpOptional } from "../i18n";
 import { nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { tokenVar } from "../lib/ports";
+import { runWarningText } from "../lib/runWarning";
 import { identifierView, untrustedText } from "../lib/safeText";
 import { useUi } from "../store/ui";
 import type { NodeRunState } from "../store/workflow";
@@ -214,6 +215,15 @@ function NodeShellImpl({ data, selected }: NodeProps<ShellNode>) {
         {errors.length === 0 && warns.length > 0 && (
           <span className="state warn">⚠ {warns.length}</span>
         )}
+        {runState?.warnings?.map((w, i) => {
+          const text = runWarningText(w, () => nodeTitle(spec, typeId));
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: warnings are append-only for one run
+            <span key={i} className="state warn run-warning" title={text.what}>
+              ⚠ {text.title}
+            </span>
+          );
+        })}
         {runState ? (
           <RunBadge state={runState} />
         ) : (

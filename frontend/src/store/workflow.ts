@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "../api";
 import type {
+  EventError,
   NodeRunStatus,
   NodeSpec,
   PortType,
@@ -21,6 +22,8 @@ export interface NodeRunState {
   errorCode?: string;
   progress?: number;
   message?: string;
+  /** Run `warning` events for this node (e.g. CACHE-001: the saved result is unreadable, the step runs again). */
+  warnings?: EventError[];
 }
 
 interface WorkflowState {
@@ -302,7 +305,13 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
           const st: NodeRunState = { status: ev.status };
           if (ev.progress !== undefined) st.progress = ev.progress;
           if (ev.error) st.errorCode = ev.error.code;
+          const kept = run.nodes[ev.node_id]?.warnings;
+          if (kept) st.warnings = kept;
           set({ run: { ...run, nodes: { ...run.nodes, [ev.node_id]: st } } });
+        } else if (ev.type === "warning" && ev.node_id && ev.error) {
+          const prev = run.nodes[ev.node_id] ?? { status: "pending" as const };
+          const warnings = [...(prev.warnings ?? []), ev.error];
+          set({ run: { ...run, nodes: { ...run.nodes, [ev.node_id]: { ...prev, warnings } } } });
         } else if (ev.type === "run_status") {
           if (ev.status === "running") return;
           // Terminal (completed/failed/cancelled/interrupted/invalid): nodes never started stay as they are.

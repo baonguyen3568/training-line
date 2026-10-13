@@ -53,6 +53,7 @@ error:
   CACHE-001:
     title: Kết quả cũ bị hỏng, sẽ chạy lại
     what: Kết quả đã lưu của bước "{node}" (lúc {saved_at}) không đọc được nên app sẽ chạy lại bước này, mất khoảng {est_minutes} phút.
+    what_no_estimate: Kết quả đã lưu của bước "{node}" (lúc {saved_at}) không đọc được nên app sẽ chạy lại bước này.
   SYS-003:
     title: Bước này dừng đột ngột
     what: Bước này dừng giữa chừng mà không báo lý do (có thể do máy khởi động lại hoặc tiến trình bị tắt). Tiến độ đến {checkpoint_step} đã được lưu nếu có.

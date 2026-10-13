@@ -53,6 +53,7 @@ error:
   CACHE-001:
     title: Saved result is damaged, re-running
     what: The saved result of "{node}" (from {saved_at}) can't be read, so the app will run this step again, about {est_minutes} minutes.
+    what_no_estimate: The saved result of "{node}" (from {saved_at}) can't be read, so the app will run this step again.
   SYS-003:
     title: This step stopped unexpectedly
     what: This step stopped midway without reporting why (the machine may have restarted or the process was killed). Progress up to {checkpoint_step} was saved if available.

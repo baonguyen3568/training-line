@@ -3,6 +3,7 @@ import { useState } from "react";
 import { t } from "../i18n";
 import { formatDuration, formatEstimate } from "../lib/format";
 import { nodeTitle } from "../lib/nodeText";
+import { runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
 import { useWorkflow } from "../store/workflow";
 
@@ -36,6 +37,13 @@ export function CheckBar() {
         node: nodeTitle(specs.get(currentNode.type), currentNode.type),
       })
     : null;
+  const nodeLabel = (id: string) => {
+    const n = workflow.nodes.find((x) => x.id === id);
+    return n ? nodeTitle(specs.get(n.type), n.type) : id;
+  };
+  const runWarnings = states.flatMap(([id, s]) =>
+    (s.warnings ?? []).map((w) => ({ id, ...runWarningText(w, nodeLabel) })),
+  );
   const lost = run?.status === "connection_lost" || run?.status === "run_not_found";
   const finishedText = lost
     ? t("run.connection_lost")
@@ -66,6 +74,19 @@ export function CheckBar() {
             {running && (
               <span data-testid="run-progress">{progress ?? t("node_state.queued")}</span>
             )}
+            {runWarnings.map((w, i) => (
+              <button
+                // biome-ignore lint/suspicious/noArrayIndexKey: warnings are append-only for one run
+                key={i}
+                type="button"
+                className="link state warn"
+                data-testid="run-warning"
+                title={w.what}
+                onClick={() => showMe(w.id)}
+              >
+                ⚠ {w.what ?? `${w.title}: ${nodeLabel(w.id)}`}
+              </button>
+            ))}
             {run.done && (
               <>
                 <span className={failedCount > 0 || lost ? "run-result bad" : "run-result"}>
