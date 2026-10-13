@@ -6,7 +6,9 @@ description: Use when measuring latency, throughput or peak memory of a VLM (bef
 # Performance benchmark protocol — DGX Spark GB10 (UMA, shared host)
 
 ## 0. Pre-flight
-- GPU lock: create `.team/GPU_LOCK` (owner, job, start, PID); abort if it exists.
+- GPU lock: ONLY via `uv run python -m vlm_pipeline.common.gpu_lock {status|acquire|release}` or, better, run the job
+  through `vlm_pipeline.common.jobrun_cli` (preflight + lock + memguard + run.json). Never write `.team/GPU_LOCK` by hand.
+  Team jobs ≤30' only when the lock is free AND the app (7870) has no user run running/queued (PM rule 2026-10-13).
 - Record host state: `free -g`, `cat /proc/meminfo | egrep 'MemTotal|MemAvailable|Cached'`,
   `docker ps --format '{{.Names}}'` (other services = noise), `nvidia-smi --query-gpu=name,driver_version,temperature.gpu,power.draw,clocks.sm --format=csv`.
 - Do NOT run `drop_caches` (needs sudo — forbidden). Record `Cached` instead.
@@ -47,4 +49,4 @@ Same engine, same flags, same images/prompts, same concurrency, run back-to-back
 (tester-eval-sanity) — a speedup with unacceptable accuracy drop is a FAIL.
 
 ## 6. Cleanup
-Stop servers (only your own `vlm-*` containers / your PIDs), kill memory sampler, `rm -f .team/GPU_LOCK`.
+Stop servers (only your own `vlm-*` containers / your PIDs), kill memory sampler; jobrun releases the lock (else `gpu_lock release`).
