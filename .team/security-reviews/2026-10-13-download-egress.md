@@ -51,9 +51,24 @@ every other job: --network none (unchanged)
 
 ## 3. What is fetched: pinned revision + include/exclude
 
-- `repo` + `revision` = 40-hex commit SHA from the catalog (models.yaml / datasets.yaml). A repo outside the catalog
-  is not offered in 1.0. If a "custom repo" comes later: the host resolves `main` → SHA, shows it, and the same
-  filter applies with remote code always refused.
+- MODELS: `repo` + `revision` = 40-hex commit SHA from the catalog (models.yaml) only, in 1.0 (check_support and
+  the recipes need the catalog entry). Any model repo = roadmap, behind an in-app vetting flow.
+- DATASETS (PM 2026-10-13, user wants deep freedom): any HF dataset repo, accepted with these rules:
+  - DATA FILES ONLY: `*.parquet`, `*.arrow`, `*.json`, `*.jsonl`, `*.csv`, `*.png|*.jpg|*.jpeg|*.webp`, plus
+    `README.md` / `LICENSE*`. No `*.py` loader, no `*.tar` (webdataset stays catalog-only in 1.0), no archives.
+    A repo whose data only exists through a loader script → refused with a clear message.
+  - The host resolves the ref the user typed (default `main`) to the 40-hex commit SHA BEFORE the download, shows
+    it, and records it in run.json + the dataset manifest; every later use reads that SHA, never `main` again.
+  - License: read from the dataset card (`card_data.license`) and shown as is, with the badge "not reviewed by the
+    team". `unknown`/missing → yellow warning, and export/share of anything trained on it is blocked (P012 rule).
+  - Benchmark contamination: an arbitrary repo may be a test set (DATA-007 cannot see it). The UI warns once:
+    "do not train on data you will evaluate on". Catalog eval sets stay blocked by DATA-007.
+  - Parsing untrusted files happens only in a job (network none, narrow mounts), never in the app process:
+    pyarrow ≥ 14.0.1 (CVE-2023-47248, PyExtensionType deserialization; the job image has 25.0.0), images through
+    `common.image_rules`, CSV/JSON with row and field size limits.
+  - Same size budget, staging and verification as models. Integrity = LFS sha256 from the hub metadata (there is no
+    team pin for these).
+- A repo name is validated `^[A-Za-z0-9][A-Za-z0-9._-]{0,95}/[A-Za-z0-9][A-Za-z0-9._-]{0,95}$` before any call.
 - `allow_patterns` (models): `*.safetensors`, `*.safetensors.index.json`, `config.json`, `generation_config.json`,
   `*processor_config.json`, `tokenizer*`, `special_tokens_map.json`, `added_tokens.json`, `vocab.*`, `merges.txt`,
   `*.model` (sentencepiece), `*.tiktoken`, `chat_template.*`, `*.jinja`, `README.md`, `LICENSE*`, `NOTICE*`.
