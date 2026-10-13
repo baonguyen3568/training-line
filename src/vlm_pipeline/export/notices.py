@@ -30,6 +30,8 @@ from vlm_pipeline.common.licenses import license_text
 from vlm_pipeline.common.runinfo import RunManifest, read_manifest
 
 ATTRIBUTION_SCHEMA_VERSION = 1
+_RUN_ID = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,119}$")  # a run dir name, never a path (".", "..", "/")
+LOCAL_DATA_LABEL = "local data (your own folder)"
 _GRAPH_RUN = re.compile(r"^g-\d{8}-\d{6}-[0-9a-f]{6}$")  # executor / app graph run ids
 
 
@@ -127,7 +129,7 @@ def _is_local_path(ref: str) -> bool:
 def public_dataset_ref(ref: str | None) -> str | None:
     """What may appear in a shared export: hub refs as-is, local paths reduced to their last name (privacy)."""
     if ref is not None and ref.startswith("local:"):
-        return "local data (your own folder)"
+        return LOCAL_DATA_LABEL
     if ref is None or not _is_local_path(ref):
         return ref
     return f"local data '{Path(ref.split('#', 1)[0]).name}' (path not recorded)"
@@ -135,7 +137,7 @@ def public_dataset_ref(ref: str | None) -> str | None:
 
 def _dataset_component(ref: str, datasets: DatasetCatalog) -> Component:
     if ref.startswith("local:"):  # DatasetRef of a user folder: content hash only, no path (privacy)
-        return Component(role="training_data", name="local data (your own folder)", repo=None, revision=None,
+        return Component(role="training_data", name=LOCAL_DATA_LABEL, repo=None, revision=None,
                          license=None)  # fmt: skip
     if _is_local_path(ref):
         return Component(role="training_data", name=public_dataset_ref(ref) or "local data", repo=None, revision=None,
@@ -185,6 +187,9 @@ def lineage(
             base = f"{manifest.base_model}@{manifest.base_model_revision or ''}"
         parent_id = manifest.parent_run_id
         if parent_id is None or _GRAPH_RUN.match(parent_id):  # a graph run groups nodes; it is not a training step
+            break
+        if not _RUN_ID.match(parent_id) or parent_id in {".", ".."}:  # run.json is data: never a path
+            gaps.append(f"run {manifest.run_id}: invalid parent run id")
             break
         candidates = (run_dir.parent / parent_id, root / "outputs" / "runs" / parent_id)  # node run dirs: siblings
         parent = next((c for c in candidates if (c / "run.json").is_file()), None)

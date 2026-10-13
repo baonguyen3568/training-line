@@ -218,3 +218,11 @@ def test_graph_node_runs_chain_through_siblings_and_stop_at_the_graph_run(tmp_pa
     assert gaps == ["training data local data (your own folder): licence not recorded"]  # no "parent not found"
     assert [c.name for c in components if c.role == "training_data"] == ["local data (your own folder)"]
     assert all("aaaa" not in (m.dataset or "") for m in mods)  # the content hash is not shared either
+
+
+@pytest.mark.parametrize("bad", ["../../etc", "a/b", "..", "."])
+def test_a_parent_run_id_is_never_used_as_a_path(tmp_path: Path, bad: str) -> None:
+    run = _run(tmp_path, "r1", base_model=PARSE.repo, base_model_revision=PARSE.revision, parent_run_id=bad)
+    _, mods, gaps = _lineage(tmp_path, run)
+    assert [m.run_id for m in mods] == ["r1"]
+    assert gaps == ["run r1: invalid parent run id"]
