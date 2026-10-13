@@ -228,6 +228,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--calib-size", type=int, default=128)
     ap.add_argument("--fp8-scaling", default="per_tensor", choices=get_args(FP8Scaling))
     a = ap.parse_args(argv)
+    from vlm_pipeline.common.cuda_init import ensure_cuda_context
+
+    ensure_cuda_context()  # before any checkpoint tensor is on the CPU: GB10 context creation OOM (fixcode)
     report = run(a.model, a.data, a.out, fmt=a.format, calib_size=a.calib_size, scaling=a.fp8_scaling)
     print(json.dumps(report, indent=2))
     from vlm_pipeline.common.errors import ExitCode
