@@ -18,6 +18,8 @@ export interface DownloadTarget {
   publisher?: string;
   /** Minutes the server expects the download to take (NET-002 est_min). */
   estMin?: number;
+  /** NET-002 not_prepared: on disk, the server only runs the preparation step (no size, no estimate shown). */
+  prepare?: boolean;
 }
 
 const gb = (bytes?: number) => (bytes === undefined ? "0" : (bytes / 1e9).toFixed(1));
@@ -73,12 +75,14 @@ export function DownloadDialog({
           <Icon name="download" size={16} /> {t("download.dialog_title")}
         </h2>
         <p>
-          {t("download.intro", {
-            name,
-            size_gb: size !== undefined ? size.toFixed(1) : "?",
-          })}
+          {target.prepare
+            ? t("download.intro_prepare", { name })
+            : t("download.intro", {
+                name,
+                size_gb: size !== undefined ? size.toFixed(1) : "?",
+              })}
         </p>
-        {target.estMin !== undefined && entry?.status !== "completed" && (
+        {!target.prepare && target.estMin !== undefined && entry?.status !== "completed" && (
           <p className="small muted">
             {t("download.estimate", { duration: formatDuration(target.estMin * 60_000) })}
           </p>

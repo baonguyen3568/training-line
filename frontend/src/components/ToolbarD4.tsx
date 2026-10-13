@@ -1,6 +1,7 @@
 import { useReactFlow } from "@xyflow/react";
 import { t } from "../i18n";
 import { workflowTitle } from "../lib/nodeText";
+import { requestRun } from "../lib/requestRun";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { gpuChip, useSystemPoll } from "./Header";
@@ -14,8 +15,7 @@ import { useWorkflowFile } from "./Toolbar";
  */
 export function ToolbarD4({ locked }: { locked: boolean }) {
   const { workflow, selectedId, past, future, validation, run } = useWorkflow();
-  const { newWorkflow, undo, redo, duplicateNode, removeNodes, startRun, cancelRun } =
-    useWorkflow.getState();
+  const { newWorkflow, undo, redo, duplicateNode, removeNodes, cancelRun } = useWorkflow.getState();
   const mode = useUi((s) => s.mode);
   const setMode = useUi((s) => s.setMode);
   const status = useSystemPoll(); // the classic header is not mounted in the D4 editor
@@ -158,7 +158,7 @@ export function ToolbarD4({ locked }: { locked: boolean }) {
           className="btn primary sm run-btn"
           disabled={!canRun}
           title={errors.length > 0 ? t("preflight.run_blocked") : undefined}
-          onClick={() => void startRun()}
+          onClick={requestRun}
         >
           <Icon name="play" size={14} />
           {t("app.run")}

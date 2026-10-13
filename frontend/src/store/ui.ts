@@ -44,6 +44,9 @@ interface UiState {
   setWireDrag(drag: WireDrag | null): void;
   /** G-5 "Tải về máy" dialog for one catalog model/dataset. */
   downloadTarget: import("../components/DownloadDialog").DownloadTarget | null;
+  /** G-5: the "download these first, then run" list (Run pressed with NET-002 warns). */
+  runMissingOpen: boolean;
+  setRunMissingOpen(open: boolean): void;
   setDownloadTarget(t: import("../components/DownloadDialog").DownloadTarget | null): void;
   /** "Gửi báo cáo lỗi" dialog for one failed step of a run. */
   bugReport: { runId: string | null; nodeId?: string; code?: string } | null;
@@ -75,6 +78,10 @@ export const useUi = create<UiState>((set) => ({
     set({ wireDrag });
   },
   downloadTarget: null,
+  runMissingOpen: false,
+  setRunMissingOpen(runMissingOpen) {
+    set({ runMissingOpen });
+  },
   setDownloadTarget(downloadTarget) {
     set({ downloadTarget });
   },

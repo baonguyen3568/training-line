@@ -2,6 +2,7 @@ import { type ReactNode, useState } from "react";
 import type { ResolvedAction, ValidationIssue } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { isModelType, nearestUpstream } from "../lib/graph";
+import { requestRun } from "../lib/requestRun";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
@@ -92,7 +93,7 @@ function navigation(
     };
   }
   if (target === "memory_panel" || target === "cleanup_dry_run") return () => navigate("storage");
-  if (target === "queue_until_memory") return () => void s.startRun(); // the run waits for memory by itself
+  if (target === "queue_until_memory") return requestRun; // the run waits for memory by itself
   if (target === "bug_report") {
     // with a run the report carries its reference code; validate/preflight errors report without one (design)
     const runId = s.run?.id ?? null;
@@ -158,7 +159,7 @@ export function QuickFixes({ issue, nodeId }: { issue: ValidationIssue; nodeId: 
       run = navigation(a, issue, a.node_id ?? nodeId);
     } else if (a.kind === "resume" && !a.patch) {
       // P017: posting the same workflow again resumes from the last valid checkpoint (same cache key)
-      run = () => void useWorkflow.getState().startRun();
+      run = requestRun;
     }
     // resume WITH a patch (resume_lighter): changed params give a new cache key, so the step starts over; its label
     // ("continue…") would not be true, so no button until the copy says so (backend 2026-10-13)

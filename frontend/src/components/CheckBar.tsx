@@ -3,6 +3,7 @@ import { useState } from "react";
 import { t } from "../i18n";
 import { estimateLine, formatDuration } from "../lib/format";
 import { nodeTitle, SEVERITY_GLYPH } from "../lib/nodeText";
+import { requestRun } from "../lib/requestRun";
 import { runErrorText, runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
 import { useUi } from "../store/ui";
@@ -12,7 +13,7 @@ import { Icon } from "./Icon";
 /** Always-visible pre-flight bar (P010 §6): Run is disabled only by blocking errors; warnings never open dialogs. */
 export function CheckBar() {
   const { workflow, validation, validating, specs } = useWorkflow();
-  const { select, startRun, cancelRun } = useWorkflow.getState();
+  const { select, cancelRun } = useWorkflow.getState();
   const run = useWorkflow((s) => s.run);
   const { setCenter, getNode } = useReactFlow();
   const [open, setOpen] = useState(false);
@@ -181,7 +182,7 @@ export function CheckBar() {
               className="primary"
               disabled={!validation || errors.length > 0 || workflow.nodes.length === 0}
               title={errors.length > 0 ? t("preflight.run_blocked") : undefined}
-              onClick={() => void startRun()}
+              onClick={requestRun}
             >
               ▶ {t("app.run")}
             </button>

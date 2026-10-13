@@ -25,15 +25,20 @@ export function downloadTargetOf(
       : undefined;
   const org = typeof p.repo === "string" && p.repo.includes("/") ? p.repo.split("/")[0] : undefined;
   const publisher = meta?.vendor_name ?? org;
+  // datasets have no option_meta: the server's catalog name / licence in the issue, when it sends them
+  const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+  const license = meta?.license ?? str(p.license);
   return {
     kind,
     catalogId,
-    name: meta?.label ?? catalogId,
+    name: meta?.label ?? str(p.name) ?? catalogId,
     ...(typeof p.size_gb === "number" ? { sizeGb: p.size_gb } : {}),
-    ...(meta?.license ? { license: meta.license } : {}),
+    ...(license ? { license } : {}),
     ...(meta?.gated ? { gated: true } : {}),
     // a proper noun, never translated nor shown as the slug (design G-5 a): the catalog name, else the repo's org
     ...(publisher ? { publisher } : {}),
     ...(typeof p.est_min === "number" ? { estMin: p.est_min } : {}),
+    // already on disk, only the preparation step is left: nothing big to fetch (design d9e43a9)
+    ...(p.reason === "not_prepared" ? { prepare: true } : {}),
   };
 }

@@ -38,6 +38,7 @@ import { Inspector } from "./Inspector";
 import { DRAG_MIME, NodeLibrary } from "./NodeLibrary";
 import { NodeShell, type ShellNode } from "./NodeShell";
 import { ResetStepDialog } from "./ResetStepDialog";
+import { RunMissingDialog } from "./RunMissingDialog";
 import { Dock, IconStrip, LibraryFlyout, StatusBar } from "./ShellD4";
 import { Toolbar } from "./Toolbar";
 import { ToolbarD4 } from "./ToolbarD4";
@@ -154,6 +155,7 @@ function EditorInner() {
   const resetNode = useUi((st) => st.resetNode);
   const bugReport = useUi((st) => st.bugReport);
   const downloadTarget = useUi((st) => st.downloadTarget);
+  const runMissingOpen = useUi((st) => st.runMissingOpen);
   useEffect(() => {
     const onToast = (e: Event) => setToast((e as CustomEvent<string>).detail);
     window.addEventListener("vlm:toast", onToast);
@@ -619,6 +621,9 @@ function EditorInner() {
             target={downloadTarget}
             onClose={() => useUi.getState().setDownloadTarget(null)}
           />
+        )}
+        {runMissingOpen && (
+          <RunMissingDialog onClose={() => useUi.getState().setRunMissingOpen(false)} />
         )}
         {bugReport && (
           <BugReportDialog

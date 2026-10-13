@@ -260,3 +260,20 @@ describe("unverified", () => {
     expect(start.mock.calls[1]?.[0]).toMatchObject({ catalog_id: "x4", check: true });
   });
 });
+
+describe("prepare only", () => {
+  it("not_prepared says the copy is on disk and only needs preparing, with no size", async () => {
+    const { useWorkflow } = await import("../src/store/workflow");
+    await useWorkflow.getState().loadCatalog();
+    const { downloadTargetOf } = await import("../src/lib/downloadTarget");
+    const target = downloadTargetOf(net002("not_prepared"), useWorkflow.getState().specs);
+    if (!target) throw new Error("no target");
+    expect(target.prepare).toBe(true);
+    const { DownloadDialog } = await import("../src/components/DownloadDialog");
+    render(<DownloadDialog target={{ ...target, estMin: 3 }} onClose={() => {}} />);
+    const text = screen.getByRole("dialog").textContent ?? "";
+    expect(text).toContain("đã có trên máy nhưng cần thêm một bước chuẩn bị");
+    expect(text).not.toMatch(/GB|Dự kiến/);
+    expect(screen.getByRole("checkbox")).toBeTruthy(); // the licence still needs "I agree"
+  });
+});

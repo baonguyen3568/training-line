@@ -1497,6 +1497,9 @@ download:
   unverified: Đã có trên máy nhưng app chưa kiểm tra các tệp. Bấm "Kiểm tra tệp" trước khi dùng.
 session:
   section_title: Phiên đăng nhập
+  row_access: Truy cập
+  row_lan: Đăng nhập qua LAN
+  row_sign_out: Đăng xuất
   origin_local: Bạn đang dùng app ngay trên máy chủ.
   origin_lan: Bạn đang dùng app qua mạng nội bộ (LAN).
   sign_out: Đăng xuất

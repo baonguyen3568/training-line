@@ -1497,6 +1497,9 @@ download:
   unverified: Already on this machine, but the app has not checked its files yet. Click "Check files" before using it.
 session:
   section_title: Sign-in session
+  row_access: Access
+  row_lan: LAN sign-in
+  row_sign_out: Sign out
   origin_local: You are using the app directly on the host machine.
   origin_lan: You are using the app over the local network (LAN).
   sign_out: Sign out

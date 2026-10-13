@@ -22,6 +22,7 @@ afterEach(async () => {
     wireDrag: null,
     bugReport: null,
     downloadTarget: null,
+    runMissingOpen: false,
   }); // the 1.0 default, whatever a test pinned
   useWorkflow.setState(initialWorkflow as ReturnType<typeof useWorkflow.getState>, true);
 });

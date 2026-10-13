@@ -1108,3 +1108,22 @@ button.hairline.sm {
   height: 6px;
   accent-color: var(--color-node-state-running);
 }
+
+/* G-5 "Bấm Chạy khi thiếu": one row per asset, its state under the name */
+.missing-list {
+  list-style: none;
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  display: grid;
+  gap: var(--space-8);
+}
+.missing-list li {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-grid);
+}
+.missing-list .download-progress {
+  display: grid;
+  gap: 2px;
+}
