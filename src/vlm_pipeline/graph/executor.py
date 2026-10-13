@@ -32,6 +32,7 @@ from vlm_pipeline.common.run_claims import (
     write_resume_lease,
 )
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, Stage, read_manifest, write_manifest
+from vlm_pipeline.graph.actions import issue_actions
 from vlm_pipeline.graph.cache import compute_cache_key
 from vlm_pipeline.graph.errors import UserError, classify
 from vlm_pipeline.graph.groups import expand
@@ -468,7 +469,7 @@ class Executor:
                 error_code=code,
                 started=started,
             )
-            failure = {"error": _error_dict(outcome.error)} if outcome.error else {}
+            failure = {"error": _error_dict(outcome.error, node)} if outcome.error else {}
             self._set(run, nid, outcome.status, cache_key=key, **failure)
             self._drop_lease(run_dir)  # an interrupted attempt's run.json says resumed_from: retention takes over
             return
@@ -538,13 +539,17 @@ def _issue_dict(issue: Issue) -> dict[str, Any]:
     }
 
 
-def _error_dict(err: UserError) -> dict[str, Any]:
+def _error_dict(err: UserError, node: _Node | None = None) -> dict[str, Any]:
+    """The error of an event, with its G-3 quick fixes computed from the failing node's own params."""
+    params = node.params.model_dump(mode="json") if node is not None else None
+    model = type(node.params) if node is not None else None
     return {
         "code": err.code,
         "params": dict(err.params),
         "resumable": err.resumable,
         "checkpoint_step": err.checkpoint_step,
         "details": err.details,
+        **issue_actions(err, node_id=node.node_id if node else None, node_params=params, params_model=model),
     }
 
 

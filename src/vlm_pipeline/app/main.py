@@ -13,6 +13,7 @@ import threading
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Annotated, Any
 
 from fastapi import Body, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
@@ -72,6 +73,27 @@ def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None =
         out[part] = i18n.t(key, locale, **params)
     out["title_key"] = f"error.{code}.title"
     return out
+
+
+def _issue_actions(issue: Mapping[str, Any], workflow: Mapping[str, Any], registry: Any) -> dict[str, Any]:
+    """G-3 quick fixes of one validate issue, from the node's params as validated (defaults filled in).
+
+    A group's inner step or a node whose params do not validate gets no patch (never a guessed value).
+    """
+    from vlm_pipeline.graph.actions import issue_actions
+
+    node_id = issue.get("node_id")
+    raw = next((n for n in workflow.get("nodes", []) if isinstance(n, Mapping) and n.get("id") == node_id), None)
+    spec = registry.get(raw.get("type")) if raw is not None and not issue.get("inner_path") else None
+    params = None
+    if spec is not None and raw is not None:
+        try:
+            params = spec.validate_params(raw.get("params") or {}).model_dump(mode="json")
+        except ValueError:  # the issue may be about these very params (CFG-005): no context, no patch
+            spec = None
+    error = SimpleNamespace(code=issue.get("code", "SYS-000"), params=issue.get("params") or {})
+    return issue_actions(error, node_id=node_id if isinstance(node_id, str) else None, node_params=params,
+                         params_model=spec.params_model if spec is not None else None)  # fmt: skip
 
 
 def _node_types(services: Services, locale: str) -> dict[str, Any]:
@@ -148,7 +170,10 @@ def _register_graph_routes(app: FastAPI, services: Services, bus: EventBus) -> N
     @app.post("/api/graphs/validate")
     def validate(workflow: Workflow, locale: Locale = i18n.DEFAULT_LOCALE) -> dict[str, Any]:
         labels = _labels(workflow, services.registry, locale)
-        errors = [_render_issue(i, locale, labels) for i in services.validate(workflow)]
+        errors = [
+            {**_render_issue(i, locale, labels), **_issue_actions(i, workflow, services.registry)}
+            for i in services.validate(workflow)
+        ]
         return {"errors": errors, "estimate": _workflow_estimate(services, workflow)}
 
     @app.post("/api/runs", status_code=202)
