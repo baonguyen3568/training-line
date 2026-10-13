@@ -13,7 +13,7 @@ export type Pipe = {
   license: { code: string | null; model: string | null; data: string | null };
   steps: { node: string | null; label: { vi: string } }[];
   measured?: {
-    train_minutes?: number;
+    train_minutes?: number | null;
     peak_ram_gb?: number;
     score?: {
       benchmark: string;
@@ -50,13 +50,34 @@ const LICENSE: Record<string, string> = {
   "openmdw-1.1": "OpenMDW-1.1",
 };
 export const METRIC = (pl.metric ?? {}) as Record<string, string>; // pipelines.metric.<id> (design copy)
+/** pipelines.metric_help.<id>: what the number means, first in the card's "?" when design wrote it ({n}). */
+export const metricHelp = (s: { metric: string; n?: number }) => {
+  const tpl = (pl.metric_help ?? {})[s.metric] as string | undefined;
+  return tpl ? fill(tpl, { n: s.n ?? "" }) : null;
+};
+
+// Same rule as the app (frontend/src/lib/score.ts, design 94ee3e9): a difference metric is signed with a real
+// minus and one decimal ("−0.6", "+0.3", "0.0"), its interval "−1.8 – 0.4"; other metrics keep two decimals.
+const MINUS = "\u2212";
+const isDelta = (metric: string) => /(^|_)delta(_|$)/.test(metric);
+const round1 = (v: number) => Math.round(v * 10) / 10;
+export const formatScore = (metric: string, v: number) => {
+  if (!isDelta(metric)) return v.toFixed(2);
+  const r = round1(v);
+  return r === 0 ? "0.0" : `${r > 0 ? "+" : MINUS}${Math.abs(r).toFixed(1)}`;
+};
+export const formatCi = (metric: string, [lo, hi]: [number, number]) => {
+  if (!isDelta(metric)) return `${lo.toFixed(2)}–${hi.toFixed(2)}`;
+  const b = (v: number) => (round1(v) < 0 ? `${MINUS}${Math.abs(round1(v)).toFixed(1)}` : round1(v).toFixed(1));
+  return `${b(lo)} – ${b(hi)}`;
+};
 export const licenseOf = (p: Pipe) =>
   [...new Set([p.license.code, p.license.model].filter(Boolean).map((x) => LICENSE[x as string] ?? x))].join(" · ");
 export const measuredLine = (m: NonNullable<Pipe["measured"]>) =>
   [
     m.train_minutes ? `Dạy model: ~${minutes(m.train_minutes)}` : null,
     m.peak_ram_gb ? fill(pl.ram_peak, { gb: m.peak_ram_gb }) : null,
-    m.score ? `${METRIC[m.score.metric] ?? m.score.metric} ${m.score.value.toFixed(2)}` : null,
+    m.score ? `${METRIC[m.score.metric] ?? m.score.metric} ${formatScore(m.score.metric, m.score.value)}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -64,7 +85,8 @@ export const measuredLine = (m: NonNullable<Pipe["measured"]>) =>
 export const compareOf = (p: Pipe) => allPipes.find((x) => x.id === p.measured?.score?.compare_with);
 /** score_compare around its {other} placeholder, so {other} can be a link: [before, after]. */
 export const compareParts = (other: Pipe) => {
-  const tpl = fill(pl.score_compare as string, { other_value: other.measured?.score?.value.toFixed(2) ?? "" });
+  const score = other.measured?.score;
+  const tpl = fill(pl.score_compare as string, { other_value: score ? formatScore(score.metric, score.value) : "" });
   const [before, after = ""] = tpl.split("{other}");
   return [before, after] as const;
 };

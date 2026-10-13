@@ -14,6 +14,7 @@ import { getLocale, t, tpOptional } from "../i18n";
 import { formatMinutesRange } from "../lib/format";
 import { licenseName } from "../lib/licenses";
 import { portShape, tokenVar } from "../lib/ports";
+import { formatScore } from "../lib/score";
 import { fold } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
@@ -39,7 +40,13 @@ interface Pipeline {
     train_minutes?: number;
     peak_ram_gb?: number;
     /** compare_with: another pipeline scored on the same benchmark/metric (checked by the generator). */
-    score?: { metric: string; value: number; compare_with?: string };
+    score?: {
+      metric: string;
+      value: number;
+      ci95?: [number, number];
+      n?: number;
+      compare_with?: string;
+    };
   } | null;
 }
 const pipelines = (data as { pipelines: Pipeline[] }).pipelines;
@@ -62,10 +69,14 @@ const host = (url: string) => {
  */
 function timeText(p: Pipeline, estimate: Range | null | undefined): string {
   const m = p.measured;
-  const time = formatMinutesRange(
-    m?.train_minutes ? { lo: m.train_minutes, hi: m.train_minutes } : (estimate ?? null),
-  );
-  return m?.peak_ram_gb ? `${time} · ${t("pipelines.ram_peak", { gb: m.peak_ram_gb })}` : time;
+  const range = m?.train_minutes
+    ? { lo: m.train_minutes, hi: m.train_minutes }
+    : (estimate ?? null);
+  const ram = m?.peak_ram_gb ? t("pipelines.ram_peak", { gb: m.peak_ram_gb }) : null;
+  // a part that does not apply (no training, train_minutes null) is left out, never "no measurement yet"
+  if (!range && ram) return ram;
+  const time = formatMinutesRange(range);
+  return ram ? `${time} · ${ram}` : time;
 }
 
 /**
@@ -78,7 +89,7 @@ function ScoreCompare({ p, onShow }: { p: Pipeline; onShow: (id: string) => void
   if (!other || value === undefined) return null;
   const [before, after = ""] = t("pipelines.score_compare", {
     other: "\u0000",
-    other_value: value.toFixed(2),
+    other_value: formatScore(other.measured?.score?.metric ?? "", value),
   }).split("\u0000");
   return (
     <p>
@@ -89,6 +100,12 @@ function ScoreCompare({ p, onShow }: { p: Pipeline; onShow: (id: string) => void
       {after}
     </p>
   );
+}
+
+/** What the number means, first in its popover when design wrote it (pipelines.metric_help.<id>, design 94ee3e9). */
+function MetricHelp({ score }: { score: { metric: string; n?: number } }) {
+  const help = tpOptional(["pipelines", "metric_help", score.metric], { n: score.n ?? "" });
+  return help ? <p>{help}</p> : null;
 }
 
 /** "?" + native popover (DESIGN.md "?" Popover): secondary detail never sits on the card itself. */
@@ -319,7 +336,7 @@ export function PipelineGallery() {
                         {" · "}
                         {tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
                           p.measured.score.metric}{" "}
-                        {p.measured.score.value.toFixed(2)}
+                        {formatScore(p.measured.score.metric, p.measured.score.value)}
                         <Help
                           id={`score-${p.id}`}
                           title={
@@ -327,6 +344,7 @@ export function PipelineGallery() {
                             p.measured.score.metric
                           }
                         >
+                          <MetricHelp score={p.measured.score} />
                           <ScoreCompare p={p} onShow={showCard} />
                           <p>{t("pipelines.score_single_run")}</p>
                         </Help>

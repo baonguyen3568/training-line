@@ -2,7 +2,7 @@
 // One reference pipeline (the app's data): step chips, title, licence and level, the measured line with its
 // source/CI/config and the score comparison behind "?". Used by the landing (available ones) and /template (all).
 import Icon from "~/components/Icon.astro";
-import { compareOf, compareParts, fill, licenseOf, METRIC, measuredLine, type Pipe, pl } from "~/lib/pipelines";
+import { compareOf, compareParts, fill, formatCi, formatScore, licenseOf, METRIC, measuredLine, metricHelp, type Pipe, pl } from "~/lib/pipelines";
 
 interface Props {
   p: Pipe;
@@ -40,15 +40,17 @@ const other = compareOf(p);
   )}
   {p.measured && (
     <div id={`pop-m-${p.id}`} popover>
+      {p.measured.score && metricHelp(p.measured.score) && <>{metricHelp(p.measured.score)} </>}
       Đo trên một máy DGX Spark.
       {p.measured.score && (
         <>
           {" "}
-          {METRIC[p.measured.score.metric] ?? p.measured.score.metric} {p.measured.score.value.toFixed(2)} trên{" "}
-          {p.measured.score.n} mẫu {p.measured.score.benchmark}
+          {METRIC[p.measured.score.metric] ?? p.measured.score.metric}{" "}
+          {formatScore(p.measured.score.metric, p.measured.score.value)} trên {p.measured.score.n} mẫu{" "}
+          {p.measured.score.benchmark}
           {p.measured.score.ci95 && (
             <>
-              , khoảng tin cậy 95%: {p.measured.score.ci95[0].toFixed(2)}–{p.measured.score.ci95[1].toFixed(2)}
+              , khoảng tin cậy 95%: {formatCi(p.measured.score.metric, p.measured.score.ci95)}
             </>
           )}
           .

@@ -18,7 +18,7 @@ describe("PipelineGallery", () => {
         status: string;
         template_id: string | null;
         title: { vi: string };
-        measured?: { train_minutes?: number } | null;
+        measured?: { train_minutes?: number | null; peak_ram_gb?: number } | null;
       }[];
     };
     const cards = screen.getAllByRole("listitem").filter((li) => li.classList.contains("rp-card"));
@@ -32,6 +32,8 @@ describe("PipelineGallery", () => {
     for (const p of data.pipelines) {
       const card = cards.find((c) => c.querySelector("h2")?.textContent === p.title.vi);
       if (p.measured?.train_minutes) expect(card?.textContent).toMatch(/Thời gian~\d/);
+      // no training (quantize): only the measured RAM, never "no measurement" for a part that does not apply
+      else if (p.measured?.peak_ram_gb) expect(card?.textContent).toMatch(/Thời gianRAM đỉnh/);
       else expect(card?.textContent).toContain("chưa có số đo");
     }
     const parseTitle = data.pipelines.find((p) => p.id === "invoice-to-json")?.title.vi;
