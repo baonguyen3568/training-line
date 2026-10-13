@@ -6,6 +6,7 @@ import { nodeTitle, SEVERITY_GLYPH } from "../lib/nodeText";
 import { runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
 import { useWorkflow } from "../store/workflow";
+import { Icon } from "./Icon";
 
 /** Always-visible pre-flight bar (P010 §6): Run is disabled only by blocking errors; warnings never open dialogs. */
 export function CheckBar() {
@@ -86,7 +87,10 @@ export function CheckBar() {
                 title={w.what}
                 onClick={() => showMe(w.id)}
               >
-                ⚠ {w.what ?? `${w.title}: ${nodeLabel(w.id)}`}
+                <span className="si si-warn" aria-hidden="true">
+                  <Icon name="triangle-alert" size={14} />
+                </span>{" "}
+                {w.what ?? `${w.title}: ${nodeLabel(w.id)}`}
               </button>
             ))}
             {run.done && (

@@ -1,5 +1,7 @@
 import { t, tpOptional } from "../i18n";
 import { identifierView } from "../lib/safeText";
+import { ErrorIcon } from "./ErrorIcon";
+import { Icon } from "./Icon";
 
 type Warnings = string[] | null | undefined;
 // Logs are scanned only after the job ends, so null on a live run means "later", not "never scanned".
@@ -25,10 +27,20 @@ export function EngineWarningsCell({ warnings, status }: { warnings: Warnings; s
     return <span className="muted">— {t("engine_warning.pending")}</span>;
   if (warnings == null) return <span className="muted">? {t("engine_warning.not_scanned")}</span>;
   if (warnings.length === 0)
-    return <span className="state ready">✓ {t("engine_warning.clean")}</span>;
+    return (
+      <span className="state ready">
+        <span className="si si-completed" aria-hidden="true">
+          <Icon name="circle-check-big" size={14} />
+        </span>{" "}
+        {t("engine_warning.clean")}
+      </span>
+    );
   return (
     <span className="state warn" title={warnings.map((c) => warningCopy(c).title).join("\n")}>
-      ⚠ {t("engine_warning.count", { warning_count: warnings.length })}
+      <span className="si si-warn" aria-hidden="true">
+        <Icon name="triangle-alert" size={14} />
+      </span>{" "}
+      {t("engine_warning.count", { warning_count: warnings.length })}
     </span>
   );
 }
@@ -41,12 +53,18 @@ export function EngineWarningsPanel({ warnings, status }: { warnings: Warnings; 
   if (warnings.length === 0) return null;
   return (
     <section className="engine-warnings" aria-label={t("engine_warning.heading")}>
-      <h2>⚠ {t("engine_warning.heading")}</h2>
+      <h2>
+        <span className="si si-warn" aria-hidden="true">
+          <Icon name="triangle-alert" size={14} />
+        </span>{" "}
+        {t("engine_warning.heading")}
+      </h2>
       <ul>
         {warnings.map((code) => {
           const copy = warningCopy(code);
           return (
             <li key={code} className="error-card warn" data-code={identifierView(code).text}>
+              <ErrorIcon tone="warn" />
               <strong>{copy.title}</strong>
               <p>{copy.what}</p>
             </li>

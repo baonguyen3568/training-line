@@ -14,6 +14,7 @@ import { selfAndDownstream } from "../lib/topo";
 import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
+import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
 import { ImageUpload } from "./ImageUpload";
 import { TrialResult } from "./TrialResult";
@@ -424,9 +425,17 @@ export function Inspector() {
   const issues = validation?.errors.filter((e) => e.node_id === node.id) ?? [];
   const fieldErrors = (param: string) => issues.filter((e) => e.param === param).map((e) => e.what);
 
-  const params = Object.entries(spec.params_schema.properties).sort(
-    ([, a], [, b]) => (a["x-ui"]?.order ?? 99) - (b["x-ui"]?.order ?? 99),
-  );
+  // x-ui.visible_when: a field that does not apply right now is hidden but keeps its value, and is shown anyway
+  // while it has a validation error (never hide a problem).
+  const props = spec.params_schema.properties;
+  const applies = (name: string, s: ParamSchema) =>
+    Object.entries(s["x-ui"]?.visible_when ?? {}).every(([k, vals]) => {
+      const cur = node.params[k] ?? props[k]?.default;
+      return vals.map(String).includes(String(cur));
+    }) || fieldErrors(name).length > 0;
+  const params = Object.entries(props)
+    .filter(([name, s]) => applies(name, s))
+    .sort(([, a], [, b]) => (a["x-ui"]?.order ?? 99) - (b["x-ui"]?.order ?? 99));
   // "Chạy thử": a model with a fixed task (Nemotron-Parse) ignores the question, so do not ask it (B-7).
   const fixedPrompt = upstreamModelMeta(workflow, specs, node.id)?.task_prompt_fixed === true;
   const simple = params.filter(
@@ -481,6 +490,17 @@ export function Inspector() {
           </code>
         </p>
       )}
+      {run?.nodes[node.id]?.nodeBase && (
+        // G-4: keyboard path to "Đặt lại bước" (the canvas also has it on right-click)
+        <button
+          type="button"
+          className="reset-step-btn"
+          title={t("storage.reset_step.menu_hint")}
+          onClick={() => useUi.getState().setResetNode(run.nodes[node.id]?.nodeBase ?? null)}
+        >
+          <Icon name="rotate-ccw" size={14} /> {t("storage.reset_step.menu")}
+        </button>
+      )}
       {mode === "simple" && customized.length > 0 && (
         <p className="badge customized">
           ⚙ {t("canvas.customized", { param_count: customized.length })}
@@ -495,6 +515,9 @@ export function Inspector() {
               className={`error-card ${e.severity}`}
               data-code={e.code}
             >
+              <ErrorIcon
+                tone={e.severity === "error" ? "critical" : e.severity === "info" ? "info" : "warn"}
+              />
               <strong>
                 {SEVERITY_GLYPH[e.severity]} {e.title}
               </strong>

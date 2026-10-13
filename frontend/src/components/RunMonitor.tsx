@@ -13,6 +13,7 @@ import {
   SUPPORTED_SCHEMA,
 } from "../lib/metrics";
 import { EngineWarningsPanel } from "./EngineWarnings";
+import { Icon } from "./Icon";
 import { type ChartSeries, LineChart } from "./LineChart";
 
 const POLL_MS = 3000;
@@ -158,7 +159,10 @@ export function RunMonitor({ runId }: { runId: string }) {
         </span>
         {stale && (
           <span className="state warn">
-            ⚠ {t("run_monitor.stale", { time: new Date(last.ts * 1000).toLocaleTimeString() })}
+            <span className="si si-warn" aria-hidden="true">
+              <Icon name="triangle-alert" size={14} />
+            </span>{" "}
+            {t("run_monitor.stale", { time: new Date(last.ts * 1000).toLocaleTimeString() })}
           </span>
         )}
         <code className="muted small">{run.run_id}</code>

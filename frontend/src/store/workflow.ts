@@ -24,6 +24,8 @@ export interface NodeRunState {
   message?: string;
   /** Run `warning` events for this node (e.g. CACHE-001: the saved result is unreadable, the step runs again). */
   warnings?: EventError[];
+  /** G-4: run-dir base "<nid>-<key16>" from node_status, what "Đặt lại bước" acts on. */
+  nodeBase?: string;
 }
 
 interface WorkflowState {
@@ -324,8 +326,10 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
           const st: NodeRunState = { status: ev.status };
           if (ev.progress !== undefined) st.progress = ev.progress;
           if (ev.error) st.errorCode = ev.error.code;
-          const kept = run.nodes[ev.node_id]?.warnings;
-          if (kept) st.warnings = kept;
+          const prev = run.nodes[ev.node_id];
+          if (prev?.warnings) st.warnings = prev.warnings;
+          const base = ev.node_base ?? prev?.nodeBase; // later events without a key keep the known base
+          if (base) st.nodeBase = base;
           set({ run: { ...run, nodes: { ...run.nodes, [ev.node_id]: st } } });
         } else if (ev.type === "warning" && ev.node_id && ev.error) {
           const prev = run.nodes[ev.node_id] ?? { status: "pending" as const };

@@ -49,9 +49,9 @@ export function ToolbarD4({ locked }: { locked: boolean }) {
           />
         </svg>
       </button>
-      <span className="tb-name" title={workflowTitle(workflow.name)}>
+      <h1 className="tb-name" title={workflowTitle(workflow.name)}>
         {workflowTitle(workflow.name)}
-      </span>
+      </h1>
       <span className="tb-sep" />
       <IconButton
         icon="file-plus"

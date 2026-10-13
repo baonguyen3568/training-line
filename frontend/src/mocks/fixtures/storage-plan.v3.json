@@ -32,7 +32,8 @@
       "event_type": "cache_evicted",
       "source": "node_cache",
       "auto": true,
-      "section": "auto"
+      "section": "auto",
+      "node_base": "n5-fedcba9876543210"
     },
     {
       "item_id": "train-1",
@@ -58,7 +59,8 @@
       "event_type": "cache_evicted",
       "source": "node_cache",
       "auto": false,
-      "section": "manual"
+      "section": "manual",
+      "node_base": "n4-0123456789abcdef"
     },
     {
       "item_id": "r-done/checkpoints/epoch_0_step_10",
@@ -83,7 +85,8 @@
       "consequence_params": {},
       "confirm_required": false,
       "confirm_text": null,
-      "event_type": "checkpoint_pruned"
+      "event_type": "checkpoint_pruned",
+      "node_base": null
     },
     {
       "item_id": "r-fail/checkpoints/epoch_0_step_10",
@@ -110,7 +113,8 @@
       },
       "confirm_required": true,
       "confirm_text": "r-fail",
-      "event_type": "checkpoint_pruned"
+      "event_type": "checkpoint_pruned",
+      "node_base": "n4-0123456789abcdef"
     },
     {
       "item_id": "r-keep/checkpoints/epoch_0_step_10",
@@ -137,7 +141,8 @@
       "consequence_params": {},
       "confirm_required": false,
       "confirm_text": null,
-      "event_type": "checkpoint_pruned"
+      "event_type": "checkpoint_pruned",
+      "node_base": null
     },
     {
       "item_id": "graph:n1/checkpoints.not-resumable-20261008-091302",
@@ -164,7 +169,8 @@
       },
       "confirm_required": true,
       "confirm_text": "n1",
-      "event_type": "checkpoint_pruned"
+      "event_type": "checkpoint_pruned",
+      "node_base": null
     },
     {
       "item_id": "r-int/checkpoints/epoch_0_step_10",
@@ -192,7 +198,8 @@
       "consequence_params": {},
       "confirm_required": false,
       "confirm_text": null,
-      "event_type": "checkpoint_pruned"
+      "event_type": "checkpoint_pruned",
+      "node_base": null
     }
   ],
   "attention": [

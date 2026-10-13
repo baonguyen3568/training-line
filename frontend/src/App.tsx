@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from "react";
 import { Editor } from "./components/Editor";
 import { Gallery } from "./components/Gallery";
 import { Header, type Nav } from "./components/Header";
@@ -79,9 +79,20 @@ export function App() {
   }, [loadCatalog]);
   useEffect(load, [load]);
 
-  // M2-6: the D4 editor owns the whole screen (its toolbar replaces the header); other views keep the header.
-  const d4Editor = skin === "d4" && view.kind === "home" && !!workflow;
-  const d4Home = skin === "d4" && ((view.kind === "home" && !workflow) || view.kind === "settings");
+  // D4 (the 1.0 default): the editor owns the whole screen (its toolbar replaces the header); every other view —
+  // gallery, runs, run monitor, storage, settings — sits in the D4 shell under its icon bar. Classic keeps the header.
+  const d4 = skin === "d4";
+  const d4Editor = d4 && view.kind === "home" && !!workflow;
+  const d4Shell = d4 && !d4Editor;
+  const shell = (body: ReactNode) =>
+    d4Shell ? (
+      <div className="editor d4 d4-home">
+        <HomeBarD4 />
+        {body}
+      </div>
+    ) : (
+      body
+    );
 
   const navigate = (to: Nav) => {
     if (to === "home") closeWorkflow();
@@ -89,8 +100,8 @@ export function App() {
   };
 
   return (
-    <div className={d4Editor || d4Home ? "app d4" : "app"}>
-      {!d4Editor && !d4Home && (
+    <div className={d4 ? "app d4" : "app"}>
+      {!d4 && (
         <Header
           onNavigate={navigate}
           active={view.kind === "home" ? "home" : view.kind === "storage" ? "storage" : "runs"}
@@ -137,28 +148,17 @@ export function App() {
             </button>
           </p>
         )}
-        {view.kind === "runs" && <RunsList onOpen={(id) => setView({ kind: "run", id })} />}
-        {view.kind === "run" && <RunMonitor runId={view.id} />}
-        {view.kind === "storage" && <StoragePanel />}
-        {view.kind === "settings" &&
-          (skin === "d4" ? (
-            <div className="editor d4 d4-home">
-              <HomeBarD4 />
-              <SettingsPanel />
-            </div>
-          ) : (
-            <SettingsPanel />
-          ))}
+        {view.kind === "runs" && shell(<RunsList onOpen={(id) => setView({ kind: "run", id })} />)}
+        {view.kind === "run" && shell(<RunMonitor runId={view.id} />)}
+        {view.kind === "storage" && shell(<StoragePanel />)}
+        {view.kind === "settings" && shell(<SettingsPanel />)}
       </Suspense>
       {/* First screen is the template gallery, never a blank canvas (P010 §8). */}
       {view.kind === "home" &&
         (workflow ? (
           <Editor />
-        ) : d4Home ? (
-          <div className="editor d4 d4-home">
-            <HomeBarD4 />
-            <PipelineGallery />
-          </div>
+        ) : d4 ? (
+          shell(<PipelineGallery />)
         ) : (
           <Gallery onOpen={(id) => void openTemplate(id)} onBlank={newWorkflow} />
         ))}

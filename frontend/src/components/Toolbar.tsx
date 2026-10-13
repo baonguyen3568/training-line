@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { t } from "../i18n";
 import { parseWorkflowFile, serializeWorkflow } from "../lib/workflowFile";
 import { useWorkflow } from "../store/workflow";
+import { Icon } from "./Icon";
 
 /** Save (.json download) and open (file picker) shared by the classic and the D4 toolbars. */
 export function useWorkflowFile() {
@@ -102,7 +103,14 @@ export function Toolbar({ locked, running }: { locked: boolean; running: boolean
       >
         🗑 {t("workflow.delete")}
       </button>
-      {running && <span className="muted small">🔒 {t("run.locked_while_running")}</span>}
+      {running && (
+        <span className="muted small">
+          <span className="si" aria-hidden="true">
+            <Icon name="lock" size={14} />
+          </span>{" "}
+          {t("run.locked_while_running")}
+        </span>
+      )}
       {file.error && (
         <span role="alert" className="toolbar-error">
           {file.error}

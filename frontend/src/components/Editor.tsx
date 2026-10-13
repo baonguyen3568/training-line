@@ -31,9 +31,11 @@ import { connectionBetween, type HandleRef, handleUnder } from "../lib/wire";
 import { useUi } from "../store/ui";
 import { graphKey, useWorkflow } from "../store/workflow";
 import { CheckBar } from "./CheckBar";
+import { Icon } from "./Icon";
 import { Inspector } from "./Inspector";
 import { DRAG_MIME, NodeLibrary } from "./NodeLibrary";
 import { NodeShell, type ShellNode } from "./NodeShell";
+import { ResetStepDialog } from "./ResetStepDialog";
 import { Dock, IconStrip, LibraryFlyout, StatusBar } from "./ShellD4";
 import { Toolbar } from "./Toolbar";
 import { ToolbarD4 } from "./ToolbarD4";
@@ -145,6 +147,22 @@ function EditorInner() {
   const [flashId, setFlashId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLElement>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // G-4: right-click menu of a node that already ran (its run-dir base is known from node_status)
+  const [menu, setMenu] = useState<{ x: number; y: number; base: string } | null>(null);
+  const resetNode = useUi((st) => st.resetNode);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      setMenu(null);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [menu]);
   const key = graphKey(workflow);
   // While a run is live the graph structure is locked (design spec M1-5 §7).
   const narrow = useNarrow();
@@ -500,7 +518,7 @@ function EditorInner() {
       ) : (
         <NodeLibrary onAdd={addFromLibrary} disabled={locked} />
       )}
-      <section
+      <main
         className="canvas"
         aria-label={workflow.name}
         ref={canvasRef}
@@ -524,6 +542,12 @@ function EditorInner() {
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onNodesDelete={onNodesDelete}
+          onNodeContextMenu={(e, n) => {
+            const base = run?.nodes[n.id]?.nodeBase;
+            if (!base) return; // nothing to reset yet: keep the browser's own menu
+            e.preventDefault();
+            setMenu({ x: e.clientX, y: e.clientY, base });
+          }}
           onConnect={onConnect}
           onConnectEnd={onConnectEnd}
           onConnectStart={onConnectStart}
@@ -560,7 +584,32 @@ function EditorInner() {
             {toast}
           </div>
         )}
-      </section>
+        {menu && (
+          <div className="node-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+            <button
+              type="button"
+              role="menuitem"
+              title={t("storage.reset_step.menu_hint")}
+              // pointerdown would close the menu before the click lands
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                useUi.getState().setResetNode(menu.base);
+                setMenu(null);
+              }}
+              ref={(el) => el?.focus()}
+            >
+              <Icon name="rotate-ccw" size={14} /> {t("storage.reset_step.menu")}
+            </button>
+          </div>
+        )}
+        {resetNode && (
+          <ResetStepDialog
+            node={resetNode}
+            onClose={() => useUi.getState().setResetNode(null)}
+            onDone={setToast}
+          />
+        )}
+      </main>
       <Inspector />
       {d4 ? (
         <Dock errorCount={errorCount}>

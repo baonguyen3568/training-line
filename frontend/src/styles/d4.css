@@ -118,6 +118,8 @@
   border-radius: var(--radius-md);
 }
 .tb-name {
+  margin: 0; /* it is the page's h1 (D7 r1): keep the toolbar look */
+  font-size: inherit;
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -675,8 +677,10 @@
 .help-btn.inline {
   position: static;
   display: inline-grid;
-  vertical-align: -3px;
-  margin-left: 4px;
+  vertical-align: -7px;
+  margin-left: 2px;
+  width: 24px; /* ≥ 24×24 target (design D7 r1, WCAG 2.5.8); the glyph stays 14px */
+  height: 24px;
 }
 .pop strong {
   display: block;
@@ -801,4 +805,109 @@
 .lane.compact .lane-label {
   pointer-events: auto;
   cursor: default;
+}
+/* modal dialog (G-4 reset step): scrim over the app, one centred card */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-16);
+  background: color-mix(in srgb, var(--color-canvas-background) 70%, transparent);
+}
+.modal {
+  width: min(480px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: var(--space-16) var(--space-24);
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.modal h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-body);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-12);
+  margin: var(--space-16) 0 0;
+}
+.reset-lost {
+  margin-bottom: var(--space-4);
+}
+.reset-lost-list {
+  margin: 0 0 var(--space-12);
+  padding-left: var(--space-24);
+  color: var(--color-text-secondary);
+}
+/* G-4: right-click menu of a node (one item for now), icon-first */
+.node-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 180px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.node-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  padding: var(--space-4) var(--space-8);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: left;
+}
+.node-menu button:hover,
+.node-menu button:focus-visible {
+  background: var(--color-canvas-node-bg);
+}
+/* G-4 "Đặt lại bước" button: storage rows and the inspector, outside the editor's .btn scope */
+.reset-step-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.reset-step-btn:hover {
+  background: var(--color-canvas-node-bg);
+}
+.reset-step-btn:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+/* D7 r1 P1: keyboard focus is always visible */
+.react-flow__node:focus-visible .vlm-node {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+.react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke-width: 4px; /* thicker, not only another colour */
+}
+.rp-search:focus-within {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+.si-info {
+  color: var(--color-text-secondary);
 }

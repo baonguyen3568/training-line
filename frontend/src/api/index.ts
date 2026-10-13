@@ -12,6 +12,8 @@ function lazyMock(): Api {
     runs: () => load().then((m) => m.runs()),
     storagePlan: (locale) => load().then((m) => m.storagePlan(locale)),
     storageApply: (body, locale) => load().then((m) => m.storageApply(body, locale)),
+    nodeResetPlan: (node, locale) => load().then((m) => m.nodeResetPlan(node, locale)),
+    nodeReset: (body, locale) => load().then((m) => m.nodeReset(body, locale)),
     upload: (file, locale) => load().then((m) => m.upload(file, locale)),
     nodeResult: (runId, nodeId) => load().then((m) => m.nodeResult(runId, nodeId)),
     settings: () => load().then((m) => m.settings()),

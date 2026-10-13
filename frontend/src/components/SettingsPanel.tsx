@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import type { SecretField, SecretState, SettingsView } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { formatDateTime } from "../lib/format";
+import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
 
 const FIELDS: SecretField[] = ["HF_TOKEN", "NGC_API_KEY", "WANDB_API_KEY"];
@@ -198,6 +199,7 @@ export function SettingsPanel() {
       <h1>{t("settings.title")}</h1>
       {!view.key_ok && (
         <div className="error-card" role="alert">
+          <ErrorIcon tone="critical" />
           <strong>{t("settings.key_broken_title")}</strong>
           <p>{t("settings.key_broken_what")}</p>
         </div>

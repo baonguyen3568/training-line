@@ -54,6 +54,8 @@ export interface UiHint {
   disabled_options?: Record<string, string | null>;
   /** The value the app recommends (e.g. epochs 3): its option reads "· khuyên dùng". */
   recommended?: string | number;
+  /** Show only while these params of the same node hold one of the values (AND across keys, OR in a list). */
+  visible_when?: Record<string, (string | number | boolean)[]>;
 }
 
 export interface OptionMeta {
@@ -312,6 +314,8 @@ export interface NodeStatusEvent {
   status: NodeRunStatus;
   progress?: number; // 0..1 when the worker reports it
   error?: EventError;
+  /** G-4: "<nid>-<key16>", the node's run-dir base that "Đặt lại bước" acts on (every event with a cache key). */
+  node_base?: string;
 }
 export interface RunStatusEvent {
   type: "run_status";
@@ -331,9 +335,38 @@ export type RunEvent = NodeStatusEvent | RunStatusEvent | OtherEvent;
  * Storage panel (bao-cleanup app/storage.py, P013 G-1, plan schema v3). Hand-written: no JSON schema is exported
  * for it yet. Text for the user comes as i18n keys + params, except `error` which the server renders.
  */
+/** G-4 "Đặt lại bước" (bao-cleanup app/storage_reset.py): read-only plan, then a one-shot apply. */
+export interface NodeResetPlan {
+  schema_version: number;
+  /** null when blocked or there is nothing to delete. */
+  plan_id: string | null;
+  expires_at: number;
+  node: string;
+  node_title: string;
+  attempts: { run_dir: string; status: string; size_gb: number; has_checkpoint: boolean }[];
+  total_gb: number;
+  /** storage.lock_reason.<code> (RUN_NOT_FINISHED, GPU_LOCK_HOLDER, … UNKNOWN_STATUS); params always carry node. */
+  blocked_by: string | null;
+  blocked_params: Record<string, string | number>;
+  consequence_code: "PERMANENT_LOSS" | null;
+  consequence_params: { name?: string };
+  confirm_required: boolean;
+  /** The node title; the server matches it ignoring accents, case and repeated spaces. */
+  confirm_text: string | null;
+  next_generation: number;
+}
+export interface NodeResetResult {
+  deleted: string[];
+  failed: string[];
+  freed_gb: number;
+  generation: number;
+}
+
 export type StorageSection = "auto" | "manual" | "kept";
 export interface StorageItem {
   item_id: string;
+  /** G-4: the graph node this item belongs to ("<nid>-<key16>", every generation/attempt), null for CLI runs. */
+  node_base?: string | null;
   source: "node_cache" | "checkpoint" | "set_aside";
   section: StorageSection;
   auto: boolean;

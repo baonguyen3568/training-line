@@ -706,8 +706,9 @@ button.link {
 }
 .toolbar-error {
   color: var(--color-text-primary);
-  border-left: 3px solid var(--color-status-ink-critical);
-  padding-left: var(--space-8);
+  border: 1px solid var(--color-status-ink-critical); /* hairline all round, no side stripe (design D7 r1) */
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-8);
   background: var(--color-surface);
 }
 
@@ -837,14 +838,27 @@ button.link {
   flex-direction: column;
   gap: var(--space-8);
 }
+/* hairline card + leading triangle in status ink (ErrorIcon); text stays in text tokens (design D7 r1) */
 .error-card {
-  border-left: 3px solid var(--color-status-ink-critical);
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: var(--space-8);
+  align-items: start;
+  border: 1px solid var(--color-status-ink-critical);
   background: var(--color-page);
   padding: var(--space-8);
   border-radius: var(--radius-sm);
 }
+.error-card > :not(.ec-icon) {
+  grid-column: 2;
+}
+.error-card > .ec-icon {
+  grid-row: 1 / span 4;
+  line-height: 0;
+  padding-top: 2px;
+}
 .error-card.warn {
-  border-left-color: var(--color-status-ink-warning);
+  border-color: var(--color-status-ink-warning);
 }
 .error-card p {
   margin: var(--space-4) 0;
@@ -908,7 +922,7 @@ button.link {
 }
 .storage-item {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto; /* checkbox · label · size · "Đặt lại bước" (G-4, optional) */
   gap: var(--space-12);
   align-items: start;
   padding: var(--space-8) var(--space-12);
@@ -998,7 +1012,7 @@ textarea {
   color: var(--color-text-secondary);
 }
 .error-card.info {
-  border-left-color: var(--color-axis);
+  border-color: var(--color-axis);
 }
 /* Port glyphs (design tokens shape.port.*): colour in --pc, shape per type, never colour alone */
 .out-port {
@@ -1108,4 +1122,49 @@ textarea {
 /* While a wire is dragged: ports it cannot reach fade (opacity only: no layout shift under the pointer). */
 .ports li.port-dim {
   opacity: 0.3;
+}
+
+/* Destructive confirm (storage delete, G-4 reset): critical, not the indigo primary (One Indigo Rule), same in both */
+button.primary.danger {
+  background: var(--color-status-critical);
+  color: var(--color-action-primary-fg);
+}
+button.primary.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-status-critical) 85%, var(--color-text-primary));
+}
+/* Secondary action of a dialog ("Huỷ"): hairline button, not an underlined link */
+button.hairline {
+  background: transparent;
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  padding: var(--space-8) var(--space-16);
+  font-weight: 600;
+  cursor: pointer;
+}
+button.hairline:hover {
+  background: var(--color-surface);
+}
+/* typed confirmation input: same as Settings (sunken surface + hairline) */
+.typed-confirm input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-md);
+  background: var(--color-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+}
+.typed-confirm input:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 1px;
+}
+
+/* machine strings inside a sentence (Mono-Means-Machine) */
+.storage-panel code {
+  font-family: var(--font-family-mono);
+  font-size: 0.95em;
+}
+.storage-lock {
+  color: var(--color-text-muted);
 }

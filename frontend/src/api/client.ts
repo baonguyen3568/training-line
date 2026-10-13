@@ -5,6 +5,8 @@
 import type {
   MetricsPage,
   MetricsQuery,
+  NodeResetPlan,
+  NodeResetResult,
   NodeTypesResponse,
   RunEvent,
   RunInfo,
@@ -112,6 +114,13 @@ export interface Api {
   storagePlan(locale: string): Promise<StoragePlan>;
   /** Rejects with ApiError: 409 {code: PLAN_EXPIRED|CLEANUP_IN_PROGRESS}, 403 {error: DISK-002 + admin_command}. */
   storageApply(body: StorageApplyRequest, locale: string): Promise<StorageApplyResult>;
+  /** G-4. 422 on a malformed node. */
+  nodeResetPlan(node: string, locale: string): Promise<NodeResetPlan>;
+  /** 400 {code: CONFIRM_REQUIRED}, 403 {error: DISK-002 + admin_command}, 409 {code: PLAN_EXPIRED | … }. */
+  nodeReset(
+    body: { plan_id: string; node: string; confirm?: string },
+    locale: string,
+  ): Promise<NodeResetResult>;
   /** B-7. Rejects with ApiError {error: DATA-005 rendered (title/what)} on 400/413/415/507. */
   upload(file: File, locale: string): Promise<UploadInfo>;
   /** 404 {error: {code: RESULT_NOT_READY}}, 502 {error: {code: RESULT_TOO_LARGE}}. */
@@ -148,6 +157,13 @@ export const httpApi: Api = {
   storagePlan: (locale) => request("GET", `/api/storage/plan?locale=${encodeURIComponent(locale)}`),
   storageApply: (body, locale) =>
     request("POST", `/api/storage/apply?locale=${encodeURIComponent(locale)}`, body),
+  nodeResetPlan: (node, locale) =>
+    request(
+      "GET",
+      `/api/storage/node-reset?node=${encodeURIComponent(node)}&locale=${encodeURIComponent(locale)}`,
+    ),
+  nodeReset: (body, locale) =>
+    request("POST", `/api/storage/node-reset?locale=${encodeURIComponent(locale)}`, body),
   upload: (file, locale) =>
     request("POST", `/api/uploads?locale=${encodeURIComponent(locale)}`, {
       raw: file,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { ApiError } from "../api/client";
 import type {
@@ -12,6 +12,9 @@ import type {
 import { getLocale, t, tpOptional } from "../i18n";
 import { formatDateTime, formatShortDeadline } from "../lib/format";
 import { untrustedText } from "../lib/safeText";
+import { ErrorIcon } from "./ErrorIcon";
+import { Icon } from "./Icon";
+import { ResetStepDialog } from "./ResetStepDialog";
 
 const SECTIONS: StorageSection[] = ["manual", "auto", "kept"];
 type Params = Record<string, string | number>;
@@ -60,6 +63,24 @@ function attentionText(a: StorageAttention): string {
   );
 }
 
+/** Machine strings inside a sentence (run dirs, checkpoint paths) read as code (Mono-Means-Machine, design G-4 r1). */
+function withCode(text: string, params: Record<string, unknown>): ReactNode {
+  const tokens = Object.values(params).filter(
+    (v): v is string => typeof v === "string" && /[/_.-]\S*\d|\//.test(v) && text.includes(v),
+  );
+  if (tokens.length === 0) return text;
+  const parts: ReactNode[] = [];
+  let rest = text;
+  for (const tok of tokens) {
+    const i = rest.indexOf(tok);
+    if (i < 0) continue;
+    parts.push(rest.slice(0, i), <code key={tok}>{tok}</code>);
+    rest = rest.slice(i + tok.length);
+  }
+  parts.push(rest);
+  return parts;
+}
+
 const gb = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v.toFixed(1));
 
 type Outcome =
@@ -78,6 +99,7 @@ export function StoragePanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [resetNode, setResetNode] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoadError(false);
@@ -149,6 +171,12 @@ export function StoragePanel() {
     }
   };
 
+  const firstOfNode = new Map<string, string>();
+  for (const section of SECTIONS)
+    for (const i of plan.items)
+      if (i.section === section && i.node_base && !firstOfNode.has(i.node_base))
+        firstOfNode.set(i.node_base, i.item_id);
+
   const adminCommand =
     outcome?.kind === "approval" ? String(outcome.error.params?.admin_command ?? "") : "";
 
@@ -157,12 +185,13 @@ export function StoragePanel() {
       <header className="storage-head">
         <h1>{t("storage.panel.title")}</h1>
         <button type="button" className="link" onClick={load}>
-          ↻ {t("storage.panel.refresh")}
+          <Icon name="rotate-cw" size={14} /> {t("storage.panel.refresh")}
         </button>
       </header>
 
       {plan.error && (
         <div className="error-card warn" role="status" data-code={plan.error.code}>
+          <ErrorIcon tone="warn" />
           <strong>{plan.error.title}</strong>
           <p>{plan.error.what}</p>
         </div>
@@ -174,6 +203,7 @@ export function StoragePanel() {
           role="status"
           data-code={a.code}
         >
+          <ErrorIcon tone="warn" />
           <p>{attentionText(a)}</p>
         </div>
       ))}
@@ -211,6 +241,7 @@ export function StoragePanel() {
       )}
       {outcome?.kind === "approval" && (
         <div className="error-card warn" role="alert" data-code={outcome.error.code}>
+          <ErrorIcon tone="warn" />
           <strong>{outcome.error.title}</strong>
           <p>{outcome.error.what}</p>
           {adminCommand && (
@@ -239,6 +270,7 @@ export function StoragePanel() {
       {plan.items.length === 0 && <p className="muted">{t("storage.panel.empty")}</p>}
       {SECTIONS.map((section) => {
         const items = plan.items.filter((i) => i.section === section);
+        // G-4: one "Đặt lại bước" per graph node, on the first row of that node in display order
         if (items.length === 0) return null;
         return (
           <section
@@ -271,7 +303,9 @@ export function StoragePanel() {
                         onChange={() => toggle(item.item_id)}
                       />
                     ) : (
-                      <span aria-hidden="true">🔒</span>
+                      <span className="si storage-lock" aria-hidden="true">
+                        <Icon name="lock" size={14} />
+                      </span>
                     )}
                     <span className="storage-label">
                       <strong>{label}</strong>
@@ -293,17 +327,27 @@ export function StoragePanel() {
                           }
                         >
                           {item.consequence_code === "PERMANENT_LOSS" && (
-                            <span className="loss-icon" aria-hidden="true">
-                              ⚠{" "}
+                            <span className="loss-icon si si-bad" aria-hidden="true">
+                              <Icon name="triangle-alert" size={14} />{" "}
                             </span>
                           )}
-                          {what}
+                          {withCode(what, item.consequence_params)}
                         </span>
                       )}
                     </span>
                     <span className="storage-size">
                       {item.size_gb === null ? "—" : `${gb(item.size_gb)} GB`}
                     </span>
+                    {item.node_base && firstOfNode.get(item.node_base) === item.item_id && (
+                      <button
+                        type="button"
+                        className="reset-step-btn"
+                        title={t("storage.reset_step.menu_hint")}
+                        onClick={() => setResetNode(item.node_base ?? null)}
+                      >
+                        <Icon name="rotate-ccw" size={14} /> {t("storage.reset_step.menu")}
+                      </button>
+                    )}
                   </li>
                 );
               })}
@@ -344,7 +388,7 @@ export function StoragePanel() {
             </label>
           ))}
           <p>
-            <button type="button" className="link" onClick={() => setConfirming(false)}>
+            <button type="button" className="hairline" onClick={() => setConfirming(false)}>
               {t("storage.dialog.cancel")}
             </button>{" "}
             <button
@@ -357,6 +401,16 @@ export function StoragePanel() {
             </button>
           </p>
         </section>
+      )}
+      {resetNode && (
+        <ResetStepDialog
+          node={resetNode}
+          onClose={() => setResetNode(null)}
+          onDone={(message) => {
+            setNotice(message);
+            load(); // the reset node's items are gone
+          }}
+        />
       )}
     </main>
   );
