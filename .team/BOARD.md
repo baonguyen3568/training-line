@@ -49,14 +49,17 @@ RÀNG BUỘC CỨNG (PM):
 - Không đổi dist 7870 khi user đang thử app; build dashboard mới ở nhánh/route riêng tới khi user duyệt.
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
+| G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | TODO |
+| G-2 | GAP: retention chạy theo lịch trong app (hiện chỉ CLI) | bao-cleanup + bao-backend | TODO |
+| G-3 | GAP: nút "Sửa nhanh" theo error_catalog actions trên UI | bao-frontend + bao-fixcode | TODO |
 | M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | TODO |
 | M2-2 | Sitemap 20–30 trang + IA + copy tiếng Việt (nguồn sự thật: ADR, P001/P002, benchmarks) | bao-design (copy) + bao-research (nội dung kỹ thuật docs) + bao-cleanup (docs vận hành/lưu trữ) | TODO |
-| M2-3 | Chọn stack site tĩnh (đề xuất: Astro + MDX, docs Starlight; MIT) trong `site/`, chung design tokens với app | bao-frontend + bao-cleancode | TODO |
+| M2-3 | Chọn stack site tĩnh (đề xuất: Astro + MDX, docs Starlight; MIT) trong `site/`, chung design tokens với app | bao-frontend + bao-cleancode | IN PROGRESS (stack chốt 10-13: Astro 7.3 + Starlight 0.42, MDX; frontend dựng khung; cleancode: gate check.sh + check `sources`) |
 | M2-4 | Build landing + trang marketing + animation (prefers-reduced-motion) | bao-frontend (+ bao-fixcode hỗ trợ dựng trang) | TODO |
-| M2-5 | Build docs + chính sách + trang phụ | bao-cleancode (dựng) + bao-design (review) | TODO |
+| M2-5 | Build docs + chính sách + trang phụ | bao-cleancode (dựng) + bao-design (review) | IN PROGRESS: 5 trang chính sách import từ docs/legal (chờ security review); tiếp: docs + trang phụ |
 | M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | TODO |
-| M2-7 | QA: link checker, a11y (WCAG AA), visual regression 3 viewport, Lighthouse, kiểm "không bịa số" | bao-tester | TODO |
-| M2-8 | Security: CSP, không tracker, license ảnh/font/icon, trademark NVIDIA, trang chính sách đúng thực tế | bao-security | TODO |
+| M2-7 | QA: link checker, a11y (WCAG AA), visual regression 3 viewport, Lighthouse, kiểm "không bịa số" | bao-tester | IN PROGRESS (P011 draft; G1 check_site_numbers.py xong report-only) |
+| M2-8 | Security: CSP, không tracker, license ảnh/font/icon, trademark NVIDIA, trang chính sách đúng thực tế | bao-security | REVIEW (spec + gate site_check + docs/legal + SECURITY.md xong; chờ U7–U10 của user, fix CSP Starlight của frontend) |
 
 ## 🎯 MILESTONE M1 — "Kéo thả → nối → Chạy thật" (ƯU TIÊN SỐ 1, user phản hồi 2026-10-12: app còn thô, chưa tạo/nối pipeline được)
 Definition of Done: user mở app → tạo workflow TRỐNG → kéo node từ thư viện vào canvas → nối dây → bấm Chạy →
