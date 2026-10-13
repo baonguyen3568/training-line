@@ -98,7 +98,7 @@ def test_failed_eviction_becomes_invalid(idx: ArtifactIndex, tmp_path: Path) -> 
     assert entry.state == "invalid"
 
 
-def test_pinned_and_required_parents_are_not_evictable(idx: ArtifactIndex, tmp_path: Path) -> None:
+def test_required_parents_are_not_evictable(idx: ArtifactIndex, tmp_path: Path) -> None:
     idx.record("base", run_dir=RUN_DIR, run_id="base", node_type="train.sft", outputs=_out(tmp_path, "base"))
     idx.record("other", run_dir=RUN_DIR, run_id="o", node_type="t", outputs=_out(tmp_path, "o"))
     idx.record(
@@ -113,12 +113,8 @@ def test_pinned_and_required_parents_are_not_evictable(idx: ArtifactIndex, tmp_p
     idx.record(
         "quant", run_dir=RUN_DIR, run_id="q", node_type="quantize", outputs=_out(tmp_path, "q"), parents=["lora"]
     )
-    idx.set_pinned("other", pinned=True)
-    assert idx.live_dependents("base") == ["lora"]
-    assert idx.live_dependents("lora") == []  # quant is self-contained
-    assert {e.cache_key for e in idx.evictable()} == {"lora", "quant"}
+    assert {e.cache_key for e in idx.evictable()} == {"lora", "quant", "other"}  # quant is self-contained
     assert not idx.begin_evict("base")
-    assert not idx.begin_evict("other")
     # once the adapter is gone, its base becomes evictable
     assert idx.begin_evict("lora")
     idx.finish_evict("lora")
@@ -184,13 +180,13 @@ def test_leased_entries_are_not_evictable_until_released(idx: ArtifactIndex, tmp
     assert idx.begin_evict("in-use")
 
 
-def test_stale_leases_are_reported_but_still_block(tmp_path: Path) -> None:
+def test_old_leases_still_block(tmp_path: Path) -> None:
     clock = Clock()
     idx = ArtifactIndex(tmp_path / "app.db", clock=clock)
     idx.record("k", run_dir=RUN_DIR, run_id="r", node_type="t", outputs=_out(tmp_path, "r"))
     idx.lease(["k"], run_id="crashed-graph")
     clock.t += 25 * 3600
-    assert [(k, r) for k, r, _ in idx.stale_leases()] == [("k", "crashed-graph")]
+    assert not idx.begin_evict("k")  # fail closed: only release_run frees it
     assert not idx.begin_evict("k")
 
 

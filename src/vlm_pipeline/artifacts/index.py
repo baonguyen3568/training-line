@@ -3,11 +3,12 @@
 The executor ``record``s every completed cacheable node, ``lookup``s before running one, ``verify``s a hit and
 ``mark_hit``s it (LRU input), and ``invalidate``s an entry whose files no longer match. Retention evicts in three steps
 so it never races the executor: ``begin_evict`` (completed -> evicting, executor sees a miss) -> delete files ->
-``finish_evict`` (-> evicted). Pinned entries and parents still needed at load time by a live child cannot be evicted.
+``finish_evict`` (-> evicted). Parents still needed at load time by a live child cannot be evicted. Pinning is a KEEP
+file (cache_retention); the ``pinned`` column stays for old databases.
 
 The executor ``lease``s every entry it hits or produces for the duration of a graph run and ``release_run``s in a
-``finally``; leased entries are never evicted. Leases older than 24 h are listed by ``stale_leases`` for the UI/PM but
-still block eviction (fail closed).
+``finally``; leased entries are never evicted, however old the lease (fail closed: a crashed graph's lease is
+released by the startup reconciliation, never by age).
 
 Stdlib only (``sqlite3``), WAL mode, one connection guarded by a lock so one instance can be shared across threads.
 """
@@ -71,7 +72,6 @@ _BEGIN_EVICT_SQL = (
     " WHERE p.parent = :k AND c.requires_parent_at_load = 1 AND c.state IN ('completed', 'evicting'))"
     " AND NOT EXISTS (SELECT 1 FROM artifact_leases l WHERE l.cache_key = :k)"
 )
-STALE_LEASE_S = 24 * 3600.0
 INDEX_REL = Path("outputs") / "graph" / "app.db"  # same file the executor opens (state_dir / "app.db")
 
 
@@ -265,30 +265,7 @@ class ArtifactIndex:
             ).fetchall()
         return [r["cache_key"] for r in rows]
 
-    def stale_leases(self, *, older_than_s: float = STALE_LEASE_S) -> list[tuple[str, str, float]]:
-        """(cache_key, run_id, since) of leases older than ``older_than_s``: reported, still blocking."""
-        cutoff = self._clock() - older_than_s
-        with self._lock:
-            rows = self._db.execute(
-                "SELECT cache_key, run_id, since FROM artifact_leases WHERE since < ? ORDER BY since", (cutoff,)
-            ).fetchall()
-        return [(r["cache_key"], r["run_id"], r["since"]) for r in rows]
-
     # ------------------------------------------------------------------ retention side
-    def set_pinned(self, cache_key: str, pinned: bool) -> None:
-        with self._tx() as db:
-            db.execute("UPDATE artifacts SET pinned = ? WHERE cache_key = ?", (int(pinned), cache_key))
-
-    def live_dependents(self, cache_key: str) -> list[str]:
-        """Completed children that need ``cache_key`` when they are loaded (e.g. LoRA adapter -> base model)."""
-        with self._lock:
-            rows = self._db.execute(
-                "SELECT a.cache_key FROM artifact_parents p JOIN artifacts a ON a.cache_key = p.child"
-                " WHERE p.parent = ? AND a.requires_parent_at_load = 1 AND a.state IN ('completed', 'evicting')",
-                (cache_key,),
-            ).fetchall()
-        return sorted(r["cache_key"] for r in rows)
-
     def evictable(self) -> list[CacheEntry]:
         """Completed, unpinned entries without a live dependent, least recently used first."""
         with self._lock:

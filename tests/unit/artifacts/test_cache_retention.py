@@ -105,15 +105,13 @@ def test_evict_frees_heavy_bytes_and_keeps_history(root: Path, idx: ArtifactInde
     assert events[-1]["cache_key"] == "a"
 
 
-def test_pinned_and_needed_parents_are_not_evicted(root: Path, idx: ArtifactIndex) -> None:
+def test_needed_parents_are_not_evicted(root: Path, idx: ArtifactIndex) -> None:
     _cached_run(root, idx, "base")
     _cached_run(root, idx, "lora", parents=["base"], requires_parent_at_load=True)
-    _cached_run(root, idx, "pinned")
-    idx.set_pinned("pinned", pinned=True)
     assert {i.cache_key for i in plan_cache(root, idx, cap_gb=0).evict} == {"lora"}
-    res = evict(root, idx, ["base", "pinned"], by="app")
+    res = evict(root, idx, ["base"], by="app")
     assert res.evicted == []
-    assert len(res.skipped) == 2
+    assert len(res.skipped) == 1
 
 
 def test_outputs_outside_run_dir_are_never_deleted(root: Path, idx: ArtifactIndex) -> None:
