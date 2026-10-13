@@ -75,4 +75,25 @@ describe("SettingsPanel password managers", () => {
     expect(container.querySelector(".set-warning")).toBeNull();
     expect(container.textContent).not.toContain("NO_SUCH_CODE");
   });
+
+  it("shows APPROVAL_OFF_SHARED under the approval row, with the warning icon", async () => {
+    const { api } = await import("../src/api");
+    const real = await api.settings();
+    const pol = real.admin_policy["storage.approval_policy"];
+    if (!pol) throw new Error("no approval policy in the mock");
+    vi.spyOn(api, "settings").mockResolvedValue({
+      ...real,
+      admin_policy: {
+        ...real.admin_policy,
+        "storage.approval_policy": { ...pol, warning: "APPROVAL_OFF_SHARED" },
+      },
+    });
+    const { SettingsPanel } = await import("../src/components/SettingsPanel");
+    const { container } = render(<SettingsPanel />);
+    await screen.findByRole("heading", { level: 1 });
+    const warn = container.querySelector('[data-key="storage.approval_policy"] .set-warning');
+    expect(warn?.textContent).toContain("Máy này dùng chung");
+    expect(warn?.querySelector(".si-warn svg")).toBeTruthy();
+    expect(container.querySelectorAll(".set-warning")).toHaveLength(1);
+  });
 });
