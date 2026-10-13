@@ -60,3 +60,21 @@ describe("D4 shell", () => {
     await waitFor(() => expect(widths()[2]).toBe("56px"));
   });
 });
+
+describe("D4 status bar", () => {
+  it("shows the live run line and a progress bar while a run is going", async () => {
+    const { useUi } = await import("../src/store/ui");
+    useUi.setState({ skin: "d4" });
+    const { useWorkflow } = await import("../src/store/workflow");
+    const { setFakeStepMs } = await import("../src/mocks/api");
+    setFakeStepMs(200);
+    await useWorkflow.getState().loadCatalog();
+    useWorkflow.getState().newWorkflow();
+    useWorkflow.getState().addNode("model.hf_pick", { x: 0, y: 0 });
+    const { StatusBar } = await import("../src/components/ShellD4");
+    render(<StatusBar />);
+    await useWorkflow.getState().startRun();
+    await waitFor(() => expect(screen.getByRole("progressbar")).toBeTruthy(), { timeout: 3000 });
+    await waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull(), { timeout: 5000 });
+  });
+});

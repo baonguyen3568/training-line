@@ -366,8 +366,27 @@ export function Inspector() {
 
   return (
     <aside className="inspector" aria-label={nodeTitle(spec, node.type)}>
-      <h2>{nodeTitle(spec, node.type)}</h2>
-      <p className="muted">{nodeDesc(spec, node.type)}</p>
+      {skin === "d4" ? (
+        <div className="insp-head">
+          <h2>{nodeTitle(spec, node.type)}</h2>
+          <button
+            type="button"
+            className="help-btn"
+            popoverTarget="help-node"
+            aria-label={t("d4.explain")}
+          >
+            <Icon name="circle-question-mark" size={14} />
+          </button>
+          <div id="help-node" popover="auto" className="pop">
+            {nodeDesc(spec, node.type)}
+          </div>
+        </div>
+      ) : (
+        <>
+          <h2>{nodeTitle(spec, node.type)}</h2>
+          <p className="muted">{nodeDesc(spec, node.type)}</p>
+        </>
+      )}
       {mode === "advanced" && (
         <p className="small">
           <code>

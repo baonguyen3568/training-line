@@ -33,7 +33,7 @@ import { CheckBar } from "./CheckBar";
 import { Inspector } from "./Inspector";
 import { DRAG_MIME, NodeLibrary } from "./NodeLibrary";
 import { NodeShell, type ShellNode } from "./NodeShell";
-import { Dock, IconStrip, LibraryFlyout } from "./ShellD4";
+import { Dock, IconStrip, LibraryFlyout, StatusBar } from "./ShellD4";
 import { Toolbar } from "./Toolbar";
 import { ToolbarD4 } from "./ToolbarD4";
 
@@ -482,9 +482,8 @@ function EditorInner() {
         <Dock errorCount={errorCount}>
           <CheckBar />
         </Dock>
-      ) : (
-        <CheckBar />
-      )}
+      ) : null}
+      {d4 ? <StatusBar /> : <CheckBar />}
     </div>
   );
 }

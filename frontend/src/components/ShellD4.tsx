@@ -1,5 +1,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { t } from "../i18n";
+import { nodeTitle } from "../lib/nodeText";
+import { stepNumbers } from "../lib/topo";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
@@ -119,5 +121,51 @@ export function Dock({ children, errorCount }: { children: ReactNode; errorCount
         {children}
       </div>
     </section>
+  );
+}
+
+/**
+ * D4 status bar (26px, full width): the live run line ("Đang chạy bước 4/5 · Fine-tune toàn bộ") with a mini
+ * progress bar, so progress is visible while the dock stays collapsed (design D4 r2 #2). Idle: nothing to say.
+ */
+export function StatusBar() {
+  const { workflow, run, specs } = useWorkflow();
+  if (!workflow || !run) return <footer className="sb" aria-hidden="true" />;
+  const states = Object.entries(run.nodes);
+  const done = states.filter(([, s]) =>
+    ["completed", "cached", "skipped"].includes(s.status),
+  ).length;
+  const current = states.find(([, s]) => s.status === "running");
+  const node = current && workflow.nodes.find((n) => n.id === current[0]);
+  const steps = stepNumbers(workflow);
+  const text = run.done
+    ? t(`run_monitor.status.${run.status === "completed" ? "completed" : (run.status ?? "failed")}`)
+    : node
+      ? t("run.progress", {
+          current_step: steps.get(node.id) ?? done + 1,
+          total_count: states.length,
+          node: nodeTitle(specs.get(node.type), node.type),
+        })
+      : t("node_state.queued");
+  const pct = states.length ? Math.round((done / states.length) * 100) : 0;
+  return (
+    <footer className="sb" role="status" aria-live="polite">
+      <span className={`si ${run.done ? "si-completed" : "si-running"}`}>
+        <Icon name={run.done ? "circle-check-big" : "loader-circle"} size={14} />
+      </span>
+      <span>{text}</span>
+      {!run.done && (
+        <span
+          className="sb-bar"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          aria-label={text}
+        >
+          <span style={{ width: `${pct}%` }} />
+        </span>
+      )}
+    </footer>
   );
 }
