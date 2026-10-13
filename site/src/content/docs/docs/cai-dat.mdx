@@ -2,7 +2,7 @@
 title: Cài đặt và chạy app
 description: Cài từ mã nguồn, dựng image train và mở giao diện trên máy của bạn.
 sidebar:
-  order: 1
+  order: 2
 sources:
   - src/vlm_pipeline/app/server.py
   - scripts/dev/app.sh
@@ -25,6 +25,10 @@ uv sync
 ```
 
 `uv` tạo môi trường Python riêng cho dự án, không ảnh hưởng Python của hệ thống.
+
+<Hint title="Vì sao tên bên trong là vlm-?">
+Các tên kỹ thuật bên trong (image, container, lệnh) dùng tiền tố `vlm-` để dễ nhận ra và dọn dẹp trên máy. Đó vẫn là app NTC-Training.
+</Hint>
 
 ## 2. Build giao diện
 
@@ -51,36 +55,31 @@ Image gốc của NVIDIA nặng khoảng 29,4 GB. Trên máy dùng chung, báo q
 
 ## 4. Chạy app
 
+Trên máy **cá nhân**:
+
 ```bash
 uv run vlm-app --worker container
 ```
 
+Trên máy **dùng chung** với người khác, luôn chạy qua script này. Nó bật chế độ máy dùng chung: chặt hơn về plugin, và cần quản trị viên duyệt khi xoá quá 20 GB dữ liệu trong 24 giờ.
+
+```bash
+scripts/dev/app.sh --worker container
+```
+
+:::note
+Nếu quên `--worker container`, app chỉ **giả lập**: giao diện chạy bình thường nhưng không train thật.
+:::
+
 | Tuỳ chọn | Ý nghĩa |
 |---|---|
 | `--port` | Cổng của app, mặc định 7870 |
-| `--worker container` | Chạy tác vụ thật trong container |
-| `--worker fake` | Mặc định: chỉ giả lập, để thử giao diện mà không dùng GPU |
+| `--worker container` | Chạy tác vụ thật trên GPU |
+| `--worker fake` | Mặc định: chỉ giả lập, để thử giao diện |
 
 Khi khởi động, app in **một lần** đường dẫn đăng nhập dạng `http://127.0.0.1:7870/?token=…`. Mở đường dẫn này bằng trình duyệt trên cùng máy. App chỉ nghe ở `127.0.0.1`, không mở ra mạng ngoài.
 
-<Hint title="Cài trên máy dùng chung">
-Dùng `scripts/dev/app.sh` thay cho `uv run vlm-app`. Script bật chế độ `shared_dev`: chặt hơn về plugin, và cần quản trị viên duyệt khi xoá quá 20 GB dữ liệu trong 24 giờ. Xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/).
-</Hint>
-
-## 5. Tự kiểm tra trước tác vụ nặng
-
-App tự kiểm tra trước mỗi tác vụ nặng ([chi tiết](/docs/kiem-tra-truoc-khi-chay/)). Bạn cũng có thể kiểm bằng lệnh, lệnh này chỉ đọc:
-
-```bash
-uv run python scripts/cleanup/preflight.py --est-peak-gb 40 --ckpt-gb 9
-```
-
-| Mã kết thúc | Ý nghĩa |
-|---|---|
-| `0` | Đạt |
-| `2` | Thiếu bộ nhớ hoặc swap |
-| `3` | Thiếu ổ đĩa |
-| `4` | GPU đang bận |
+App tự kiểm tra bộ nhớ, ổ đĩa và GPU trước mỗi tác vụ nặng. Muốn tự kiểm bằng dòng lệnh: xem [Xử lý sự cố](/docs/xu-ly-su-co-bo-nho/#tu-kiem-tra).
 
 ## Dữ liệu được lưu ở đâu
 
@@ -90,7 +89,7 @@ Mọi thứ app tạo ra nằm trong thư mục dự án:
 |---|---|
 | `.cache/` | Model và dữ liệu tải về |
 | `outputs/runs/` | Mỗi lần train hoặc đánh giá một thư mục: cấu hình, nhật ký, số đo, checkpoint |
-| `outputs/graph/` | Kết quả từng node của workflow và chỉ mục bộ nhớ đệm |
+| `outputs/graph/` | Kết quả từng node của workflow |
 | `outputs/system/` | Báo cáo dung lượng, nhật ký dọn dẹp |
 
 Thư mục cache Hugging Face chung của máy (`~/.cache/huggingface`) chỉ được đọc, app không ghi hay xoá ở đó.

@@ -1,6 +1,6 @@
 ---
 title: Chính sách lưu giữ dữ liệu
-description: App giữ checkpoint, kết quả và lịch sử chạy bao lâu, và những gì không bao giờ bị xoá.
+description: App giữ checkpoint, kết quả và lịch sử chạy bao lâu, tự dọn khi nào, và những gì không bao giờ bị xoá.
 sidebar:
   order: 6
 sources:
@@ -8,14 +8,17 @@ sources:
   - src/vlm_pipeline/artifacts/retention.py
   - .team/proposals/005-storage-retention-policy.md
   - src/vlm_pipeline/app/storage_scheduler.py
+  - src/vlm_pipeline/artifacts/cache_retention.py
 ---
 import Hint from '~/components/Hint.astro';
 
 Chính sách này áp dụng cho dữ liệu app tạo ra **trên máy của bạn**. App không gửi dữ liệu đi đâu; mọi thứ nằm trong thư mục dự án.
 
-:::note[Hiện trạng]
-App áp dụng các luật dưới đây theo lịch, mỗi 6 giờ, trừ các mục sẽ mất vĩnh viễn: những mục đó chỉ bị xoá khi bạn tự chọn và xác nhận. Trên máy dùng chung, quản trị viên quyết định có bật xoá thật hay chỉ chạy thử. Xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/).
-:::
+## App tự dọn khi nào
+
+Khi app đang chạy, cứ **6 giờ** app dọn một lượt (lượt đầu vài phút sau khi khởi động). Mỗi lượt chỉ làm những việc **không làm mất thứ không lấy lại được**: xoá kết quả tạm lâu không dùng khi vượt giới hạn, và áp dụng các luật checkpoint bên dưới. Mục sẽ mất vĩnh viễn chỉ bị xoá khi bạn tự chọn và xác nhận trong [panel Dung lượng](/docs/quan-ly-dung-luong/).
+
+Lượt dọn **bỏ qua** khi máy đang có tác vụ GPU (hoặc còn khoá GPU chưa được giải phóng), và chạy lại ở lượt sau. Trên máy dùng chung, quản trị viên quyết định bật xoá thật hay chỉ chạy thử.
 
 ## Nguyên tắc
 
@@ -25,12 +28,14 @@ App áp dụng các luật dưới đây theo lịch, mỗi 6 giờ, trừ các 
 4. **Không tự động xoá model bạn đã train.**
 5. **Mọi lần xoá đều được ghi lại**: cái gì, bao nhiêu, lúc nào, ai làm, ai duyệt.
 
-## Luôn được giữ
+## Không bao giờ bị dọn tự động
 
-- `run.json` (thông tin lần chạy), các file `*.jsonl` (số đo, sự kiện), thư mục `logs/`
-- thư mục `export/` (model bạn đã xuất)
-- lần chạy hoặc checkpoint có file `KEEP`
-- lần chạy đang chạy, đang chờ, đang tạm dừng, hoặc đang giữ GPU
+- thông tin lần chạy, nhật ký, số đo và sự kiện;
+- model bạn đã train và model bạn đã xuất;
+- mục đã ghim;
+- lần chạy đang chạy, đang chờ, đang tạm dừng, hoặc đang dùng GPU;
+- kết quả mà một workflow đang chạy cần dùng, hoặc model gốc mà một phần học thêm (LoRA) còn cần;
+- mục có thông tin lần chạy bị hỏng (app giữ lại cho an toàn).
 
 ## Checkpoint khi train
 
@@ -41,7 +46,7 @@ Sau khi lần chạy **hoàn thành**:
 | Checkpoint | Cách giữ |
 |---|---|
 | Mới nhất | Giữ đủ **7 ngày** để train tiếp được; sau đó bỏ trạng thái optimizer, giữ model |
-| Tốt nhất (sai số kiểm định thấp nhất) | Giữ model, bỏ trạng thái optimizer ngay |
+| Tốt nhất (sai số trên tập kiểm tra thấp nhất) | Giữ model, bỏ trạng thái optimizer ngay |
 | Lưu dở (bị ngắt khi đang ghi) | Xoá |
 | Các checkpoint khác | Xoá sau **7 ngày** |
 
@@ -51,30 +56,27 @@ Sau khi lần chạy **thất bại hoặc bị huỷ**:
 - Sau 3 ngày: xoá checkpoint lưu dở và các checkpoint không phải mới nhất.
 - Sau **7 ngày**: xoá cả checkpoint mới nhất.
 
+Thời gian được tính từ hoạt động cuối của lần chạy. Khi không chắc, app chọn **giữ lâu hơn**.
+
 <Hint title="Trạng thái optimizer là gì?">
 Ngoài trọng số model, checkpoint còn lưu trạng thái của thuật toán tối ưu để train tiếp đúng chỗ dừng. Phần này khá lớn: với Nemotron Parse v1.1 là 2,7 GB trong 8,1 GB mỗi checkpoint. Bỏ nó đi thì model vẫn dùng, nén và đánh giá được, chỉ không train tiếp từ điểm đó được nữa.
 </Hint>
 
-Khi một model chưa hỗ trợ train tiếp mà bạn vẫn yêu cầu chạy tiếp, app cất checkpoint và số đo cũ sang một bên rồi train lại từ đầu. Phần đã cất chỉ bị dọn sau **3 ngày** **và** khi lần train lại đã hoàn thành. Nếu lần train lại chưa xong hoặc thất bại, phần đã cất có thể là bản model duy nhất nên được giữ, và chỉ bị xoá khi bạn tự chọn và xác nhận.
+<Hint title="Model chưa hỗ trợ train tiếp thì sao?">
+Nếu bạn yêu cầu chạy tiếp một model chưa hỗ trợ train tiếp, app cất checkpoint cũ sang một bên rồi train lại từ đầu. Phần đã cất chỉ bị dọn sau 3 ngày **và** khi lần train lại đã hoàn thành. Nếu lần train lại chưa xong hoặc thất bại, phần đã cất có thể là bản model duy nhất nên được giữ, và chỉ bị xoá khi bạn tự chọn và xác nhận.
+</Hint>
 
-Thời gian được tính từ hoạt động cuối của lần chạy. Khi không chắc, app chọn **giữ lâu hơn**.
+## Kết quả tạm của các node
 
-## Kết quả node trong workflow
-
-Kết quả tạm bị xoá theo thứ tự lâu không dùng nhất khi vượt giới hạn bộ nhớ đệm. Model đã train chỉ bị xoá khi bạn tự chọn và gõ xác nhận. Xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/).
-
-## Image container
-
-Image của dự án có nhãn `project=vlm-training` hoặc tên bắt đầu bằng `vlm-`. App không bao giờ chạy lệnh dọn toàn bộ Docker của máy. Image gốc của NVIDIA chỉ bị xoá theo quy trình hai bước, có quản trị viên xác nhận.
-
-## Mức cảnh báo dung lượng
-
-| Tổng dữ liệu của dự án | Mức |
-|---|---|
-| Dưới 500 GB | Bình thường |
-| Từ 500 GB | Cảnh báo |
-| Từ 800 GB | Nguy hiểm |
+Kết quả tạm bị xoá theo thứ tự lâu không dùng nhất khi vượt giới hạn (xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/)). Chỉ phần nặng bị xoá; thư mục xuất bản, nhật ký và số đo vẫn còn.
 
 ## Nhật ký xoá
 
 Mỗi lần xoá ghi một dòng vào `outputs/system/cleanup.jsonl` và vào nhật ký sự kiện của lần chạy liên quan: loại sự kiện, đường dẫn, dung lượng, thời điểm, người thực hiện và người duyệt (nếu có).
+
+<details>
+<summary>Dành cho quản trị viên: image container</summary>
+
+Image của dự án có nhãn `project=vlm-training` hoặc tên bắt đầu bằng `vlm-`. App không bao giờ chạy lệnh dọn toàn bộ Docker của máy. Image gốc của NVIDIA chỉ bị xoá theo quy trình hai bước, có quản trị viên xác nhận.
+
+</details>

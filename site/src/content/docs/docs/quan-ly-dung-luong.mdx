@@ -1,6 +1,6 @@
 ---
 title: Quản lý dung lượng
-description: App dùng ổ đĩa vào đâu, tự dọn những gì, phần nào được bảo vệ, và cách tự chọn mục cần xoá trong panel Dung lượng.
+description: Làm sao xem dung lượng đang dùng vào đâu và giải phóng ổ đĩa an toàn bằng panel Dung lượng.
 sidebar:
   order: 5
 sources:
@@ -8,97 +8,78 @@ sources:
   - src/vlm_pipeline/artifacts/cache_retention.py
   - src/vlm_pipeline/i18n/vi.yaml
   - src/vlm_pipeline/app/storage_scheduler.py
+  - docs/adr/ADR-005-storage-retention.md
 ---
 import Hint from '~/components/Hint.astro';
 
-Train model tạo ra nhiều dữ liệu lớn: model tải về, checkpoint, model đã nén, kết quả từng node. Trang này nói dữ liệu nằm ở đâu, phần nào được bảo vệ, và cách dọn dẹp mà không mất thứ cần giữ.
+Mở **panel Dung lượng** bằng nút **Dung lượng** trên thanh trên cùng để xem dữ liệu đang chiếm chỗ ở đâu và chọn mục cần xoá. App cũng tự dọn những gì an toàn theo [chính sách lưu giữ](/docs/chinh-sach-luu-giu/).
 
-## App tự dọn những gì
-
-Khi app đang chạy, cứ **6 giờ** app dọn một lượt (lượt đầu sau khi khởi động vài phút). Mỗi lượt chỉ làm những việc **không làm mất thứ không lấy lại được**:
-
-- xoá kết quả tạm lâu không dùng khi bộ nhớ đệm vượt giới hạn;
-- áp dụng [chính sách lưu giữ](/docs/chinh-sach-luu-giu/) cho checkpoint, trừ các mục sẽ mất vĩnh viễn.
-
-Lượt dọn **bỏ qua** khi máy đang có tác vụ GPU (hoặc còn khoá GPU chưa được giải phóng), và chạy lại ở lượt sau. Mục được bảo vệ hoặc sẽ mất vĩnh viễn không bao giờ bị dọn tự động; chúng nằm trong mục **Cần bạn chọn** của panel Dung lượng.
-
-<Hint title="Trên máy dùng chung">
-Mặc định app chỉ **chạy thử**: liệt kê những gì sẽ dọn mà không xoá. Quản trị viên bật xoá thật trong file cấu hình của máy. Mỗi lượt cũng tuân theo giới hạn 20 GB mỗi 24 giờ; phần vượt để lượt sau.
-</Hint>
-
-## Bốn nhóm dữ liệu
-
-| Nhóm | Ví dụ | Khi dọn dẹp |
-|---|---|---|
-| **Model đã tải** | Model gốc từ Hugging Face | Không bị dọn. Xoá thì phải tải lại. |
-| **Model bạn đã train** | Kết quả của node Fine-tune | **Không bao giờ bị dọn tự động.** Chỉ xoá khi bạn chọn và gõ tên để xác nhận. |
-| **Dữ liệu** | Bộ dữ liệu đã tải và đã xử lý | Không bị dọn. |
-| **Kết quả tạm (có thể tính lại)** | Đầu ra của các node khác | Được dọn khi bộ nhớ đệm vượt giới hạn. |
-
-Lịch sử chạy (nhật ký, số đo, thông tin lần chạy) **luôn được giữ**, kể cả khi dữ liệu lớn của lần chạy đó đã bị xoá.
-
-## Bộ nhớ đệm kết quả node
-
-Khi chạy lại workflow, node có đầu vào và thiết lập không đổi sẽ dùng lại kết quả cũ thay vì chạy lại. Các kết quả này nằm trong bộ nhớ đệm có giới hạn:
-
-- Giới hạn mặc định: **200 GB, hoặc 10% dung lượng ổ đĩa còn trống** nếu số đó nhỏ hơn.
-- Khi dọn, **kết quả tạm lâu không dùng nhất** được xoá trước, cho tới khi về dưới giới hạn.
-- Chỉ phần nặng bị xoá (checkpoint, engine, file kết quả). Thư mục xuất bản `export/`, nhật ký và số đo vẫn còn.
-
-Không bao giờ bị dọn tự động:
-
-- model bạn đã train;
-- mục đã ghim;
-- mục một workflow đang chạy cần dùng;
-- model gốc mà một phần học thêm (LoRA) còn cần để chạy;
-- mục có thông tin lần chạy bị hỏng.
-
-Nếu đã xoá hết những gì được phép mà vẫn vượt giới hạn, công cụ dọn dẹp **dừng lại** và báo **DISK-003** "Bộ nhớ đệm đầy, cần bạn chọn mục xoá", chứ không xoá thêm.
+**Trên máy dùng chung, app mặc định chỉ chạy thử:** app liệt kê những gì sẽ dọn nhưng không xoá, cho tới khi quản trị viên bật xoá thật. Nếu ổ đĩa không giảm dù có nhiều kết quả tạm, hãy hỏi quản trị viên.
 
 ## Panel Dung lượng
 
-Mở bằng nút **Dung lượng** trên thanh trên cùng. Panel chia ba nhóm:
+Panel chia ba nhóm:
 
-- **Cần bạn chọn**: mục được bảo vệ hoặc sẽ mất vĩnh viễn, kèm lý do.
-- **App sẽ tự dọn khi cần**: bạn cũng có thể xoá ngay.
-- **Được giữ lại**: chỉ để xem, kèm lý do (ví dụ đang chạy, có file `KEEP`).
+| Nhóm | Nghĩa |
+|---|---|
+| **Cần bạn chọn** | Mục được bảo vệ hoặc sẽ mất vĩnh viễn nếu xoá. App không tự xoá. |
+| **App sẽ tự dọn khi cần** | Mục an toàn để xoá. Bạn cũng có thể xoá ngay. |
+| **Được giữ lại** | Chỉ để xem: dung lượng đang bị giữ và lý do (đang chạy, đã ghim…). |
 
-Mỗi mục ghi dung lượng và **hậu quả nếu xoá**. Chọn mục rồi bấm xoá; nếu đang có lượt dọn khác chạy, app báo thử lại sau ít phút.
-
-## Xoá một mục được bảo vệ
-
-Model bạn đã train chỉ bị xoá khi bạn chọn đúng mục đó **và gõ lại tên** của nó để xác nhận. Trước khi xoá, công cụ luôn cho xem hậu quả, ví dụ:
+Mỗi mục ghi dung lượng và **hậu quả nếu xoá**, ví dụ:
 
 - "Có thể tạo lại": chạy lại workflow sẽ tạo lại.
 - "… sẽ mất vĩnh viễn — không khôi phục hay tạo lại y hệt được."
 - "Model vẫn dùng được, nhưng không thể train tiếp run … từ điểm này."
 
-<Hint title="Vì sao danh sách xem trước hết hạn?">
-Danh sách xem trước chỉ dùng được 10 phút. Sau đó phải lập lại, vì trong lúc chờ có thể đã có workflow bắt đầu dùng một mục. Mục nào lúc xoá đang được dùng hoặc đã được bảo vệ sẽ bị bỏ qua, kèm lý do.
+Chọn mục rồi bấm xoá. Nếu đang có lượt dọn khác chạy, app báo thử lại sau ít phút.
+
+<Hint title="Vì sao danh sách bị làm mới?">
+Danh sách chỉ dùng được 10 phút. Sau đó app lập lại, vì trong lúc chờ có thể đã có workflow bắt đầu dùng một mục. Mục nào lúc xoá đang được dùng hoặc đã được bảo vệ sẽ bị bỏ qua, kèm lý do.
 </Hint>
+
+## Xoá model bạn đã train
+
+Model bạn đã train chỉ bị xoá khi bạn chọn đúng mục đó **và gõ lại tên** của nó để xác nhận. Mục sẽ mất vĩnh viễn cũng vậy.
 
 ## Máy dùng chung: cần quản trị viên duyệt
 
-Trên máy dùng chung (chế độ `shared_dev`), nếu tổng dung lượng xoá trong 24 giờ vượt **20 GB** thì việc xoá bị từ chối với **DISK-002** "Cần duyệt trước khi dọn dung lượng". Các lần xoá trong 24 giờ được cộng dồn, nên chia nhỏ cũng không lách được. Trên máy cá nhân, mặc định không cần duyệt.
+Trên máy dùng chung, nếu tổng dung lượng xoá trong 24 giờ vượt **20 GB** thì việc xoá bị từ chối với **DISK-002** "Cần duyệt trước khi dọn dung lượng". Chưa có gì bị xoá. Thông báo kèm lệnh để quản trị viên tự chạy. Các lần xoá trong 24 giờ được cộng dồn, nên chia nhỏ cũng không lách được. Trên máy cá nhân, mặc định không cần duyệt.
+
+## Khi kết quả tạm đầy
+
+Kết quả tạm của các node có giới hạn: **200 GB, hoặc 10% dung lượng ổ đĩa còn trống** nếu số đó nhỏ hơn. Nếu vượt giới hạn mà mọi mục còn lại đều được bảo vệ, app báo **DISK-003** "Bộ nhớ đệm đầy, cần bạn chọn mục xoá" thay vì tự xoá thêm. Mở panel và chọn mục trong nhóm **Cần bạn chọn**.
+
+<Hint title="&quot;Bộ nhớ đệm&quot; ở đây là gì?">
+Là kết quả tạm lưu trên **ổ đĩa**, không phải bộ nhớ (RAM) của máy. Thiếu RAM là các lỗi MEM-*, xem [Xử lý sự cố](/docs/xu-ly-su-co-bo-nho/).
+</Hint>
+
+## Mức cảnh báo dung lượng
+
+| Tổng dữ liệu của dự án | Mức |
+|---|---|
+| Dưới 500 GB | Bình thường |
+| Từ 500 GB | Cảnh báo |
+| Từ 800 GB | Nguy hiểm |
 
 ## Giữ lại một lần chạy
 
-Tạo một file rỗng tên `KEEP`:
+Nút **Ghim** trên giao diện chưa có. Hiện quản trị viên ghim bằng cách tạo file rỗng tên `KEEP` (xem mục dòng lệnh bên dưới). Mục đã ghim nằm trong nhóm **Được giữ lại**.
 
-- trong thư mục lần chạy (`outputs/runs/<run>/KEEP`) để giữ toàn bộ lần chạy;
-- trong một thư mục checkpoint để chỉ giữ checkpoint đó.
-
-Xoá file `KEEP` khi không cần giữ nữa.
-
-## Dọn bằng dòng lệnh
+<details>
+<summary>Dành cho quản trị viên: dọn và ghim bằng dòng lệnh</summary>
 
 Mọi lệnh dọn dẹp **chỉ xem trước** nếu không có `--apply`, và bắt buộc ghi tên người thực hiện bằng `--by`.
 
 | Lệnh | Việc |
 |---|---|
 | `scripts/cleanup/disk_report.py` | Báo cáo dung lượng dự án theo nhóm và mức cảnh báo |
-| `scripts/cleanup/retention.py` | Checkpoint nào sẽ bị dọn theo [chính sách lưu giữ](/docs/chinh-sach-luu-giu/) |
-| `scripts/cleanup/cache.py` | Bộ nhớ đệm node và các mục sẽ bị xoá |
+| `scripts/cleanup/retention.py` | Checkpoint nào sẽ bị dọn theo chính sách lưu giữ |
+| `scripts/cleanup/cache.py` | Kết quả tạm của các node và mục sẽ bị xoá |
 | `scripts/cleanup/worktrees.py` | Thư mục làm việc tạm của các lần chạy đã xong |
 
 Chạy bằng `uv run python <lệnh>`. Thêm `--apply --by <tên>` để thực hiện. Mục được bảo vệ cần thêm `--confirm` kèm đúng mã mục. Mỗi lần xoá được ghi vào `outputs/system/cleanup.jsonl`.
+
+Ghim: tạo file rỗng `outputs/runs/<run>/KEEP` để giữ cả lần chạy, hoặc `KEEP` trong một thư mục checkpoint để chỉ giữ checkpoint đó. Xoá file `KEEP` để bỏ ghim.
+
+</details>

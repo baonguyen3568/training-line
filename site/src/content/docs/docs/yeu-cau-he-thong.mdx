@@ -2,13 +2,13 @@
 title: Yêu cầu hệ thống
 description: Phần cứng, phần mềm và dung lượng ổ đĩa cần có để chạy app. Hiện chỉ DGX Spark đã được kiểm thử.
 sidebar:
-  order: 0
+  order: 1
 sources:
   - .team/knowledge/research.md
   - docker/IMAGES.lock
   - .team/proposals/005-storage-retention-policy.md
-  - docs/adr/ADR-005-storage-retention.md
   - .team/contracts/S-4-preflight.md
+numbers_without_source: ["74"]  # 8,1 × 3 + 50, computed from the formula shown on the page
 ---
 import Hint from '~/components/Hint.astro';
 
@@ -20,11 +20,11 @@ App hiện được phát triển và kiểm thử trên **một loại máy duy
 |---|---|
 | Máy | NVIDIA DGX Spark, 1 GPU GB10 |
 | Kiến trúc CPU | ARM 64-bit (aarch64) |
-| Bộ nhớ | 128 GB bộ nhớ hợp nhất (CPU và GPU dùng chung) |
+| Bộ nhớ | 128 GB, dùng chung cho CPU và GPU |
 | Driver và CUDA | Driver 580 (đã thử bản 580.142), CUDA 13 |
 | Ổ đĩa trống cho dự án | Nên từ 500 GB (xem bên dưới) |
 
-Bộ nhớ hợp nhất và chuyện máy dùng chung ảnh hưởng ra sao tới việc train: xem [Phần cứng và bộ nhớ](/docs/phan-cung-va-bo-nho/).
+Vì sao máy 128 GB vẫn có lúc báo thiếu bộ nhớ: xem [Phần cứng và bộ nhớ](/docs/phan-cung-va-bo-nho/).
 
 ## Phần mềm
 
@@ -34,39 +34,40 @@ Bộ nhớ hợp nhất và chuyện máy dùng chung ảnh hưởng ra sao tớ
 | Docker và NVIDIA Container Toolkit | Bản đi kèm DGX OS; việc train chạy trong container |
 | Python | `3.12`, cài và quản lý bằng `uv` |
 | Node.js | `22.12` trở lên, chỉ cần khi tự build giao diện |
-| Image train | `vlm-automodel:26.08-5`, dựng từ image chính thức `nvcr.io/nvidia/nemo-automodel:26.08` bản arm64 |
+| Image train | `vlm-automodel:26.08-5`, dựng từ image `nvcr.io/nvidia/nemo-automodel:26.08` bản arm64 |
 
 Mọi image và thư viện phải có bản **arm64**. Image gốc được ghim theo mã băm (digest), không dùng tag có thể bị đổi nội dung.
 
 <Hint title="Vì sao không dùng thẳng image của NVIDIA?">
-Image gốc thiếu vài thư viện xử lý ảnh mà Nemotron Parse cần, và có một số lỗi team đã vá. Mỗi bản vá được kiểm mã băm khi build; bản vá lạ làm build thất bại.
+Image gốc thiếu vài thư viện xử lý ảnh mà Nemotron Parse cần, và có một số lỗi chúng tôi đã vá. Mỗi bản vá được kiểm mã băm khi build; bản vá lạ làm build thất bại.
 </Hint>
 
 ## Dung lượng ổ đĩa
 
-Ước lượng cho các model hiện có trong catalog (chưa tính model từ 27B trở lên):
+Ước lượng cho các model hiện có trong app:
 
 | Hạng mục | Ước lượng |
 |---|---|
 | Model tải về (Qwen3.5 0.8B, 2B, 4B, 9B) | khoảng 36 GB |
-| Mỗi image container của dự án | khoảng 29,6 GB |
+| Image gốc của NVIDIA | khoảng 29,4 GB |
+| Image train của app (dựng trên image gốc, phần thêm rất nhỏ) | khoảng 29,6 GB |
 | Dữ liệu đánh giá | khoảng 10–30 GB |
 | Checkpoint LoRA | vài trăm MB mỗi lần chạy |
 | Checkpoint khi fine-tune toàn bộ Nemotron Parse v1.1 (đo thật) | khoảng 8,1 GB mỗi checkpoint |
-| Model đã gộp, bản nén FP8/NVFP4 và engine | khoảng 60 GB |
-| Bộ nhớ đệm kết quả node (giới hạn trên) | tối đa 200 GB |
+| Model đã gộp, bản nén và engine | khoảng 60 GB |
+| Kết quả tạm của các node (giới hạn trên) | tối đa 200 GB |
 | **Tổng trường hợp xấu nhất** | **khoảng 430 GB** |
 
-Mỗi model cỡ 27–35B cần thêm khoảng 55–72 GB.
+Mức cảnh báo dung lượng của dự án: xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/).
 
-App cảnh báo khi dữ liệu dự án vượt **500 GB** và báo mức nguy hiểm từ **800 GB**.
+### Ổ đĩa cần trống trước khi train
 
-<Hint title="App kiểm ổ đĩa trước khi train thế nào?">
-Cần trống ít nhất: dung lượng một checkpoint × (số checkpoint giữ lại + 1) + 50 GB dự phòng. Ví dụ giữ 2 checkpoint 8,1 GB thì cần khoảng 74 GB trống.
-</Hint>
+Trước khi train, app kiểm ổ đĩa còn đủ chỗ cho các checkpoint sắp ghi:
+
+**dung lượng một checkpoint × (số checkpoint giữ lại + 1) + 50 GB dự phòng**
+
+Ví dụ: giữ 2 checkpoint 8,1 GB thì cần khoảng 8,1 × 3 + 50 ≈ 74 GB trống.
 
 ## Trên máy dùng chung
 
-- Mỗi lúc chỉ **một tác vụ nặng** được dùng GPU.
-- App chỉ ghi và xoá dữ liệu **trong thư mục dự án**, không đụng container, image hay cache của ứng dụng khác.
-- App không dùng `sudo` và không xoá bộ nhớ đệm của hệ điều hành để lấy thêm bộ nhớ.
+App được thiết kế để chạy cạnh các ứng dụng khác: chỉ ghi và xoá trong thư mục dự án, không dùng `sudo`. Các quy tắc chạy an toàn (mỗi lúc một tác vụ nặng, kiểm bộ nhớ): xem [Kiểm tra trước khi chạy](/docs/kiem-tra-truoc-khi-chay/).
