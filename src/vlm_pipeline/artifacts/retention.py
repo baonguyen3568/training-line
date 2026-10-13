@@ -81,8 +81,10 @@ CLEANUP_LOCK_REL = Path("outputs") / "system" / "retention.lock"  # one deleting
 RUN_JSON_MAX = 1 << 20  # run.json is written by the job too: never read more than this, never a fifo or a symlink
 INPUT_REASON = "INPUT_OF_RUNNING_ATTEMPT"  # P017 C6: a later attempt resumes from this run dir; nothing overrides it
 _NAME_RE = re.compile(r"[A-Za-z0-9._-]+", re.ASCII)  # fullmatch: a run dir / checkpoint name, never a path
-_ATTEMPT_RE = re.compile(r"(.+)-[0-9a-f]{16}(?:-a[0-9]+)?", re.ASCII)  # fullmatch: <node id>-<key16>[-aN]
-_LATER_ATTEMPT_RE = re.compile(r".+-[0-9a-f]{16}-a[0-9]+", re.ASCII)  # fullmatch: only these resume from a source
+# fullmatch: <node id>-<key16>[-gN][-aM] (P017 attempts, G-4 generations); group 1 = every attempt of one node
+_ATTEMPT_RE = re.compile(r"(.+-[0-9a-f]{16})(?:-g[0-9]{1,3})?(?:-a[0-9]+)?", re.ASCII)
+_LATER_ATTEMPT_RE = re.compile(r".+-[0-9a-f]{16}(?:-g[0-9]{1,3})?-a[0-9]+", re.ASCII)  # only these resume
+RESUME_LEASES_REL = Path("outputs") / "system" / "resume_leases"  # host-side, written by the executor (P017 R2)
 
 logger = logging.getLogger(__name__)
 
@@ -466,8 +468,9 @@ def _resume_target(base: Path, ref: object) -> Path | None:
 
 
 def _node_prefix(run_dir_name: str) -> str:
+    """``<node id>-<key16>``: every generation and attempt of one node (node ids alone repeat across workflows)."""
     match = _ATTEMPT_RE.fullmatch(run_dir_name)
-    return (match.group(1) if match else run_dir_name) + "-"
+    return match.group(1) if match else run_dir_name
 
 
 def _may_still_resume(run_dir: Path, data: dict[str, object], now: float, policy: RetentionPolicy) -> bool:
@@ -516,7 +519,47 @@ def resume_inputs(root: Path, *, now: float | None = None, policy: RetentionPoli
             else:
                 logger.warning("run %s: unreadable resumed_from, every attempt of its node is kept", run_dir.name)
                 prefixes.add((base.resolve(), _node_prefix(run_dir.name)))
+    _add_resume_leases(root, dirs, prefixes)
     return ResumeInputs(frozenset(dirs), frozenset(prefixes))
+
+
+def _add_resume_leases(root: Path, dirs: set[Path], prefixes: set[tuple[Path, str]]) -> None:
+    """Sources the executor chose for an attempt that has not written its run.json yet (waiting for memory / the lock).
+
+    ``outputs/system/resume_leases/<attempt dir>.json`` = ``{"run", "checkpoint", ...}``; every valid lease is honored
+    (orphans are removed by ``stale_runs``, never judged here). An unreadable lease keeps its whole node; an unsafe
+    store (a symlink or a non-directory anywhere on its path, unreadable) keeps every graph run dir this pass.
+    """
+    leases = root / RESUME_LEASES_REL
+    base = root / GRAPH_RUNS_REL
+    try:
+        for part in (root / "outputs", root / "outputs" / "system", leases):  # every component, not only the last
+            if not stat.S_ISDIR(part.lstat().st_mode):
+                raise NotADirectoryError(part)
+        entries = sorted(leases.iterdir())
+    except FileNotFoundError:
+        return  # no lease store yet: no lease
+    except OSError:  # a symlink, a file or an unreadable store: which sources are leased is unknown (fail closed)
+        logger.warning("%s is not a plain directory: every graph checkpoint is kept this pass", RESUME_LEASES_REL)
+        prefixes.add((base.resolve(), ""))
+        return
+    for lease in entries:
+        name = lease.name.removesuffix(".json")
+        if lease.suffix != ".json" or not _LATER_ATTEMPT_RE.fullmatch(name):
+            logger.warning("resume lease %s: not an attempt name, ignored", lease.name)
+            continue
+        try:
+            data = read_small_json(lease)
+        except FileNotFoundError:
+            continue  # released meanwhile
+        except (OSError, ValueError):
+            data = None
+        target = _resume_target(base, data)
+        if target is not None:
+            dirs.add(target.resolve())
+        else:
+            logger.warning("resume lease %s unreadable: every attempt of its node is kept", lease.name)
+            prefixes.add((base.resolve(), _node_prefix(name)))
 
 
 def plan(

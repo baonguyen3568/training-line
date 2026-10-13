@@ -400,6 +400,52 @@ def test_a_hostile_run_json_never_hangs_and_fails_closed(tmp_path: Path, kind: s
     assert resume_inputs(tmp_path, now=NOW).blocks(graph / "n1-0123456789abcdef")  # its source may be in use
 
 
+KEY = "0123456789abcdef"
+
+
+@pytest.mark.parametrize(
+    ("lease", "blocked_dirs"),
+    [
+        ({"run": f"n1-{KEY}", "checkpoint": "epoch_0_step_9", "pid": 1}, {f"n1-{KEY}"}),  # valid: only its source
+        ({"run": "../x", "checkpoint": "epoch_0_step_9"}, {f"n1-{KEY}", f"n1-{KEY}-a2", f"n1-{KEY}-g2"}),  # whole node
+        ("not json", {f"n1-{KEY}", f"n1-{KEY}-a2", f"n1-{KEY}-g2"}),
+    ],
+)
+def test_resume_lease_keeps_the_source_before_run_json_exists(
+    tmp_path: Path, lease: object, blocked_dirs: set[str]
+) -> None:
+    """P017 R2: the executor leases the source while the new attempt waits for memory / the GPU lock."""
+    graph = tmp_path / "outputs" / "graph" / "runs"
+    names = (f"n1-{KEY}", f"n1-{KEY}-a2", f"n1-{KEY}-g2", f"n1-{'f' * 16}", f"n2-{KEY}")
+    for name in names:
+        (graph / name).mkdir(parents=True)
+    leases = tmp_path / "outputs" / "system" / "resume_leases"
+    leases.mkdir(parents=True)
+    (leases / f"n1-{KEY}-a3.json").write_text(lease if isinstance(lease, str) else json.dumps(lease))
+    (leases / "evil.json").write_text(json.dumps({"run": f"n2-{KEY}", "checkpoint": "epoch_0_step_1"}))  # bad name
+    inputs = resume_inputs(tmp_path, now=NOW)
+    assert {n for n in names if inputs.blocks(graph / n)} == blocked_dirs  # another node / config is never affected
+    assert (leases / f"n1-{KEY}-a3.json").exists()  # read only: leases are released by the executor / stale_runs
+
+
+@pytest.mark.parametrize("kind", ["symlink", "file", "system_symlink"])
+def test_an_unsafe_lease_store_keeps_every_graph_run(tmp_path: Path, kind: str) -> None:
+    """Security R2: a job that replaces the lease store must not unprotect the sources (fail closed)."""
+    graph = tmp_path / "outputs" / "graph" / "runs"
+    (graph / f"n1-{KEY}").mkdir(parents=True)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    system = tmp_path / "outputs" / "system"
+    if kind == "system_symlink":
+        system.symlink_to(elsewhere)
+        (elsewhere / "resume_leases").mkdir()
+    else:
+        system.mkdir()
+        leases = system / "resume_leases"
+        leases.symlink_to(elsewhere) if kind == "symlink" else leases.write_text("x")
+    assert resume_inputs(tmp_path, now=NOW).blocks(graph / f"n1-{KEY}")
+
+
 def test_set_aside_of_a_resume_source_is_blocked(tmp_path: Path) -> None:
     _run(tmp_path, "pyproject-holder")  # writes pyproject.toml
     node = tmp_path / "outputs" / "graph" / "runs" / "n1-0123456789abcdef"
