@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type Mode = "simple" | "advanced";
-/** M2-6: the D4 shell is opt-in (`?ui=d4`, remembered; `?ui=classic` goes back) until the user approves it. */
+/** Release 1.0: the D4 shell is the default; `?ui=classic` (remembered) keeps the classic layout, `?ui=d4` returns. */
 export type Skin = "classic" | "d4";
 const KEY = "vlm.ui.mode";
 const SKIN_KEY = "vlm.ui.skin";
@@ -9,13 +9,14 @@ const SKIN_KEY = "vlm.ui.skin";
 function readSkin(): Skin {
   try {
     const q = new URLSearchParams(location.search).get("ui");
-    if (q === "d4" || q === "classic") {
-      localStorage.setItem(SKIN_KEY, q);
-      return q;
+    if (q === "d4" || q === "classic" || q === "legacy") {
+      const skin: Skin = q === "d4" ? "d4" : "classic"; // "legacy": alias in design's plan, same as classic
+      localStorage.setItem(SKIN_KEY, skin);
+      return skin;
     }
-    return localStorage.getItem(SKIN_KEY) === "d4" ? "d4" : "classic";
+    return localStorage.getItem(SKIN_KEY) === "classic" ? "classic" : "d4";
   } catch {
-    return "classic";
+    return "d4";
   }
 }
 

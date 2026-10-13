@@ -106,7 +106,7 @@ async function addFromLibrary(page: Page, typeId: string, how: "drag" | "dblclic
 }
 
 async function buildGraph(page: Page): Promise<void> {
-  await page.goto("/");
+  await page.goto("/?ui=classic"); // classic chrome; the D4 default has its own journey
   await page.getByRole("button", { name: tr("gallery.blank_workflow") }).click();
   await expect(page.locator(".react-flow")).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
@@ -139,7 +139,7 @@ async function buildGraph(page: Page): Promise<void> {
 }
 
 test("first screen is the gallery and offers a blank workflow", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?ui=classic"); // classic chrome; the D4 default has its own journey
   await expect(page.getByRole("heading", { level: 1, name: tr("gallery.title") })).toBeVisible();
   await page.getByRole("button", { name: tr("gallery.blank_workflow") }).click();
   await expect(page.locator(".react-flow")).toBeVisible();
@@ -219,7 +219,7 @@ test("work survives a page reload (autosave)", async ({ page }) => {
 });
 
 test("gallery lists templates without an error @narrow", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?ui=classic"); // classic chrome; the D4 default has its own journey
   await expect(
     page.getByRole("button", { name: tr("gallery.use_template") }).first(),
   ).toBeVisible();
@@ -228,7 +228,7 @@ test("gallery lists templates without an error @narrow", async ({ page }) => {
 
 test("narrow screens can open a template and see the canvas @narrow", async ({ page }) => {
   // Regression guard: < 1280 px is view-only (P010) but the canvas must stay visible (fixed 2026-10-12).
-  await page.goto("/");
+  await page.goto("/?ui=classic"); // classic chrome; the D4 default has its own journey
   const useTemplate = page.getByRole("button", { name: tr("gallery.use_template") }).first();
   await expect(useTemplate).toBeVisible({ timeout: 10_000 }); // fail fast: an expected failure must not time out
   await useTemplate.click();
@@ -240,7 +240,7 @@ test("narrow screens can open a template and see the canvas @narrow", async ({ p
 test("handles do not move when validation results arrive (no layout shift)", async ({ page }) => {
   // Root cause of a lost-wire flake (bao-frontend, 2026-10-12): validation inserted a hint inside the node and
   // thickened its border, pushing handles down mid-drag. Guard: the target handle keeps its position.
-  await page.goto("/");
+  await page.goto("/?ui=classic"); // classic chrome; the D4 default has its own journey
   await page.getByRole("button", { name: tr("gallery.blank_workflow") }).click();
   await addFromLibrary(page, NODES[2], "dblclick");
   const handle = page.locator(".react-flow__handle.target[data-handleid='base_model']");
@@ -255,7 +255,7 @@ test("handles do not move when validation results arrive (no layout shift)", asy
 });
 
 test("a wire dragged right after adding the nodes connects (no waiting)", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?ui=classic"); // classic chrome; the D4 default has its own journey
   await page.getByRole("button", { name: tr("gallery.blank_workflow") }).click();
   await addFromLibrary(page, NODES[0], "dblclick");
   await addFromLibrary(page, NODES[2], "dblclick");

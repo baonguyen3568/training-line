@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.stubEnv("VITE_MOCK_API", "1");
 
 describe("vertical slice", () => {
-  it("opens a template from the gallery and shows a clean pre-flight", async () => {
+  it("opens a template from the gallery and shows a clean pre-flight (classic)", async () => {
+    const { useUi } = await import("../src/store/ui");
+    useUi.setState({ skin: "classic" }); // ?ui=classic; the D4 gallery is covered by pipeline-gallery tests
     const { App } = await import("../src/App");
     render(<App />);
     const buttons = await screen.findAllByRole(

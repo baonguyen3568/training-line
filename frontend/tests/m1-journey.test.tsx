@@ -92,8 +92,15 @@ describe("M1 journey (store)", () => {
   });
 });
 
+// Classic chrome (still reachable with ?ui=classic in 1.0); the D4 default has its own journey below.
+async function classic() {
+  const { useUi } = await import("../src/store/ui");
+  useUi.setState({ skin: "classic" });
+}
+
 describe("M1 journey (UI)", () => {
   it("double-click in the library adds a node; Run shows per-node status", async () => {
+    await classic();
     const wfStore = await setup();
     const { Editor } = await import("../src/components/Editor");
     const { container } = render(<Editor />);
@@ -153,6 +160,30 @@ describe("Inspector enum handling", () => {
   });
 });
 
+describe("M1 journey (UI, D4 default)", () => {
+  it("adds a node from the library flyout and Run shows per-node status", async () => {
+    const wfStore = await setup();
+    const { useUi } = await import("../src/store/ui");
+    expect(useUi.getState().skin).toBe("d4"); // Release 1.0 default
+    const { Editor } = await import("../src/components/Editor");
+    const { container } = render(<Editor />);
+    fireEvent.click(screen.getByRole("button", { name: "Thư viện bước" }));
+    fireEvent.doubleClick(await screen.findByTestId("library-item-model.hf_pick"));
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="node-model.hf_pick"]')).toBeTruthy(),
+    );
+    expect(wfStore.getState().workflow?.nodes).toHaveLength(1);
+    const run = () => screen.getByRole("button", { name: /^Chạy/ });
+    await waitFor(() => expect(run()).toHaveProperty("disabled", false));
+    fireEvent.click(run());
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="node-model.hf_pick"]')?.getAttribute("data-status"),
+      ).toBe("completed"),
+    );
+  });
+});
+
 describe("cycle and empty-canvas guards (design review M1 K2/K3)", () => {
   it("rejects wiring a node from its own downstream and hides such sources in 'Nhận từ'", async () => {
     const wfStore = await setup();
@@ -172,6 +203,7 @@ describe("cycle and empty-canvas guards (design review M1 K2/K3)", () => {
   });
 
   it("shows 'add a step' instead of 'ready' on an empty canvas", async () => {
+    await classic();
     await setup();
     const { Editor } = await import("../src/components/Editor");
     render(<Editor />);
