@@ -60,3 +60,4 @@
 - 2026-10-13 ✅ M1b: mọi node first-party có worker thật (7ea9bda). Còn: template 2 file (research), template 3 đổi model native (chờ suite eval Qwen), export Parse (B3 patch).
 - 2026-10-13 quantize_bench tạm ẩn khỏi gallery (Parse chưa nén được, chưa có suite eval Qwen); rule QUANT-FORMAT-MODEL thành error. Nguyên tắc: validate sạch ⇒ worker không từ chối vì lý do hỗ trợ (test bất biến).
 - 2026-10-13 Policy chuyển sang ~/.config/ntc-training/policy.toml (700/600, shared_dev, schedule=apply). Xoá ~/.config/vlm-app sau khi 7870 restart lên code mới.
+- 2026-10-13 M3(b) data root: không sửa path trong code; compose bind-mount VLM_DATA_ROOT vào /app/{.cache,outputs,data}; chỉ vlm-runner dịch path container→host khi mount cho job. Dev trên host không dùng VLM_DATA_ROOT (cảnh báo nếu đặt).
