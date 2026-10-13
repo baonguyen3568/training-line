@@ -141,6 +141,19 @@ error:
   CFG-011:
     title: This step can't run for real yet
     what: '"{node}" isn''t supported for real runs in this version yet. Remove the step to run the rest, or wait for an update.'
+  CFG-012:
+    title: This step group has a problem
+    what:
+      invalid_definition: 'A step group in this workflow file is broken (missing parts or wrong format). Ask the sender for the file again; if the app created it, send a bug report.'
+      namespace: 'Group "{group}" uses a name reserved for the app''s built-in groups. Your own groups must start with "user.".'
+      name_clash: 'Two groups are named "{group}", or the name matches a built-in step. Rename one of them.'
+      bad_mapping: 'Group "{group}" connects a port or setting to an inner step that does not have it. Fix the group, or ask the sender for the file again.'
+      recursion: 'Group "{group}" contains itself. Remove "{group}" from inside itself.'
+      too_deep: 'Group "{group}" is nested more than {limit} levels deep. Merge one level.'
+      too_many_nodes: 'With every group expanded, the workflow has more than {limit} steps. Split it into smaller workflows.'
+      too_many_edges: 'With every group expanded, the workflow has more than {limit} connections. Split it into smaller workflows.'
+      too_many_definitions: 'The workflow file defines more than {limit} groups. Remove the unused ones.'
+      id_too_long: 'The step names inside group "{group}" add up to a name that is too long. Use shorter step names.'
   EXP-001:
     title: License text missing for export
     what: The app has no approved license text for {license_ids} yet, so it can't export the model with its licenses. This isn't your fault; send a report so the team can add it.

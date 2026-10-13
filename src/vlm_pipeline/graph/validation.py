@@ -2,7 +2,8 @@
 
 Returns ``Issue``s (catalog code + params only; text comes from i18n at the API edge). Order: file shape (CFG-007),
 node ids (CFG-008), node types (CFG-004), params (CFG-005 / SEC-001 / SEC-002), edges (CFG-006 / CFG-001),
-cycles (CFG-002), missing inputs (CFG-003), then the registry's cross-node rules (e.g. CFG-010).
+cycles (CFG-002), missing inputs (CFG-003), then the registry's cross-node rules (e.g. CFG-010). Group instances are
+expanded first (``graph.groups``, CFG-012) and issues on inner nodes are re-anchored to their group node.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     from vlm_pipeline.common.errors import VlmPipelineError
     from vlm_pipeline.graph.worker import SupportQuery
 
+from vlm_pipeline.graph.groups import expand
 from vlm_pipeline.graph.workflow import WORKFLOW_FORMAT, WorkflowEdge, WorkflowFile, WorkflowNode, allowed_keys
 from vlm_pipeline.nodes.spec import LOCAL_PATH_FORMAT, GraphView, Issue, NodeSpec, Registry, is_compatible
 
@@ -224,6 +226,9 @@ def _validate(
         return [*issues, Issue("CFG-007", params={"field": "nodes" if not isinstance(raw_nodes, list) else "edges"})]
     if not raw_nodes:
         issues.append(Issue("CFG-007", params={"field": "nodes"}))
+    expansion = expand(workflow, registry)  # P016: groups become their inner nodes; every check sees the flat graph
+    issues += expansion.issues
+    raw_nodes, raw_edges = expansion.workflow["nodes"], expansion.workflow["edges"]
     seen, specs, raw_params = _check_nodes(raw_nodes, registry, workspace, issues)
     links, connected, sources = _check_edges(raw_edges, seen, specs, issues)
     cycle = _find_cycle(seen, links)
@@ -244,7 +249,7 @@ def _validate(
         issues.extend(rule(view))
     if support is not None:
         issues += _support_issues(view, support, already={(i.code, i.node_id) for i in issues})
-    return issues
+    return [expansion.anchor(i) for i in issues]
 
 
 def _support_issues(view: GraphView, support: Support, *, already: set[tuple[str, str | None]]) -> list[Issue]:

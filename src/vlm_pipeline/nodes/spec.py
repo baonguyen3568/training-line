@@ -132,6 +132,8 @@ class Issue:
     port: str | None = None
     param: str | None = None
     params: Mapping[str, object] = field(default_factory=dict)
+    # Inside a group (P016): node_id is the top-level group node and this is the inner node ids per level.
+    inner_path: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

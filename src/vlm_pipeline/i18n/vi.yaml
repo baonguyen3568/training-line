@@ -141,6 +141,19 @@ error:
   CFG-011:
     title: Bước này chưa chạy thật được
     what: Bước "{node}" chưa được hỗ trợ chạy thật trong phiên bản này. Bạn có thể xoá bước này để chạy phần còn lại, hoặc chờ bản cập nhật.
+  CFG-012:
+    title: Nhóm bước bị lỗi nên chưa chạy được
+    what:
+      invalid_definition: 'File workflow có một nhóm bước bị hỏng (thiếu phần hoặc sai định dạng). Hãy xin lại file từ người gửi; nếu file do app tạo ra, hãy gửi báo cáo lỗi.'
+      namespace: 'Nhóm "{group}" dùng tên dành riêng cho nhóm có sẵn của app. Nhóm tự tạo phải có tên bắt đầu bằng "user.".'
+      name_clash: 'Có hai nhóm cùng tên "{group}", hoặc tên này trùng với một bước có sẵn. Hãy đổi tên một nhóm.'
+      bad_mapping: 'Nhóm "{group}" nối cổng hoặc thiết lập tới một bước con không có cổng hay thiết lập đó. Hãy sửa nhóm, hoặc xin lại file từ người gửi.'
+      recursion: 'Nhóm "{group}" chứa chính nó ở bên trong. Hãy xoá nhóm "{group}" khỏi phần bên trong của nó.'
+      too_deep: 'Nhóm "{group}" lồng quá {limit} cấp. Hãy gộp bớt một cấp.'
+      too_many_nodes: 'Khi bung hết các nhóm, workflow có hơn {limit} bước. Hãy chia thành nhiều workflow nhỏ hơn.'
+      too_many_edges: 'Khi bung hết các nhóm, workflow có hơn {limit} dây nối. Hãy chia thành nhiều workflow nhỏ hơn.'
+      too_many_definitions: 'File workflow định nghĩa hơn {limit} nhóm. Hãy bỏ bớt các nhóm không dùng.'
+      id_too_long: 'Tên các bước trong nhóm "{group}" ghép lại quá dài. Hãy đặt tên bước ngắn hơn.'
   EXP-001:
     title: Thiếu văn bản giấy phép để xuất model
     what: App chưa có văn bản giấy phép đã duyệt cho {license_ids}, nên chưa thể xuất model kèm giấy phép. Đây không phải lỗi của bạn; hãy gửi báo cáo để team bổ sung.

@@ -522,6 +522,25 @@ CFG-011:
   actions:
     - {id: remove_step, kind: patch, confirm: true}
 
+CFG-012:
+  slug: GROUP_INVALID
+  severity: error
+  prevent_in_preflight: true
+  # A group (subgraph, P016) that cannot be expanded (graph/groups.py). group = the group id, "" when the definition
+  # is not even valid (an arbitrary id from the file is never echoed); limit = the cap of the too_* reasons.
+  params:
+    - group
+    - name: reason
+      type: enum
+      values: [invalid_definition, namespace, name_clash, bad_mapping, recursion, too_deep, too_many_nodes,
+               too_many_edges, too_many_definitions, id_too_long]
+    - limit
+  variant_by: reason
+  match:
+    - {kind: validate, value: "group expansion failed (graph.groups)"}
+  actions:  # only reasons anchored on a group node; the others are about the whole file (no node to open)
+    - {id: open_node, kind: navigate, target: "node:self", confirm: false, when: {reason: [bad_mapping, recursion, too_deep, id_too_long]}}
+
 EXP-001:
   slug: EXPORT_LICENSE_TEXT_MISSING
   severity: error
