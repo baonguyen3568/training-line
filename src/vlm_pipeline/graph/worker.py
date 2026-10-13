@@ -57,6 +57,8 @@ class NodeJob:
 @dataclass(frozen=True)
 class NodeResult:
     outputs: Mapping[str, ArtifactRef]  # one entry per output port of the spec
+    # Catalog warnings of a node that completed (code, params), e.g. QNT-002: shown on the card, the run goes on.
+    warnings: tuple[tuple[str, Mapping[str, object]], ...] = ()
 
 
 class Worker(Protocol):

@@ -348,3 +348,22 @@ def test_memory_wait_is_reported_as_node_state(tmp_path: Path) -> None:
     assert {k: state[k] for k in ("node_id", "state", "need_gb", "avail_gb", "since")} == {
         "node_id": "t", "state": "waiting_memory", "need_gb": 22.0, "avail_gb": 9.5, "since": 1.0,
     }  # fmt: skip
+
+
+def test_a_completed_node_warning_reaches_the_events(tmp_path: Path) -> None:
+    """QNT-002 style: the node completes, its output is used, and the card shows the worker's catalog warning."""
+
+    class Warns(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            result = super().run(job)
+            if job.node_id != "t":
+                return result
+            return NodeResult(outputs=result.outputs, warnings=(("QNT-002", {"node": "t", "reason": "top1"}),))
+
+    events: list[dict[str, Any]] = []
+    run = Executor(make_test_registry(), Warns(), tmp_path, on_event=events.append).run(_wf())
+    assert run.status["t"] == "completed"
+    [warning] = [e for e in events if e.get("type") == "warning"]
+    assert warning["node_id"] == "t"
+    assert (warning["error"]["code"], warning["error"]["params"]["reason"]) == ("QNT-002", "top1")
+    assert "actions" in warning["error"]

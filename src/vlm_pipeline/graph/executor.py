@@ -474,6 +474,10 @@ class Executor:
             self._drop_lease(run_dir)  # an interrupted attempt's run.json says resumed_from: retention takes over
             return
         run.outputs[nid] = dict(result.outputs)
+        for code, params in result.warnings:  # e.g. QNT-002: the output is usable, the user should know
+            warning = UserError(code, dict(params))
+            run.warnings.setdefault(nid, []).append(warning)
+            self._emit(run.graph_run_id, {"type": "warning", "node_id": nid, "error": _error_dict(warning, node)})
         if node.spec.cacheable:
             self.index.record(
                 key,
