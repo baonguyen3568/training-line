@@ -32,13 +32,15 @@ CALIB_PROMPT = "Describe this image."  # same default prompt as training (make_c
 PARITY_SAMPLES = 16
 PARITY_MAX_NEW_TOKENS = 64
 # Parity is a sanity check in two levels; the user-facing quality gate is the benchmark (eval quant_vs_parent).
-#   warn: worse than the B-4 probe (Qwen3.5-0.8B, 8 imgs: top-1 0.961, KL 0.0087); the model is still handed over.
-#   fail: the quantization is broken. Provisional until the calib 32/128/512 A/B (2026-10-13 node run, calib 128,
-#         16 imgs: top-1 0.935, KL 0.021 -> warn).
-MIN_TOP1_AGREEMENT = 0.95
-MAX_KL = 0.02
-FAIL_TOP1_AGREEMENT = 0.85
-FAIL_KL = 0.10
+# Typical FP8 level (A/B 2026-10-13, Qwen3.5-0.8B, 16 CORD val images, calib 32/128/512): top-1 0.928-0.935
+# (per-image min 0.86-0.89), KL 0.021-0.023, independent of the calib size.
+#   warn: clearly below that typical level; the model is still handed over (QNT-002).
+#   fail: the quantization is broken (QNT-001). Not measured on a broken model yet: set far below the typical level.
+# One model measured: re-check when a second model (Qwen3.5-2B) is quantized.
+MIN_TOP1_AGREEMENT = 0.90
+MAX_KL = 0.05
+FAIL_TOP1_AGREEMENT = 0.80
+FAIL_KL = 0.20
 ParityVerdict = Literal["pass", "warn", "fail", "none"]  # contract with app/quantize_worker (QNT-001 / QNT-002)
 EXIT_PARITY_FAIL = 3  # quantized and exported, but parity says the quantization is broken
 
@@ -196,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--data", required=True, type=Path, help="HF dataset snapshot (parquet) with train/validation")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--format", default="fp8", choices=FORMATS)
-    ap.add_argument("--calib-size", type=int, default=512)
+    ap.add_argument("--calib-size", type=int, default=128)
     a = ap.parse_args(argv)
     report = run(a.model, a.data, a.out, fmt=a.format, calib_size=a.calib_size)
     print(json.dumps(report, indent=2))

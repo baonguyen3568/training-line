@@ -23,14 +23,14 @@ class QuantizeNotSupportedError(VlmPipelineError):
     code: ClassVar[str] = "CFG-011"
 
 
-def est_peak_gb(entry: CatalogEntry) -> float:
-    """BF16 weights twice (model + calibration activations / export copy) + 16 GB runtime and cold JIT compile.
+def est_peak_gb(entry: CatalogEntry, calib_size: int = 128) -> float:
+    """BF16 weights twice (model + calibration activations / export copy) + runtime and cold JIT compile overhead.
 
-    Measured on Qwen3.5-0.8B (1.77 GB snapshot), run.json peaks: B-4 probe 16.6 GB (calib 32); first node run
-    2026-10-13 19.3 GB (calib 128, cold Triton + nvcc caches: a read-only job compiles in its own run dir every time).
-    The 16 GB overhead is fitted on that one model (catalog disk_gb 2.0 -> 20.0 GB >= 19.3 measured).
+    Measured on Qwen3.5-0.8B (1.77 GB snapshot), run.json peaks with cold Triton + nvcc caches (a read-only job
+    compiles in its own run dir every time): calib 32 16.8 GB, 128 19.3 GB, 512 21.0 GB (A/B 2026-10-13).
+    Overhead fitted on that one model: 16 GB up to calib 128, 18 GB above (catalog disk_gb 2.0 -> 20.0 / 22.0 GB).
     """
-    return round(entry.disk_gb * 2 + 16, 1)
+    return round(entry.disk_gb * 2 + (16 if calib_size <= 128 else 18), 1)
 
 
 def check_supported(entry: CatalogEntry, params: QuantizeParams, node_id: str) -> None:

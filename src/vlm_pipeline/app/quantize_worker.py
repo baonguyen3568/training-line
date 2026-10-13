@@ -60,7 +60,7 @@ def run_quantize(worker: RealWorker, job: NodeJob) -> NodeResult:
         read_only_project=True,  # writes only its run dir; JIT caches go there too (jobrun.compile_cache_env)
         rw_dirs=(run_dir,),
     )
-    need = est_peak_gb(entry)
+    need = est_peak_gb(entry, params.calib_size)
     try:
         final = run_job(
             container, manifest, run_dir, project_root=worker.root, who=worker.who, est_peak_gb=need,

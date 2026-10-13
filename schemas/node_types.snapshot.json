@@ -841,7 +841,7 @@
         "additionalProperties": false,
         "properties": {
           "calib_size": {
-            "default": 512,
+            "default": 128,
             "enum": [
               128,
               512

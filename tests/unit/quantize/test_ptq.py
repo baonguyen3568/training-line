@@ -36,16 +36,17 @@ def test_out_of_scope_requests_are_refused_with_a_reason(model_id: str, params: 
 
 
 def test_memory_estimate_never_below_the_measured_probe() -> None:
-    assert est_peak_gb(_entry("qwen3.5-0.8b")) == 20.0  # first node run 2026-10-13: 19.3 GB (run.json, cold caches)
+    small = _entry("qwen3.5-0.8b")  # A/B 2026-10-13 (run.json): calib 128 19.3 GB, calib 512 21.0 GB
+    assert (est_peak_gb(small, 128), est_peak_gb(small, 512)) == (20.0, 22.0)
     big = _entry("qwen3.5-9b")
-    assert est_peak_gb(big) == round(big.disk_gb * 2 + 16, 1)
+    assert est_peak_gb(big, 512) == round(big.disk_gb * 2 + 18, 1)
 
 
 def test_parity_verdict() -> None:
     probe = parity_stats([0.99, 0.9245, 0.968], [0.0087, 0.013, 0.004])  # B-4 probe: mean 0.961, min 0.9245
     assert (probe["verdict"], probe["samples"]) == ("pass", 3)
-    node_run = parity_stats([0.9346], [0.02144])  # first node run 2026-10-13 (calib 128): below the probe, not broken
-    assert node_run["verdict"] == "warn"
+    for top1, kl in ((0.9277, 0.02316), (0.9346, 0.02144), (0.9316, 0.02235)):  # A/B calib 32/128/512: typical FP8
+        assert parity_stats([top1], [kl])["verdict"] == "pass"
     assert parity_stats([MIN_TOP1_AGREEMENT - 0.01], [0.001])["verdict"] == "warn"
     assert parity_stats([0.99], [MAX_KL + 0.001])["verdict"] == "warn"
     assert parity_stats([FAIL_TOP1_AGREEMENT - 0.01], [0.001])["verdict"] == "fail"
