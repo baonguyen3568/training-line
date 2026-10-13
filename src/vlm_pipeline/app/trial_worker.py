@@ -196,6 +196,7 @@ def run_trial(worker: RealWorker, job: NodeJob) -> NodeResult:
             est_peak_gb=est_peak_gb(entry),
             cancel=job.cancel,
             require_approved_image=True,
+            on_wait=job.on_wait,  # not enough free memory: the node shows "waiting for memory" (ADR-005 A1)
         )
     except MemoryPreemptedBeforeStartError as exc:
         raise InsufficientMemoryError(str(exc), params={"need_gb": est_peak_gb(entry)}) from exc
