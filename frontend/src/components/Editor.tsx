@@ -54,6 +54,14 @@ function useNarrow(): boolean {
 }
 const VALIDATE_DEBOUNCE_MS = 500;
 
+/** A measured size only for the node it was measured on (same type); else undefined, so React Flow measures it. */
+export function measuredOf(
+  entry: { type: string; width: number; height: number } | undefined,
+  type: string,
+): { width: number; height: number } | undefined {
+  return entry && entry.type === type ? { width: entry.width, height: entry.height } : undefined;
+}
+
 const LANE_TOP = -4000;
 const LANE_HEIGHT = 12000;
 
@@ -91,7 +99,7 @@ function Lanes({ boxes }: { boxes: readonly LaneBox[] }) {
 }
 
 function EditorInner() {
-  const { workflow, specs, ports, validation, selectedId, run } = useWorkflow();
+  const { workflow, specs, ports, validation, selectedId, run, opened } = useWorkflow();
   const skin = useUi((st) => st.skin);
   // D4 compact lanes: geometry from occupied lanes; frozen while a node is dragged (a lane only shrinks after
   // the drop), and the target lane of a library drag opens under the cursor.
@@ -213,12 +221,25 @@ function EditorInner() {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo, duplicateNode, selectedId, locked]);
 
+  // Sizes React Flow measured (its "dimensions" changes). Every rebuild below makes new node objects (validation,
+  // selection, flash…); without `measured` React Flow treats each as re-initialised: it drops the handle bounds and
+  // hides the node until re-measured, so a wire dropped then finds no port and a press on a port pans the canvas
+  // (tester x100 traces, @xyflow/system adoptUserNodes/parseHandles). Carrying `measured` keeps them.
+  // An entry belongs to one node of one workflow: dropped when the node is removed (its id may come back as another
+  // node), ignored if the type differs, and cleared when another workflow opens (ids n1, n2… repeat).
+  const measuredRef = useRef(new Map<string, { type: string; width: number; height: number }>());
+  const openedRef = useRef(opened);
   const nodes: ShellNode[] = useMemo(() => {
+    if (openedRef.current !== opened) {
+      measuredRef.current.clear();
+      openedRef.current = opened;
+    }
     if (!workflow) return [];
     const steps = stepNumbers(workflow);
     return workflow.nodes.map((n) => ({
       id: n.id,
       type: "vlm",
+      measured: measuredOf(measuredRef.current.get(n.id), n.type),
       position: { x: toDisplayX(n.ui?.x ?? 0, boxes), y: n.ui?.y ?? 0 },
       selected: n.id === selectedId,
       className: n.id === flashId ? "flash" : undefined,
@@ -234,7 +255,7 @@ function EditorInner() {
         runState: run?.nodes[n.id],
       },
     }));
-  }, [workflow, specs, ports, validation, selectedId, run, locked, flashId, boxes]);
+  }, [workflow, specs, ports, validation, selectedId, run, locked, flashId, boxes, opened]);
 
   const edges: Edge[] = useMemo(() => {
     if (!workflow) return [];
@@ -361,8 +382,8 @@ function EditorInner() {
         return;
       }
       if (isValidConnection(conn)) {
-        // Keep until the root cause is fixed: each line means React Flow's stored handle bounds were stale (debt:
-        // refresh node internals when a node's layout changes without a resize). E2E counts these (tester).
+        // Should no longer fire now that nodes carry `measured` (see measuredRef); kept as a safety net, and the
+        // log tells E2E (tester) if React Flow still misses a port.
         console.debug("[wire] connected from the DOM drop target", conn);
         onConnect(conn);
         return;
@@ -385,6 +406,11 @@ function EditorInner() {
   const onNodesChange = useCallback(
     (changes: NodeChange<ShellNode>[]) => {
       for (const ch of changes) {
+        if (ch.type === "dimensions" && ch.dimensions) {
+          const type = useWorkflow.getState().workflow?.nodes.find((n) => n.id === ch.id)?.type;
+          if (type) measuredRef.current.set(ch.id, { type, ...ch.dimensions });
+        }
+        if (ch.type === "remove") measuredRef.current.delete(ch.id);
         if (ch.type === "position" && ch.position)
           move(ch.id, toModelX(ch.position.x, boxes), ch.position.y);
         if (ch.type === "position" && ch.dragging === true) setNodeDragging(true);

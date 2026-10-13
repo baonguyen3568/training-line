@@ -35,6 +35,8 @@ interface WorkflowState {
   validating: boolean;
   past: Workflow[];
   future: Workflow[];
+  /** Bumped whenever another workflow is opened or closed (node ids like n1 repeat across workflows). */
+  opened: number;
   /** Live per-node state of the current run (node_status events). */
   run: {
     id: string;
@@ -123,6 +125,7 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
     validating: false,
     past: [],
     future: [],
+    opened: 0,
     run: null,
 
     async loadCatalog() {
@@ -149,12 +152,28 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       );
       for (const n of wf.nodes) n.ui ??= layout.get(n.id) ?? { x: 0, y: 0 };
       get().stopWatching();
-      set({ workflow: wf, selectedId: null, validation: null, past: [], future: [], run: null });
+      set({
+        workflow: wf,
+        selectedId: null,
+        validation: null,
+        past: [],
+        future: [],
+        run: null,
+        opened: get().opened + 1,
+      });
     },
 
     closeWorkflow() {
       get().stopWatching();
-      set({ workflow: null, selectedId: null, validation: null, past: [], future: [], run: null });
+      set({
+        workflow: null,
+        selectedId: null,
+        validation: null,
+        past: [],
+        future: [],
+        run: null,
+        opened: get().opened + 1,
+      });
     },
 
     select(id) {

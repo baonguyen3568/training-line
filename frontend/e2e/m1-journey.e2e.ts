@@ -50,7 +50,16 @@ async function waitUntilSettled(locator: Locator): Promise<void> {
     .toBe(true);
 }
 
+// Forward the app's "[wire] connected from the DOM drop target" fallback log to the runner, so a x100 run can
+// count how often React Flow still misses a port (should be 0 since nodes carry `measured`).
+const forwarding = new WeakSet<Page>();
 async function dragHandle(page: Page, from: Locator, to: Locator): Promise<void> {
+  if (!forwarding.has(page)) {
+    forwarding.add(page);
+    page.on("console", (m) => {
+      if (m.text().startsWith("[wire]")) console.log(`${m.text()} (${test.info().title})`);
+    });
+  }
   const a = await from.boundingBox();
   const b = await to.boundingBox();
   if (!a || !b) throw new Error("handle not visible");
