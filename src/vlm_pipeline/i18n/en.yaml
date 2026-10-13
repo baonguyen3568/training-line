@@ -1476,6 +1476,13 @@ download:
   estimate: Expected to take about {duration}, depending on your connection.
   license_lead: "License:"
   license_accept: I have read and accept this license
+  license_accept_all: I have read and accept the licenses above
+  missing_title: Download needed before running
+  missing_intro: "The workflow needs models or datasets that are not on this machine yet ({item_count}). The app downloads them one by one and runs the workflow when all are done."
+  missing_total: About {size_gb} GB in total
+  missing_gated: '"{name}" needs you to accept its terms on Hugging Face first; do that, then come back.'
+  download_and_run: Download and run
+  chain_stopped: Stopped because "{name}" could not be downloaded. The workflow has not run.
   confirm_large: This download is large ({size_gb} GB), over the {threshold_gb} GB threshold, so please confirm.
   start: Download
   cancel: Cancel download
@@ -1486,3 +1493,14 @@ download:
   completed: Downloaded "{name}" to this machine.
   failed: Could not download "{name}".
   unverified: Already on this machine, but the app has not checked its files yet. Click "Check files" before using it.
+session:
+  section_title: Sign-in session
+  origin_local: You are using the app directly on the host machine.
+  origin_lan: You are using the app over the local network (LAN).
+  sign_out: Sign out
+  revoke_all: Sign out every device
+  revoke_all_confirm: Every browser that has the app open, including this one, will have to sign in again with the new link printed in the app's log. Continue?
+  revoke_all_done: Every device has been signed out.
+  lan_locked: "LAN sign-in is locked until {time} after {failure_count} wrong attempts."
+  unlock_lan: Unlock
+  unlock_done: LAN sign-in is unlocked.

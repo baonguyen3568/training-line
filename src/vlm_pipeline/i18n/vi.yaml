@@ -1476,6 +1476,13 @@ download:
   estimate: Dự kiến khoảng {duration}, tuỳ tốc độ mạng.
   license_lead: "Giấy phép:"
   license_accept: Tôi đã đọc và đồng ý với giấy phép này
+  license_accept_all: Tôi đã đọc và đồng ý với các giấy phép ở trên
+  missing_title: Cần tải về trước khi chạy
+  missing_intro: Workflow cần {item_count} model hoặc bộ dữ liệu chưa có trên máy. App tải lần lượt từng thứ, tải xong hết thì tự chạy.
+  missing_total: Tổng khoảng {size_gb} GB
+  missing_gated: '"{name}" cần bạn tự đồng ý điều khoản trên Hugging Face trước; làm bước đó xong rồi quay lại.'
+  download_and_run: Tải rồi chạy
+  chain_stopped: Dừng lại vì chưa tải được "{name}". Workflow chưa chạy.
   confirm_large: Lần tải này lớn ({size_gb} GB), vượt ngưỡng {threshold_gb} GB nên cần bạn xác nhận.
   start: Tải về
   cancel: Huỷ tải
@@ -1486,3 +1493,14 @@ download:
   completed: Đã tải "{name}" về máy.
   failed: Chưa tải được "{name}".
   unverified: Đã có trên máy nhưng app chưa kiểm tra các tệp. Bấm "Kiểm tra tệp" trước khi dùng.
+session:
+  section_title: Phiên đăng nhập
+  origin_local: Bạn đang dùng app ngay trên máy chủ.
+  origin_lan: Bạn đang dùng app qua mạng nội bộ (LAN).
+  sign_out: Đăng xuất
+  revoke_all: Đăng xuất mọi thiết bị
+  revoke_all_confirm: Mọi trình duyệt đang mở app, kể cả trình duyệt này, sẽ phải đăng nhập lại bằng đường link mới in trong nhật ký (log) của app. Tiếp tục?
+  revoke_all_done: Đã đăng xuất mọi thiết bị.
+  lan_locked: Đăng nhập qua LAN đang bị khoá tới {time} vì đã nhập sai {failure_count} lần.
+  unlock_lan: Mở khoá
+  unlock_done: Đã mở khoá đăng nhập qua LAN.
