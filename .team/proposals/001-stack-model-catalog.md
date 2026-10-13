@@ -130,3 +130,24 @@ Run `outputs/runs/20261013-0937-b4-fp8-probe-q35-08b-b28b`, script `scripts/rese
 - **Pitfall:** ModelOpt ≥0.44 có `quant_cfg` dạng **list** (entry sau thắng), không phải dict.
 - ⇒ **Chưa cần image ModelOpt 0.47** cho FP8 Qwen3.5. Còn mở: vLLM 0.31 load checkpoint này (nhờ fixcode trong B-7); Parse (remote code, encoder-decoder) FP8 là spike riêng (P-5).
 - Gate đề xuất cho node: sanity = top-1 ≥ 0.95 và KL ≤ 0.02 trên ảnh val (rẻ); gate người dùng = `quant_gate` (Δ benchmark, configs/eval/gates.yaml).
+
+#### B-4 node chạy thật + A/B calib (research, 2026-10-13 13:30–14:15)
+- Node `quantize.modelopt_ptq` chạy qua Executor + RealWorker. Lần 1 fail vì Triton cache ghi vào project :ro → sửa compile_cache_env (ddae958, backend + security APPROVE).
+- A/B calib trên cùng 16 ảnh CORD val, Qwen3.5-0.8B FP8 (vision + lm_head giữ bf16), image 26.08-6. Peak lấy từ run.json, cache lạnh:
+
+| calib | top-1 mean / min | KL mean / max | peak | thời gian calib / tổng | run |
+|---|---|---|---|---|---|
+| 32 | 0.928 / 0.859 | 0.023 / 0.037 | 16.8 GB | 29 s / 469 s | outputs/research/quant_ab/calib32 |
+| 128 | 0.935 / 0.875 | 0.021 / 0.031 | 19.3 GB | 119 s / 535 s | outputs/graph/runs/n3-f03d17784e408456 |
+| 512 | 0.932 / 0.891 | 0.022 / 0.029 | 21.0 GB | 470 s / 893 s | outputs/runs/20261013-1356-research-quant-ab-calib512 |
+
+  Kích thước: bf16 1.77 GB → FP8 1.23 GB.
+- Kết luận:
+  - Số ảnh calib **không** ảnh hưởng parity (giả thuyết "calib nhiều thì amax lớn, lượng tử thô" bị bác bỏ).
+  - Probe B-4 cho 0.961 / 0.0087 vì khác tập ảnh (8 ảnh, 96 token). Ngưỡng 0.95 / 0.02 đặt từ đó là sai (lỗi của research).
+- Chốt:
+  - Calib mặc định = 128 (512 tốn thêm ~6 phút và +1.7 GB mà không lợi gì).
+  - Parity 2 mức: warn top-1 < 0.90 hoặc KL > 0.05; fail < 0.80 hoặc > 0.20 (fail chưa đo trên model hỏng, ngưỡng tạm).
+  - est_peak = disk×2 + 18 GB.
+  - Gate chất lượng thật vẫn là Δ benchmark (`quant_vs_parent`).
+  - Đo lại khi nén model thứ hai (Qwen3.5-2B).
