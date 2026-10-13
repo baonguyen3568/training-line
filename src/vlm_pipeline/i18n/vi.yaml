@@ -354,7 +354,7 @@ estimate:
   range_ram_gb: RAM ~{lo}–{hi} GB
   range_disk_gb: Ổ đĩa ~{lo}–{hi} GB
 app:
-  name: VLM Studio
+  name: NTC-Training
   demo_mode: Chế độ demo (dữ liệu giả lập) — chưa có gì được train thật.
   mode_simple: Đơn giản
   mode_advanced: Nâng cao

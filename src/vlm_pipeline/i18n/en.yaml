@@ -354,7 +354,7 @@ estimate:
   range_ram_gb: RAM ~{lo}–{hi} GB
   range_disk_gb: Disk ~{lo}–{hi} GB
 app:
-  name: VLM Studio
+  name: NTC-Training
   demo_mode: Demo mode (simulated data) — nothing is actually being trained.
   mode_simple: Simple
   mode_advanced: Advanced

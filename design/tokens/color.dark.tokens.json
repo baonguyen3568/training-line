@@ -32,14 +32,14 @@
       "$value": "#383835"
     },
     "accent": {
-      "$description": "Brand/chrome only (nav, focus). Never a series or status color.",
+      "$description": "Brand indigo (NTC-Training, M2 D4). Not NVIDIA green: security spec M2-8 section 4 forbids #76B900 as brand colour.",
       "brand": {
         "$type": "color",
-        "$value": "#76b900"
+        "$value": "#6e56cf"
       },
       "focus": {
         "$type": "color",
-        "$value": "#76b900",
+        "$value": "#b3a6ff",
         "$description": "Focus ring / selection: \u22653:1 vs surface & canvas (light #76b900 is only 2.2:1, so a darker step is used)."
       }
     },
@@ -290,26 +290,26 @@
       }
     },
     "action": {
-      "$description": "Primary CTA & selected segment. NVIDIA green with DARK text (8.2:1); white text on green fails (2.4\u20133.9:1). Links use text.primary + underline (green text fails 4.5:1 on surface).",
+      "$description": "Primary CTA & selected segment: indigo #6e56cf with white text (5.4:1); hover #5f48c6. Links use text.primary + underline.",
       "primary_bg": {
         "$type": "color",
-        "$value": "#76b900"
+        "$value": "#6e56cf"
       },
       "primary_bg_hover": {
         "$type": "color",
-        "$value": "#86c916"
+        "$value": "#5f48c6"
       },
       "primary_fg": {
         "$type": "color",
-        "$value": "#0b0b0b"
+        "$value": "#ffffff"
       },
       "selected_bg": {
         "$type": "color",
-        "$value": "#76b900"
+        "$value": "#6e56cf"
       },
       "selected_fg": {
         "$type": "color",
-        "$value": "#0b0b0b"
+        "$value": "#ffffff"
       },
       "link": {
         "$type": "color",
