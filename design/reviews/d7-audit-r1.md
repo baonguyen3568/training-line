@@ -89,3 +89,12 @@ Bằng chứng gồm 3 nguồn:
 5. **[P3]:** màn viewport hẹp, chuyển màu hex sang token.
 
 Nghiệm thu: sau khi sửa, mình chạy lại cùng probe. Điều kiện: 0 P1, đủ landmark, và mọi node hiện viền focus khi nhấn Tab.
+
+## Vòng 2 (nghiệm thu f39ffab, cùng probe)
+- **P1 node focus:** ĐẠT. `.vlm-node` có outline 2px khi node được focus, đã chụp ảnh xác nhận. Probe chung vẫn báo node/edge "không có ring" vì nó đo trên wrapper; đây là false positive đã biết.
+- **P1 ô tìm:** ĐẠT. `.rp-search` có `:focus-within` với outline 2px.
+- **P2 landmark:** ĐẠT. Canvas đã có `main` + `h1`. Còn P3: inspector lặp lại tiêu đề bằng `h2` cùng chữ; có thể hạ xuống `p` đậm.
+- **P2 side-tab / glyph:** ĐẠT. Thẻ lỗi dùng hairline + icon; glyph đã đổi sang Lucide. Ngoại lệ: "⚠" trong `<option>` của chọn model (Inspector:69). Sửa bằng cách bỏ glyph, vì chữ `model_picker.needs_free_ram` đã tự nói rõ.
+- **P2 nút "?" điều khoản:** còn 15×24. Đạt chiều cao, chiều rộng vẫn hẹp; hạ xuống P3 vì đã có khoảng cách quanh nút.
+- **P2 số đo lệch:** chấp nhận theo giải thích của frontend. Inspector tính theo tham số hiện tại (`estimate.duration_basis` đã nói rõ nguồn), còn thư viện hiện số research đo với cấu hình mặc định. Trên app thật cả hai đều có số. Mock chỉ có số của thư viện, nên trên mock mới trông lệch.
+- **Tổng:** 0 P0, 0 P1, 0 P2 mở; còn 4 P3. D7 coi như xong cho 1.0.
