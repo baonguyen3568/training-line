@@ -1,7 +1,7 @@
 import { legalPages } from "./legal";
 
 // Site chrome copy (vi), IA from design/m2/sitemap.md (M2-2). Page copy lives in the pages; bao-design owns wording.
-// Only pages that exist are linked: check-links fails the build on a dead link (Lộ trình/Thay đổi come later).
+// Only pages that exist are linked: check-links fails the build on a dead link.
 export const nav = [
   { href: "/tinh-nang/", label: "Tính năng" },
   { href: "/template/", label: "Template" },
@@ -19,6 +19,8 @@ export const footer = [
       { href: "/tinh-nang/", label: "Tính năng" },
       { href: "/template/", label: "Template" },
       { href: "/truong-hop-su-dung/", label: "Trường hợp sử dụng" },
+      { href: "/lo-trinh/", label: "Lộ trình" },
+      { href: "/thay-doi/", label: "Thay đổi" },
     ],
   },
   {

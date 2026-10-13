@@ -1,0 +1,31 @@
+---
+// Release notes, generated from git tags v<semver> and their annotations (scripts/changelog.py; design sitemap §5).
+// Never hand-written: no tag yet = no release yet. Copy and layout: bao-design.
+import changelog from "~/generated/changelog.json";
+import Marketing from "~/layouts/Marketing.astro";
+
+const { releases } = changelog;
+// "2026-10-13" -> "13/10/2026" (vi), the ISO date stays in <time datetime>.
+const viDate = (iso: string) => iso.split("-").reverse().join("/");
+---
+
+<Marketing title="Thay đổi" description="Các bản phát hành của NTC-Training và điểm mới trong từng bản.">
+  <article class="prose">
+    <h1>Thay đổi</h1>
+    <p>Mỗi bản phát hành của NTC-Training và điểm mới trong bản đó. Việc đang làm nằm ở <a href="/lo-trinh/">Lộ trình</a>.</p>
+    {
+      releases.length === 0 ? (
+        <p>Chưa có bản phát hành. Bạn vẫn cài được từ mã nguồn mới nhất, xem <a href="/docs/cai-dat/">Cài đặt</a>.</p>
+      ) : (
+        releases.map((r) => (
+          <section id={`v${r.version}`}>
+            <h2>
+              Phiên bản {r.version} · <time datetime={r.date}>{viDate(r.date)}</time>
+            </h2>
+            {r.notes ? <p style="white-space: pre-line">{r.notes}</p> : null}
+          </section>
+        ))
+      )
+    }
+  </article>
+</Marketing>
