@@ -44,6 +44,10 @@
   `_target_ _partial_ _args_ _recursive_ _convert_ trust_remote_code` and path/dir/file/url/uri/module/class/cls/fn/func/
   callable/import/hook/plugin/script/cmd/command/env/token/key/secret/password/revision/repo/cache/endpoint/host/port.
   Node-controlled keys (dirs, batch, lr…) stay node params.
+  Exceptions (security): same module, FULL key names scoped per node type/engine (e.g. `{"train.*": {"use_cache"}}`),
+  each with a one-line reason + `# approved: bao-security <date>` (test fails without it), bool/int/float/enum only
+  (never str), and never for `_x_` Hydra keys, trust_remote_code, *path*/*file*/*url*/*module*/*token*/*secret*/*password*.
+  The file header says any edit needs security review; the first exception list goes to security.
 - Each node's `params_model` gets `advanced: AdvancedOverrides` built from that file: `extra="forbid"`, types bool/int/
   float/enum/short scalar lists, any remaining str field with a strict pattern, **any value containing `${` or `oc.` is
   refused** (OmegaConf resolvers such as `${oc.env:HF_TOKEN}` would leak secrets; tested). `x-ui.advanced=true`.
