@@ -49,12 +49,15 @@ def paired_ci(a, b, n=1000, seed=0):  # a, b: per-sample 0/1 correctness, same o
 - Calibration data must be disjoint from eval data.
 - Vision tower precision must be recorded (bf16 / fp8 / nvfp4).
 
-## GPU lock (mandatory for full runs)
+## GPU lock (mandatory for every GPU job)
+Never read or write the lock file by hand (its path moved to `.team/lock/GPU_LOCK` in 28c2088; hand-written locks
+count as corrupt). Run GPU work through `jobrun_cli`, which does preflight (ADR-005 80% rule), takes and releases the
+lock, runs memguard and writes run.json:
 ```bash
 cd /home/ntcai/Trainning-model
-test -e .team/GPU_LOCK && { cat .team/GPU_LOCK; echo "LOCKED - wait"; exit 1; }
-echo "owner=bao-tester job=<desc> start=$(date -Is) pid=$$" > .team/GPU_LOCK
-# ... run ...
-rm -f .team/GPU_LOCK
+uv run python -m vlm_pipeline.common.gpu_lock status        # who holds it; "held": false = free
+uv run python -m vlm_pipeline.common.jobrun_cli --image vlm-automodel:<tag> --tag <short-name> --stage eval \
+  --est-peak-gb <N> --who bao-tester -- python /workspace/scripts/qa/<worker>.py ... --out RUN_DIR/pred.jsonl
 ```
-Never kill another member's job.
+To queue behind another job: `until uv run python -m vlm_pipeline.common.gpu_lock status | grep -q '"held": false';
+do sleep 30; done` then the jobrun command. Never kill another member's job.
