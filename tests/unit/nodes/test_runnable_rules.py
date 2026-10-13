@@ -72,5 +72,7 @@ def test_real_worker_supports_only_what_it_runs(tmp_path: Any) -> None:
     from vlm_pipeline.app.workers import RealWorker
 
     w = RealWorker(tmp_path)
-    assert w.supports(REGISTRY.get("train.sft_vlm"))  # type: ignore[arg-type]
-    assert not w.supports(REGISTRY.get("export.hf_dir"))  # type: ignore[arg-type]
+    specs = {spec.type_id: spec for spec in REGISTRY.all()}
+    assert {t for t, spec in specs.items() if w.supports(spec)} == set(w._handlers) & set(specs)
+    unknown = specs["export.hf_dir"].model_copy(update={"type_id": "plugin.not_installed"})
+    assert not w.supports(unknown)
