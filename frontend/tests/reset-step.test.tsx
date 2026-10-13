@@ -70,6 +70,7 @@ describe("reset step dialog", () => {
         blocked_params: { node: "Dạy model" },
       }),
     );
+    await waitFor(() => expect(document.querySelector(".reset-blocked")).not.toBeNull());
     expect(screen.queryByRole("button", { name: "Đặt lại bước" })).toBeNull();
     expect(document.querySelector(".reset-blocked")?.textContent ?? "").not.toMatch(
       /\{\w+\}|RUN_NOT_FINISHED/,
@@ -78,7 +79,7 @@ describe("reset step dialog", () => {
 
   it("a node that never ran has nothing to reset", async () => {
     await dialog(plan({ attempts: [], plan_id: null, total_gb: 0 }));
-    expect(screen.getByText(/chưa chạy lần nào/)).toBeTruthy();
+    await screen.findByText(/chưa chạy lần nào/);
   });
 
   it("an expired plan is fetched again and the user confirms on the fresh one", async () => {

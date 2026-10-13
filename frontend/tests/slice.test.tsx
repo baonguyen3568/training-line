@@ -29,14 +29,12 @@ describe("vertical slice", () => {
     await useWorkflow.getState().openTemplate("image_video_understanding");
     useWorkflow.getState().select("n4");
     render(<Editor />);
-    const pickers = screen.getAllByLabelText(/Nhận từ/);
+    const pickers = await screen.findAllByLabelText(/Nhận từ/);
     fireEvent.change(pickers[0] as HTMLElement, { target: { value: "" } });
-    await waitFor(
-      // D4 default: Run lives in the toolbar only (no second one in the dock)
-      () => expect(screen.getByRole("button", { name: /^Chạy/ })).toHaveProperty("disabled", true),
-      {
-        timeout: 2000,
-      },
+    // D4 default: Run lives in the toolbar only (no second one in the dock). Validation is debounced, so wait
+    // with the suite's timeout rather than a short one of its own (it went red under load).
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^Chạy/ })).toHaveProperty("disabled", true),
     );
   });
 
