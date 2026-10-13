@@ -7,7 +7,7 @@
 #                unknown (mixed or unverified: eval only, no redistribution)
 # obligations[].when: always | distribute (only when the user shares weights/outputs) | cosmos (catalog model family
 #                     cosmos only; research joins it from models.yaml)
-# i18n: storage key license.obligation.<id>.{title,body} (design writes the copy; ids are stable).
+# i18n: flat key license.obligation.<id> in src/vlm_pipeline/i18n (design writes the copy; security checks it; ids stable).
 schema_version: 1
 licences:
   apache-2.0:
