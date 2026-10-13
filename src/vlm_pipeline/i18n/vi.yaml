@@ -1258,3 +1258,24 @@ settings_error:
   settings_invalid: Token không hợp lệ (trống, có khoảng trắng ở đầu hoặc cuối, hoặc quá dài).
   settings_body_too_large: Nội dung gửi lên quá lớn.
   settings_key_unusable: File khoá có quyền truy cập sai, cần quản trị viên sửa.
+reference_pipeline:
+  invoice-to-json:
+    summary: Dạy model đọc ảnh hoá đơn và trả về JSON gồm cửa hàng, món, tổng tiền. Chạy ngay với bộ hoá đơn mẫu CORD-v2.
+  image-video-understanding:
+    summary: Dạy một model nhỏ trả lời câu hỏi về ảnh theo dữ liệu của bạn, bằng LoRA. Bản này chỉ hỗ trợ ảnh, chưa hỗ trợ video.
+  quantize-fp8-benchmark:
+    summary: Nén model xuống FP8 cho nhỏ và nhanh hơn, rồi đo lại điểm trên cùng bộ kiểm tra để thấy chất lượng giảm bao nhiêu.
+  gemma4-e4b-lora:
+    summary: Dạy nhẹ Gemma 4 E4B bằng LoRA trên bộ hoá đơn CORD-v2, rồi chấm theo từng trường để so với các model khác.
+  qwen35-4b-lora:
+    summary: Dạy nhẹ Qwen3.5-4B bằng LoRA trên dữ liệu của bạn. Model lớn hơn mẫu "Hiểu ảnh", cần nhiều bộ nhớ hơn.
+  grpo-geometry:
+    summary: Dạy model giải bài hình học bằng cách chấm điểm từng câu trả lời (GRPO). Chỉ để tham khảo, app chưa có bước GRPO.
+  dgx-spark-vlm-playbook:
+    summary: Hướng dẫn chính thức của NVIDIA để fine-tune model ảnh trên DGX Spark, so sánh trước và sau khi dạy. Chỉ để tham khảo, app chưa dựng lại được.
+  donut-cord:
+    summary: Model Donut đọc hoá đơn CORD, dùng làm mốc để so với mẫu Đọc hoá đơn. Chạy bằng công cụ khác, không chạy trong app.
+  curator-image-curation:
+    summary: Lọc ảnh kém chất lượng và bỏ ảnh trùng bằng model trước khi dạy. Chỉ để tham khảo; bản này dùng bước lọc và bỏ trùng chạy bằng CPU của app.
+  cosmos-reason2-lora:
+    summary: Dạy nhẹ Cosmos Reason2 2B bằng LoRA trên dữ liệu của bạn. Chỉ để tham khảo, cần tài khoản Hugging Face để tải model.
