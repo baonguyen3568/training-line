@@ -78,19 +78,53 @@ def _with_restore_from(text: str, ckpt_c: str) -> str:
 _CKPT_PARTS = ("model", "optim", "step_scheduler.pt")
 
 
-def _optimizer_target(text: str) -> str | None:
-    m = re.search(r"^optimizer:\n(?:[ \t]+.*\n)*?[ \t]+_target_:\s*(\S+)", text, re.M)
-    return m.group(1) if m else None
+_RESUME_MAY_CHANGE = frozenset({"lr", "weight_decay"})  # optimizer keys that do not change the saved state layout
+
+
+def _optimizer_block(text: str) -> dict[str, object] | None:
+    """Parsed top-level ``optimizer:`` block, None when the recipe has none.
+
+    Parsed, not string-compared: the checkpoint's config.yaml is AutoModel's re-dump (``1.0e-05``, block lists).
+    """
+    import yaml
+
+    block = (yaml.safe_load(text) or {}).get("optimizer")
+    return {k: _as_number(v) for k, v in block.items()} if isinstance(block, dict) else None
+
+
+def _as_number(value: object) -> object:
+    """YAML 1.1 reads ``1e-8`` (no dot) as a string but AutoModel dumps ``1.0e-08``: compare numbers as floats."""
+    if isinstance(value, list):
+        return [_as_number(v) for v in value]
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return value
+    return value
 
 
 def _check_restore_source(ckpt: Path, text: str) -> str | None:
-    """Why ``ckpt`` cannot be resumed by ``text`` (fail before the GPU lock, not after loading the model), or None."""
+    """Why ``ckpt`` cannot be resumed by ``text`` (fail before the GPU lock, not after loading the model), or None.
+
+    The optimizer must match the parent's except ``_RESUME_MAY_CHANGE``: e.g. FusedAdam master_weights false -> true
+    would find no master/remainder state and silently rebuild it from the bf16 params.
+    """
     if missing := [part for part in _CKPT_PARTS if not (ckpt / part).exists()]:
         return f"{ckpt} is not a training checkpoint (missing {', '.join(missing)})"
     parent_cfg = ckpt / "config.yaml"
-    parent = _optimizer_target(parent_cfg.read_text(encoding="utf-8")) if parent_cfg.is_file() else None
-    if parent != _optimizer_target(text):  # different optimizer state layout: could load partly, re-init silently
-        return f"optimizer differs from the checkpoint's ({parent} != {_optimizer_target(text)})"
+    if not parent_cfg.is_file():
+        return f"{ckpt} has no config.yaml: cannot verify that its optimizer state matches the recipe"
+    parent, child = _optimizer_block(parent_cfg.read_text(encoding="utf-8")), _optimizer_block(text)
+    if parent is None or child is None:
+        if parent is child:  # both use the AutoModel default optimizer
+            return None
+        return f"optimizer block only in the {'recipe' if parent is None else 'checkpoint'}"
+    diff = sorted(k for k in (parent.keys() | child.keys()) - _RESUME_MAY_CHANGE if parent.get(k) != child.get(k))
+    if diff:
+        return "optimizer differs from the checkpoint's: " + ", ".join(
+            f"{k} {parent.get(k)} -> {child.get(k)}" for k in diff
+        )
     return None
 
 

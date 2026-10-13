@@ -54,6 +54,45 @@ def test_restore_source_refuses_other_optimizer(tmp_path: Path) -> None:
     assert "torch.optim.AdamW" in problem
 
 
+def test_restore_source_refuses_other_state_layout(tmp_path: Path) -> None:
+    parent = FUSED + "  master_weights: false  # no fp32 master\n"
+    child = FUSED.replace("lr: 1.0e-5", "lr: 2.0e-5") + "  master_weights: true\n"
+    problem = smoke._check_restore_source(_ckpt(tmp_path, parent), RECIPE + child)
+    assert problem == "optimizer differs from the checkpoint's: master_weights False -> True"
+
+
+def test_restore_source_reads_automodel_redump(tmp_path: Path) -> None:
+    """The checkpoint's config.yaml is AutoModel's re-dump of the recipe: same values, other spelling."""
+    recipe = FUSED + "  betas: [0.9, 0.95]\n"
+    redump = FUSED.replace("1.0e-5", "1.0e-05") + "  betas:\n  - 0.9\n  - 0.95\n"
+    recipe += "  eps: 1e-8\n"  # YAML 1.1: a string; the re-dump writes the float 1.0e-08
+    redump += "  eps: 1.0e-08\n"
+    assert smoke._check_restore_source(_ckpt(tmp_path, redump), RECIPE + recipe) is None
+
+
+def test_restore_source_allows_lr_and_weight_decay_changes(tmp_path: Path) -> None:
+    child = FUSED.replace("lr: 1.0e-5", "lr: 2.0e-5  # resume with a higher lr") + "  weight_decay: 0.1\n"
+    assert smoke._check_restore_source(_ckpt(tmp_path, FUSED), RECIPE + child) is None
+
+
+@pytest.mark.parametrize(
+    ("parent", "child", "match"),
+    [
+        (None, FUSED, "no config.yaml"),
+        ("", FUSED, "only in the recipe"),
+        (FUSED, "", "only in the checkpoint"),
+    ],
+)
+def test_restore_source_refuses_unverifiable(tmp_path: Path, parent: str | None, child: str, match: str) -> None:
+    problem = smoke._check_restore_source(_ckpt(tmp_path, parent), RECIPE + child)
+    assert problem is not None
+    assert match in problem
+
+
+def test_restore_source_allows_default_optimizer_on_both_sides(tmp_path: Path) -> None:
+    assert smoke._check_restore_source(_ckpt(tmp_path, ""), RECIPE) is None
+
+
 def test_restore_source_refuses_non_checkpoint_dirs(tmp_path: Path) -> None:
     problem = smoke._check_restore_source(_ckpt(tmp_path, FUSED, parts=("model",)), RECIPE + FUSED)
     assert problem is not None
