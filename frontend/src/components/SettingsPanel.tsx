@@ -221,10 +221,12 @@ export function SettingsPanel() {
         <h2 id="set-admin">
           <Icon name="lock" size={16} /> {t("settings.section_admin")}
         </h2>
-        {Object.entries(view.admin_policy).map(([key, { value, source, reason_key }]) => {
+        {Object.entries(view.admin_policy).map(([key, { value, source, reason_key, warning }]) => {
           const popId = `pol-${key.replace(/\W+/g, "-")}`;
+          // design: under its row, warning icon in status ink, text in text tokens (Ink-Not-Label), no page banner
+          const warn = warning ? tpOptional(["settings", "policy_warning", warning]) : undefined;
           return (
-            <div key={key} className="set-row locked">
+            <div key={key} className="set-row locked" data-key={key}>
               <span className="set-label">{tpOptional(["settings", "policy", key]) ?? key}</span>
               <div className="set-control">
                 {source === "default" ? (
@@ -252,6 +254,14 @@ export function SettingsPanel() {
                   </p>
                 </div>
               </div>
+              {warn && (
+                <p className="set-warning" role="status">
+                  <span className="si si-warn">
+                    <Icon name="triangle-alert" size={14} />
+                  </span>{" "}
+                  {warn}
+                </p>
+              )}
             </div>
           );
         })}

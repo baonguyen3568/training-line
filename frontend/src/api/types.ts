@@ -435,7 +435,13 @@ export interface SettingsView {
    * the app's built-in default applies. reason_key may come later (optional). */
   admin_policy: Record<
     string,
-    { value: unknown; source: "deployment" | "default"; reason_key?: string }
+    {
+      value: unknown;
+      source: "deployment" | "default";
+      reason_key?: string;
+      /** e.g. "APPROVAL_OFF_SHARED": a risky value on a shared machine → settings.policy_warning.<code>. */
+      warning?: string;
+    }
   >;
   key_ok: boolean;
 }

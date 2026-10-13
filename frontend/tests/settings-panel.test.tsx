@@ -56,4 +56,23 @@ describe("SettingsPanel password managers", () => {
     expect(input.getAttribute("data-lpignore")).toBe("true");
     expect(container.querySelector("form")).toBeNull();
   });
+
+  it("shows a policy warning under its row only when the app has copy for it (never the raw code)", async () => {
+    const { api } = await import("../src/api");
+    const real = await api.settings();
+    const pol = real.admin_policy["storage.approval_policy"];
+    if (!pol) throw new Error("no approval policy in the mock");
+    vi.spyOn(api, "settings").mockResolvedValue({
+      ...real,
+      admin_policy: {
+        ...real.admin_policy,
+        "storage.approval_policy": { ...pol, warning: "NO_SUCH_CODE" },
+      },
+    });
+    const { SettingsPanel } = await import("../src/components/SettingsPanel");
+    const { container } = render(<SettingsPanel />);
+    await screen.findByRole("heading", { level: 1 });
+    expect(container.querySelector(".set-warning")).toBeNull();
+    expect(container.textContent).not.toContain("NO_SUCH_CODE");
+  });
 });

@@ -770,3 +770,13 @@
   display: block;
   margin-bottom: 4px;
 }
+/* policy warning (e.g. approval off on a shared machine): its own line under the row, spanning both columns */
+.set-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+}
