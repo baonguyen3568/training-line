@@ -42,8 +42,26 @@ from vlm_pipeline.serve.vllm_batch import (
 
 VLLM_IMAGE = "vlm-vllm:0.31.0"  # docker/IMAGES.lock, bao-security APPROVED 2026-10-13
 DEFAULT_MEM_FRAC = 0.3
-CPU_SIDE_GB = 4.0  # engine process + tokenizer/processor + image decode on the CPU side (UMA: same pool)
+# Outside the engine's pool, on the CPU side (UMA: the same memory): engine processes, tokenizer/processor, image
+# decode, kernel JIT, and the weights' host copy while loading. Measured on GB10 2026-10-13 (peak MemAvailable drop,
+# engine 36.5 GB): Qwen3.5-0.8B bf16 39.4 / FP8 46.1, Qwen3.5-2B bf16 53.7 / FP8 46.2 GB -> base + per weight GB.
+CPU_SIDE_BASE_GB = 8.0
+CPU_SIDE_PER_WEIGHT_GB = 2.5
+
+
+def cpu_side_gb(weights: float) -> float:
+    return CPU_SIDE_BASE_GB + CPU_SIDE_PER_WEIGHT_GB * weights
+
+
 MIN_KV_GB = 2.0  # below this the engine starts but cannot hold one 8k request with an image
+# Activations + CUDA graphs-free workspace + multimodal encoder cache outside the KV pool (eager mode). Measured on GB10
+# (Qwen3.5-0.8B bf16/FP8, 2026-10-13): weights + KV + this left > 1 GB unused at mem_util 0.3.
+ACT_RESERVE_GB = 3.0
+# KV pool when the caller does not pin one. An eval batch (chunk 64, prompts ~1-2k tokens incl. the image, greedy
+# answers <= 1k) needs a few GB on <= 2B models (Qwen3.5-0.8B: ~17 KB/token -> 64 x 3k tokens ~ 3.3 GB); the old
+# pool sized to mem_frac (30+ GB) only raised the peak on a shared host (research). Short of it vLLM preempts, slower
+# but correct, and engine.json reports num_preemptions.
+DEFAULT_KV_GB = 8.0
 MAX_TOKENS_LIMIT = 8192
 MAX_LOGPROBS = 5
 # bao-security S2: images are mounted one file at a time (no sibling files exposed); only a big batch from one dir
@@ -60,6 +78,7 @@ class EngineBudget:
     gpu_memory_utilization: float
     engine_gb: float
     est_peak_gb: float  # engine + CPU side: what preflight / the memory queue check
+    kv_cache_gb: float  # pinned KV cache: engine - weights x 1.1 - activations (no profiling on a shared UMA host)
 
 
 @dataclass(frozen=True)
@@ -117,26 +136,36 @@ def engine_budget(
     available_gb: float,
     mem_frac: float = DEFAULT_MEM_FRAC,
     thresholds: MemThresholds = DEFAULT_THRESHOLDS,
+    kv_cache_gb: float | None = None,
 ) -> EngineBudget:
-    """The engine's ``gpu_memory_utilization`` for this job under the 80 %-of-free rule (pure).
+    """Engine size = weights x 1.1 + activations + a pinned KV cache, under the 80 %-of-free rule (pure).
 
-    Wanted: ``mem_frac`` x total. Allowed now: ``max_free_frac`` x available - CPU side. Needed at least: weights + 10 %
-    + a minimal KV cache. The engine gets min(wanted, allowed) but never less than needed; when needed > allowed the
-    estimate says so and ``run_job`` queues the job until memory frees up. Needed > wanted is a caller error.
+    KV: ``kv_cache_gb`` when given (a gate passes the SAME value to both runs of a pair, tester), else
+    ``DEFAULT_KV_GB`` (research: eval batches use a few GB; a pool sized to mem_frac only raised the peak), shrunk to
+    fit what is allowed now but never below ``MIN_KV_GB``. The engine never exceeds ``mem_frac`` x total (caller
+    error). A given KV is never shrunk: when it does not fit now, ``run_job`` queues the job until memory frees up.
     """
     if not 0.0 < mem_frac <= 1.0:
         raise BatchRequestError(f"mem_frac must be in (0, 1], got {mem_frac}")
+    if kv_cache_gb is not None and not MIN_KV_GB <= kv_cache_gb <= total_gb:
+        raise BatchRequestError(f"kv_cache_gb must be in [{MIN_KV_GB}, {total_gb:.0f}], got {kv_cache_gb}")
+    fixed = weights * 1.1 + ACT_RESERVE_GB
     wanted = mem_frac * total_gb
-    needed = weights * 1.1 + MIN_KV_GB
-    if needed > wanted:
+    kv = DEFAULT_KV_GB if kv_cache_gb is None else kv_cache_gb
+    if fixed + (MIN_KV_GB if kv_cache_gb is None else kv) > wanted:
         raise BatchRequestError(
-            f"the model needs {needed:.1f} GB but mem_frac {mem_frac} gives the engine {wanted:.1f} GB"
+            f"the model needs {fixed + kv:.1f} GB but mem_frac {mem_frac} gives the engine {wanted:.1f} GB"
         )
-    allowed = thresholds.max_free_frac * available_gb - CPU_SIDE_GB
-    engine = max(needed, min(wanted, allowed))
-    util = round(engine / total_gb, 3)
+    cpu = cpu_side_gb(weights)
+    if kv_cache_gb is None:
+        allowed = thresholds.max_free_frac * available_gb - cpu - fixed
+        kv = max(MIN_KV_GB, min(kv, wanted - fixed, allowed))
+    engine = fixed + kv
     return EngineBudget(
-        gpu_memory_utilization=util, engine_gb=round(engine, 1), est_peak_gb=round(engine + CPU_SIDE_GB, 1)
+        gpu_memory_utilization=round(engine / total_gb, 3),
+        engine_gb=round(engine, 1),
+        est_peak_gb=round(engine + cpu, 1),
+        kv_cache_gb=round(kv, 2),
     )
 
 
@@ -245,6 +274,7 @@ def run_vllm_batch(
     max_pixels: int = 0,
     enable_thinking: bool = False,
     logprobs: int = 0,
+    kv_cache_gb: float | None = None,
     extra: Mapping[str, Any] | None = None,
     cancel: threading.Event | None = None,
     on_wait: Callable[[dict[str, float]], None] | None = None,
@@ -274,7 +304,7 @@ def run_vllm_batch(
     items, image_mounts = build_items(root, read_requests(requests) if isinstance(requests, Path) else requests)
     total, available = memory or host_memory()
     budget = engine_budget(weights_gb(model), total_gb=total, available_gb=available, mem_frac=mem_frac,
-                           thresholds=thresholds)  # fmt: skip
+                           thresholds=thresholds, kv_cache_gb=kv_cache_gb)  # fmt: skip
 
     if run_dir is None:
         run_id = f"{time.strftime('%Y%m%d-%H%M')}-{tag}-{secrets.token_hex(2)}"
@@ -288,6 +318,7 @@ def run_vllm_batch(
         model_dir=_container_path(root, model),
         items=items,
         gpu_memory_utilization=budget.gpu_memory_utilization,
+        kv_cache_gb=budget.kv_cache_gb,
         max_model_len=max_model_len,
         quantization=quantization,
         min_pixels=min_pixels,

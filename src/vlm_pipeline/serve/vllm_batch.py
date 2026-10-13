@@ -58,6 +58,9 @@ class BatchRequest:
     items: list[BatchItem]
     gpu_memory_utilization: float
     max_model_len: int = 8192
+    # Pinned KV cache (GB): vLLM then skips its free-memory profiling, which asserts on a shared UMA host when another
+    # service frees memory meanwhile ("Error in memory profiling", GB10 2026-10-13). 0 = let vLLM profile.
+    kv_cache_gb: float = 0.0
     quantization: str | None = None  # None = what the checkpoint declares (hf_quant_config.json -> "modelopt")
     min_pixels: int = 0  # 0 = the processor's default
     max_pixels: int = 0
@@ -134,6 +137,14 @@ def _scheduler(llm: Any) -> dict[str, Any]:
     }
 
 
+def _preemptions(llm: Any) -> int | None:
+    """vllm:num_preemptions summed over engines; None when the metrics API is unavailable (never fails the batch)."""
+    try:
+        return int(sum(m.value for m in llm.get_metrics() if m.name == "vllm:num_preemptions"))
+    except Exception:  # noqa: BLE001 - a missing metric must not cost the answers
+        return None
+
+
 def run(request_path: Path) -> dict[str, Any]:
     os.environ.update(CONTAINER_ENV)
     req = BatchRequest.from_json(request_path.read_text(encoding="utf-8"))
@@ -146,9 +157,11 @@ def run(request_path: Path) -> dict[str, Any]:
         model=req.model_dir,
         quantization=req.quantization,
         gpu_memory_utilization=req.gpu_memory_utilization,
+        kv_cache_memory_bytes=int(req.kv_cache_gb * 2**30) if req.kv_cache_gb > 0 else None,
         max_model_len=req.max_model_len,
         enforce_eager=req.enforce_eager,
         seed=SEED,
+        disable_log_stats=False,  # keeps the metrics registry: num_preemptions for the gate (tester)
         load_format="safetensors",  # bao-security S1: never the .bin/.pt (pickle) branch, even if the dir has both
         trust_remote_code=False,
         limit_mm_per_prompt={"image": 1},
@@ -208,6 +221,7 @@ def run(request_path: Path) -> dict[str, Any]:
         "dtype": str(getattr(config, "dtype", "")),
         "max_model_len": req.max_model_len,
         "gpu_memory_utilization": req.gpu_memory_utilization,
+        "kv_cache_gb": req.kv_cache_gb,
         "enforce_eager": req.enforce_eager,
         "seed": SEED,
         # Batch composition changes kernels/shapes (tester): a bf16-vs-FP8 comparison needs these equal on both runs.
@@ -223,6 +237,7 @@ def run(request_path: Path) -> dict[str, Any]:
         "image_decoder": "common.image_rules.open_image",
         "requests": len(req.items),
         "errors": sum("error" in r for r in rows.values()),
+        "num_preemptions": _preemptions(llm),
         "load_s": load_s,
         "generate_s": generate_s,
         "extra": req.extra,

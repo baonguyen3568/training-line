@@ -16,21 +16,37 @@ from vlm_pipeline.serve.vllm_runner import BatchRequestError, build_items, engin
 # ------------------------------------------------------------------------------------------------ budget
 
 
-def test_budget_asks_mem_frac_when_it_fits() -> None:
+def test_budget_pins_a_small_default_kv_pool() -> None:
+    """research: an eval batch needs a few GB of KV; sizing the pool to mem_frac only raised the shared host's peak."""
     b = engine_budget(1.6, total_gb=121.7, available_gb=110.0)
-    assert b.gpu_memory_utilization == pytest.approx(0.3)
-    assert b.est_peak_gb == pytest.approx(0.3 * 121.7 + 4.0, abs=0.1)
+    assert b.kv_cache_gb == pytest.approx(8.0)
+    assert b.engine_gb == pytest.approx(1.6 * 1.1 + 3.0 + 8.0, abs=0.1)
+    assert b.est_peak_gb == pytest.approx(b.engine_gb + 8.0 + 2.5 * 1.6, abs=0.1)
 
 
-def test_budget_shrinks_to_80_percent_of_free() -> None:
-    b = engine_budget(1.6, total_gb=121.7, available_gb=30.0)  # 0.8 x 30 - 4 = 20 GB < 36.5 wanted
-    assert b.engine_gb == pytest.approx(20.0)
-    assert b.est_peak_gb <= 0.8 * 30.0 + 1e-6  # preflight passes: the job fits the user rule
+def test_a_given_kv_is_used_as_is_for_both_runs_of_a_pair() -> None:
+    """tester: a gate pins the SAME KV for bf16 and FP8 (a smaller FP8 model would otherwise get a bigger pool)."""
+    bf16 = engine_budget(4.3, total_gb=121.7, available_gb=110.0, kv_cache_gb=6.0)
+    fp8 = engine_budget(2.9, total_gb=121.7, available_gb=110.0, kv_cache_gb=6.0)
+    assert bf16.kv_cache_gb == fp8.kv_cache_gb == 6.0
+    tight = engine_budget(4.3, total_gb=121.7, available_gb=10.0, kv_cache_gb=6.0)
+    assert tight.kv_cache_gb == 6.0  # never shrunk: the job waits in the queue instead
+    with pytest.raises(BatchRequestError, match="kv_cache_gb"):
+        engine_budget(1.6, total_gb=121.7, available_gb=110.0, kv_cache_gb=0.5)
+    with pytest.raises(BatchRequestError, match="mem_frac"):
+        engine_budget(4.3, total_gb=121.7, available_gb=110.0, kv_cache_gb=40.0)
+
+
+def test_default_kv_shrinks_to_80_percent_of_free() -> None:
+    b = engine_budget(1.6, total_gb=121.7, available_gb=25.0)  # 0.8 x 25 - 12 (cpu) - 4.76 (fixed) = 3.24 GB of KV
+    assert b.kv_cache_gb == pytest.approx(3.24, abs=0.01)
+    assert b.est_peak_gb <= 0.8 * 25.0 + 1e-6  # preflight passes: the job fits the user rule
 
 
 def test_budget_never_starves_the_engine_it_queues_instead() -> None:
     b = engine_budget(1.6, total_gb=121.7, available_gb=5.0)  # allowed < 0: keep the floor, run_job waits
-    assert b.engine_gb == pytest.approx(1.6 * 1.1 + 2.0, abs=0.1)
+    assert b.engine_gb == pytest.approx(1.6 * 1.1 + 3.0 + 2.0, abs=0.1)
+    assert b.kv_cache_gb == pytest.approx(2.0, abs=0.01)  # the floor keeps a minimal KV cache
     assert b.est_peak_gb > 0.8 * 5.0
 
 
@@ -116,7 +132,8 @@ def test_job_is_narrowed_read_only_on_the_approved_vllm_image(tmp_path: Path, mo
         root / "data/imgs/a.png",
     }  # whole repo: blob links
     assert job.env["VLLM_NO_USAGE_STATS"] == "1"
-    assert seen["kw"]["est_peak_gb"] == pytest.approx(0.3 * 121.7 + 4.0, abs=0.1)
+    weights = 1024 / 2**30  # the fixture's tiny model.safetensors
+    assert seen["kw"]["est_peak_gb"] == pytest.approx(weights * 1.1 + 3.0 + 8.0 + 8.0 + 2.5 * weights, abs=0.1)
     req = BatchRequest.from_json((res.run_dir / "batch.json").read_text())
     assert (req.min_pixels, req.max_pixels, req.enable_thinking) == (200704, 1003520, False)
     assert req.model_dir == "/workspace/.cache/hf/hub/models--Q--M/snapshots/abc"
@@ -213,3 +230,19 @@ def test_top_logprobs_are_listed_by_rank() -> None:
     gen = SimpleNamespace(logprobs=[{7: lp(logprob=-0.1, rank=1), 9: lp(logprob=-2.5, rank=2)}], token_ids=[7])
     assert _top_logprobs(gen) == [[[7, -0.1], [9, -2.5]]]
     assert _top_logprobs(SimpleNamespace(logprobs=None)) is None
+
+
+def test_kv_cache_is_always_pinned_so_vllm_skips_free_memory_profiling() -> None:
+    """GB10 2026-10-13: another service freed memory during vLLM's profiling -> AssertionError at start-up."""
+    b = engine_budget(1.6, total_gb=121.7, available_gb=110.0)
+    assert b.kv_cache_gb == pytest.approx(b.engine_gb - 1.6 * 1.1 - 3.0, abs=0.06)
+
+
+@pytest.mark.parametrize(
+    ("weights", "peak"),
+    [(1.6, 39.4), (1.25, 46.1), (4.3, 53.7), (2.9, 46.2)],  # GB10 2026-10-13, engine 36.5 GB
+)
+def test_estimate_covers_the_measured_peaks(weights: float, peak: float) -> None:
+    """The preflight / memory-queue estimate is never below what these runs really took."""
+    kv = 36.5 - (weights * 1.1 + 3.0)  # those runs had a 36.5 GB engine (KV sized to mem_frac 0.3 then)
+    assert engine_budget(weights, total_gb=121.7, available_gb=110.0, kv_cache_gb=kv).est_peak_gb >= peak
