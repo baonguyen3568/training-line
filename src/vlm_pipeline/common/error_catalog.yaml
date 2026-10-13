@@ -421,6 +421,8 @@ NET-002:
     - catalog_id
     - {name: kind, type: enum, values: [model, dataset]}
     - size_gb
+    - name  # catalog display_name: the "download before running" dialog lists each missing item ...
+    - license  # ... with its licence id (datasets have no option_meta to read it from)
   variant_by: reason
   match:
     - {kind: executor, value: "app/workers.py NotCachedError"}
