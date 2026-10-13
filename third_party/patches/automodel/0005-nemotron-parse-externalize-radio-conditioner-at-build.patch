@@ -1,0 +1,16 @@
+diff --git a/nemo_automodel/components/models/nemotron_parse/model.py b/nemo_automodel/components/models/nemotron_parse/model.py
+--- a/nemo_automodel/components/models/nemotron_parse/model.py
++++ b/nemo_automodel/components/models/nemotron_parse/model.py
+@@ -400,6 +400,12 @@
+ 
+         # Create RADIO encoder from config (which is now actual RADIOConfig)
+         self.model_encoder = AutoModel.from_config(config, trust_remote_code=True)
++        # PATCH(vlm): BUG-003 - externalize the input conditioner when the module is BUILT, not at the first forward.
++        # Lazily it vanished from the state_dict only after step 1, so a resumed run (fresh model, conditioner
++        # buffers present) asked the saved shard for norm_mean/norm_std it never had: "Missing key in checkpoint
++        # state_dict". Built this way, the training state_dict is the same before and after any forward; the base
++        # checkpoint's conditioner keys are simply not requested (the image processor normalizes instead).
++        self._externalize_radio_input_conditioner()
+ 
+         # Neck components (dtype conversion done later via .to())
+         last_hidden_state = 1024

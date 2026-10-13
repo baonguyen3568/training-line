@@ -97,3 +97,21 @@ and stay the same when joined with a target.
 containing the literal strings `</s>`, `<s>`, `<predict_bbox>`, … becomes those special tokens (a fake EOS / task
 token inside the label). CORD/synthetic data never contains them; for user datasets, tokenize the target with
 `split_special_tokens=True` or reject/escape these strings at data validation (owner: data validate node).
+
+## 0005-nemotron-parse-externalize-radio-conditioner-at-build.patch (on top of 0001–0004) — BUG-003
+File: `nemo_automodel/components/models/nemotron_parse/model.py` (`RadioWithNeck.__init__`)
+With `image_processor_normalizes=True` the RADIO input conditioner (`norm_mean`/`norm_std` buffers) was swapped for
+`nn.Identity` at the **first forward** (`_externalize_radio_input_conditioner`). Training checkpoints are saved after
+that, so the model shard has 665 keys; a model built for resume has not run a forward yet and asks for 667: DCP's
+strict load fails with `Missing key in checkpoint state_dict: ...input_conditioner.norm_mean` (resume smoke
+2026-10-13, run `20261013-0851-resume-b2-a93e`). Fix: externalize once in `__init__` (the forward call stays, it is
+idempotent). The training state_dict is then the same before and after any forward; the base checkpoint's
+conditioner keys are not requested (DCP loads only the model's keys; `allow_checkpoint_key_subset` is never set), and
+the math is unchanged (the image processor normalizes, the conditioner was Identity from step 1 anyway). Checkpoints
+saved by 26.08-5 (665 keys) become resumable with it: fresh patched model keys == shard keys, measured on
+`20261013-0849-resume-b1-0335/checkpoints/epoch_0_step_1`. HF exports still need `ckpt_complete` (BUG-002) because
+NVIDIA's remote class expects the conditioner buffers. Tests: `test_nemotron_parse_resume.py` (1 FAIL on 26.08-5,
+3 PASS patched, incl. the base file carrying the 2 keys); end-to-end proof on the rebuilt image, BOTH required
+before bumping the default image (review bao-cleancode/bao-backend): (a) a fresh run from the base (the base load
+now meets 2 extra file keys; any "unexpected keys" warning is expected and must be recorded here), (b) the
+FusedAdam resume smoke from the 26.08-5 checkpoint. Run ids go into `.team/bugs/BUG-003-*.md`.
