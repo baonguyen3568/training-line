@@ -30,18 +30,17 @@ const other = compareOf(p);
   </p>
   {p.measured ? (
     <p class="tpl-measured">
-      {measuredLine(p.measured)}
+      <span class="tpl-label">{pl.measured}</span> · {measuredLine(p.measured)}
       <button class="help" popovertarget={`pop-m-${p.id}`} aria-label="Về số đo này">
         <Icon name="circle-question-mark" size={14} />
       </button>
     </p>
   ) : (
-    <p class="tpl-measured muted">Chưa có số đo</p>
+    <p class="tpl-measured muted"><span class="tpl-label">{pl.measured}</span> · chưa có số đo</p>
   )}
   {p.measured && (
     <div id={`pop-m-${p.id}`} popover>
       {p.measured.score && metricHelp(p.measured.score) && <>{metricHelp(p.measured.score)} </>}
-      Đo trên một máy DGX Spark.
       {p.measured.score && (
         <>
           {" "}

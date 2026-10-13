@@ -31,9 +31,10 @@ describe("PipelineGallery", () => {
     // numbers only where research measured a real run (data file), never invented elsewhere
     for (const p of data.pipelines) {
       const card = cards.find((c) => c.querySelector("h2")?.textContent === p.title.vi);
-      if (p.measured?.train_minutes) expect(card?.textContent).toMatch(/Thời gian~\d/);
+      if (p.measured?.train_minutes) expect(card?.textContent).toMatch(/Đo trên DGX Spark~\d/);
       // no training (quantize): only the measured RAM, never "no measurement" for a part that does not apply
-      else if (p.measured?.peak_ram_gb) expect(card?.textContent).toMatch(/Thời gianRAM đỉnh/);
+      else if (p.measured?.peak_ram_gb)
+        expect(card?.textContent).toMatch(/Đo trên DGX SparkRAM đỉnh/);
       else expect(card?.textContent).toContain("chưa có số đo");
     }
     const parseTitle = data.pipelines.find((p) => p.id === "invoice-to-json")?.title.vi;
@@ -69,6 +70,27 @@ describe("PipelineGallery", () => {
     render(<PipelineGallery />);
     await waitFor(() => expect(document.body.textContent).toContain("~1 giờ 56 phút"));
     expect(document.body.textContent).not.toContain("5 giờ");
+  });
+
+  it("under 'Đo trên DGX Spark' the card never shows the server's time, even one it measured here", async () => {
+    // measured on the user's machine (maybe not a DGX Spark): that belongs to the Inspector, not this card
+    const { api } = await import("../src/api");
+    const real = await api.templates();
+    const base = real[0] as (typeof real)[number];
+    vi.spyOn(api, "templates").mockResolvedValue([
+      ...real.filter((x) => x.id !== "quantize_bench"),
+      {
+        ...base,
+        id: "quantize_bench",
+        estimate: { ...base.estimate, minutes: { lo: 25, hi: 25 }, source: "measured" },
+      },
+    ]);
+    const { PipelineGallery } = await import("../src/components/PipelineGallery");
+    render(<PipelineGallery />);
+    await new Promise((r) => setTimeout(r, 50));
+    const card = document.getElementById("rp-quantize-fp8-benchmark")?.textContent ?? "";
+    expect(card).toContain("Đo trên DGX SparkRAM đỉnh 17.8 GB");
+    expect(card).not.toContain("25 phút");
   });
 
   it("the compared pipeline's name brings its card into view, even from another tab", async () => {

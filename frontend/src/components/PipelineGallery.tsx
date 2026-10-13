@@ -7,8 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { api } from "../api";
-import type { Range } from "../api/types";
 import data from "../generated/reference-pipelines.json";
 import { getLocale, t, tpOptional } from "../i18n";
 import { formatMinutesRange } from "../lib/format";
@@ -64,14 +62,13 @@ const host = (url: string) => {
 };
 
 /**
- * Time on the card: a run research measured on this machine (data file, with its source) first, else the server's
- * template estimate, else "no measurement yet". Peak RAM joins when measured.
+ * The card's "Đo trên DGX Spark" line: research's measured run (data file, with its source) only. The server's time
+ * is measured on the user's machine, which may not be a DGX Spark, so it belongs to the Inspector / workflow summary
+ * ("đã đo trên máy này"), never to this card (design 1.0). Peak RAM joins when measured.
  */
-function timeText(p: Pipeline, estimate: Range | null | undefined): string {
+function timeText(p: Pipeline): string {
   const m = p.measured;
-  const range = m?.train_minutes
-    ? { lo: m.train_minutes, hi: m.train_minutes }
-    : (estimate ?? null);
+  const range = m?.train_minutes ? { lo: m.train_minutes, hi: m.train_minutes } : null;
   const ram = m?.peak_ram_gb ? t("pipelines.ram_peak", { gb: m.peak_ram_gb }) : null;
   // a part that does not apply (no training, train_minutes null) is left out, never "no measurement yet"
   if (!range && ram) return ram;
@@ -206,14 +203,6 @@ export function PipelineGallery() {
       card?.focus({ preventScroll: true });
     });
   };
-  // App templates carry the server's measured time (estimate.minutes); never a number from the data file.
-  const [minutes, setMinutes] = useState<Map<string, Range | null>>(new Map());
-  useEffect(() => {
-    api.templates().then(
-      (list) => setMinutes(new Map(list.map((x) => [x.id, x.estimate.minutes]))),
-      () => {},
-    );
-  }, []);
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {
       all: pipelines.length,
@@ -328,9 +317,9 @@ export function PipelineGallery() {
                   </dd>
                 </div>
                 <div>
-                  <dt>{t("pipelines.time")}</dt>
+                  <dt>{t("pipelines.measured")}</dt>
                   <dd>
-                    {timeText(p, p.template_id ? minutes.get(p.template_id) : undefined)}
+                    {timeText(p)}
                     {p.measured?.score && (
                       <>
                         {" · "}
