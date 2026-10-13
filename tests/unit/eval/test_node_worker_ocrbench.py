@@ -255,3 +255,25 @@ def test_a_malformed_manifest_line_asks_for_a_repair(tmp_path: Path, line: str) 
         nw.run_ocrbench(_request(tmp_path, runner, model_hash=f"n3-x:{_base_hash()}:fp8"))
     assert err.value.params["reason"] == "not_prepared"
     assert runner.calls == []
+
+
+def test_every_vllm_job_has_a_claimable_run_id_and_a_failed_parent_run_stays_retryable(tmp_path: Path) -> None:
+    # run_job claims manifest.run_id once and refuses names outside RUN_ID: without one, the quantize_bench smoke
+    # failed bad_run_id (run id taken from the dir name "model").
+    import dataclasses
+
+    from vlm_pipeline.common.run_claims import RUN_ID
+
+    _data(tmp_path)
+    runner = FakeBatch({"fp8": [True] * 10, "base": [True] * 10})
+    node_dir = tmp_path / "outputs" / "graph" / "runs" / "n4-3aaefa737788c698-a2"
+    req = dataclasses.replace(_request(tmp_path, runner, model_hash=f"n3-x:{_base_hash()}:fp8"), run_dir=node_dir)
+    nw.run_ocrbench(req)
+    for cache in (tmp_path / "outputs" / "eval-cache").glob("ocrbench-*.json"):
+        cache.unlink()  # as if the parent run had failed: it must run again under a NEW claim
+    nw.run_ocrbench(req)
+    ids = [c["manifest"].run_id for c in runner.calls]
+    assert ids[0] == ids[2] == "n4-3aaefa737788c698-a2-model"
+    assert ids[1] != ids[3]
+    assert all(RUN_ID.fullmatch(i) for i in ids), ids
+    assert all(c["manifest"].stage == "eval" for c in runner.calls)

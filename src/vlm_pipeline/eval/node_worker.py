@@ -320,7 +320,8 @@ def _cached_base(request: EvalRequest, ids: Sequence[int]) -> Path:
         if hit is not None:
             return hit
     tmp = cache_dir.with_name(f"{named}.tmp-{os.getpid()}-{secrets.token_hex(3)}")
-    pred = _generate(request, request.base, ids, tmp, f"eval-base-{key[:12]}")
+    # run_claims.RUN_ID shape, and a fresh claim per attempt (the key is deterministic; a failed run stays retryable)
+    pred = _generate(request, request.base, ids, tmp, f"eval-base-{key[:16]}-{secrets.token_hex(8)}")
     if cache_dir.exists() and _cache_hit(cache_dir, len(ids)) is None:
         cache_dir.rename(cache_dir.with_name(f"{named}.stale-{time.strftime('%Y%m%d-%H%M%S')}"))
     try:
@@ -516,26 +517,41 @@ def _ocrbench_data(root: Path) -> tuple[Path, str, str]:
         raise EvalDataNotDownloadedError(str(exc), params={**params, "reason": "not_prepared"}) from exc
 
 
-def _vllm_run(request: EvalRequest, model: ModelRef, rows: Sequence[dict[str, Any]], data: Path, *,
-              quantized: bool, run_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:  # fmt: skip
-    """One vLLM batch (model or base) -> (per-question scores, engine facts); EvalJobFailed if it does not complete."""
+def _vllm_run(request: EvalRequest, model: ModelRef, rows: Sequence[dict[str, Any]], data: Path, revision: str, *,
+              quantized: bool, run_dir: Path, run_id: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:  # fmt: skip
+    """One vLLM batch (model or base) -> (per-question scores, engine facts); EvalJobFailed if it does not complete.
+
+    ``run_id`` names the job's claim (run_claims.RUN_ID): run_job refuses any other shape, and a claim is used once.
+    """
     runner = request.vllm_batch
     if runner is None:
         raise EvalSuiteUnsupportedError("the vLLM runner is not available here", params={"node": request.node_id})
     lo, hi = _template_pixels(request.root, request.entry)
+    manifest = RunManifest(
+        run_id=run_id,
+        name=f"eval.benchmarks OCRBench {request.entry.display_name} ({run_id})",
+        stage="eval",
+        task="vllm_batch",
+        base_model=request.entry.repo,
+        base_model_revision=request.entry.revision,
+        dataset=f"{OCRBENCH_CATALOG_ID}:{'regression_500' if request.params.level == 'quick' else 'full'}",
+        dataset_revision=revision,
+    )
     res = runner(
         request.root, model.path, ocrbench.batch_requests(rows, data, ocrbench.MAX_TOKENS), who=request.who,
-        tag=f"ocrbench-{run_dir.name}", quantization="modelopt" if quantized else None, min_pixels=lo,
+        tag="ocrbench", quantization="modelopt" if quantized else None, min_pixels=lo,
         max_pixels=hi, enable_thinking=False, kv_cache_gb=ocrbench.KV_CACHE_GB, cancel=request.cancel,
-        on_wait=request.on_wait, run_dir=run_dir,
+        on_wait=request.on_wait, run_dir=run_dir, manifest=manifest,
     )  # fmt: skip
     if not res.ok:
         raise EvalJobFailed(read_manifest(res.run_dir), log_tail(res.run_dir))
     return ocrbench.score_batch(rows, res.rows()), res.engine()
 
 
-def _ocrbench_base(request: EvalRequest, rows: Sequence[dict[str, Any]], data: Path, manifest_sha: str,
-                   model_engine: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:  # fmt: skip
+def _ocrbench_base(
+    request: EvalRequest, rows: Sequence[dict[str, Any]], data: Path, manifest_sha: str, *, revision: str,
+    model_engine: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:  # fmt: skip
     """Base / bf16 parent scores from the shared cache, keyed on everything that determines them.
 
     A cached run whose engine differs from the model's (e.g. another vLLM image) is not reused.
@@ -554,8 +570,11 @@ def _ocrbench_base(request: EvalRequest, rows: Sequence[dict[str, Any]], data: P
     cached = _read_cache(cache_file)
     if cached is not None and not ocrbench.engine_mismatch(cached[1], model_engine):
         return cached
-    run_dir = cache_file.with_name(f"{key}.run-{os.getpid()}-{secrets.token_hex(3)}")
-    scored, engine = _vllm_run(request, request.base, rows, data, quantized=False, run_dir=run_dir)
+    # A fresh claim per attempt: the key is deterministic, and a failed base run must stay retryable.
+    run_id = f"ocrbench-base-{key[9:25]}-{secrets.token_hex(8)}"
+    run_dir = cache_file.with_name(f"{key}.run-{os.getpid()}-{secrets.token_hex(3)}")  # retention's EVAL_CACHE_RUN_RE
+    scored, engine = _vllm_run(request, request.base, rows, data, revision, quantized=False, run_dir=run_dir,
+                               run_id=run_id)  # fmt: skip
     _write_cache(cache_file, {"scored": scored, "engine": engine})
     return scored, engine
 
@@ -599,12 +618,15 @@ def run_ocrbench(request: EvalRequest) -> EvalOutcome:
             "comparing a quantized fine-tuned model with its parent is not available yet",
             params={"node": request.node_id, "node_type": "eval.benchmarks"},
         )
-    scored, engine = _vllm_run(request, request.model, rows, data, quantized=quant is not None,
-                               run_dir=request.run_dir / "jobs" / "model")  # fmt: skip
+    scored, engine = _vllm_run(request, request.model, rows, data, revision, quantized=quant is not None,
+                               run_dir=request.run_dir / "jobs" / "model",
+                               run_id=f"{request.run_dir.name}-model")  # fmt: skip
     compare = quant is not None or (request.params.compare_with == "base" and request.base.hash != request.model.hash)
     base_scored, base_engine, comparison = None, None, None
     if compare:
-        base_scored, base_engine = _ocrbench_base(request, rows, data, manifest_sha, engine)
+        base_scored, base_engine = _ocrbench_base(
+            request, rows, data, manifest_sha, revision=revision, model_engine=engine
+        )
         if mismatch := ocrbench.engine_mismatch(engine, base_engine):
             raise EvalSuiteUnsupportedError(f"base and model ran on different engines: {mismatch}",
                                             params={"node": request.node_id})  # fmt: skip

@@ -26,9 +26,11 @@ class FakeJobs:
         self.status = status
         self.jobs: list[tuple[str, ...]] = []
         self.kwargs: list[dict[str, Any]] = []
+        self.run_ids: list[str] = []
 
     def __call__(self, job: Any, manifest: RunManifest, run_dir: Path, **kw: Any) -> RunManifest:
         self.kwargs.append(kw)
+        self.run_ids.append(manifest.run_id)
         argv = job.argv
         self.jobs.append(argv)
         model = Path(argv[argv.index("--model") + 1]).name
@@ -123,6 +125,11 @@ def test_quick_level_warns_and_base_is_cached(root: Path, monkeypatch: pytest.Mo
     nw.run_eval_benchmarks(_request(root))
     models = [Path(a[a.index("--model") + 1]).name for a in jobs.jobs]
     assert models == ["finetuned", "base", "finetuned"]  # second run reused the cached base predictions
+    # run_job claims the base job's run id once and refuses names outside RUN_ID (12 hex used to fail bad_run_id)
+    from vlm_pipeline.common.run_claims import RUN_ID
+
+    assert RUN_ID.fullmatch(jobs.run_ids[1])
+    assert jobs.run_ids[1].startswith("eval-base-")
     assert list((root / "outputs" / "eval-cache").iterdir())  # cache lives outside the node run dir
 
 
