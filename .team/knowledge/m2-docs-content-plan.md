@@ -40,8 +40,9 @@ Nguyên tắc (PM, BOARD M2):
 
 ## Việc cần cập nhật docs khi tính năng xong (theo dõi)
 - [ ] Backend: export kèm LICENSE + NOTICE/ATTRIBUTION. Khi xong, sửa `faq-ky-thuat` (mục Giấy phép) và `catalog-model` từ "user phải tự giữ kèm" thành mô tả đúng.
-- [ ] Parse resume sửa xong: sửa `gioi-han-da-biet` + `faq-ky-thuat`.
+- [x] Parse resume sửa xong (00eaf79): sửa `gioi-han-da-biet` + `faq-ky-thuat`.
 - [ ] Điểm P-3b (val gate → test 100 ảnh): viết `template-hoa-don`, cập nhật `gioi-han-da-biet`.
 - [ ] Kết luận repetition_penalty trên validation: cập nhật FAQ.
 - [ ] Template còn lại chuyển sang FusedAdam: cập nhật `phan-cung-va-bo-nho`.
 - [ ] OML §3.2: trang docs/site nói về template Cosmos phải có câu "Built on NVIDIA Cosmos" (chờ security chốt cách hiển thị, M2-8).
+- [ ] Khi B-1 merge_lora commit (backend): `gioi-han-da-biet` thêm mục "Qwen3.5 sau khi gộp LoRA: lớp MTP (dự đoán nhiều token) giữ nguyên như model gốc, nên LoRA không áp lên MTP; vLLM speculative decoding vẫn đúng nhưng có thể nhận ít token hơn". Source = file code/BUG mà backend ghi chuyện này.
