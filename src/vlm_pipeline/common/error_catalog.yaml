@@ -450,7 +450,9 @@ CFG-005:
   slug: PARAM_INVALID
   severity: error
   prevent_in_preflight: true
-  params: [{name: node, ref: node}, {name: param, ref: param}, value, rule]
+  # key: the dotted engine option inside `advanced` (P016 §3, one issue per bad key; "" when the key has no valid shape,
+  # never echoed). rule for advanced: type | range | choice | resolver | not_offered | too_many | not_for_model.
+  params: [{name: node, ref: node}, {name: param, ref: param}, value, rule, key]
   match:
     - {kind: validate, value: "node params ValidationError"}
     # Runtime guard from AutoModel patch 0002: trainable share outside the recipe's expectation (freeze did not
