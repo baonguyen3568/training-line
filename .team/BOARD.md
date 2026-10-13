@@ -39,8 +39,8 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 | B-1 | train.merge_lora (PEFT merge_and_unload trong container) | bao-backend | TODO |
 | B-2 | export.hf_dir cho model native (ADR-012) → sau đó Parse (B3) | bao-backend | TODO |
 | B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | TODO |
-| B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | TODO |
-| B-5 | eval.benchmarks (từ CORD worker + lmms-eval, ADR-002) | bao-tester | TODO |
+| B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | DOING (probe 0.44 trên Qwen3.5-0.8B) |
+| B-5 | eval.benchmarks (từ CORD worker + lmms-eval, ADR-002) | bao-tester | DOING (thiết kế gửi backend/research 09:25; CORD trước, lmms-eval sau) |
 | B-6 | bench.perf (latency/throughput/peak mem theo tester-perf-bench) | bao-tester | TODO |
 | B-7 | serve.vllm = node "Chạy thử" (vLLM ≥0.31, mem-util ≤0.3, prefix parity) | bao-fixcode | TODO |
 DoD: cả 3 template chạy thật end-to-end trên canvas (template 2 cần user accept Cosmos trên HF).
@@ -64,7 +64,7 @@ RÀNG BUỘC CỨNG (PM):
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
 | G-1 | GAP: Panel Dung lượng UI (node-cache + set-aside + checkpoint retention, dry-run/apply, PERMANENT_LOSS confirm) | bao-frontend + bao-cleanup (API) | TODO (API sẵn 10-13: GET /api/storage/plan, POST /api/storage/apply; frontend làm sau khung site M2-3) |
-| G-2 | GAP: retention chạy theo lịch trong app (hiện chỉ CLI) | bao-cleanup + bao-backend | TODO |
+| G-2 | GAP: retention chạy theo lịch trong app (hiện chỉ CLI) | bao-cleanup + bao-backend | scheduler DONE (3f6c1bd); còn wiring app + policy loader (backend) |
 | G-3 | GAP: nút "Sửa nhanh" theo error_catalog actions trên UI | bao-frontend + bao-fixcode | TODO |
 | M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | TODO |
 | M2-2 | Sitemap 20–30 trang + IA + copy tiếng Việt (nguồn sự thật: ADR, P001/P002, benchmarks) | bao-design (copy) + bao-research (nội dung kỹ thuật docs) + bao-cleanup (docs vận hành/lưu trữ) | TODO |
