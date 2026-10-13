@@ -117,7 +117,7 @@ Config phân tầng: mặc định → `.env.local` → DB (`outputs/app.db`, b�
 - **Secret trong DB phải mã hoá**: AEAD (AES-256-GCM, `cryptography` 50.0.2 — duyệt 2026-10-13, xem §4.6; ghi chú cũ "đã qua review" là SAI, chưa từng có review, hoặc libsodium secretbox),
   nonce ngẫu nhiên mỗi lần ghi, AAD = tên field (chống tráo ô).
   - Khoá 32 byte ở `~/.config/ntc-training/secrets.key` (home theo pwd, KHÔNG có env override; file 0600, sinh lần đầu bằng
-    `secrets.token_bytes`), hoặc `VLM_SECRETS_KEY` trong `.env.local`.
+    `secrets.token_bytes`). Không đặt khoá trong `.env.local` (app chỉ đọc khoá hạ tầng từ file đó).
   - Khoá **không** nằm trong DB, image hay thư mục mà job mount.
   - Mất khoá thì secret không đọc được: UI báo "nhập lại token", không crash.
 - **Chỉ ghi, không đọc lại**: GET settings trả `{"set": true, "updated_at": …, "last4": "…ab12"}` (tối đa 4 ký tự cuối)
