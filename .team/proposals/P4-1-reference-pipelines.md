@@ -1,6 +1,6 @@
 # P4-1 — Thư viện pipeline tham chiếu (phần 1: khảo sát + đề xuất chọn)
 
-- **Owner:** bao-research · **Ngày:** 2026-10-13 · **Trạng thái:** DRAFT phần 1 (chờ PM/user chọn). Phần 2 = P4-2 (chuẩn mực thành dữ liệu).
+- **Owner:** bao-research · **Ngày:** 2026-10-13 · **Trạng thái:** ACCEPTED (PM 2026-10-13; user chốt Cosmos-Reason2 là pipeline tham chiếu, ADR-001 am.2). Phần 2 = P4-2 (chuẩn mực thành dữ liệu).
 - **Cách làm:** khảo sát 12 ứng viên từ nguồn chính chủ (repo, docs, model card; chỉ đọc). Research tự kiểm lại các điểm then chốt (đánh dấu ✔). Điểm nào chưa kiểm được ghi **UNVERIFIED**.
 - **Tiêu chí xếp hạng:**
   1. chạy được trên 1 GB10 với ~35 GB trống;
