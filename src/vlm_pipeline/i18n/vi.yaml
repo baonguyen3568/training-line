@@ -1506,3 +1506,6 @@ session:
   lan_locked: Đăng nhập qua LAN đang bị khoá tới {time} vì đã nhập sai {failure_count} lần.
   unlock_lan: Mở khoá
   unlock_done: Đã mở khoá đăng nhập qua LAN.
+  ended_title: Phiên đăng nhập đã kết thúc
+  ended_body: Mở đường link đăng nhập mới nhất mà app in trong nhật ký (log) để đăng nhập lại. Nếu app chạy trên máy khác, hãy hỏi người quản trị đường link đó.
+  ended_retry: Thử lại

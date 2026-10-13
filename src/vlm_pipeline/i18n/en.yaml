@@ -1506,3 +1506,6 @@ session:
   lan_locked: "LAN sign-in is locked until {time} after {failure_count} wrong attempts."
   unlock_lan: Unlock
   unlock_done: LAN sign-in is unlocked.
+  ended_title: Your session has ended
+  ended_body: Open the latest sign-in link the app printed in its log to sign in again. If the app runs on another machine, ask its admin for that link.
+  ended_retry: Try again
