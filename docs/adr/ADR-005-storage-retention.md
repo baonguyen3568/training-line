@@ -26,3 +26,9 @@ Chấp nhận toàn bộ D1–D8 của Proposal 005 v3. Tóm tắt:
 ## Hệ quả
 - Phase 2: bao-cleanup viết `scripts/cleanup/{disk_report,retention,preflight}.py`, bao-tester viết test, bao-cleancode + bao-security review.
 - Mọi job nặng phải khai báo `est_peak_gb` trong `run.json` (mặc định 40GB).
+
+## Amendment A1 (2026-10-13, USER) — Trần bộ nhớ 80%
+User: "cứ chơi đi, không quá 80% VRAM". Team dùng GPU tự do (bỏ cơ chế giữ GPU cho user), nhưng:
+- **TỔNG bộ nhớ đang dùng trên thiết bị ≤ 80%.** UMA (GB10): `MemTotal − MemAvailable ≤ 0.8 × MemTotal`, tức MemAvailable ≥ ~25.5GB trên máy này. GPU rời: VRAM used ≤ 80%.
+- Preflight: `used_hiện_tại + est_peak ≤ 80%`. Runtime: warn ở 75%, abort khi vượt 80% (fast-fall dự báo chạm 80%).
+- Đây là ngưỡng CHẶT HƠN ngưỡng 8GB cũ, và thay thế ngưỡng đó. Ngưỡng là setting: mặc định 80, chỉ được chỉnh chặt hơn. Owner: bao-fixcode (memguard).
