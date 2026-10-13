@@ -34,7 +34,7 @@ Giai đoạn hiện tại: CHỈ reset + setup dự án. KHÔNG chạy train/spi
 ## 🧩 MILESTONE M4 — Pipeline tự do sâu + chuẩn mực + thư viện 5–10 pipeline tham chiếu (user định hướng cốt lõi 2026-10-13)
 | ID | Task | Owner | Status |
 |----|------|-------|--------|
-| P4-1 | Khảo sát + chọn 5–10 pipeline tham chiếu (vd NVIDIA AutoModel VLM SFT, DGX Spark VLM playbook (GRPO), NeMo-RL GRPO/DPO VLM, Cosmos-Reason post-training, Qwen3-VL official fine-tune, HF TRL SFT/DPO VLM, LLaMA-Factory VLM LoRA, NeMo Curator data pipeline, ModelOpt PTQ/QAT…): nguồn, license, chạy được trên GB10 không, số công bố để tái lập | bao-research | DOING (khảo sát đang chạy; báo từng phần) |
+| P4-1 | Khảo sát + chọn 5–10 pipeline tham chiếu (vd NVIDIA AutoModel VLM SFT, DGX Spark VLM playbook (GRPO), NeMo-RL GRPO/DPO VLM, Cosmos-Reason post-training, Qwen3-VL official fine-tune, HF TRL SFT/DPO VLM, LLaMA-Factory VLM LoRA, NeMo Curator data pipeline, ModelOpt PTQ/QAT…): nguồn, license, chạy được trên GB10 không, số công bố để tái lập | bao-research | DONE (ACCEPTED, configs/reference_pipelines.yaml 160f166) |
 | P4-2 | "Chuẩn mực" thành dữ liệu: định dạng dữ liệu VLM chuẩn (HF datasets/chat template, LLaVA/ShareGPT, WebDataset/Energon), kiểm chất lượng (dedupe, leak train/test, kích thước ảnh, độ dài token), chọn model, recipe train/nén → rule validate + gợi ý trong node | bao-research + bao-tester + bao-fixcode (error catalog) | TODO |
 | P4-3 | Hệ node sâu: thêm node chi tiết (data: filter/dedupe/resize/format-convert/caption/augment/mix; train: SFT/LoRA/QLoRA/DPO/GRPO; eval; quantize FP8/NVFP4/AWQ/QAT; export HF/TRT-LLM), subgraph/group (node to bung thành node nhỏ), tham số Advanced đầy đủ từ engine | bao-backend + bao-cleancode (nodes/ registry) | DOING: proposal 016 (0b51234) chờ review backend/frontend/design/security |
 | P4-4 | UX tự do sâu: subgraph expand/collapse, thư viện node lớn có tìm kiếm/nhóm, Simple/Advanced, gallery pipeline tham chiếu có nhãn nguồn/license/độ khó/thời gian | bao-design + bao-frontend | TODO |
@@ -59,12 +59,12 @@ YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được c�
 |----|------|-------|--------|
 | B-0 | GraphRule: node chưa có worker thật / model chưa hỗ trợ (vd Parse export) → lỗi validate | bao-backend | DONE (84d44f9) |
 | B-1 | train.merge_lora (PEFT merge_and_unload trong container) | bao-backend | DONE (f6854b2) |
-| B-2 | export.hf_dir cho model native (ADR-012) → sau đó Parse (B3) | bao-backend | TODO |
-| B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | split DONE (d8b8bb6); local_folder DOING |
-| B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | DOING (probe 0.44 trên Qwen3.5-0.8B) |
+| B-2 | export.hf_dir cho model native (ADR-012) → sau đó Parse (B3) | bao-backend | DONE (worker có; xem log 2026-10-13) |
+| B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | DONE (worker có; xem log 2026-10-13) |
+| B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | DONE (worker có; xem log 2026-10-13) |
 | B-5 | eval.benchmarks (từ CORD worker + lmms-eval, ADR-002) | bao-tester | DOING (engine f234dd6 + gate db0ba7d; chờ adapter _eval của backend rồi smoke GPU; lmms-eval sau) |
-| B-6 | bench.perf (latency/throughput/peak mem theo tester-perf-bench) | bao-tester | DOING (thiết kế: Parse HF in-process trước, vLLM theo B-7) |
-| B-7 | serve.vllm = node "Chạy thử" (vLLM ≥0.31, mem-util ≤0.3, prefix parity) | bao-fixcode | TODO |
+| B-6 | bench.perf (latency/throughput/peak mem theo tester-perf-bench) | bao-tester | DONE (worker có; xem log 2026-10-13) |
+| B-7 | serve.vllm = node "Chạy thử" (vLLM ≥0.31, mem-util ≤0.3, prefix parity) | bao-fixcode | DONE (worker có; xem log 2026-10-13) |
 DoD: cả 3 template chạy thật end-to-end trên canvas (template 2 cần user accept Cosmos trên HF).
 
 ## 🎨 MILESTONE M2 — SaaS site + Dashboard kiểu Unreal (user yêu cầu 2026-10-13)
@@ -91,9 +91,9 @@ RÀNG BUỘC CỨNG (PM):
 | M2-1 | Research phong cách (Linear, Vercel, Modal, Replicate, Hugging Face, Unreal Editor, Figma, ComfyUI…) + `impeccable init`/`shape` → PRODUCT.md, DESIGN.md, 2–3 hướng moodboard + đề xuất 3 tên sản phẩm cho user chọn | bao-design | DONE: user chọn D4; DESIGN.md 13a5729, mock design/m2/directions/chuan |
 | M2-2 | Sitemap 20–30 trang + IA + copy tiếng Việt (nguồn sự thật: ADR, P001/P002, benchmarks) | bao-design (copy) + bao-research (nội dung kỹ thuật docs) + bao-cleanup (docs vận hành/lưu trữ) | TODO |
 | M2-3 | Chọn stack site tĩnh (đề xuất: Astro + MDX, docs Starlight; MIT) trong `site/`, chung design tokens với app | bao-frontend + bao-cleancode | DONE (b61617c khung, b7a402e gate check.sh) |
-| M2-4 | Build landing + trang marketing + animation (prefers-reduced-motion) | bao-frontend (+ bao-fixcode hỗ trợ dựng trang) | IN PROGRESS (landing D4 committed, design r2 APPROVE; trang marketing chờ design review) |
+| M2-4 | Build landing + trang marketing + animation (prefers-reduced-motion) | bao-frontend (+ bao-fixcode hỗ trợ dựng trang) | IN PROGRESS (landing D4 + trang marketing đã commit, design APPROVE; còn /tinh-nang minh hoạ) |
 | M2-5 | Build docs + chính sách + trang phụ | bao-cleancode (dựng) + bao-design (review) | IN PROGRESS: 5 trang chính sách import từ docs/legal (chờ security review); tiếp: docs + trang phụ |
-| M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | DOING: đợt 1 khung D4 sau cờ ?ui=d4 (frontend), design review từng phần |
+| M2-6 | Redesign dashboard kiểu Unreal: dock panels, toolbar icon-first, tooltip/popover, 1 màn hình, dark-first | bao-design (direction) + bao-frontend | DOING: đợt 1 khung D4 (?ui=d4) đã commit, design r2 APPROVE; đợt 2: status bar, gallery D4, settings, subgraph, waiting_memory |
 | M2-7 | QA: link checker, a11y (WCAG AA), visual regression 3 viewport, Lighthouse, kiểm "không bịa số" | bao-tester | IN PROGRESS (P011 draft; G1 check_site_numbers.py xong report-only) |
 | M2-8 | Security: CSP, không tracker, license ảnh/font/icon, trademark NVIDIA, trang chính sách đúng thực tế | bao-security | REVIEW (spec, gate site_check, docs/legal, SECURITY.md, CSP Starlight, THIRD_PARTY_LICENSES xong; chỉ còn chờ U7–U10 + license nội dung site của user) |
 
