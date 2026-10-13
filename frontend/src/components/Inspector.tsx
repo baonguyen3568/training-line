@@ -67,8 +67,8 @@ function optionLabel(schema: ParamSchema, value: string | number, availGb?: numb
       const need = Math.round(meta.ram_gb + RAM_HEADROOM_GB);
       parts.push(
         need > availGb
-          ? `⚠ ${t("model_picker.needs_free_ram", { need_gb: need, avail_gb: Math.round(availGb) })}`
-          : `✓ ${t("model_picker.fits")}`,
+          ? t("model_picker.needs_free_ram", { need_gb: need, avail_gb: Math.round(availGb) }) // copy says it (design P3)
+          : t("model_picker.fits"),
       );
     }
     return parts.join(" · ");
@@ -376,7 +376,8 @@ function WorkflowSummary() {
   ];
   return (
     <aside className="inspector wf-summary" aria-label={workflowTitle(workflow.name)}>
-      <h2>{workflowTitle(workflow.name)}</h2>
+      {/* the workflow name is already the page h1 (toolbar): not a second heading here (design D7 r2) */}
+      <p className="wf-title">{workflowTitle(workflow.name)}</p>
       <p>{t("d4.step_count", { step_count: workflow.nodes.length })}</p>
       <p>
         {errors === 0 && warnings === 0 ? (

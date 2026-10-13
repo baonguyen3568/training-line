@@ -20,7 +20,20 @@ export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <main className="gallery">
       <h1>{t("run_monitor.runs_title")}</h1>
-      {shown.length === 0 && <p className="muted">{t("run_monitor.no_runs")}</p>}
+      {shown.length === 0 && (
+        <>
+          <p className="muted">{t("run_monitor.no_runs")}</p>
+          <button
+            type="button"
+            className="hairline"
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent("vlm:navigate", { detail: "home" }))
+            }
+          >
+            {t("run_monitor.no_runs_cta")}
+          </button>
+        </>
+      )}
       {shown.length > 0 && (
         <table className="runs-table">
           <thead>

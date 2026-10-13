@@ -431,7 +431,8 @@
   }
 }
 /* inspector with nothing selected: workflow summary (design r1 #3) */
-.wf-summary h2 {
+.wf-summary h2,
+.wf-summary .wf-title {
   margin: 0 0 var(--space-8);
   font-size: var(--font-size-panel);
 }
@@ -680,6 +681,7 @@
   vertical-align: -7px;
   margin-left: 2px;
   width: 24px; /* ≥ 24×24 target (design D7 r1, WCAG 2.5.8); the glyph stays 14px */
+  flex-shrink: 0; /* inside flex rows (HF terms note) it was squeezed to 15px */
   height: 24px;
 }
 .pop strong {
