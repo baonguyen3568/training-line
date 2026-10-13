@@ -65,7 +65,7 @@ export function LineChart({
               if (!markers.length) return;
               const ctx = u.ctx;
               ctx.save();
-              ctx.fillStyle = css("--color-status-critical");
+              ctx.fillStyle = css("--color-status-ink-critical");
               ctx.font = `${12 * devicePixelRatio}px sans-serif`;
               for (const mx of markers) {
                 const px = u.valToPos(mx, "x", true);

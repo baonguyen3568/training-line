@@ -65,15 +65,15 @@ select {
   white-space: nowrap;
 }
 .gpu-busy {
-  border-color: var(--color-status-warning);
+  border-color: var(--color-status-ink-warning);
 }
 .gpu-critical {
-  border-color: var(--color-status-critical);
+  border-color: var(--color-status-ink-critical);
 }
 .banner {
   margin: 0;
   padding: var(--space-8) var(--space-16);
-  border-bottom: 2px solid var(--color-status-critical);
+  border-bottom: 2px solid var(--color-status-ink-critical);
 }
 
 button.primary {
@@ -249,10 +249,10 @@ button.link {
   padding: 2px 0;
 }
 .issue.error > span:first-child {
-  color: var(--color-status-critical);
+  color: var(--color-status-ink-critical);
 }
 .issue.warn > span:first-child {
-  color: var(--color-status-warning);
+  color: var(--color-status-ink-warning);
 }
 .toast {
   position: absolute;
@@ -260,7 +260,7 @@ button.link {
   bottom: var(--space-16);
   transform: translateX(-50%);
   background: var(--color-surface);
-  border: 1px solid var(--color-status-critical);
+  border: 1px solid var(--color-status-ink-critical);
   border-radius: var(--radius-sm);
   padding: var(--space-8) var(--space-12);
   z-index: 10;
@@ -304,10 +304,10 @@ button.link {
   outline-offset: 2px;
 }
 .vlm-node.has-error {
-  border: 2px solid var(--color-status-critical);
+  border: 2px solid var(--color-status-ink-critical);
 }
 .vlm-node.has-warn {
-  border: 2px solid var(--color-status-warning);
+  border: 2px solid var(--color-status-ink-warning);
 }
 .vlm-node.third-party {
   box-shadow:
@@ -348,8 +348,9 @@ button.link {
   font-size: var(--font-size-caption);
 }
 .badge.blocked {
-  color: var(--color-node-state-blocked-policy);
+  color: var(--color-text-primary);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-node-state-blocked-policy);
 }
 .node-ports {
   display: flex;
@@ -395,21 +396,28 @@ button.link {
   border-top: 1px solid var(--color-grid);
 }
 .perm.level-warning {
-  color: var(--color-status-warning);
+  color: var(--color-text-primary);
+  box-shadow: inset 3px 0 0 var(--color-status-ink-warning);
+  padding-left: var(--space-4);
 }
 .perm.level-critical {
-  color: var(--color-status-critical);
+  color: var(--color-text-primary);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-status-ink-critical);
+  padding-left: var(--space-4);
 }
 .perm.level-info {
   color: var(--color-text-secondary);
 }
+/* Status TEXT always uses text ink (design 92cb55d: status colours fail 4.5:1 as text); colour marks the edge. */
 .state.failed {
-  color: var(--color-node-state-failed);
+  color: var(--color-text-primary);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-status-ink-critical);
+  padding-left: var(--space-4);
 }
 .state.ready {
-  color: var(--color-node-state-ready);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 1279px) {
@@ -572,7 +580,7 @@ button.link {
 }
 .chip.status-failed,
 .chip.status-interrupted {
-  border-color: var(--color-status-critical);
+  border-color: var(--color-status-ink-critical);
 }
 .chip.status-running,
 .chip.status-queued {
@@ -698,7 +706,7 @@ button.link {
 }
 .toolbar-error {
   color: var(--color-text-primary);
-  border-left: 3px solid var(--color-status-critical);
+  border-left: 3px solid var(--color-status-ink-critical);
   padding-left: var(--space-8);
   background: var(--color-surface);
 }
@@ -795,7 +803,7 @@ button.link {
 }
 @keyframes vlm-pulse {
   50% {
-    box-shadow: 0 0 0 4px var(--color-status-warning);
+    box-shadow: 0 0 0 4px var(--color-status-ink-warning);
   }
 }
 .port-hint {
@@ -809,7 +817,7 @@ button.link {
   pointer-events: none;
   padding: 1px var(--space-8);
   background: var(--color-surface);
-  border: 1px solid var(--color-status-warning);
+  border: 1px solid var(--color-status-ink-warning);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-caption);
   color: var(--color-text-primary);
@@ -818,7 +826,7 @@ button.link {
   .react-flow__node.flash .vlm-node,
   .port.needs-wire {
     animation: none;
-    outline: 2px solid var(--color-status-warning);
+    outline: 2px solid var(--color-status-ink-warning);
   }
 }
 .error-cards {
@@ -830,13 +838,13 @@ button.link {
   gap: var(--space-8);
 }
 .error-card {
-  border-left: 3px solid var(--color-status-critical);
+  border-left: 3px solid var(--color-status-ink-critical);
   background: var(--color-page);
   padding: var(--space-8);
   border-radius: var(--radius-sm);
 }
 .error-card.warn {
-  border-left-color: var(--color-status-warning);
+  border-left-color: var(--color-status-ink-warning);
 }
 .error-card p {
   margin: var(--space-4) 0;
@@ -920,7 +928,7 @@ button.link {
   padding: var(--space-16);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  border: 2px solid var(--color-status-critical);
+  border: 2px solid var(--color-status-ink-critical);
 }
 .typed-confirm {
   display: grid;
@@ -939,5 +947,5 @@ button.link {
   font-weight: 600;
 }
 .loss-icon {
-  color: var(--color-status-critical);
+  color: var(--color-status-ink-critical);
 }
