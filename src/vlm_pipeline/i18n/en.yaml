@@ -1057,12 +1057,8 @@ standards:
     test_split_in_training: "Training data comes from the benchmark set. That set is only for the final score; training on it makes the score meaningless."
     too_few_samples: "Fewer than {below} training samples. The model may memorise instead of learning the task."
   quant:
-    format_not_supported_by_model: "This model cannot be quantized in the selected format yet. Pick another model or remove the quantize step."
-    experimental_needs_benchmark: "Quantizing this model is experimental. Benchmark before and after to make sure it did not get worse."
     calib_size: "Calibration size {value} is outside the recommended range ({min}–{max}). Too few makes the quantized model less accurate; too many takes longer without helping."
     calib_from_heldout: "Calibration data comes from the benchmark set. Use training data so the post-quantization score stays trustworthy."
-    vision_quant: "\"Also compress the vision part\" is not supported yet. Turn it off; by default only the language part is compressed, because vision loses accuracy more easily."
-    kv_cache_quant: "\"KV cache compression\" is not supported yet. Set it to \"No compression\"."
   data:
     broken_images_some: "Some images are broken or too small (short side under {min_short_side_px} px). The app will skip them."
     broken_images_many: "More than {above}% of images are broken or too small. The folder may be wrong; check it before training."

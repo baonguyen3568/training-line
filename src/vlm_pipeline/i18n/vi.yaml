@@ -1057,12 +1057,8 @@ standards:
     test_split_in_training: "Dữ liệu học đang lấy từ bộ chấm điểm. Bộ này chỉ dùng để chấm điểm cuối; học trên nó làm điểm số không còn ý nghĩa."
     too_few_samples: "Chỉ có dưới {below} mẫu dữ liệu học. Model dễ học thuộc thay vì học cách làm."
   quant:
-    format_not_supported_by_model: "Model này chưa nén được theo định dạng đã chọn. Hãy chọn model khác hoặc bỏ bước nén."
-    experimental_needs_benchmark: "Nén model này mới ở mức thử nghiệm. Hãy đo điểm trước và sau khi nén để chắc model không kém đi."
     calib_size: "Số mẫu hiệu chỉnh {value} nằm ngoài khoảng khuyến nghị ({min}–{max}). Ít quá thì bản nén kém chính xác, nhiều quá thì chạy lâu mà không tốt hơn."
     calib_from_heldout: "Dữ liệu hiệu chỉnh đang lấy từ bộ chấm điểm. Hãy dùng dữ liệu học để điểm sau khi nén còn đáng tin."
-    vision_quant: "App chưa hỗ trợ \"Nén cả phần nhìn ảnh\". Hãy tắt tuỳ chọn này; cách mặc định chỉ nén phần ngôn ngữ, vì phần nhìn ảnh dễ mất chính xác hơn."
-    kv_cache_quant: "App chưa hỗ trợ \"Nén bộ đệm hội thoại (KV cache)\". Hãy chọn \"Không nén\" cho tuỳ chọn này."
   data:
     broken_images_some: "Có ảnh hỏng hoặc quá nhỏ (cạnh ngắn dưới {min_short_side_px} px). App sẽ bỏ qua các ảnh đó."
     broken_images_many: "Hơn {above}% ảnh hỏng hoặc quá nhỏ. Thư mục có thể chọn sai; hãy kiểm tra trước khi train."
