@@ -1,0 +1,38 @@
+---
+title: Trường hợp sử dụng
+description: Những việc bạn có thể dạy model làm bằng NTC-Training, với dữ liệu của chính bạn.
+sources:
+  - PRODUCT.md
+  - configs/templates/invoice_to_json.json
+  - configs/templates/image_video_understanding.json
+  - configs/templates/quantize_bench.json
+numbers_without_source: []
+---
+import Hint from '~/components/Hint.astro';
+
+Các ví dụ dưới đây là những việc NTC-Training được thiết kế để làm. Trang này không nói về khách hàng hay kết quả của ai cụ thể. Điểm số thật của mỗi mẫu nằm ở trang mẫu đó, và chỉ được ghi khi đã đo.
+
+## Đọc hoá đơn thành dữ liệu có cấu trúc
+
+**Bạn có:** ảnh hoặc bản scan hoá đơn, biên lai.
+**Bạn muốn:** model đọc ra tên hàng, số lượng, đơn giá, tổng tiền dưới dạng JSON để đưa vào phần mềm kế toán.
+
+Mở mẫu **Đọc hoá đơn → JSON**. Mẫu dạy thêm một model chuyên đọc tài liệu bằng bộ hoá đơn mẫu có sẵn. Khi đã chạy được, bạn thay bộ mẫu bằng ảnh hoá đơn của bạn. <Hint title="Vì sao phải dạy thêm">Model đọc tài liệu có sẵn đã đọc được nhiều loại hoá đơn, nhưng mẫu hoá đơn của mỗi công ty mỗi khác. Dạy thêm bằng ảnh của bạn giúp model quen đúng bố cục và cách ghi của bạn.</Hint>
+
+## Hỏi đáp về ảnh và video
+
+**Bạn có:** ảnh hoặc video kèm câu hỏi và câu trả lời đúng, ví dụ ảnh sản phẩm lỗi kèm mô tả lỗi.
+**Bạn muốn:** model trả lời các câu hỏi như vậy cho ảnh mới.
+
+Mở mẫu **Hiểu ảnh và video**. Mẫu dạy nhẹ một model nhỏ bằng LoRA và không cần tài khoản nào. <Hint title="LoRA là gì">LoRA chỉ dạy thêm một phần nhỏ của model thay vì toàn bộ. Cách này nhanh hơn và cần ít bộ nhớ hơn, phù hợp với máy dùng chung.</Hint>
+
+## Thu nhỏ model để chạy nhanh hơn
+
+**Bạn có:** một model đã dạy xong.
+**Bạn muốn:** model chiếm ít bộ nhớ hơn và trả lời nhanh hơn, nhưng vẫn đủ chính xác.
+
+Mẫu **Nén model & đo lại điểm** nén model rồi đo lại điểm và tốc độ, để bạn so trước và sau khi nén. <Hint title="Nén có làm model kém đi không">Có thể kém đi một chút. Vì vậy mẫu luôn đo lại trên cùng bộ kiểm tra để bạn thấy chênh lệch, rồi tự quyết định có dùng bản nén hay không.</Hint> Phần nén đang được hoàn thiện.
+
+## Tự ghép workflow của riêng bạn
+
+Không có mẫu nào khớp việc của bạn? Bắt đầu từ workflow trống, kéo các bước cần dùng từ thư viện vào rồi nối dây. App kiểm tra kết nối, bộ nhớ và dung lượng trước khi chạy, nên bạn biết ngay workflow có chạy được không.

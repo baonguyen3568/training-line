@@ -1,7 +1,58 @@
 ---
 title: Tính năng
-description: Các tính năng chính.
-sources: []
+description: Kéo thả các bước thành workflow, app kiểm tra trước khi chạy, báo lỗi bằng lời thường và chỉ chạy lại phần đã thay đổi.
+sources:
+  - PRODUCT.md
+  - docs/adr/ADR-005-storage-retention.md
+  - docs/adr/ADR-009-app-architecture-direction.md
+  - src/vlm_pipeline/common/error_catalog.yaml
+  - .team/BOARD.md
+numbers_without_source: []
 ---
+import Hint from '~/components/Hint.astro';
 
-Trang khung (M2-3), nội dung làm ở M2-4/M2-5.
+## Ghép workflow bằng kéo thả
+
+Mỗi việc là một khối trên màn hình: chọn model, lấy dữ liệu, chia dữ liệu học và kiểm tra, dạy model, đo điểm. Bạn kéo khối từ thư viện vào rồi nối dây từ đầu ra của khối này sang đầu vào của khối kia. Các khối tự xếp theo thứ tự các bước, từ Nguồn đến Xuất, nên workflow dài vẫn dễ theo dõi.
+
+Workflow được lưu thành một file. Gửi file đó cho đồng nghiệp là họ mở ra được đúng như bạn thấy.
+
+## Kiểm tra trước khi chạy
+
+Trước khi bạn bấm Chạy, app kiểm tra cả workflow:
+
+- **Nối đúng kiểu.** Mỗi cổng nhận một loại: Dữ liệu ■, Model ●, Kết quả đo ◆. Nối nhầm thì dây không gắn vào được, và app nói rõ cổng đó cần gì.
+- **Thiếu gì.** Khối nào còn thiếu đầu vào bắt buộc sẽ được đánh dấu, bạn bấm vào là tới đúng chỗ.
+- **Đủ bộ nhớ và ổ đĩa.** App ước lượng bộ nhớ từng bước cần rồi so với phần còn trống thật trên máy. <Hint title="Vì sao phải so với phần còn trống">Máy thường đang chạy cả ứng dụng khác. Một bước có thể chạy được lúc máy rảnh nhưng hết bộ nhớ lúc máy bận, nên app so với phần còn trống ngay lúc đó chứ không so với tổng dung lượng.</Hint>
+
+Mọi ước lượng đều ghi rõ nguồn: đã đo trên máy, tính theo công thức, hay chưa có số đo.
+
+## Báo lỗi bằng lời thường
+
+Không có stack trace. Mỗi lỗi có một mã, kèm câu nói chuyện gì đã xảy ra và bạn có thể làm gì tiếp. Ví dụ: máy đang bận nên không đủ bộ nhớ thì app nói rõ đó không phải lỗi của bạn, và cho xếp hàng để tự chạy khi máy rảnh.
+
+## Chỉ chạy lại phần đã thay đổi
+
+App nhớ kết quả của từng bước. Khi bạn chỉ đổi bước cuối, các bước trước không thay đổi sẽ dùng lại kết quả cũ thay vì chạy lại từ đầu. <Hint title="Khi nào bước bị chạy lại">Một bước chạy lại khi đầu vào hoặc thiết lập của nó thay đổi, hoặc khi kết quả đã lưu bị hỏng. Trường hợp kết quả hỏng, app báo rõ trước khi chạy lại.</Hint>
+
+## Đơn giản và Nâng cao
+
+Chế độ Đơn giản là mặc định: mỗi bước chỉ hiện vài thiết lập quan trọng, có sẵn mức chọn như Chậm, Vừa, Nhanh. Chế độ Nâng cao hiện thêm tham số chi tiết cho người cần chỉnh sâu.
+
+## Quản lý dung lượng
+
+Bảng Dung lượng cho biết mỗi lần chạy đang chiếm bao nhiêu chỗ trên ổ đĩa, mục nào được giữ lại và vì sao, mục nào xoá được. Xoá một model đã train phải gõ đúng tên để xác nhận.
+
+## Tiếng Việt và tiếng Anh
+
+Giao diện mặc định là tiếng Việt có dấu đầy đủ, và chuyển được sang tiếng Anh.
+
+## Đang hoàn thiện
+
+Các phần sau đang được làm. Trang này sẽ cập nhật khi chúng chạy được:
+
+- Nén model và đo tốc độ, độ chính xác sau khi nén.
+- Xuất model đã train ra thư mục để dùng ở máy khác.
+- Bung một bước lớn thành các bước nhỏ bên trong, và thư viện pipeline tham chiếu từ các dự án lớn.
+- Cài node do bên thứ ba viết, chạy trong vùng cách ly và có khai báo quyền.
+- Nút sửa nhanh ngay trên thẻ lỗi.
