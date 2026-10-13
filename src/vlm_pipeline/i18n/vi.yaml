@@ -1162,7 +1162,7 @@ docs_error:
   actions_lead: "Tuỳ trường hợp, app sẽ đề xuất một trong các cách sau:"
 pipelines:
   more_steps: "+{step_count} bước"
-  title: Pipeline tham khảo
+  title: Pipeline tham chiếu
   search: Tìm pipeline…
   filter:
     all: Tất cả
