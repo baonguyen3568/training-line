@@ -91,3 +91,35 @@ About 1 day of code after §6 is answered. The licence texts and notice fields a
 3. ~~PM: model card now or M2?~~ **Answered (PM 2026-10-13): now, minimal, generated per export.** README.md =
    base model name, datasets, licence(s), notice text, 3-line usage, known limitations from the catalog. Fuller card later.
 4. **fixcode:** EXP-001 naming and i18n text.
+
+## 7. Trả lời của research (2026-10-13). Đây là cách đọc licence của kỹ sư, KHÔNG phải tư vấn pháp lý; verdict cuối thuộc bao-security
+### 7.1 Licence text đã vendor (§2.1)
+- Có 4 id trong catalog: `nvidia-open-model-license`, `apache-2.0`, `cc-by-4.0`, `openmdw-1.1`. Text nằm ở `configs/licenses/<id>.txt`; nguồn, sha256 và cách trích ghi ở `LICENSES.lock`. Verdict security: PENDING.
+- OML lấy từ **PDF chính thức** (bản phát hành 2025-10-24), không lấy từ trang HTML, vì HTML làm mất số mục (§2.1, §3.1…) mà licence tự tham chiếu. OpenMDW chỉ có HTML: lấy phần thân licence, bỏ nav/footer.
+- Snapshot Parse 2.0 và Qwen có file `LICENSE` riêng. Parse v1.1 thì không. Cosmos: chưa đọc được vì gated.
+
+### 7.2 Q1: fine-tune có là "Derivative Model" theo OML không?
+- **Có.** OML §1.1 định nghĩa "Derivative Model" gồm "(a) modifications to the Model, (b) works based on the Model". Trọng số fine-tune thuộc cả (a) lẫn (b). §1.3 "Model" bao gồm "checkpoints, learnt weights … configuration files".
+- **Nghĩa vụ khi phân phối** (OML §3.1, Redistribution): cấp kèm một bản copy Agreement, và kèm file "Notice" có đúng câu **"Licensed by NVIDIA Corporation under the NVIDIA Open Model License"**. Câu chữ của điều này nói "If you distribute the Model". Áp dụng cho Derivative Model là cách đọc thận trọng, và ta chọn cách đó.
+- **Cosmos** (OML §3.2): nếu phân phối model Cosmos hoặc model phái sinh từ Cosmos, **hoặc** dùng Cosmos để fine-tune, thì phải ghi **"Built on NVIDIA Cosmos"** trên website / UI / tài liệu liên quan. ⇒ NOTICE của export có câu này. Đồng thời **site và docs của chính ta** cũng phải có câu đó ở chỗ nói về template Cosmos (báo PM/design/security, M2-8).
+- **Guardrail** (§2.1): đây là điều kiện ràng buộc người dùng, không có yêu cầu nhắc lại trong NOTICE. Bản copy Agreement đi kèm là đủ về nghĩa vụ. Đề xuất (thực hành tốt, không bắt buộc): NOTICE có 1 dòng trỏ tới §2.1 (Guardrail) và §2.3 (Trustworthy AI terms, https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/).
+- **OpenMDW-1.1** (Parse 2.0): phân phối thì phải giữ (1) bản copy agreement, (2) "all copyright notices and other notices of origin included in the Model Materials". Licence không có câu notice cố định. ⇒ Copy `LICENSE` của snapshot (đây là notice of origin của NVIDIA) cùng mọi dòng copyright có trong snapshot.
+- **Apache-2.0** (Qwen, Gemma 4): §4 yêu cầu (a) kèm licence; (b) file đã sửa phải có thông báo nổi bật là đã sửa; (c) giữ các notice copyright/attribution; (d) nếu upstream có file NOTICE thì kèm phần attribution trong đó. ⇒ Copy `LICENSE` (và `NOTICE` nếu có) của snapshot, cộng với câu sửa đổi do app sinh.
+- **Tokenizer của Parse (CC-BY-4.0)**: CC-BY §3(a) yêu cầu ghi tác giả, notice copyright, notice licence + URI, và **ghi rõ nếu có sửa**. Tokenizer không bị sửa khi fine-tune, nên ghi "not modified".
+
+### 7.3 Q2: dữ liệu CC-BY dùng để train có buộc ghi công trong model không?
+- **Không chắc.** Điều kiện của CC-BY chỉ áp khi model là "Adapted Material" hoặc khi ta "Share" chính dữ liệu. Trọng số model có phải Adapted Material hay không còn tranh cãi, và Creative Commons không đưa ra kết luận chung.
+- Creative Commons **khuyến nghị** ghi công kể cả khi không bắt buộc. Chi phí ghi công gần như 0, nên **ghi công dưới nhãn "Training data"** như PM muốn. Không bao giờ viết rằng việc này là bắt buộc hay không bắt buộc. Câu sửa đổi ghi: "used to fine-tune this model; the dataset itself is not redistributed".
+
+### 7.4 Giá trị `notice` đề xuất cho catalog (chờ security duyệt; cleancode mở rộng loader trước khi research ghi vào YAML)
+| catalog | notice |
+|---|---|
+| Model `nvidia-open-model-license` (Parse v1.1) | `Licensed by NVIDIA Corporation under the NVIDIA Open Model License` |
+| Model `nvidia-open-model-license` + Cosmos (cosmos-reason2-2b/8b) | `Licensed by NVIDIA Corporation under the NVIDIA Open Model License` + `Built on NVIDIA Cosmos` |
+| Model `openmdw-1.1` (Parse 2.0) | `NVIDIA Nemotron Parse 2.0, provided by NVIDIA Corporation under the OpenMDW License Agreement, version 1.1 (OpenMDW-1.1)`, kèm copy LICENSE của snapshot |
+| Model `apache-2.0` (Qwen*, Gemma 4) | `Based on <repo>@<revision> by <vendor: Qwen Team, Alibaba Cloud / Google>, licensed under the Apache License 2.0. Modified: fine-tuned with <tool> on <date>.` (phần `<...>` do app điền) |
+| Parse tokenizer (thành phần riêng, CC-BY-4.0) | `Tokenizer from nvidia/NVIDIA-Nemotron-Parse-v1.1 by NVIDIA Corporation, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Not modified.` |
+| Dataset `cord-v2` | `Training data: CORD: A Consolidated Receipt Dataset for Post-OCR Parsing (Park et al., NAVER Clova AI), https://github.com/clovaai/cord, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Used to fine-tune this model; the dataset is not redistributed.` |
+- **Cần security xác nhận:** chủ thể copyright của tokenizer Parse (README chỉ ghi licence, không ghi copyright holder), và tên vendor chính xác cho Qwen/Gemma (lấy từ LICENSE/NOTICE của snapshot).
+- Đề xuất schema: thay vì 1 chuỗi `notice`, dùng `notices: list[str]` để Cosmos có 2 câu; tokenizer là component riêng có licence id riêng (`component_licenses` hoặc entry con).
+- (research, sau phản hồi backend) Câu Guardrail đưa vào `notices` của model OML như dữ liệu: `Use of this model remains subject to the NVIDIA Open Model License, including Section 2.1 (Guardrail) and Section 2.3 (NVIDIA Trustworthy AI terms: https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/).` Câu notice Apache theo vendor của từng entry: Qwen → "Qwen Team, Alibaba Cloud", Gemma 4 → "Google". Cả hai chờ security xác nhận theo LICENSE/NOTICE của snapshot.
