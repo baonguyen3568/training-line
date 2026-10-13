@@ -539,6 +539,7 @@ node_state:
   ready: Ready
   queued: Queued
   cached: Reusing result from {time}
+  cached_no_time: Reusing result
   running: Running {percent}%
   done: Done
   interrupted: Paused
@@ -1277,6 +1278,8 @@ docs_error:
   actions_lead: "Depending on the situation, the app suggests one of these:"
 pipelines:
   more_steps: "+{step_count} steps"
+  metric:
+    field_f1: Field F1
   title: Reference pipelines
   search: Search pipelines…
   filter:

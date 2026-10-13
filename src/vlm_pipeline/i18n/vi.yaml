@@ -539,6 +539,7 @@ node_state:
   ready: Sẵn sàng
   queued: Đang chờ
   cached: Dùng lại kết quả lúc {time}
+  cached_no_time: Dùng lại kết quả
   running: Đang chạy {percent}%
   done: Xong
   interrupted: Tạm dừng
@@ -1277,6 +1278,8 @@ docs_error:
   actions_lead: "Tuỳ trường hợp, app sẽ đề xuất một trong các cách sau:"
 pipelines:
   more_steps: "+{step_count} bước"
+  metric:
+    field_f1: F1 theo trường
   title: Pipeline tham chiếu
   search: Tìm pipeline…
   filter:
