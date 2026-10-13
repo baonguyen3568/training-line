@@ -3,21 +3,16 @@
 # message in the `standards.` i18n namespace, non-empty source (repo paths must exist). Owner of content: bao-research.
 # Waiting for GraphView machine info: "format needs GPU capability" (FP8 >= sm_89, NVFP4 >= sm_100,
 # .team/knowledge/multiarch-gpu.md).
+# QUANT-FORMAT-EXPERIMENTAL (warn) returns when the worker supports experimental models (Parse FP8, P-5); until
+# then QUANT-FORMAT-MODEL blocks them at validate time instead of failing after the job waited for memory.
 schema_version: 1
 rules:
   - id: QUANT-FORMAT-MODEL
     applies_to: {node: quantize.modelopt_ptq, param: format}
-    check: {kind: catalog_field_in, catalog_field: quant_fp8, allowed: [official, experimental]}
+    check: {kind: catalog_field_in, catalog_field: quant_fp8, allowed: [official]}
     level: error
     message: standards.quant.format_not_supported_by_model
-    source: "ModelOpt examples/hf_ptq support matrix (Qwen3-VL / Qwen3.5 / Gemma 3: FP8 only); configs/catalog/models.yaml quant_fp8"
-
-  - id: QUANT-FORMAT-EXPERIMENTAL
-    applies_to: {node: quantize.modelopt_ptq, param: format}
-    check: {kind: catalog_field_not_in, catalog_field: quant_fp8, values: [experimental]}
-    level: warn
-    message: standards.quant.experimental_needs_benchmark
-    source: "configs/catalog/models.yaml (Nemotron Parse quant_fp8 experimental: no ModelOpt recipe yet)"
+    source: "ModelOpt examples/hf_ptq support matrix (Qwen3-VL / Qwen3.5 / Gemma 3: FP8 only); configs/catalog/models.yaml quant_fp8; src/vlm_pipeline/quantize/scope.py (worker v1 runs official FP8 only)"
 
   - id: QUANT-CALIB-SIZE
     applies_to: {node: quantize.modelopt_ptq, param: calib_size}
@@ -36,6 +31,13 @@ rules:
   - id: QUANT-VISION-OFF
     applies_to: {node: quantize.modelopt_ptq, param: quantize_vision}
     check: {kind: equals, value: false}
-    level: info
+    level: error  # worker v1 refuses it (quantize/scope.py); back to info when vision quantization is supported
     message: standards.quant.vision_quant
-    source: "ModelOpt hf_ptq README: by default only the language model is quantized"
+    source: "ModelOpt hf_ptq README: by default only the language model is quantized; src/vlm_pipeline/quantize/scope.py"
+
+  - id: QUANT-KV-CACHE-OFF
+    applies_to: {node: quantize.modelopt_ptq, param: kv_cache_quant}
+    check: {kind: equals, value: none}
+    level: error  # worker v1 refuses KV-cache quantization (quantize/scope.py)
+    message: standards.quant.kv_cache_quant
+    source: "src/vlm_pipeline/quantize/scope.py (v1 scope); ModelOpt hf_ptq kv_cache options"
