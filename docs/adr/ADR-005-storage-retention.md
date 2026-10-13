@@ -32,3 +32,8 @@ User: "cứ chơi đi, không quá 80% VRAM". Team dùng GPU tự do (bỏ cơ c
 - **TỔNG bộ nhớ đang dùng trên thiết bị ≤ 80%.** UMA (GB10): `MemTotal − MemAvailable ≤ 0.8 × MemTotal`, tức MemAvailable ≥ ~25.5GB trên máy này. GPU rời: VRAM used ≤ 80%.
 - Preflight: `used_hiện_tại + est_peak ≤ 80%`. Runtime: warn ở 75%, abort khi vượt 80% (fast-fall dự báo chạm 80%).
 - Đây là ngưỡng CHẶT HƠN ngưỡng 8GB cũ, và thay thế ngưỡng đó. Ngưỡng là setting: mặc định 80, chỉ được chỉnh chặt hơn. Owner: bao-fixcode (memguard).
+- **Xác nhận user (2026-10-13):** 80% là TỔNG bộ nhớ của cả máy, tính cả service khác. Chi tiết triển khai (bao-fixcode):
+  - `max_used_frac` mặc định 0.80, chỉ chỉnh chặt hơn (lỏng hơn → CFG-005). GB10: dùng = MemTotal − MemAvailable. GPU rời: VRAM (D-4).
+  - Preflight: `MemAvailable ≥ max(est_peak + max(10GB, 20%×est_peak), 20GB, est_peak + (1−max_used_frac)×MemTotal)`; SwapFree ≥ 2GB. Từ chối → MEM-001.
+  - Runtime: warn > 75% (~30.4GB available), abort > 80% (~24.3GB), grace 60s / 300s khi đang save; fast-fall dự báo chạm 80% trong 5s → kill ngay; emergency < 4GB kill ngay. run.json ghi `memguard_abort_gb`.
+  - Job không đủ ngân sách thì **xếp hàng chờ** RAM (không fail ngay); quá lâu → SYS-002 cho user biết.
