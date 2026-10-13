@@ -377,3 +377,9 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - Còn chờ: resume smoke (A/B1/B2) + gate per-ckpt của tester (token acc, greedy F1/truncated trên val) trước khi chuyển template Parse v1.1 sang FusedAdam.
 - (số đo phụ, dùng cho docs M2) Tốc độ chấm CORD qua HF remote, batch 1, use_cache on: **~7 ảnh/phút** (tester, ma trận P-3 2026-10-12). P-3: ~20 s/step ở GBS 8, peak 18.9 GB.
 - (2026-10-13, PM) Resume smoke FusedAdam (A/B1/B2) **không qua**. PM xác định nguyên nhân là bug riêng ở checkpoint shard, không do FusedAdam. Template vẫn chuyển sang FusedAdam (0780e10). **Giới hạn hiện tại: chưa dừng rồi chạy tiếp được với Parse.** Chờ bug report của backend.
+- **Gate P-3b-A step 99** (tester, 20 ảnh CORD val, penalty 1.0, batch 1; run 20261013-0921-gate-greedy-p3b-a-s99-765b):
+  - field F1 **57.4**, CI95 [48.1, 67.5]; json_exact 5.0; nTED 47.9; parse_fail 0%; truncated 10% (2/20, Wilson ~3–30%).
+  - Teacher-forced acc 96.8%, ngưỡng tham khảo là 97%.
+  - ⇒ Sát ngưỡng, đi đúng hướng. 2 ảnh lặp (val 5, val 11) đều là thoái hoá do chưa học đủ (val 5 ảo giác item rồi lặp, val 11 lặp token trong tên món); nhiều item giống nhau thật không phải nguyên nhân.
+  - P-3 không so trực tiếp được (P-3 chỉ có số test: F1 8.9, truncated 86%).
+- **PM duyệt P-3b đầy đủ** (300 step, `nemotron_parse_v1_1_p3b_full.yaml`). Chọn preset dựa trên ckpt 100/200/300 chấm trên đúng 20 ảnh val đó (paired với s99), áp quy tắc 90% của §10.1. Số test chỉ để báo.
