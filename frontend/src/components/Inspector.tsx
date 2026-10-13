@@ -7,6 +7,7 @@ import {
   formatMinutesRange,
   workflowDurationText,
 } from "../lib/format";
+import { withCode } from "../lib/machineText";
 import { nodeDesc, nodeTitle, SEVERITY_GLYPH, workflowTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
@@ -528,7 +529,7 @@ export function Inspector() {
               <strong>
                 {SEVERITY_GLYPH[e.severity]} {e.title}
               </strong>
-              <p>{e.what}</p>
+              <p>{withCode(e.what, e.params)}</p>
               <QuickFixes issue={e} nodeId={node.id} />
               {e.why && (
                 <p className="muted small">

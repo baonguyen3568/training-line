@@ -11,6 +11,7 @@ import type {
 } from "../api/types";
 import { getLocale, t, tpOptional } from "../i18n";
 import { formatDateTime, formatShortDeadline } from "../lib/format";
+import { withCode } from "../lib/machineText";
 import { untrustedText } from "../lib/safeText";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
@@ -61,24 +62,6 @@ function attentionText(a: StorageAttention): string {
       until: formatShortDeadline(a.resume_until),
     }) ?? untrustedText(a.message, 300)
   );
-}
-
-/** Machine strings inside a sentence (run dirs, checkpoint paths) read as code (Mono-Means-Machine, design G-4 r1). */
-function withCode(text: string, params: Record<string, unknown>): ReactNode {
-  const tokens = Object.values(params).filter(
-    (v): v is string => typeof v === "string" && /[/_.-]\S*\d|\//.test(v) && text.includes(v),
-  );
-  if (tokens.length === 0) return text;
-  const parts: ReactNode[] = [];
-  let rest = text;
-  for (const tok of tokens) {
-    const i = rest.indexOf(tok);
-    if (i < 0) continue;
-    parts.push(rest.slice(0, i), <code key={tok}>{tok}</code>);
-    rest = rest.slice(i + tok.length);
-  }
-  parts.push(rest);
-  return parts;
 }
 
 const gb = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v.toFixed(1));
