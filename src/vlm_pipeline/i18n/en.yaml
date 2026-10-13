@@ -577,6 +577,10 @@ node_state:
   waiting_gpu: Waiting for the GPU
   waiting_gpu_tooltip: Another heavy job is using the GPU. The app will run this step when the GPU is free.
   waited_for: Waiting for {duration} so far.
+  not_downloaded: Not on this machine yet
+  not_downloaded_tooltip: This step needs "{name}" on this machine. Click "Download" to get it.
+  downloading: Downloading {percent}%
+  downloading_indeterminate: Downloading
 preflight:
   title: Pre-run check
   summary_ok: Everything is ready
@@ -1453,3 +1457,18 @@ advanced_panel:
   engine_default: set by the engine
   range: "Range: {min}–{max}"
   list_hint: Separate values with commas
+download:
+  dialog_title: Download to this machine
+  intro: 'The app will download "{name}" (about {size_gb} GB) to this machine. After that, steps use the local copy and need no network.'
+  estimate: Expected to take about {duration}, depending on your connection.
+  license_lead: "License:"
+  license_accept: I have read and accept this license
+  confirm_large: This download is large ({size_gb} GB), over the {threshold_gb} GB threshold, so please confirm.
+  start: Download
+  cancel: Cancel download
+  cancel_confirm: Cancel this download? The partly downloaded files will not be used.
+  progress: "{done_gb}/{total_gb} GB · files {file_done_count}/{file_count}"
+  verifying: Checking the downloaded files…
+  installing: Installing into the app's cache…
+  completed: Downloaded "{name}" to this machine.
+  failed: Could not download "{name}".

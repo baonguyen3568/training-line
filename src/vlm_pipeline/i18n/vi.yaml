@@ -577,6 +577,10 @@ node_state:
   waiting_gpu: Chờ GPU rảnh
   waiting_gpu_tooltip: Một việc nặng khác đang dùng GPU. App sẽ tự chạy bước này khi GPU rảnh.
   waited_for: Đã chờ {duration}.
+  not_downloaded: Chưa tải về máy
+  not_downloaded_tooltip: Bước này cần "{name}" có sẵn trên máy. Bấm "Tải về máy" để tải.
+  downloading: Đang tải {percent}%
+  downloading_indeterminate: Đang tải
 preflight:
   title: Kiểm tra trước khi chạy
   summary_ok: Mọi thứ đã sẵn sàng
@@ -1453,3 +1457,18 @@ advanced_panel:
   engine_default: do engine tự chọn
   range: "Khoảng: {min}–{max}"
   list_hint: Các giá trị cách nhau bằng dấu phẩy
+download:
+  dialog_title: Tải về máy
+  intro: 'App sẽ tải "{name}" (khoảng {size_gb} GB) về máy này. Sau đó các bước chạy dùng bản trên máy, không cần mạng.'
+  estimate: Dự kiến khoảng {duration}, tuỳ tốc độ mạng.
+  license_lead: "Giấy phép:"
+  license_accept: Tôi đã đọc và đồng ý với giấy phép này
+  confirm_large: Lần tải này lớn ({size_gb} GB), vượt ngưỡng {threshold_gb} GB nên cần bạn xác nhận.
+  start: Tải về
+  cancel: Huỷ tải
+  cancel_confirm: Huỷ lần tải này? Phần đã tải dở sẽ không được dùng.
+  progress: "{done_gb}/{total_gb} GB · {file_done_count}/{file_count} tệp"
+  verifying: Đang kiểm tra tệp vừa tải…
+  installing: Đang cài vào bộ nhớ đệm của app…
+  completed: Đã tải "{name}" về máy.
+  failed: Chưa tải được "{name}".
