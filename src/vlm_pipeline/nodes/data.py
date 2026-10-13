@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vlm_pipeline.data.config import DedupeParams, FilterParams, MixParams, SplitParams
+from vlm_pipeline.data.config import CaptionParams, DedupeParams, FilterParams, MixParams, SplitParams
 from vlm_pipeline.nodes.spec import NodeSpec, PortSpec
 
 DATA_SPLIT = NodeSpec(
@@ -54,6 +54,18 @@ DATA_MIX = NodeSpec(
     outputs={"dataset": PortSpec(type="Dataset")},
     params_model=MixParams,
     runner="host",
+)
+
+DATA_CAPTION_VLM = NodeSpec(
+    type_id="data.caption_vlm",
+    version="1.0.0",
+    category="data",
+    icon="message-square",
+    # model: a catalog model (model.hf_pick / a trained one), so only vetted weights ever caption (security §B3)
+    inputs={"dataset": PortSpec(type="Dataset"), "model": PortSpec(type="Model")},
+    outputs={"dataset": PortSpec(type="Dataset")},
+    params_model=CaptionParams,
+    runner="container",  # GPU + GPU lock, the trial (serve.vllm) path
 )
 
 # Data nodes that keep one dataset's identity through their ``dataset`` input (standards follow them upstream).

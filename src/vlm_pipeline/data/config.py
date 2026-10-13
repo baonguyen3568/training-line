@@ -91,3 +91,17 @@ class MixParams(Params):
     weight_3: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(advanced=True, visible_when=_INTERLEAVE))
     weight_4: float = Field(1.0, ge=0, le=10, json_schema_extra=ui(advanced=True, visible_when=_INTERLEAVE))
     seed: int = Field(DEFAULT_SEED, json_schema_extra=ui(advanced=True))
+
+
+class CaptionParams(Params):
+    """data.caption_vlm: a catalog VLM (wired model input) writes the target text of each image (research 2026-10-13).
+
+    The caption is UNTRUSTED text (security §B3): bounded by max_new_tokens, never rendered as HTML/Markdown. Greedy
+    decoding only (no sampling knob). The model + revision go into the dataset metadata (its licence carries over).
+    """
+
+    prompt: str = Field(
+        "Describe this image in detail.", min_length=1, max_length=500, json_schema_extra=ui(order=0, widget="textarea")
+    )
+    max_new_tokens: int = Field(256, ge=32, le=1024, json_schema_extra=ui(order=1))
+    overwrite_existing: bool = Field(False, json_schema_extra=ui(order=2))  # False: only samples without a target

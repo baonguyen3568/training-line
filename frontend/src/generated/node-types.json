@@ -675,6 +675,75 @@
     },
     {
       "cacheable": true,
+      "category": "data",
+      "icon": "message-square",
+      "inputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "dataset": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "data.caption_vlm: a catalog VLM (wired model input) writes the target text of each image (research 2026-10-13).\n\nThe caption is UNTRUSTED text (security \u00a7B3): bounded by max_new_tokens, never rendered as HTML/Markdown. Greedy\ndecoding only (no sampling knob). The model + revision go into the dataset metadata (its licence carries over).",
+        "properties": {
+          "max_new_tokens": {
+            "default": 256,
+            "maximum": 1024,
+            "minimum": 32,
+            "title": "Max New Tokens",
+            "type": "integer",
+            "x-ui": {
+              "order": 1
+            }
+          },
+          "overwrite_existing": {
+            "default": false,
+            "title": "Overwrite Existing",
+            "type": "boolean",
+            "x-ui": {
+              "order": 2
+            }
+          },
+          "prompt": {
+            "default": "Describe this image in detail.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string",
+            "x-ui": {
+              "order": 0,
+              "widget": "textarea"
+            }
+          }
+        },
+        "title": "CaptionParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "data.caption_vlm",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
       "category": "train",
       "icon": "train",
       "inputs": {

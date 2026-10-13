@@ -680,6 +680,22 @@ node:
     port:
       dataset: Data
       heldout: Test data
+  data.caption_vlm:
+    title: Caption images with a model
+    desc: A vision model writes the answer for samples that have none, to use as training data. Check a few answers before training; the model can get things wrong.
+    param:
+      prompt:
+        label: Question for the model
+        help: The request sent with every image, for example "Describe this image in detail".
+      max_new_tokens:
+        label: Maximum length (tokens)
+        help: Caps each answer (32–1024). Longer takes more time.
+      overwrite_existing:
+        label: Overwrite existing answers
+        help: On rewrites samples that already have an answer, replacing it. Off writes only for samples without one.
+    port:
+      dataset: Data
+      model: Captioning model
   data.mix:
     title: Mix data
     desc: Combine 2 to 4 datasets into one for training.

@@ -680,6 +680,22 @@ node:
     port:
       dataset: Dữ liệu
       heldout: Dữ liệu kiểm tra
+  data.caption_vlm:
+    title: Tạo mô tả ảnh bằng model
+    desc: Dùng một model đọc ảnh để viết câu trả lời cho các mẫu chưa có, rồi dùng làm dữ liệu train. Nên xem lại vài câu trước khi train, vì model có thể viết sai.
+    param:
+      prompt:
+        label: Câu hỏi cho model
+        help: Câu yêu cầu gửi kèm mỗi ảnh, ví dụ "Mô tả chi tiết ảnh này".
+      max_new_tokens:
+        label: Độ dài tối đa (token)
+        help: Giới hạn độ dài mỗi câu trả lời (32–1024). Dài hơn thì chạy lâu hơn.
+      overwrite_existing:
+        label: Ghi đè câu trả lời đã có
+        help: Bật thì viết lại cả những mẫu đã có câu trả lời, câu cũ bị thay. Tắt thì chỉ viết cho mẫu chưa có.
+    port:
+      dataset: Dữ liệu
+      model: Model viết mô tả
   data.mix:
     title: Trộn dữ liệu
     desc: Gộp 2 đến 4 bộ dữ liệu thành một bộ để train.

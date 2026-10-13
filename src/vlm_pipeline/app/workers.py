@@ -638,6 +638,15 @@ def _check_merge(q: SupportQuery) -> None:
         )
 
 
+def _check_caption(q: SupportQuery) -> None:
+    """data.caption_vlm v1: a native catalog model on a local folder dataset (no hub parquet on the host)."""
+    params = {"node": q.node_id, "node_type": q.spec.type_id}
+    if q.model is not None and q.model.auto_class != "AutoModelForImageTextToText":
+        raise NodeNotRunnableError("caption needs a native (AutoModelForImageTextToText) model", params=params)
+    if q.inputs.get("dataset", "dataset:local") != "dataset:local":  # allowlist; unwired is CFG-003's job
+        raise NodeNotRunnableError("caption reads local datasets only (v1)", params=params)
+
+
 def _check_export(q: SupportQuery) -> None:
     from vlm_pipeline.app.export_worker import ExportUnsupportedError
 
@@ -666,6 +675,7 @@ def _support_checks() -> dict[str, Callable[[SupportQuery], None]]:
         "train.lora_vlm": _check_train,
         "train.sft_vlm": _check_train,
         "train.merge_lora": _check_merge,
+        "data.caption_vlm": _check_caption,
         "export.hf_dir": _check_export,
         "quantize.modelopt_ptq": _owner_check("vlm_pipeline.quantize.scope"),
         "eval.benchmarks": _owner_check("vlm_pipeline.eval.node_worker"),
