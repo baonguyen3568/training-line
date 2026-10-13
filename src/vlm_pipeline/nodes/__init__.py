@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.paths import configs_root
 from vlm_pipeline.nodes.data import DATA_CAPTION_VLM, DATA_DEDUPE, DATA_FILTER, DATA_MIX, DATA_SPLIT
 from vlm_pipeline.nodes.evaluate import BENCH_PERF, EVAL_BENCHMARKS
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ, SERVE_VLLM, TRAIN_MERGE_LORA
@@ -38,7 +38,7 @@ SPECS = (
 # Container images are not pinned per node yet (M1 runs with the FakeWorker first).
 REGISTRY = Registry(
     SPECS,
-    rules=(*RULES, standards_rule(load_standards(project_root(), SPECS, check_sources=False))),  # P4-2
+    rules=(*RULES, standards_rule(load_standards(configs_root(), SPECS, check_sources=False))),  # P4-2
     allow_unpinned=True,
 )
 

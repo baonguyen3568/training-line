@@ -25,6 +25,7 @@ from typing import Any, ClassVar
 
 from vlm_pipeline.common.download_rules import Kind, check_repo, name_ok, wanted
 from vlm_pipeline.common.errors import VlmPipelineError
+from vlm_pipeline.common.paths import configs_root
 from vlm_pipeline.common.runinfo import read_small_json
 
 
@@ -36,7 +37,7 @@ class DownloadIntegrityError(VlmPipelineError):
 
 def pinned_hashes(root: Path, catalog_id: str, revision: str) -> dict[str, str]:
     """``name -> sha256`` from ``configs/models/pinned/<id>@<rev8>.sha256`` (``sha256sum`` format); {} if none."""
-    path = root / "configs" / "models" / "pinned" / f"{catalog_id}@{revision[:8]}.sha256"
+    path = configs_root(root) / "configs" / "models" / "pinned" / f"{catalog_id}@{revision[:8]}.sha256"
     if not path.is_file():
         return {}
     pins: dict[str, str] = {}

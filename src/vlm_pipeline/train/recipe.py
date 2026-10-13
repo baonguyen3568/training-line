@@ -14,6 +14,7 @@ from typing import Any
 
 from vlm_pipeline.common.catalog import CatalogEntry
 from vlm_pipeline.common.decoding import DECODE_OVERRIDES_KEY, decode_overrides_of
+from vlm_pipeline.common.paths import configs_root
 from vlm_pipeline.train.advanced import keys_not_for, set_dotted
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 
@@ -33,13 +34,13 @@ def templates_digest(project_root: Path) -> str:
     """
     lines = [
         f"{path.name}:{hashlib.sha256(path.read_bytes()).hexdigest()}"
-        for path in sorted((project_root / TEMPLATE_DIR).glob("*.yaml"))
+        for path in sorted((configs_root(project_root) / TEMPLATE_DIR).glob("*.yaml"))
     ]
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()[:12]
 
 
 def template_path(project_root: Path, entry: CatalogEntry) -> Path:
-    path = project_root / TEMPLATE_DIR / f"{entry.id}.yaml"
+    path = configs_root(project_root) / TEMPLATE_DIR / f"{entry.id}.yaml"
     if not path.is_file():
         raise RecipeError(f"no training template for model {entry.id!r}")
     return path

@@ -28,6 +28,7 @@ from vlm_pipeline.common.host_paths import check_mount_source, link_units, secre
 from vlm_pipeline.common.images import check_pinned_image
 from vlm_pipeline.common.launcher import JobLauncher, default_launcher
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
+from vlm_pipeline.common.paths import CODE_ROOT_ENV, is_team_worktree_dir
 from vlm_pipeline.common.run_claims import RunDirClaimedError, claim_run, is_claimed
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
@@ -795,9 +796,6 @@ def _checks_before_queueing(
     return pinned_id
 
 
-CODE_ROOT_ENV = "VLM_CODE_ROOT"  # a clean worktree of HEAD whose src/ + configs/ jobs run (research/E2E runs)
-
-
 def with_code_root(job: ContainerJob, project_root: Path) -> ContainerJob:
     """``job`` reading its code from ``$VLM_CODE_ROOT`` (data, outputs and the lock stay the project's).
 
@@ -820,24 +818,8 @@ def with_code_root(job: ContainerJob, project_root: Path) -> ContainerJob:
 
 
 def _is_team_worktree(root: Path, code: Path) -> bool:
-    """A real git worktree of this project where the team keeps them, never a folder a job can write (security C1).
-
-    Under ``.cache/wt-*``, ``.cache/check-clean.*`` or ``.worktrees/*`` only (never outputs/, data/, uploads/: a
-    job could plant pyproject.toml + src/ there), with a ``.git`` FILE (worktree link) and a HEAD git resolves.
-    """
-    if not code.is_relative_to(root):
-        return False
-    parts = code.relative_to(root).parts
-    placed = len(parts) == 2 and (
-        (parts[0] == ".cache" and parts[1].startswith(("wt-", "check-clean."))) or parts[0] == ".worktrees"
-    )
-    if not placed or not (code / ".git").is_file() or code.is_symlink():
-        return False
-    try:
-        project = 'name = "vlm-pipeline"' in (code / "pyproject.toml").read_text(encoding="utf-8")
-    except OSError:
-        return False
-    return project and git_state(code)[0] is not None
+    """A real git worktree of this project where the team keeps them, never a folder a job can write (security C1)."""
+    return is_team_worktree_dir(root, code) and git_state(code)[0] is not None
 
 
 def _gpu_turn(

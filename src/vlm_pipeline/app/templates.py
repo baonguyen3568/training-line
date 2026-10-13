@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from vlm_pipeline.common.catalog import load_catalog
+from vlm_pipeline.common.paths import configs_root
 
 TEMPLATE_DIR = Path("configs") / "templates"
 
@@ -56,7 +57,7 @@ def load_templates(root: Path, *, include_hidden: bool = False, image: str | Non
     ``image``: the real train image; with it, ``estimate.minutes`` comes from measured runs (app.estimates).
     """
     out = []
-    for path in (root / TEMPLATE_DIR).glob("*.json"):
+    for path in (configs_root(root) / TEMPLATE_DIR).glob("*.json"):
         tpl = TemplateFile.model_validate(json.loads(path.read_text(encoding="utf-8")))
         if tpl.hidden and not include_hidden:
             continue

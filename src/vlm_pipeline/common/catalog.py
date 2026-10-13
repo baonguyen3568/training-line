@@ -13,7 +13,7 @@ from typing import Annotated, Literal, Self
 import yaml
 from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.paths import configs_root
 
 CATALOG_PATH = Path("configs") / "catalog" / "models.yaml"
 DATASETS_PATH = Path("configs") / "catalog" / "datasets.yaml"
@@ -190,7 +190,7 @@ def load_catalog_file(path: Path) -> Catalog:
 @functools.cache
 def load_catalog() -> Catalog:
     """The project catalog (cached for the process)."""
-    return load_catalog_file(project_root() / CATALOG_PATH)
+    return load_catalog_file(configs_root() / CATALOG_PATH)
 
 
 # ------------------------------------------------------------------------------------------------- datasets
@@ -274,5 +274,5 @@ def license_ids_needing_text(catalog: Catalog, datasets: DatasetCatalog) -> set[
 @functools.cache
 def load_dataset_catalog() -> DatasetCatalog:
     """The project dataset catalog (cached for the process)."""
-    path = project_root() / DATASETS_PATH
+    path = configs_root() / DATASETS_PATH
     return DatasetCatalog.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))

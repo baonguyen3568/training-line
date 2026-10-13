@@ -9,6 +9,7 @@ GIB = 1024**3  # every ``*_gb`` value in this project is GiB (like ``free -g``; 
 KIB_PER_GIB = 1024 * 1024
 
 PROJECT_ROOT_ENV = "VLM_PROJECT_ROOT"
+CODE_ROOT_ENV = "VLM_CODE_ROOT"  # a clean worktree of HEAD whose src/ + configs/ jobs run (research/E2E runs)
 
 
 def project_root(start: Path | None = None) -> Path:
@@ -36,3 +37,40 @@ def _is_project_root(path: Path) -> bool:
     except OSError:
         return False
     return 'name = "vlm-pipeline"' in text
+
+
+def is_team_worktree_dir(root: Path, code: Path) -> bool:
+    """``code`` sits where the team keeps worktrees of ``root`` and looks like one (no git call; jobrun adds that).
+
+    Under ``.cache/wt-*``, ``.cache/check-clean.*`` or ``.worktrees/*`` only (never outputs/, data/, uploads/: a
+    job could plant pyproject.toml + configs/ there), not a symlink, with a ``.git`` FILE (worktree link).
+    """
+    if not code.is_relative_to(root):
+        return False
+    parts = code.relative_to(root).parts
+    placed = len(parts) == 2 and (
+        (parts[0] == ".cache" and parts[1].startswith(("wt-", "check-clean."))) or parts[0] == ".worktrees"
+    )
+    return placed and not code.is_symlink() and (code / ".git").is_file() and _is_project_root(code)
+
+
+def configs_root(root: Path | None = None) -> Path:
+    """Where the host reads ``configs/`` (catalogs, templates, standards, licences): the code the jobs run.
+
+    ``$VLM_CODE_ROOT`` (a team worktree of ``root``) when set, so the app half and the job half of a run never see
+    two different catalogs (research 2026-10-13); else ``root`` (default: the project root). Set but not a team
+    worktree: ValueError (security: never a silent fallback to the root's configs). Data, outputs and the GPU lock
+    always stay ``root``'s.
+    """
+    base = (root if root is not None else project_root()).resolve()
+    raw = os.environ.get(CODE_ROOT_ENV, "").strip()
+    if not raw:
+        return base
+    code = Path(raw).resolve()
+    if code == base:
+        return base
+    if not (is_team_worktree_dir(base, code) and (code / "configs").is_dir()):  # fail closed, like with_code_root
+        raise ValueError(
+            f"${CODE_ROOT_ENV} must be a git worktree checkout of this project (.cache/wt-*, .worktrees/*)"
+        )
+    return code

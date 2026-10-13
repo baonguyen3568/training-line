@@ -14,7 +14,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from vlm_pipeline.common.licenses import LICENSES_DIR
-from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.paths import configs_root
 
 if TYPE_CHECKING:
     from vlm_pipeline.common.catalog import CatalogEntry
@@ -55,7 +55,7 @@ class ObligationsTable(BaseModel):
 
 @functools.cache
 def load_obligations() -> ObligationsTable:
-    path = project_root() / OBLIGATIONS_PATH
+    path = configs_root() / OBLIGATIONS_PATH
     return ObligationsTable.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
 

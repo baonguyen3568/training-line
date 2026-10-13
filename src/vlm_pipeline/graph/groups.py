@@ -22,7 +22,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.paths import configs_root
 from vlm_pipeline.graph.workflow import MAX_GROUP_DEFINITIONS, GroupDefinition
 from vlm_pipeline.nodes.spec import Issue, Registry
 
@@ -63,7 +63,7 @@ class _OverLimitError(Exception):
 def first_party_groups(root: Path | None = None) -> Mapping[str, GroupDefinition]:
     """``configs/groups/*.json`` (``group.*`` only); a broken file fails loudly: it ships with the app."""
     found: dict[str, GroupDefinition] = {}
-    for path in sorted(((root or project_root()) / GROUPS_DIR).glob("*.json")):
+    for path in sorted((configs_root(root) / GROUPS_DIR).glob("*.json")):
         group = GroupDefinition.model_validate(json.loads(path.read_text(encoding="utf-8")))
         if not group.id.startswith("group.") or group.id in found:
             raise ValueError(f"{path.name}: first-party group ids are unique and under group.*")

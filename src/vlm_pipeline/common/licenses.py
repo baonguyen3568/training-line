@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from vlm_pipeline.common.approval import is_security_approved
+from vlm_pipeline.common.paths import configs_root
 
 LICENSES_DIR = Path("configs") / "licenses"
 LICENSES_LOCK = LICENSES_DIR / "LICENSES.lock"
@@ -28,7 +29,7 @@ def read_lock(root: Path) -> dict[str, LockedLicense]:
 
     Approved = the verdict starts with ``bao-security APPROVED`` (same mark as IMAGES.lock).
     """
-    path = root / LICENSES_LOCK
+    path = configs_root(root) / LICENSES_LOCK
     if not path.is_file():
         return {}
     rows: dict[str, LockedLicense] = {}
@@ -44,7 +45,7 @@ def read_lock(root: Path) -> dict[str, LockedLicense]:
 def license_text(root: Path, license_id: str) -> Path | None:
     """Verbatim text of ``license_id`` if it is vendored, approved AND matches its locked sha256."""
     row = read_lock(root).get(license_id)
-    path = root / LICENSES_DIR / f"{license_id}.txt"
+    path = configs_root(root) / LICENSES_DIR / f"{license_id}.txt"
     if row is None or not row.approved or not path.is_file():
         return None
     return path if hashlib.sha256(path.read_bytes()).hexdigest() == row.sha256 else None

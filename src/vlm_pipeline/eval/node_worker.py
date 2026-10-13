@@ -39,7 +39,7 @@ from vlm_pipeline.common.jobrun import (
     image_digest,
     run_job,
 )
-from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.paths import configs_root, project_root
 from vlm_pipeline.common.run_log import log_tail
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest
 from vlm_pipeline.eval import cord
@@ -166,7 +166,7 @@ def _sha256(path: Path) -> str:
 
 def template_overrides(root: Path, entry: CatalogEntry) -> dict[str, Any]:
     """The training template's ``decode_overrides`` (base -> template -> node, 001a §10.7); {} without a template."""
-    path = root / TEMPLATE_DIR / f"{entry.id}.yaml"
+    path = configs_root(root) / TEMPLATE_DIR / f"{entry.id}.yaml"
     if not path.is_file():
         return {}
     return decode_overrides_of(yaml.safe_load(path.read_text(encoding="utf-8")) or {}).as_dict()

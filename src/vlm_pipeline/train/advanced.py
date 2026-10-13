@@ -19,7 +19,7 @@ from pydantic_core import PydanticCustomError
 
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
-from vlm_pipeline.common.paths import project_root
+from vlm_pipeline.common.paths import configs_root
 
 ENGINE_DIR = Path("configs") / "engine"
 MAX_KEYS = 100  # a hand-written file cannot smuggle thousands of overrides into one recipe
@@ -33,7 +33,7 @@ class AdvancedNotForModelError(VlmPipelineError):
 
 @functools.cache  # read once per process like the templates digest: the file ships with the app
 def engine_options(root: Path | None = None) -> Mapping[str, Mapping[str, Any]]:
-    path = (root or project_root()) / ENGINE_DIR / f"automodel-{DEFAULT_TRAIN_IMAGE.rsplit(':', 1)[-1]}.json"
+    path = configs_root(root) / ENGINE_DIR / f"automodel-{DEFAULT_TRAIN_IMAGE.rsplit(':', 1)[-1]}.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     return {entry["key"]: entry for entry in data["keys"]}
 
