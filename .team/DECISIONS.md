@@ -58,3 +58,4 @@
 - 2026-10-13 USER: 'cứ chơi đi, không quá 80% VRAM' → team dùng GPU tự do, trần tổng bộ nhớ thiết bị 80% (ADR-005 A1). ADR-001 amendment 2 (template 2 Qwen3.5-2B) ACCEPTED.
 - 2026-10-13 USER sửa: trần = job không dùng quá 80% phần RAM/VRAM CÒN TRỐNG lúc bắt đầu (chừa 20%), không phải 80% tổng máy. ADR-005 A1 cập nhật.
 - 2026-10-13 ✅ M1b: mọi node first-party có worker thật (7ea9bda). Còn: template 2 file (research), template 3 đổi model native (chờ suite eval Qwen), export Parse (B3 patch).
+- 2026-10-13 quantize_bench tạm ẩn khỏi gallery (Parse chưa nén được, chưa có suite eval Qwen); rule QUANT-FORMAT-MODEL thành error. Nguyên tắc: validate sạch ⇒ worker không từ chối vì lý do hỗ trợ (test bất biến).
