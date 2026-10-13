@@ -50,3 +50,20 @@ Qwen2.5-VL-3B (qwen-research, phi thương mại); RLHF-V / RLAIF-V (CC-BY-NC-4.
 - Curator: https://github.com/NVIDIA-NeMo/Curator/tree/main/tutorials/image
 - ModelOpt: https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/hf_ptq ; NVFP4-QAD card: https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-NVFP4-QAD
 - Donut: https://github.com/clovaai/donut
+
+## 5. Khảo sát Cosmos 3 (PM giao, 2026-10-13): có thay template 2 được không?
+| Câu hỏi | Kết quả (nguồn) |
+|---|---|
+| Là gì | "omnimodal world models built on a unified Mixture-of-Transformers architecture": một tower autoregressive (sinh text, tức phần **Reasoner** = VLM) cộng một tower diffusion (sinh ảnh/video/action) (github.com/NVIDIA/Cosmos; card Cosmos3-Edge) |
+| Biến thể | Cosmos3-Super 64B (H200/B200/GB200), **Cosmos3-Nano 16B** (RTX Pro 6000/H100/B200; safetensors 34.9 GB), **Cosmos3-Edge 4B** (Jetson Orin/Thor, RTX Pro 6000; safetensors 9.1 GB, rev 344d602b, phát hành 2026-07-20) |
+| License | **OpenMDW-1.1** (code + model), cùng licence với Parse 2.0, đã vendor và security APPROVED. Không gated. Thoáng hơn OML, không có điều khoản "Built on NVIDIA Cosmos" |
+| Chạy trên DGX Spark | **Inference: có số đo** trong card Edge (bảng vLLM-Omni có dòng "DGX Spark": image-to-video 165.96 s/clip …). "Only BF16 precision is tested. Other precisions like FP4, FP8, and FP16 are not officially supported" ⇒ **chưa nén được chính thức** |
+| Post-training | Qua **Cosmos Framework** (repo riêng): chỉ SFT, "shipped recipes … are 8-GPU configurations (tested on 8× H100 80 GB)". Không nói tới LoRA, RL, DGX Spark hay single-GPU |
+| Load bằng transformers | config Edge: `Cosmos3EdgeForConditionalGeneration`, `model_type: cosmos3_edge`, transformers 4.57.1, không có auto_map. transformers 5.12.1 trong image có `cosmos3_omni` nhưng **không có `cosmos3_edge`** ⇒ AutoModel/AutoModelForImageTextToText chưa load được nếu không có code chuyển đổi. UNVERIFIED cho tới khi probe |
+**Đánh giá research:**
+- Cosmos 3 là một world model (sinh video/action), mạnh nhất cho robotics và AV. Phần VLM (Reasoner) chỉ là một tower. Với app fine-tune VLM của ta thì Cosmos 3 **không thay thế trực tiếp** Cosmos-Reason2: không có recipe LoRA/1-GPU, không được AutoModel hỗ trợ, nén chưa chính thức.
+- Edge 4B (9.1 GB) **vừa GB10 cho inference**. Fine-tune trên GB10 thì cần tự port (FSDP 1 GPU + LoRA) ⇒ R&D, không phải template.
+- **Đề xuất:**
+  1. Template 2 (ảnh/video) chuyển sang **Qwen3.5-2B/4B LoRA** (Apache-2.0, video có trong catalog, AutoModel có recipe Qwen3.5, FP8 chính thức).
+  2. Cosmos-Reason2-2B ở lại catalog mức "ứng viên" (inference + LoRA thử nghiệm).
+  3. Cosmos3-Edge vào hàng đợi R&D: probe inference trên GB10 + node "Chạy thử", chưa train.
