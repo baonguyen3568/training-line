@@ -1,15 +1,14 @@
 {
   "format": "vlm-workflow",
   "schema_version": 1,
-  "name": "Dạy model đọc tài liệu (LoRA) — chạy thử",
+  "name": "Parse nối vào LoRA (T6)",
   "nodes": [
     {
       "id": "model",
       "type": "model.hf_pick",
       "version": "1.0.0",
       "params": {
-        "repo": "Qwen/Qwen3.5-0.8B",
-        "revision": "0000000000000000000000000000000000000000"
+        "model": "nemotron-parse-v1.1"
       },
       "ui": {
         "x": 0,
@@ -18,10 +17,10 @@
     },
     {
       "id": "data",
-      "type": "data.local_folder",
+      "type": "data.hf_load",
       "version": "1.0.0",
       "params": {
-        "path": "data/samples/invoices-mini"
+        "repo": "naver-clova-ix/cord-v2"
       },
       "ui": {
         "x": 0,
@@ -29,10 +28,12 @@
       }
     },
     {
-      "id": "fmt",
-      "type": "data.format_vlm_chat",
+      "id": "split",
+      "type": "data.split",
       "version": "1.0.0",
-      "params": {},
+      "params": {
+        "val_fraction": 0.1
+      },
       "ui": {
         "x": 250,
         "y": 200
@@ -43,22 +44,10 @@
       "type": "train.lora_vlm",
       "version": "1.0.0",
       "params": {
-        "run_mode": "smoke"
+        "epochs": 3
       },
       "ui": {
         "x": 500,
-        "y": 100
-      }
-    },
-    {
-      "id": "eval",
-      "type": "eval.benchmarks",
-      "version": "1.0.0",
-      "params": {
-        "tier": "smoke"
-      },
-      "ui": {
-        "x": 750,
         "y": 100
       }
     }
@@ -70,17 +59,7 @@
         "dataset"
       ],
       "to": [
-        "fmt",
-        "dataset"
-      ]
-    },
-    {
-      "from": [
-        "fmt",
-        "dataset"
-      ],
-      "to": [
-        "train",
+        "split",
         "dataset"
       ]
     },
@@ -96,22 +75,22 @@
     },
     {
       "from": [
-        "model",
-        "model"
+        "split",
+        "train"
       ],
       "to": [
-        "eval",
-        "model"
+        "train",
+        "train_data"
       ]
     },
     {
       "from": [
-        "train",
-        "adapter"
+        "split",
+        "val"
       ],
       "to": [
-        "eval",
-        "adapter"
+        "train",
+        "val_data"
       ]
     }
   ]

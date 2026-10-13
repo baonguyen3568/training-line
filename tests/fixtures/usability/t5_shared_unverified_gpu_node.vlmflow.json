@@ -1,15 +1,14 @@
 {
   "format": "vlm-workflow",
   "schema_version": 1,
-  "name": "Workflow đồng nghiệp gửi (T5)",
+  "name": "Node chia sẻ chưa xác minh (T5)",
   "nodes": [
     {
       "id": "model",
       "type": "model.hf_pick",
       "version": "1.0.0",
       "params": {
-        "repo": "Qwen/Qwen3.5-0.8B",
-        "revision": "0000000000000000000000000000000000000000"
+        "model": "nemotron-parse-v1.1"
       },
       "ui": {
         "x": 0,
@@ -18,10 +17,10 @@
     },
     {
       "id": "data",
-      "type": "data.local_folder",
+      "type": "data.hf_load",
       "version": "1.0.0",
       "params": {
-        "path": "data/samples/invoices-mini"
+        "repo": "naver-clova-ix/cord-v2"
       },
       "ui": {
         "x": 0,
@@ -29,10 +28,12 @@
       }
     },
     {
-      "id": "fmt",
-      "type": "data.format_vlm_chat",
+      "id": "split",
+      "type": "data.split",
       "version": "1.0.0",
-      "params": {},
+      "params": {
+        "val_fraction": 0.1
+      },
       "ui": {
         "x": 250,
         "y": 200
@@ -41,11 +42,10 @@
     {
       "id": "boost",
       "type": "fastvision/turbo-lora.train",
-      "version": "2.1.0",
+      "version": "1.0.0",
       "params": {
         "gpu_boost": true
       },
-      "package": "vlm/lora-trainer",
       "ui": {
         "x": 500,
         "y": 100
@@ -59,17 +59,7 @@
         "dataset"
       ],
       "to": [
-        "fmt",
-        "dataset"
-      ]
-    },
-    {
-      "from": [
-        "fmt",
-        "dataset"
-      ],
-      "to": [
-        "boost",
+        "split",
         "dataset"
       ]
     },
@@ -81,6 +71,16 @@
       "to": [
         "boost",
         "base_model"
+      ]
+    },
+    {
+      "from": [
+        "split",
+        "train"
+      ],
+      "to": [
+        "boost",
+        "dataset"
       ]
     }
   ]

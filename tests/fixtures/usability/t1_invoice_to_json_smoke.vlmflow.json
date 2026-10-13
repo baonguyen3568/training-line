@@ -1,0 +1,129 @@
+{
+  "format": "vlm-workflow",
+  "schema_version": 1,
+  "name": "Hoá đơn → JSON (T1)",
+  "nodes": [
+    {
+      "id": "model",
+      "type": "model.hf_pick",
+      "version": "1.0.0",
+      "params": {
+        "model": "nemotron-parse-v1.1"
+      },
+      "ui": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "data",
+      "type": "data.hf_load",
+      "version": "1.0.0",
+      "params": {
+        "repo": "naver-clova-ix/cord-v2"
+      },
+      "ui": {
+        "x": 0,
+        "y": 200
+      }
+    },
+    {
+      "id": "split",
+      "type": "data.split",
+      "version": "1.0.0",
+      "params": {
+        "val_fraction": 0.1
+      },
+      "ui": {
+        "x": 250,
+        "y": 200
+      }
+    },
+    {
+      "id": "train",
+      "type": "train.sft_vlm",
+      "version": "1.0.0",
+      "params": {
+        "epochs": 3
+      },
+      "ui": {
+        "x": 500,
+        "y": 100
+      }
+    },
+    {
+      "id": "eval",
+      "type": "eval.benchmarks",
+      "version": "1.0.0",
+      "params": {
+        "suite": "cord_test"
+      },
+      "ui": {
+        "x": 750,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": [
+        "data",
+        "dataset"
+      ],
+      "to": [
+        "split",
+        "dataset"
+      ]
+    },
+    {
+      "from": [
+        "model",
+        "model"
+      ],
+      "to": [
+        "train",
+        "base_model"
+      ]
+    },
+    {
+      "from": [
+        "split",
+        "train"
+      ],
+      "to": [
+        "train",
+        "train_data"
+      ]
+    },
+    {
+      "from": [
+        "split",
+        "val"
+      ],
+      "to": [
+        "train",
+        "val_data"
+      ]
+    },
+    {
+      "from": [
+        "train",
+        "model"
+      ],
+      "to": [
+        "eval",
+        "model"
+      ]
+    },
+    {
+      "from": [
+        "split",
+        "val"
+      ],
+      "to": [
+        "eval",
+        "data"
+      ]
+    }
+  ]
+}

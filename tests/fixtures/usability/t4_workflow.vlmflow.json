@@ -1,15 +1,14 @@
 {
   "format": "vlm-workflow",
   "schema_version": 1,
-  "name": "Fine-tune full (T4)",
+  "name": "Thiếu bộ nhớ (T4)",
   "nodes": [
     {
       "id": "model",
       "type": "model.hf_pick",
       "version": "1.0.0",
       "params": {
-        "repo": "Qwen/Qwen3.5-0.8B",
-        "revision": "0000000000000000000000000000000000000000"
+        "model": "nemotron-parse-v1.1"
       },
       "ui": {
         "x": 0,
@@ -18,10 +17,10 @@
     },
     {
       "id": "data",
-      "type": "data.local_folder",
+      "type": "data.hf_load",
       "version": "1.0.0",
       "params": {
-        "path": "data/samples/invoices-mini"
+        "repo": "naver-clova-ix/cord-v2"
       },
       "ui": {
         "x": 0,
@@ -29,10 +28,12 @@
       }
     },
     {
-      "id": "fmt",
-      "type": "data.format_vlm_chat",
+      "id": "split",
+      "type": "data.split",
       "version": "1.0.0",
-      "params": {},
+      "params": {
+        "val_fraction": 0.1
+      },
       "ui": {
         "x": 250,
         "y": 200
@@ -42,7 +43,9 @@
       "id": "train",
       "type": "train.sft_vlm",
       "version": "1.0.0",
-      "params": {},
+      "params": {
+        "epochs": 3
+      },
       "ui": {
         "x": 500,
         "y": 100
@@ -53,7 +56,7 @@
       "type": "eval.benchmarks",
       "version": "1.0.0",
       "params": {
-        "tier": "smoke"
+        "suite": "cord_test"
       },
       "ui": {
         "x": 750,
@@ -68,17 +71,7 @@
         "dataset"
       ],
       "to": [
-        "fmt",
-        "dataset"
-      ]
-    },
-    {
-      "from": [
-        "fmt",
-        "dataset"
-      ],
-      "to": [
-        "train",
+        "split",
         "dataset"
       ]
     },
@@ -94,7 +87,27 @@
     },
     {
       "from": [
-        "model",
+        "split",
+        "train"
+      ],
+      "to": [
+        "train",
+        "train_data"
+      ]
+    },
+    {
+      "from": [
+        "split",
+        "val"
+      ],
+      "to": [
+        "train",
+        "val_data"
+      ]
+    },
+    {
+      "from": [
+        "train",
         "model"
       ],
       "to": [
@@ -104,12 +117,12 @@
     },
     {
       "from": [
-        "train",
-        "adapter"
+        "split",
+        "val"
       ],
       "to": [
         "eval",
-        "adapter"
+        "data"
       ]
     }
   ]

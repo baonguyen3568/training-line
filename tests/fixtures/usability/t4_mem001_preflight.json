@@ -7,33 +7,15 @@
       "code": "MEM-001",
       "severity": "error",
       "params": {
-        "need_gb": 48,
-        "avail_gb": 42
-      }
+        "need_gb": 14,
+        "avail_gb": 9
+      },
+      "already_optimized": true
     }
   ],
-  "estimates": {
-    "train": {
-      "ram_gb": [
-        44,
-        48
-      ],
-      "source": "measured"
-    }
-  },
-  "action_estimates": {
-    "use_qlora": {
-      "ram_gb": [
-        20,
-        24
-      ]
-    },
-    "use_lora": {
-      "ram_gb": [
-        30,
-        34
-      ]
-    }
-  },
-  "_note": "Numbers mirror this shared GB10 (~42 GB MemAvailable). use_qlora/use_lora ranges must come from the estimator once S-3 calibration lands - do not show invented numbers to participants."
+  "expected_available_actions": [
+    "queue_until_memory",
+    "see_memory_usage"
+  ],
+  "_note": "need_gb/avail_gb are ILLUSTRATIVE (design prototype) until the estimator is calibrated by P-1 on 26.08-2. Parse full fine-tune: no memory patch applies (method fixed to full, max_pixels fixed by the processor, micro_batch_size already 1, no smaller Parse model) -> already_optimized=true; re-derive from the real NodeSpec bounds."
 }

@@ -2,18 +2,25 @@
   "t3_wrong_wire_missing_input.vlmflow.json": [
     {
       "code": "CFG-001",
-      "node_id": "eval"
+      "node_id": "eval",
+      "port": "model"
     },
     {
       "code": "CFG-003",
-      "node_id": "train"
+      "node_id": "train",
+      "port": "base_model"
     }
   ],
   "t4_workflow.vlmflow.json": [
     {
       "code": "MEM-001",
       "node_id": "train",
-      "via": "t4_mem001_preflight.json (stub)"
+      "via": "t4_mem001_preflight.json (stub)",
+      "already_optimized": true,
+      "available_actions": [
+        "queue_until_memory",
+        "see_memory_usage"
+      ]
     }
   ],
   "t5_shared_unverified_gpu_node.vlmflow.json": [
@@ -27,8 +34,25 @@
       },
       "must_not_contain": [
         "vlm/lora-trainer"
-      ]
+      ],
+      "port": null
     }
   ],
-  "t1_lora_template_smoke.vlmflow.json": []
+  "t1_invoice_to_json_smoke.vlmflow.json": [],
+  "t6_parse_on_lora.vlmflow.json": [
+    {
+      "code": "CFG-010",
+      "node_id": "train",
+      "port": "base_model",
+      "params": {
+        "model": "NVIDIA Nemotron Parse v1.1",
+        "supported": "train.sft_vlm"
+      },
+      "must_not_contain": [
+        "train.sft_vlm",
+        "train.lora_vlm",
+        "\"train\""
+      ]
+    }
+  ]
 }
