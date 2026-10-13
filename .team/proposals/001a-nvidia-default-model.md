@@ -376,3 +376,4 @@ Greedy không penalty (baseline), prefix đúng trên mọi record. Record: `ben
   - ⇒ Cùng ngân sách 1 epoch, fp32 master tốt hơn rõ 3 epoch bf16. Lỗi bf16 là nguyên nhân chính.
   - Còn chờ: resume smoke (A/B1/B2) + gate per-ckpt của tester (token acc, greedy F1/truncated trên val) trước khi chuyển template Parse v1.1 sang FusedAdam.
 - (số đo phụ, dùng cho docs M2) Tốc độ chấm CORD qua HF remote, batch 1, use_cache on: **~7 ảnh/phút** (tester, ma trận P-3 2026-10-12). P-3: ~20 s/step ở GBS 8, peak 18.9 GB.
+- (2026-10-13, PM) Resume smoke FusedAdam (A/B1/B2) **không qua**. PM xác định nguyên nhân là bug riêng ở checkpoint shard, không do FusedAdam. Template vẫn chuyển sang FusedAdam (0780e10). **Giới hạn hiện tại: chưa dừng rồi chạy tiếp được với Parse.** Chờ bug report của backend.
