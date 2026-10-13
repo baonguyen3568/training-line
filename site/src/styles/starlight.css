@@ -1,5 +1,9 @@
-/* Starlight docs follow the shared design tokens (same source as the app). */
-:root {
+/* Starlight docs follow the shared design tokens (same source as the app), in BOTH themes: Starlight sets its own
+   palette on :root[data-theme="light"|"dark"], so the mapping must match that specificity. Docs keep the theme picker
+   (design 2026-10-13: long reads respect the reader); tokens.css switches on the same data-theme attribute. */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
   --sl-font: var(--font-family-ui);
   --sl-font-mono: var(--font-family-mono);
   --sl-color-accent: var(--color-accent-brand);
