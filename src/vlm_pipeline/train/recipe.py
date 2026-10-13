@@ -14,6 +14,7 @@ from typing import Any
 
 from vlm_pipeline.common.catalog import CatalogEntry
 from vlm_pipeline.common.decoding import DECODE_OVERRIDES_KEY, decode_overrides_of
+from vlm_pipeline.train.advanced import keys_not_for, set_dotted
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 
 TEMPLATE_DIR = Path("configs") / "train" / "templates"
@@ -101,6 +102,7 @@ def build_recipe(
     drop_validation: bool = False,
     train_meta: str | None = None,
     val_meta: str | None = None,
+    model_id: str | None = None,
 ) -> dict[str, Any]:
     """Return a new recipe dict (the template is not modified).
 
@@ -111,6 +113,7 @@ def build_recipe(
     ``train_meta`` / ``val_meta``: local data (container paths of ``make_meta_dataset`` meta files written by the
     train worker from the data node's records); they replace the template's dataset sections, whatever their
     loader (research: templates stay neutral about the data source).
+    ``model_id``: the catalog id of the template, to refuse Advanced keys it does not have (P016 §3).
     """
     import copy
 
@@ -122,6 +125,13 @@ def build_recipe(
         r, dataset_dir=dataset_dir, train_limit=train_limit, train_split=train_split, val_dataset_dir=val_dataset_dir,
         val_split=val_split, drop_validation=drop_validation, train_meta=train_meta, val_meta=val_meta,
     )  # fmt: skip
+    if model_id is not None and (wrong := keys_not_for(model_id, params.advanced)):  # also outside the canvas (CLI)
+        raise RecipeError(f"advanced options not in the {model_id} template: {wrong}")
+    for key, value in sorted(params.advanced.items()):  # P016 §3: after the template, before the node's own fields
+        try:
+            set_dotted(r, key, value)
+        except ValueError as exc:
+            raise RecipeError(str(exc)) from exc
     sched = _section(r, "step_scheduler")
     sched["global_batch_size"] = params.global_batch_size
     sched["local_batch_size"] = params.local_batch_size

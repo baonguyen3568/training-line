@@ -47,6 +47,7 @@ from vlm_pipeline.graph.worker import (
     checkpoint_dirs,
 )
 from vlm_pipeline.nodes.spec import NodeSpec, is_compatible
+from vlm_pipeline.train.advanced import AdvancedNotForModelError, keys_not_for
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path, templates_digest
 
@@ -443,6 +444,7 @@ class RealWorker:
             val_meta=val_meta,
             run_dir=self.container_path(run_dir),
             class_token_start_idx=class_token,
+            model_id=entry.id,
         )
         if job.resume_from is not None and entry.id not in RESUME_UNSUPPORTED:
             # P017: the earlier attempt's checkpoint (chosen and checked by the executor, C1-C3) is read through the
@@ -637,6 +639,12 @@ def _check_train(q: SupportQuery) -> None:
         raise TrainModeUnsupportedError(
             "train node not vetted for this model",
             params={"node": q.node_id, "model": q.model.display_name, "supported": q.model.train_node},
+        )
+    advanced = getattr(q.params, "advanced", {})
+    if q.model is not None and (wrong := keys_not_for(q.model.id, advanced)):  # P016 §3: optimizers differ per model
+        raise AdvancedNotForModelError(
+            "advanced option not in this model's template",
+            params={"node": q.node_id, "param": "advanced", "value": wrong[0], "rule": "not_for_model"},
         )
     if getattr(q.params, "quantize_base", "none") != "none":  # QLoRA: offered disabled until smoke-tested on GB10
         raise NodeNotRunnableError(

@@ -777,6 +777,9 @@ node:
       quantize_base:
         label: Nén model gốc khi học (QLoRA)
         help: Nén model gốc xuống 4-bit để tiết kiệm bộ nhớ khi học. Chỉ có lợi với model lớn (từ ~9B). Chưa dùng được trên máy này.
+      advanced:
+        label: Tuỳ chọn engine nâng cao
+        help: Các tuỳ chọn của engine train (NeMo AutoModel), giữ nguyên tên gốc. Chỉ đổi khi bạn biết rõ tác dụng; để trống là dùng mặc định đã được kiểm tra. App vẫn kiểm tra giá trị trước khi chạy.
     port:
       base_model: Model gốc
       train_data: Dữ liệu học
@@ -791,6 +794,9 @@ node:
       val_data: Dữ liệu kiểm tra (tuỳ chọn)
       model: Model hoàn chỉnh
     param:
+      advanced:
+        label: Tuỳ chọn engine nâng cao
+        help: Các tuỳ chọn của engine train (NeMo AutoModel), giữ nguyên tên gốc. Chỉ đổi khi bạn biết rõ tác dụng; để trống là dùng mặc định đã được kiểm tra. App vẫn kiểm tra giá trị trước khi chạy.
       epochs:
         label: Thời lượng huấn luyện
         help: Số lượt model đọc hết dữ liệu. Nhiều lượt hơn thì lâu hơn và dễ học vẹt.

@@ -6,9 +6,9 @@ S-3 smoke). Per-model defaults (loss, pixels, freezing) come from the model cata
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from vlm_pipeline.common.params import Params, ui
 
@@ -36,6 +36,15 @@ class _FinetuneParams(Params):
     activation_checkpointing: bool = Field(True, json_schema_extra=ui(advanced=True))
     max_recent_checkpoints: int = Field(2, ge=1, le=5, json_schema_extra=ui(advanced=True))
     seed: int = Field(DEFAULT_SEED, json_schema_extra=ui(advanced=True))
+    # Engine options by dotted key (P016 §3), offered from configs/engine/*.json: checked in train/advanced.py.
+    advanced: dict[str, Any] = Field(default_factory=dict, json_schema_extra=ui(advanced=True, widget="advanced"))
+
+    @field_validator("advanced")
+    @classmethod
+    def _offered_engine_options(cls, value: dict[str, Any]) -> dict[str, Any]:
+        from vlm_pipeline.train.advanced import check_advanced
+
+        return check_advanced(value)
 
     @model_validator(mode="after")
     def _batch_divides(self) -> Self:

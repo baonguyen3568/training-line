@@ -777,6 +777,9 @@ node:
       quantize_base:
         label: Compress the base model while training (QLoRA)
         help: Loads the base model in 4-bit to save memory while training. Only pays off for large models (~9B and up). Not available on this machine yet.
+      advanced:
+        label: Advanced engine options
+        help: Options of the training engine (NeMo AutoModel), under their original names. Change them only if you know what they do; empty uses the tested defaults. The app still checks the values before running.
     port:
       base_model: Base model
       train_data: Training data
@@ -791,6 +794,9 @@ node:
       val_data: Validation data (optional)
       model: Complete model
     param:
+      advanced:
+        label: Advanced engine options
+        help: Options of the training engine (NeMo AutoModel), under their original names. Change them only if you know what they do; empty uses the tested defaults. The app still checks the values before running.
       epochs:
         label: Training length
         help: How many passes over all the data. More passes take longer and can cause memorizing.
