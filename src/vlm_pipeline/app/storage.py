@@ -182,8 +182,8 @@ def _item(item: cache_retention.CacheItem, protected_reason: str | None) -> dict
 
 
 def _cache_entry(item: cache_retention.CacheItem, reason: str | None, auto: set[str], node: str = "") -> dict[str, Any]:
-    """Panel row of a cache entry; one a later attempt resumes from (P017 C6) is only shown, never selectable."""
-    if reason == retention.INPUT_REASON:
+    """Panel row of a cache entry; one that is pinned (KEEP) or a later attempt resumes from (P017 C6) is only shown."""
+    if reason in cache_retention.NEVER_CONFIRMABLE:
         row = _item(item, None)
         return {
             **row,
@@ -473,7 +473,7 @@ class StorageApi:
                 skipped.append({"item_id": key, "reason": "NOT_EVICTABLE"})
                 continue
             item, why = found
-            if why == retention.INPUT_REASON:  # a later attempt resumes from it: no confirmation unlocks it
+            if why in cache_retention.NEVER_CONFIRMABLE:  # pinned, or a later attempt resumes from it
                 skipped.append({"item_id": key, "reason": why})
                 continue
             if why is not None:

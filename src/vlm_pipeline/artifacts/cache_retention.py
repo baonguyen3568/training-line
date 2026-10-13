@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import time
 from collections.abc import Collection
@@ -139,15 +140,19 @@ def _item(root: Path, entry: CacheEntry) -> CacheItem:
     )
 
 
+PINNED_OR_KEEP = "PINNED_OR_KEEP"  # a KEEP file in the run dir: the one way to pin (no UI pin button in 1.0)
 TRAINED_MODEL = "TRAINED_MODEL"
 MANIFEST_UNREADABLE = "MANIFEST_UNREADABLE"
+
+
+NEVER_CONFIRMABLE = frozenset({INPUT_REASON, PINNED_OR_KEEP})  # no typed confirmation deletes these
 
 
 def protection_reason(root: Path, entry: CacheEntry, inputs: ResumeInputs | None = None) -> str | None:
     """Why automatic eviction must skip ``entry`` (None = may be evicted automatically). Fails closed.
 
-    ``INPUT_OF_RUNNING_ATTEMPT`` (a later attempt resumes from this run dir, P017 C6) is the one reason a typed
-    confirmation never overrides.
+    ``INPUT_OF_RUNNING_ATTEMPT`` (a later attempt resumes from this run dir, P017 C6) and ``PINNED_OR_KEEP`` (a
+    ``KEEP`` file in the run dir, as in checkpoint retention) are never overridden by a typed confirmation.
 
     Trained-ness comes from the index flag the executor sets from node registry metadata (never from matching the
     namespaced ``node_type`` string) or from run.json ``stage``; an unreadable run.json also protects the entry.
@@ -156,6 +161,8 @@ def protection_reason(root: Path, entry: CacheEntry, inputs: ResumeInputs | None
         run_dir = entry_run_dir(root, entry)
         if run_dir is not None and inputs is not None and inputs.blocks(run_dir):
             return INPUT_REASON
+        if run_dir is not None and os.path.lexists(run_dir / "KEEP"):
+            return PINNED_OR_KEEP
         if entry.trained_model:
             return TRAINED_MODEL
         if run_dir is None:
@@ -235,7 +242,7 @@ def evict(
     for key in cache_keys:
         entry = index.get(key)
         reason = protection_reason(root, entry, inputs) if entry is not None else None
-        if reason is not None and (key not in confirmed or reason == INPUT_REASON):
+        if reason is not None and (key not in confirmed or reason in NEVER_CONFIRMABLE):
             result.skipped.append((key, reason))
             continue
         if entry is None or not index.begin_evict(key):

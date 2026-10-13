@@ -296,3 +296,14 @@ def test_the_source_of_a_running_attempt_is_never_evicted_even_confirmed(root: P
         json.dumps({"run_id": "a2", "status": "completed", "resumed_from": {"run": "n1-0123456789abcdef"}})
     )  # the attempt finished: the source follows the normal rules again (a trained model: confirmation)
     assert evict(root, idx, ["n1-0123456789abcdef"], by="t", confirmed={"n1-0123456789abcdef"}).evicted
+
+
+def test_a_keep_file_pins_a_cache_entry_even_against_a_typed_confirmation(root: Path, idx: ArtifactIndex) -> None:
+    """KEEP is the one way to pin (as in checkpoint retention): never chosen automatically, never deleted by hand."""
+    run = _cached_run(root, idx, "eval-keep")
+    (run / "KEEP").touch()
+    plan = plan_cache(root, idx, cap_gb=0.0)
+    assert [(i.cache_key, why) for i, why in plan.protected] == [("eval-keep", "PINNED_OR_KEEP")]
+    res = evict(root, idx, ["eval-keep"], by="t", manual=True, confirmed={"eval-keep"})
+    assert res.skipped == [("eval-keep", "PINNED_OR_KEEP")]
+    assert (run / "artifacts" / "model" / "weights.bin").exists()
