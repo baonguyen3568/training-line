@@ -90,10 +90,26 @@ class _Budget:
 
 
 class EgressProxy:
-    def __init__(self, *, resolve: Resolve = _system_resolve, connect: Connect = _system_connect) -> None:
+    def __init__(
+        self,
+        *,
+        resolve: Resolve = _system_resolve,
+        connect: Connect = _system_connect,
+        peers: ipaddress.IPv4Network | None = None,
+    ) -> None:
         self._resolve = resolve
         self._connect = connect
         self._jobs: dict[str, _Budget] = {}
+        self._peers = peers  # the egress network: a tunnel from anywhere else is closed unanswered
+
+    def peer_allowed(self, peer: object) -> bool:
+        if self._peers is None:
+            return True
+        host = peer[0] if isinstance(peer, tuple) and peer else None
+        try:
+            return ipaddress.ip_address(str(host)) in self._peers
+        except ValueError:
+            return False
 
     # ------------------------------------------------------------------------------------------ control (runner)
     def register(self, job: str, key: str, max_bytes: int) -> None:
@@ -121,6 +137,8 @@ class EgressProxy:
     # ------------------------------------------------------------------------------------------ tunnels (jobs)
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
+            if not self.peer_allowed(writer.get_extra_info("peername")):
+                return  # not a download job (security nit): no reply at all
             await self._handle(reader, writer)
         except (OSError, TimeoutError, asyncio.IncompleteReadError, asyncio.LimitOverrunError, ValueError):
             pass
@@ -223,9 +241,13 @@ def control_command(proxy: EgressProxy, raw: bytes) -> dict[str, Any]:
 
 
 async def serve(
-    control_path: Path, listen_port: int = 3128, allowed_uid: int | None = None
+    control_path: Path,
+    listen_port: int = 3128,
+    allowed_uid: int | None = None,
+    listen_host: str = "0.0.0.0",  # noqa: S104 - compose passes the proxy's own address on the egress network
+    peers: ipaddress.IPv4Network | None = None,
 ) -> None:  # pragma: no cover
-    proxy = EgressProxy()
+    proxy = EgressProxy(peers=peers)
     uid = os.getuid() if allowed_uid is None else allowed_uid
 
     async def on_control(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -242,7 +264,7 @@ async def serve(
     control_path.unlink(missing_ok=True)
     control = await asyncio.start_unix_server(on_control, path=str(control_path))
     control_path.chmod(0o660)
-    tunnels = await asyncio.start_server(proxy.handle, host="0.0.0.0", port=listen_port)  # noqa: S104 - egress net
+    tunnels = await asyncio.start_server(proxy.handle, host=listen_host, port=listen_port)
     async with control, tunnels:
         await asyncio.gather(control.serve_forever(), tunnels.serve_forever())
 
@@ -250,8 +272,15 @@ async def serve(
 def main() -> None:  # pragma: no cover - the egress-proxy container entrypoint
     logging.basicConfig(level=logging.INFO)
     control = Path(os.environ.get("VLM_EGRESS_CONTROL", "/run/vlm-egress/control.sock"))
+    subnet = os.environ.get("VLM_EGRESS_SUBNET", "")
+    listen = os.environ.get("VLM_EGRESS_LISTEN", "")
     asyncio.run(
-        serve(control, allowed_uid=int(os.environ["VLM_RUNNER_UID"]) if "VLM_RUNNER_UID" in os.environ else None)
+        serve(
+            control,
+            allowed_uid=int(os.environ["VLM_RUNNER_UID"]) if "VLM_RUNNER_UID" in os.environ else None,
+            listen_host=str(ipaddress.IPv4Address(listen)) if listen else "0.0.0.0",  # noqa: S104 - dev only
+            peers=ipaddress.IPv4Network(subnet) if subnet else None,  # a bad value stops the proxy, never widens
+        )
     )
 
 

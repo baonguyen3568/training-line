@@ -28,6 +28,10 @@ Lệnh cài:
 
 Chạy lại lệnh cài bất cứ lúc nào để cập nhật: file đã có sẽ không bị ghi đè.
 
+Nâng cấp từ bản cài trước ngày 2026-10-13: hai mạng nội bộ của app (`edge` cho nginx, `egress` cho job tải về) giờ có
+dải địa chỉ cố định. Nếu `docker compose up` báo mạng `ntc-training_egress` hoặc `ntc-training_edge` "sai cấu hình",
+hãy chạy `docker compose --env-file .env.compose down` một lần (chỉ dừng app, không xoá dữ liệu) rồi chạy lại lệnh cài.
+
 ### Token Hugging Face (chuyển từ bản cũ)
 
 Token nhập trong app: **Cài đặt → Token**. Token được mã hoá bằng `secrets.key`; app không đọc token từ file `.env`.

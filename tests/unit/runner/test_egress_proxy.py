@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
 import json
 
 import pytest
@@ -182,3 +183,33 @@ def test_a_client_that_never_finishes_its_request_is_dropped() -> None:
         assert asyncio.run(run()) == b""  # closed by the proxy
     finally:
         egress_proxy.HEAD_TIMEOUT_S = 10.0
+
+
+@pytest.mark.parametrize(
+    ("peer", "ok"),
+    [(("10.231.48.9", 5000), True), (("10.231.47.3", 5000), False), (("127.0.0.1", 1), False), (None, False),
+     (("not-an-ip", 1), False)],
+)  # fmt: skip
+def test_only_the_egress_network_may_open_a_tunnel(peer: object, ok: bool) -> None:
+    proxy = EgressProxy(peers=ipaddress.IPv4Network("10.231.48.0/28"))
+    assert proxy.peer_allowed(peer) is ok
+    assert EgressProxy().peer_allowed(peer) is True  # no subnet configured (dev, tests): unchanged
+
+
+def test_a_peer_outside_the_egress_network_gets_no_reply() -> None:
+    async def run() -> bytes:
+        proxy = EgressProxy(peers=ipaddress.IPv4Network("10.231.48.0/28"))  # the test client is 127.0.0.1
+        proxy.register("dl-1", KEY, 1_000_000)
+        server = await asyncio.start_server(proxy.handle, "127.0.0.1", 0)
+        async with server:
+            reader, writer = await asyncio.open_connection("127.0.0.1", server.sockets[0].getsockname()[1])
+            writer.write(f"CONNECT huggingface.co:443 HTTP/1.1\r\n{_auth()}\r\n".encode())
+            await writer.drain()
+            try:
+                reply = await asyncio.wait_for(reader.read(), 5)
+            except ConnectionResetError:  # closed with our request unread: a reset, still no reply
+                reply = b""
+            writer.close()
+            return reply
+
+    assert asyncio.run(run()) == b""  # closed unanswered, even with a valid credential

@@ -92,9 +92,14 @@ services:
     environment:
       VLM_EGRESS_CONTROL: /run/vlm-egress/control.sock
       VLM_RUNNER_UID: "${VLM_UID}"  # only the runner may register budgets (SO_PEERCRED)
+      VLM_EGRESS_LISTEN: "${VLM_EGRESS_PROXY_IP:-10.231.48.2}"  # tunnels on the egress network only
+      VLM_EGRESS_SUBNET: "${VLM_EGRESS_SUBNET:-10.231.48.0/28}"  # and only from it
     volumes:
       - "egress-control:/run/vlm-egress"
-    networks: [egress, default]
+    networks:
+      egress:
+        ipv4_address: "${VLM_EGRESS_PROXY_IP:-10.231.48.2}"
+      default: {}
     depends_on: [runner]
     mem_limit: 128m
 
@@ -129,6 +134,10 @@ networks:
           ip_range: "${VLM_EDGE_IP_RANGE:-10.231.47.4/30}"  # the app's pool: never nginx's fixed .2
   egress:
     internal: true  # no route out: download jobs reach the internet only through egress-proxy
+    ipam:
+      config:
+        - subnet: "${VLM_EGRESS_SUBNET:-10.231.48.0/28}"
+          ip_range: "${VLM_EGRESS_IP_RANGE:-10.231.48.8/29}"  # download jobs: never the proxy's fixed .2
 
 volumes:
   runner-sock: {}

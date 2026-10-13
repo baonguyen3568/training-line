@@ -117,6 +117,12 @@ lan_value() { sed -n "s/^${1}=\(.*\)$/\1/p" <<<"$2"; }
 # The app always joins the nginx<->app "edge" network: its subnet must not overlap any network of this machine.
 edge_out="$(python3 -I "$ROOT/scripts/lib_lan.py" edge "$EDGE_SUBNET")" || fail "set another VLM_EDGE_SUBNET in .env.local"
 EDGE_IP_RANGE="$(lan_value EDGE_IP_RANGE "$edge_out")"
+# The download jobs' network (security download-egress): fixed, so the proxy listens and accepts on it only.
+EGRESS_SUBNET="$(setting VLM_EGRESS_SUBNET)"; EGRESS_SUBNET="${EGRESS_SUBNET:-10.231.48.0/28}"
+egress_out="$(python3 -I "$ROOT/scripts/lib_lan.py" edge "$EGRESS_SUBNET" "$EDGE_SUBNET")" \
+  || fail "set another VLM_EGRESS_SUBNET in .env.local"
+EGRESS_IP_RANGE="$(lan_value EDGE_IP_RANGE "$egress_out")"
+EGRESS_PROXY_IP="$(lan_value PROXY_PEER "$egress_out")"
 if [[ -n "$LAN_BIND" ]]; then
   command -v openssl >/dev/null || fail "openssl is needed for the LAN certificate (package openssl)"
   lan_out="$(python3 -I "$ROOT/scripts/lib_lan.py" lan "$LAN_BIND" "$LAN_PORT" "$(setting VLM_LAN_ALLOW)" \
@@ -165,6 +171,9 @@ VLM_RUNNER_SECRETS=$SECRETS_DIR
 VLM_BUILD_COMMIT=$COMMIT
 VLM_EDGE_SUBNET=$EDGE_SUBNET
 VLM_EDGE_IP_RANGE=$EDGE_IP_RANGE
+VLM_EGRESS_SUBNET=$EGRESS_SUBNET
+VLM_EGRESS_IP_RANGE=$EGRESS_IP_RANGE
+VLM_EGRESS_PROXY_IP=$EGRESS_PROXY_IP
 VLM_PUBLIC_ORIGINS=$PUBLIC_ORIGINS
 VLM_PROXY_PEER=$PROXY_PEER
 EOF
