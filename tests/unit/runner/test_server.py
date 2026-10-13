@@ -342,11 +342,26 @@ TOKEN = "hf_" + "A1b2C3d4" * 4
 
 def _download(**changes: Any) -> bytes:
     body = {"job_kind": "download", "argv": ["python", "-m", "vlm_pipeline.download.hub", "--catalog-id", "x"],
-            "hf_token": TOKEN, **changes}  # fmt: skip
+            "hf_token": TOKEN, "max_bytes": 5 * 1024**3, **changes}  # fmt: skip
     return _submit(**body)
 
 
-def test_only_a_download_job_gets_the_egress_network_and_the_token_as_a_file(tmp_path: Path) -> None:
+@pytest.fixture(autouse=True)
+def egress_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """The egress proxy's control socket, recorded (the proxy itself: test_egress_proxy.py)."""
+    calls: list[dict[str, Any]] = []
+
+    def call(self: Runner, body: dict[str, Any]) -> dict[str, Any]:
+        calls.append(body)
+        return {"ok": True}
+
+    monkeypatch.setattr(Runner, "_egress_call", call)
+    return calls
+
+
+def test_only_a_download_job_gets_the_egress_network_and_the_token_as_a_file(
+    tmp_path: Path, egress_calls: list[dict[str, Any]]
+) -> None:
     """security download-egress §1-2: network + token for kind download only; the token is a mounted file."""
     cfg = _project(tmp_path)
     cfg.secrets_dir = tmp_path / "secrets"
@@ -363,6 +378,9 @@ def test_only_a_download_job_gets_the_egress_network_and_the_token_as_a_file(tmp
     assert TOKEN not in (cfg.state_dir / "runner.jsonl").read_text()  # nor in the audit
     runner.handle(json.dumps({"command": "remove", "run_id": RUN}).encode())
     assert not secret.exists()  # gone with the job
+    [register] = [c for c in egress_calls if c["command"] == "register"]
+    assert (register["job"], register["max_bytes"]) == (RUN, 5 * 1024**3)  # the budget the proxy enforces
+    assert any(a == f"HTTPS_PROXY=http://{RUN}:{register['key']}@egress-proxy:3128" for a in argv)
 
 
 def test_every_other_job_has_no_network_and_cannot_take_a_token(tmp_path: Path) -> None:

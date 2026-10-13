@@ -11,6 +11,7 @@ an env var, a container name or a free image name. Everything here is a pure che
 * ``argv``: must start with one of the kind's allowed prefixes (ALLOWED_ARGV); the rest are plain strings;
 * ``gpu``, ``memory_gb`` (1..MEMORY_CAP_GB), ``lock_token`` (required with gpu);
 * ``hf_token`` (optional, ``download`` jobs ONLY): handed to the job as a mounted file, never env, never logged;
+* ``max_bytes`` (``download`` jobs ONLY, required there): the proxy's hard byte budget for the job;
 * ``run_dir``: the job's writable dir, an app path ``/app/outputs/runs/<run_id>`` or ``/app/outputs/graph/runs/<dir>``;
 * ``inputs``: app paths mounted READ-ONLY (earlier nodes' outputs, uploads, datasets), each under INPUT_ROOTS.
 The paths are translated to host paths by ``common.host_paths`` and checked there (no symlink, owner, kind).
@@ -40,6 +41,7 @@ APP_ROOT = PurePosixPath("/app")
 UPLOAD_NAME = re.compile(r"^[0-9a-f]{32}\.png$")
 IMAGE_TAG = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,127}:[A-Za-z0-9._-]{1,64}$")
 LOCK_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+MAX_DOWNLOAD_BYTES = 2 * 1024**4  # 2 TiB: far above any catalog entry, a sanity bound only
 HF_TOKEN = re.compile(r"^hf_[A-Za-z0-9]{20,100}$")  # the shape of a Hugging Face token
 COMMANDS = frozenset({"submit", "stop", "kill", "status", "logs", "remove", "image_id"})
 JOB_KINDS = frozenset({"train", "eval", "quantize", "probe", "download", "serve"})
@@ -74,6 +76,7 @@ class Submit:
     run_dir: PurePosixPath
     inputs: tuple[PurePosixPath, ...]
     hf_token: str | None = field(default=None, repr=False)  # never in a repr, a log or an audit line
+    max_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -148,7 +151,7 @@ def _argv(value: Any, kind: str) -> tuple[str, ...]:
 
 def parse_submit(body: dict[str, Any]) -> Submit:
     fields = {"run_id", "job_kind", "image_tag", "argv", "gpu", "memory_gb", "lock_token", "run_dir", "inputs"}
-    _closed(body, fields | {"command", "hf_token"}, fields - {"lock_token"})
+    _closed(body, fields | {"command", "hf_token", "max_bytes"}, fields - {"lock_token"})
     run_id = _text(body["run_id"], "bad_run_id", RUN_ID)
     kind = _text(body["job_kind"], "bad_job_kind")
     if kind not in JOB_KINDS:
@@ -163,6 +166,12 @@ def parse_submit(body: dict[str, Any]) -> Submit:
         token = _text(token, "bad_lock_token", LOCK_TOKEN)
     if gpu and token is None:
         raise ProtocolError("gpu_needs_lock_token")
+    max_bytes = body.get("max_bytes")
+    if (max_bytes is not None) != (kind == "download"):
+        raise ProtocolError("bad_max_bytes")  # a download always has a budget; nothing else has one
+    if max_bytes is not None and (isinstance(max_bytes, bool) or not isinstance(max_bytes, int)
+                                  or not 0 < max_bytes <= MAX_DOWNLOAD_BYTES):  # fmt: skip
+        raise ProtocolError("bad_max_bytes")
     hf_token = body.get("hf_token")
     if hf_token is not None:
         if kind != "download":  # security download-egress §2: only the download job ever receives the token
@@ -181,6 +190,7 @@ def parse_submit(body: dict[str, Any]) -> Submit:
         run_dir=run_dir,
         inputs=_inputs(body["inputs"], run_dir),
         hf_token=hf_token,
+        max_bytes=max_bytes,
     )
 
 

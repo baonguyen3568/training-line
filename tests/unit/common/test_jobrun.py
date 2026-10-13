@@ -683,10 +683,19 @@ def test_network_and_token_files_are_for_narrowed_download_jobs_only(tmp_path: P
         docker_args(no_net, root)
     link = tmp_path / "link"
     link.symlink_to(secret)
+    auth = "t:" + "ab" * 16
     linked = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), egress=True,
-                          secret_file=link)  # fmt: skip
+                          secret_file=link, egress_auth=auth)  # fmt: skip
     with pytest.raises(ValueError, match="regular file"):
         docker_args(linked, root)
+    no_auth = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), egress=True)
+    with pytest.raises(ValueError, match="proxy credential"):
+        docker_args(no_auth, root)
+    ok = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), egress=True,
+                      secret_file=secret, egress_auth=auth)  # fmt: skip
+    argv = docker_args(ok, root)
+    assert f"HTTPS_PROXY=http://{auth}@egress-proxy:3128" in argv
+    assert argv[argv.index("--network") + 1] == "ntc-training_egress"
     plain = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(data,))
     argv = docker_args(plain, root)
     assert argv[argv.index("--network") + 1] == "none"

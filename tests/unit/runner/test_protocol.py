@@ -60,7 +60,12 @@ def test_a_good_submit_parses() -> None:
         ({"argv": ["bash", "-c", "id"]}, "argv_not_allowed"),
         ({"argv": ["python", "-c", "import os"]}, "argv_not_allowed"),
         ({"argv": ["python", "-m", "vlm_pipeline.quantize.ptq"]}, "argv_not_allowed"),  # wrong kind for train
-        ({"job_kind": "download", "argv": ["python", "-m", "vlm_pipeline.data.download"]}, "argv_not_allowed"),
+        (
+            {"job_kind": "download", "max_bytes": 1, "argv": ["python", "-m", "vlm_pipeline.data.download"]},
+            "argv_not_allowed",
+        ),
+        ({"job_kind": "download", "argv": ["python", "-m", "vlm_pipeline.download.hub"]}, "bad_max_bytes"),
+        ({"max_bytes": 10}, "bad_max_bytes"),  # only a download has a byte budget
         ({"argv": ["automodel", "a\nb"]}, "bad_argv"),
         ({"argv": []}, "bad_argv"),
         ({"gpu": "yes"}, "bad_gpu"),

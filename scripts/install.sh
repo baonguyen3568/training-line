@@ -66,6 +66,17 @@ for d in outputs .cache data uploads; do run mkdir -p "$DATA_ROOT/$d"; done
 if [[ -d "$ROOT/.team/lock" ]]; then LOCK_DIR="$ROOT/.team/lock"; else LOCK_DIR="$DATA_ROOT/system/lock"; fi
 run mkdir -p "$LOCK_DIR"
 
+# Download tokens (security download-egress §2, S1): one 0400 file per running job, on the host's tmpfs (gone at
+# reboot, never in a backup or the project folder); the data root's gitignored system/ only if there is no tmpfs.
+if [[ -n "${XDG_RUNTIME_DIR:-}" && -d "${XDG_RUNTIME_DIR}" ]]; then
+  SECRETS_DIR="$XDG_RUNTIME_DIR/ntc-training/runner-secrets"
+else
+  SECRETS_DIR="$DATA_ROOT/system/runner-secrets"
+fi
+[[ "$SECRETS_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || fail "unexpected secrets folder: $SECRETS_DIR"
+run mkdir -p "$SECRETS_DIR"
+run chmod 700 "$SECRETS_DIR"
+
 # ------------------------------------------------------------------------------------------------ key + policy
 # secrets.key: 32 random bytes, 0600, created once (the app container mounts it read-only and cannot create it).
 # policy.toml: the admin policy (may stay empty); mounted read-only, never written by the app.
@@ -100,6 +111,7 @@ VLM_DATA_ROOT=$DATA_ROOT
 VLM_GPU_LOCK_DIR=$LOCK_DIR
 VLM_POLICY_FILE=$CONFIG_DIR/policy.toml
 VLM_SECRETS_KEY_FILE=$CONFIG_DIR/secrets.key
+VLM_RUNNER_SECRETS=$SECRETS_DIR
 VLM_BUILD_COMMIT=$COMMIT
 EOF
 }

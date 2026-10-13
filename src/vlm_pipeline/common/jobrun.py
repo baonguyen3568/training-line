@@ -71,6 +71,7 @@ class ContainerJob:
     # field: the internal egress network (whose only way out is the HF-only proxy) and the token as a mounted FILE.
     egress: bool = False
     secret_file: Path | None = None
+    egress_auth: str | None = None  # "<job>:<key>" registered with the proxy (its byte budget); not the HF token
 
 
 # Env every first-party job gets (P003 D2, ADR-005 D1 caches); never secrets.
@@ -355,6 +356,7 @@ def _check_env(env: Mapping[str, str]) -> None:
 
 EGRESS_NETWORK = "ntc-training_egress"  # compose network `egress` (internal: true); only egress-proxy leaves it
 EGRESS_PROXY = "http://egress-proxy:3128"
+_EGRESS_AUTH = re.compile(r"^[a-z0-9][a-z0-9-]{0,120}:[0-9a-f]{32,128}$")
 SECRET_TOKEN_PATH = "/run/secrets/hf_token"  # noqa: S105 - a path: the job reads the token from this file, never env
 
 
@@ -369,7 +371,10 @@ def _egress_args(job: ContainerJob) -> tuple[list[str], dict[str, str]]:
         if job.secret_file is not None:
             raise ValueError("a token file is only for a download job")
         return ["--network", "none"], {}
-    env = {"HTTPS_PROXY": EGRESS_PROXY, "NO_PROXY": "", "HF_HUB_DISABLE_XET": "1", "HF_HUB_DISABLE_TELEMETRY": "1"}
+    if job.egress_auth is None or not _EGRESS_AUTH.fullmatch(job.egress_auth):
+        raise ValueError("a download job needs its proxy credential")
+    proxy = EGRESS_PROXY.replace("http://", f"http://{job.egress_auth}@", 1)
+    env = {"HTTPS_PROXY": proxy, "NO_PROXY": "", "HF_HUB_DISABLE_XET": "1", "HF_HUB_DISABLE_TELEMETRY": "1"}
     args = ["--network", EGRESS_NETWORK]
     if job.secret_file is not None:
         st = os.lstat(job.secret_file)

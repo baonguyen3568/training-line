@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import secrets
 import socket
 import socketserver
 import struct
@@ -79,6 +80,7 @@ class RunnerConfig:
     # Download tokens (security download-egress §2): a host path the runner sees at the same path and the app never
     # mounts, so the docker daemon can bind ONE file into the download job. None: no token can be handed over.
     secrets_dir: Path | None = None
+    egress_control: Path | None = None  # the egress proxy's control socket (download budgets); None: no downloads
 
 
 class Runner:
@@ -136,6 +138,7 @@ class Runner:
         download = sub.job_kind == "download"  # the ONLY kind with a network (HF-only proxy) and a token
         if download and sub.gpu:
             return {"ok": False, "error": "download_without_gpu"}
+        egress_auth = self._register_egress(sub.run_id, sub.max_bytes or 0) if download else None
         secret = self._write_secret(sub.run_id, sub.hf_token) if sub.hf_token is not None else None
         try:
             job = ContainerJob(
@@ -143,17 +146,19 @@ class Runner:
                 memory_gb=sub.memory_gb,
                 narrow=True, rw_dirs=(run_dir,), ro_inputs=inputs, code_root=self.cfg.host_project,
                 code_files=(EVAL_WORKER,) if sub.job_kind == "eval" else (), uid=self.job_uid, gid=self.job_gid,
-                egress=download, secret_file=secret,
+                egress=download, secret_file=secret, egress_auth=egress_auth,
             )  # fmt: skip
             argv = docker_args(job, self.cfg.data_root, lock_token=sub.lock_token)  # validates every mount source
             fd = open_run_log(run_dir, write=True)  # before the marker: a planted logs/ link refuses the job
             self._mark_started(sub.run_id, run_dir)  # one job per run id, at the trust boundary
         except BaseException:
             self._drop_secret(sub.run_id)
+            if download:
+                self._egress_call({"command": "unregister", "job": sub.run_id})
             raise
         with os.fdopen(fd, "ab") as out:
             proc = self._popen(argv, stdout=out, stderr=subprocess.STDOUT)
-        if secret is not None and callable(getattr(proc, "wait", None)):  # security S2: the token lives as long as
+        if download and callable(getattr(proc, "wait", None)):  # security S2: token and budget live as long as
             threading.Thread(target=self._drop_after, args=(proc, sub.run_id), daemon=True).start()  # the job
         return {"ok": True, "container": f"vlm-{sub.run_id}", "image_id": image_id}
 
@@ -162,6 +167,29 @@ class Runner:
             proc.wait()  # the attached `docker run` returns when the container exits
         finally:
             self._drop_secret(run_id)
+            self._egress_call({"command": "unregister", "job": run_id})
+
+    def _register_egress(self, run_id: str, max_bytes: int) -> str:
+        """A fresh proxy credential for this job with its byte budget; the job's HTTPS_PROXY carries it."""
+        key = secrets.token_hex(16)
+        reply = self._egress_call({"command": "register", "job": run_id, "key": key, "max_bytes": max_bytes})
+        if reply.get("ok") is not True:
+            raise ProtocolError("egress_unavailable")
+        return f"{run_id}:{key}"
+
+    def _egress_call(self, body: dict[str, Any]) -> dict[str, Any]:
+        if self.cfg.egress_control is None:
+            return {"ok": False}
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+                conn.settimeout(5)
+                conn.connect(str(self.cfg.egress_control))
+                conn.sendall(json.dumps(body).encode())
+                conn.shutdown(socket.SHUT_WR)
+                reply = json.loads(conn.recv(4096) or b"{}")
+        except (OSError, ValueError):
+            return {"ok": False}
+        return reply if isinstance(reply, dict) else {"ok": False}
 
     def _write_secret(self, run_id: str, token: str) -> Path:
         """The token as ONE file for ONE job: 0400, created exclusively, never through a link; removed with the job."""
@@ -344,6 +372,7 @@ def config_from_env(environ: dict[str, str] | None = None) -> RunnerConfig:
         job_gid=int(env["VLM_JOB_GID"]) if env.get("VLM_JOB_GID") else None,
         allowed_peer_uids=frozenset(int(u) for u in env.get("VLM_RUNNER_ALLOWED_UIDS", "").split(",") if u.strip()),
         secrets_dir=Path(env["VLM_RUNNER_SECRETS"]) if env.get("VLM_RUNNER_SECRETS") else None,
+        egress_control=Path(env["VLM_EGRESS_CONTROL"]) if env.get("VLM_EGRESS_CONTROL") else None,
     )
 
 

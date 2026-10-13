@@ -56,6 +56,8 @@ services:
       VLM_RUNNER_ALLOWED_UIDS: "${VLM_UID}"
       VLM_JOB_UID: "${VLM_UID}"
       VLM_JOB_GID: "${VLM_GID}"
+      VLM_RUNNER_SECRETS: "${VLM_RUNNER_SECRETS:?}"  # download tokens, one 0400 file per job (host tmpfs)
+      VLM_EGRESS_CONTROL: /run/vlm-egress/control.sock  # registers each download job's byte budget
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       # Same host paths inside the runner: it checks mount sources where the daemon will read them.
@@ -72,8 +74,32 @@ services:
       - "${VLM_GPU_LOCK_DIR}:/run/vlm-lock:ro"  # verifies a GPU job's token, never takes the lock
       - "runner-sock:/run/vlm-runner"
       - "runner-state:/var/lib/vlm-runner"  # started markers + audit: never mounted into the app or a job
+      # Host tmpfs at its host path (the daemon binds ONE token file into the download job); never in the app.
+      - "${VLM_RUNNER_SECRETS}:${VLM_RUNNER_SECRETS}"
+      - "egress-control:/run/vlm-egress"
     mem_limit: 512m
+
+  # The download job's only way out (security download-egress §1): CONNECT :443 to huggingface.co / hf.co only,
+  # public addresses only, per-job credential + byte budget. The only container on both networks.
+  egress-proxy:
+    <<: *hardening
+    image: ntc-training-runner:local  # same reviewed code base, no new image
+    command: ["python", "-m", "vlm_pipeline.runner.egress_proxy"]
+    user: "${VLM_UID}:${VLM_GID}"
+    environment:
+      VLM_EGRESS_CONTROL: /run/vlm-egress/control.sock
+      VLM_RUNNER_UID: "${VLM_UID}"  # only the runner may register budgets (SO_PEERCRED)
+    volumes:
+      - "egress-control:/run/vlm-egress"
+    networks: [egress, default]
+    depends_on: [runner]
+    mem_limit: 128m
+
+networks:
+  egress:
+    internal: true  # no route out: download jobs reach the internet only through egress-proxy
 
 volumes:
   runner-sock: {}
   runner-state: {}
+  egress-control: {}
