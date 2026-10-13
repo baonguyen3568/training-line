@@ -65,6 +65,9 @@ storage:
     NOT_IN_PLAN: Danh sách đã thay đổi, mục này không còn.
     NOT_APPLICABLE: Mục này hiện không xoá được.
     NOT_EVICTABLE: Mục này đang được dùng hoặc đã bị xoá.
+    RUN_DIR_INVALID: Không tìm thấy thư mục của lần chạy này, hoặc nó nằm ngoài thư mục dự án.
+    DELETE_FAILED: Xoá không thành công. Thử lại, nếu vẫn lỗi hãy báo quản trị viên.
+    STATE_CHANGED: Trạng thái của mục này vừa thay đổi. Bấm "Kiểm tra lại" rồi chọn lại.
 error:
   GPU-001:
     title: Phần mềm không tương thích với GPU của máy

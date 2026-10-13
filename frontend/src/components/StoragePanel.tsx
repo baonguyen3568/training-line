@@ -171,6 +171,7 @@ export function StoragePanel() {
                       {item ? itemLabel(item) : untrustedText(s.item_id, 80)}:{" "}
                       {filled(["storage", "skip_reason", s.reason], {}) ??
                         filled(["storage", "lock_reason", s.reason], {}) ??
+                        filled(["storage", "protected_reason", s.reason], {}) ??
                         t("storage.skip_reason.NOT_APPLICABLE")}
                     </li>
                   );

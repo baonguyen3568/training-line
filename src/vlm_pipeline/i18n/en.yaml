@@ -65,6 +65,9 @@ storage:
     NOT_IN_PLAN: The list changed and this item is gone.
     NOT_APPLICABLE: This item cannot be deleted right now.
     NOT_EVICTABLE: This item is in use or already deleted.
+    RUN_DIR_INVALID: This run's folder is missing or outside the project folder.
+    DELETE_FAILED: Deleting failed. Try again; if it keeps failing, tell an admin.
+    STATE_CHANGED: This item changed in the meantime. Press "Check again" and choose again.
 error:
   GPU-001:
     title: Software doesn't match this GPU
