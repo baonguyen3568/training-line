@@ -418,6 +418,47 @@ CFG-010:
     - {id: switch_train_step, kind: patch, confirm: true, when: {supported: [train.sft_vlm, train.lora_vlm]}}
     - {id: pick_other_asset, kind: navigate, target: "node:model", confirm: false}
 
+CFG-011:
+  slug: NODE_NOT_RUNNABLE_YET
+  severity: error
+  prevent_in_preflight: true
+  # The real (container) worker has no implementation for this node type yet (M1b B-0). Raised at validate only with
+  # `--worker container` (the fake worker runs every node) and by the worker (NodeNotRunnableError) as a backstop.
+  # node = the node's id; node_type is for logs/tests, not shown.
+  params: [{name: node, ref: node}, node_type]
+  match:
+    - {kind: validate, value: "node type has no real worker yet (container worker)"}
+    - {kind: executor, value: "app/workers.py NodeNotRunnableError"}
+  actions:
+    - {id: remove_step, kind: patch, confirm: true}
+
+EXP-001:
+  slug: EXPORT_LICENSE_TEXT_MISSING
+  severity: error
+  prevent_in_preflight: true
+  # An exported model must ship the full text of every component license (ADR-012); the app has no APPROVED text for
+  # these license ids (export/notices.py LicenseTextMissingError). Not the user's fault: app content to fix.
+  params: [license_ids]
+  match:
+    - {kind: validate, value: "export notices: a component license has no approved text"}
+    - {kind: executor, value: "export/notices.py LicenseTextMissingError"}
+  actions:
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+EXP-002:
+  slug: MODEL_EXPORT_UNSUPPORTED
+  severity: error
+  prevent_in_preflight: true
+  # export.hf_dir of a model whose catalog remote_code != none (Nemotron-Parse): its exported folder would need the
+  # pinned remote code resolved outside this app (B3). node = the export node's id; model = catalog display_name.
+  params: [{name: node, ref: node}, model]
+  match:
+    - {kind: validate, value: "export.hf_dir below a model with remote_code != none"}
+    - {kind: executor, value: "export worker guard before writing the export dir"}
+  actions:
+    - {id: remove_step, kind: patch, confirm: true}
+    - {id: pick_other_asset, kind: navigate, target: "node:model", confirm: false}
+
 SEC-001:
   slug: PATH_OUTSIDE_WORKSPACE
   severity: error

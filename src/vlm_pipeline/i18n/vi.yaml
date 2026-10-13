@@ -79,6 +79,15 @@ error:
       full_finetune_only: Bước "{node}" dùng LoRA, nhưng {model} chỉ hỗ trợ fine-tune toàn phần. App chưa chạy gì; hãy đổi sang bước fine-tune toàn phần hoặc chọn model khác.
       lora_only: Bước "{node}" dùng fine-tune toàn phần, nhưng {model} chỉ hỗ trợ LoRA. App chưa chạy gì; hãy đổi sang bước LoRA hoặc chọn model khác.
       not_trainable: Bước "{node}" là bước train, nhưng {model} chỉ dùng để chạy thử và đánh giá, không train được. App chưa chạy gì; hãy chọn model khác.
+  CFG-011:
+    title: Bước này chưa chạy thật được
+    what: Bước "{node}" chưa được hỗ trợ chạy thật trong phiên bản này. Bạn có thể xoá bước này để chạy phần còn lại, hoặc chờ bản cập nhật.
+  EXP-001:
+    title: Thiếu văn bản giấy phép để xuất model
+    what: App chưa có văn bản giấy phép đã duyệt cho {license_ids}, nên chưa thể xuất model kèm giấy phép. Đây không phải lỗi của bạn; hãy gửi báo cáo để team bổ sung.
+  EXP-002:
+    title: Chưa xuất được model này
+    what: Chưa hỗ trợ xuất {model} ra thư mục dùng ở máy khác (bước "{node}"). Bạn vẫn train, chạy thử và đánh giá được trong app.
   MEM-001:
     title: Không đủ bộ nhớ cho bước này
     what: Bước này cần khoảng {need_gb} GB nhưng máy chỉ còn {avail_gb} GB trống, vì máy đang dùng chung với ứng dụng khác.

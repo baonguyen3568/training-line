@@ -79,6 +79,15 @@ error:
       full_finetune_only: '"{node}" uses LoRA, but {model} only supports full fine-tuning. Nothing has run yet; switch to the full fine-tune step or pick another model.'
       lora_only: '"{node}" uses full fine-tuning, but {model} only supports LoRA. Nothing has run yet; switch to the LoRA step or pick another model.'
       not_trainable: '"{node}" is a training step, but {model} is for trying out and evaluation only and can''t be trained. Nothing has run yet; pick another model.'
+  CFG-011:
+    title: This step can't run for real yet
+    what: '"{node}" isn''t supported for real runs in this version yet. Remove the step to run the rest, or wait for an update.'
+  EXP-001:
+    title: License text missing for export
+    what: The app has no approved license text for {license_ids} yet, so it can't export the model with its licenses. This isn't your fault; send a report so the team can add it.
+  EXP-002:
+    title: This model can't be exported yet
+    what: Exporting {model} to a folder for use on another machine isn't supported yet (step "{node}"). You can still train, try out and evaluate it in the app.
   MEM-001:
     title: Not enough memory for this step
     what: This step needs about {need_gb} GB but only {avail_gb} GB is free, because the machine is shared with other apps.
