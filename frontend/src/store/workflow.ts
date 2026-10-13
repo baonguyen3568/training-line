@@ -26,6 +26,13 @@ export interface NodeRunState {
   warnings?: EventError[];
   /** G-4: run-dir base "<nid>-<key16>" from node_status, what "Đặt lại bước" acts on. */
   nodeBase?: string;
+  /** D5: queued for memory / the GPU lock (node_state); cleared by the next node_status. */
+  waiting?: {
+    state: "waiting_memory" | "waiting_gpu";
+    need_gb?: number;
+    avail_gb?: number;
+    waited_s?: number;
+  };
 }
 
 interface WorkflowState {
@@ -58,6 +65,8 @@ interface WorkflowState {
   /** Call once when a drag ends so the whole drag is one undo step. */
   commitMove(): void;
   setParam(id: string, name: string, value: unknown): void;
+  /** Several params of one node in ONE history step (G-3 quick fix: one Undo restores it). */
+  setParams(id: string, values: Record<string, unknown>): void;
   addNode(typeId: string, at: { x: number; y: number }): string | null;
   removeNodes(ids: string[]): void;
   duplicateNode(id: string): string | null;
@@ -209,6 +218,17 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       });
     },
 
+    setParams(id, values) {
+      const wf = get().workflow;
+      if (!wf) return;
+      edit({
+        ...wf,
+        nodes: wf.nodes.map((n) =>
+          n.id === id ? { ...n, params: { ...n.params, ...values } } : n,
+        ),
+      });
+    },
+
     addNode(typeId, at) {
       const wf = get().workflow;
       const spec = get().specs.get(typeId);
@@ -331,6 +351,15 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
           const base = ev.node_base ?? prev?.nodeBase; // later events without a key keep the known base
           if (base) st.nodeBase = base;
           set({ run: { ...run, nodes: { ...run.nodes, [ev.node_id]: st } } });
+        } else if (ev.type === "node_state") {
+          const prev = run.nodes[ev.node_id] ?? { status: "running" as const };
+          const waiting = {
+            state: ev.state,
+            ...(ev.need_gb !== undefined ? { need_gb: ev.need_gb } : {}),
+            ...(ev.avail_gb !== undefined ? { avail_gb: ev.avail_gb } : {}),
+            ...(ev.waited_s !== undefined ? { waited_s: ev.waited_s } : {}),
+          };
+          set({ run: { ...run, nodes: { ...run.nodes, [ev.node_id]: { ...prev, waiting } } } });
         } else if (ev.type === "warning" && ev.node_id && ev.error) {
           const prev = run.nodes[ev.node_id] ?? { status: "pending" as const };
           const warnings = [...(prev.warnings ?? []), ev.error];

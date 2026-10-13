@@ -275,6 +275,9 @@ error:
   DISK-003:
     title: Saved results are full; pick what to delete
     what: Saved results are {gb_over} GB over the {cap_gb} GB limit, but every remaining item ({protected_count}) is protected (trained models, pinned items, exports), so the app won't delete anything itself. Choose what to delete in the Storage panel.
+quick_fix:
+  apply: Apply
+  applied: 'Applied: {action}. Press Undo (Ctrl+Z) to go back.'
 action:
   migrate_node: Review changes and update
   open_node: Open this step

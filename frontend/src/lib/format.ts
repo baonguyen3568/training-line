@@ -18,7 +18,7 @@ export function formatEstimate(
 }
 
 /** 97 → "1 giờ 37 phút", 120 → "2 giờ", 45 → "45 phút". */
-function minutesText(min: number): string {
+export function minutesText(min: number): string {
   const total = Math.round(min);
   const h = Math.floor(total / 60);
   const m = total % 60;

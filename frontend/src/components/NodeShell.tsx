@@ -2,6 +2,7 @@ import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { type CSSProperties, memo } from "react";
 import type { NodeSpec, PortType, ValidationIssue } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
+import { minutesText } from "../lib/format";
 import { nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible, portShape, tokenVar } from "../lib/ports";
@@ -86,9 +87,42 @@ function StateGlyph({ icon, tone }: { icon: string; tone: "bad" | "warn" | "mute
   );
 }
 
+/**
+ * D5 "Chờ bộ nhớ trống": the job is queued until enough memory is free (or the GPU lock is released). Clock glyph in
+ * warning ink, label in text ink; the tooltip names the numbers when the executor sent them (never "{need_gb}").
+ */
+function WaitingBadge({ waiting }: { waiting: NonNullable<NodeRunState["waiting"]> }) {
+  const label = tpOptional(["node_state", waiting.state]) ?? t("node_state.queued"); // waiting_gpu copy may not exist yet
+  const why =
+    waiting.state === "waiting_gpu"
+      ? t("node_state.waiting_gpu_tooltip")
+      : waiting.need_gb !== undefined && waiting.avail_gb !== undefined
+        ? t("node_state.waiting_memory_tooltip", {
+            need_gb: Math.round(waiting.need_gb),
+            avail_gb: Math.round(waiting.avail_gb),
+          })
+        : undefined;
+  // "Đã chờ 1 giờ 5 phút." once the executor reports it (a wait can pass an hour: dur_* copy)
+  const waited =
+    waiting.waited_s !== undefined && waiting.waited_s >= 60
+      ? t("node_state.waited_for", { duration: minutesText(waiting.waited_s / 60) })
+      : undefined;
+  const tip = [why, waited].filter(Boolean).join(" ") || undefined;
+  return (
+    <span className="state run waiting" title={tip} data-waiting={waiting.state}>
+      <span className="si si-warn" aria-hidden="true">
+        <Icon name="clock" size={14} />
+      </span>{" "}
+      {label}
+      {tip && <span className="sr-only">. {tip}</span>}
+    </span>
+  );
+}
+
 /** Run state on the node face: icon + text (never color alone) and a 3px progress bar while running. */
 function RunBadge({ state }: { state: NodeRunState }) {
   const d4 = useUi((s) => s.skin) === "d4";
+  if (state.waiting && state.status === "running") return <WaitingBadge waiting={state.waiting} />;
   const percent = state.progress === undefined ? undefined : Math.round(state.progress * 100);
   const text =
     state.status === "running"

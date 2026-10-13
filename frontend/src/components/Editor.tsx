@@ -151,6 +151,11 @@ function EditorInner() {
   const [menu, setMenu] = useState<{ x: number; y: number; base: string } | null>(null);
   const resetNode = useUi((st) => st.resetNode);
   useEffect(() => {
+    const onToast = (e: Event) => setToast((e as CustomEvent<string>).detail);
+    window.addEventListener("vlm:toast", onToast);
+    return () => window.removeEventListener("vlm:toast", onToast);
+  }, []);
+  useEffect(() => {
     if (!menu) return;
     const close = (e: Event) => {
       if (e instanceof KeyboardEvent && e.key !== "Escape") return;

@@ -17,6 +17,7 @@ import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
 import { ImageUpload } from "./ImageUpload";
+import { QuickFixes } from "./QuickFixes";
 import { TrialResult } from "./TrialResult";
 
 interface SourceOption {
@@ -523,6 +524,7 @@ export function Inspector() {
                 {SEVERITY_GLYPH[e.severity]} {e.title}
               </strong>
               <p>{e.what}</p>
+              <QuickFixes issue={e} nodeId={node.id} />
               {e.why && (
                 <p className="muted small">
                   {t("error_card.why")}: {e.why}

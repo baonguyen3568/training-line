@@ -196,8 +196,24 @@ export interface Estimate {
   source: EstimateSource;
 }
 
+/**
+ * G-3: an action the server already resolved for this issue (error_catalog.resolved_actions, 6c780e0): filtered,
+ * bounded, final values. `patch: null` with kind "patch" is a graph operation named by `id`.
+ */
+export interface ResolvedAction {
+  id: string;
+  kind: "patch" | "resume" | "navigate";
+  confirm: boolean;
+  target?: string | null;
+  node_id?: string;
+  /** `from` is what the server saw; apply only while the param still holds it (else the hint is stale). */
+  patch?: { param: string; from: unknown; value: unknown }[] | null;
+}
+
 export interface ValidationIssue {
   node_id?: string;
+  /** G-3 resolved actions; older servers send only action_ids. */
+  actions?: ResolvedAction[];
   port?: string;
   param?: string;
   code: string;
@@ -329,7 +345,18 @@ export interface OtherEvent {
   node_id?: string;
   error?: EventError;
 }
-export type RunEvent = NodeStatusEvent | RunStatusEvent | OtherEvent;
+/** D5: a running node queued for memory (or the GPU lock) before its job really starts (executor `waiting`). */
+export interface NodeStateEvent {
+  type: "node_state";
+  node_id: string;
+  state: "waiting_memory" | "waiting_gpu";
+  need_gb?: number;
+  avail_gb?: number;
+  since?: number;
+  /** Seconds waited so far (run_job queueing, 287ea77). */
+  waited_s?: number;
+}
+export type RunEvent = NodeStatusEvent | RunStatusEvent | NodeStateEvent | OtherEvent;
 
 /**
  * Storage panel (bao-cleanup app/storage.py, P013 G-1, plan schema v3). Hand-written: no JSON schema is exported

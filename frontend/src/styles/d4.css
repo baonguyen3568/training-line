@@ -913,3 +913,41 @@
 .si-info {
   color: var(--color-text-secondary);
 }
+/* G-3 quick fixes on an error card: icon-first hairline buttons, preview of a confirm=true patch */
+.quick-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: var(--space-4) 0;
+}
+.quick-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+.quick-fix:hover {
+  background: var(--color-surface);
+}
+.quick-fix:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
+.quick-fix-preview {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.quick-fix-preview ul {
+  margin: 0 0 var(--space-8);
+  padding-left: var(--space-16);
+}

@@ -275,6 +275,9 @@ error:
   DISK-003:
     title: Kết quả lưu tạm đầy, cần bạn chọn mục xoá
     what: Kết quả lưu tạm đã vượt mức {cap_gb} GB thêm {gb_over} GB, nhưng {protected_count} mục còn lại thuộc loại được bảo vệ (model đã train, mục đã ghim, bản xuất) nên app không tự xoá. Hãy chọn mục muốn xoá trong bảng Dung lượng.
+quick_fix:
+  apply: Áp dụng
+  applied: 'Đã áp dụng: {action}. Bấm Hoàn tác (Ctrl+Z) để quay lại.'
 action:
   migrate_node: Xem thay đổi và cập nhật
   open_node: Mở bước này
