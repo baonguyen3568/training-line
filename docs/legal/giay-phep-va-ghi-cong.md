@@ -38,6 +38,9 @@ NVIDIA NeMo AutoModel (Apache-2.0), PyTorch (BSD-3-Clause), Hugging Face Transfo
 | {{TODO_SITE: font, vd Be Vietnam Pro / Inter / JetBrains Mono}} | SIL Open Font License 1.1 |
 | Hình minh hoạ | Xem danh sách `site/ASSETS.md` (nguồn, tác giả, giấy phép từng file) |
 
+Danh sách đầy đủ phần mềm bên thứ ba được gửi kèm website, cùng toàn văn giấy phép, có ở trang
+[Phần mềm bên thứ ba](/chinh-sach/ben-thu-ba/).
+
 ## Model và dataset trong template
 {{PRODUCT_NAME}} **không phân phối** model hay dataset. Bạn tải chúng từ nguồn chính chủ, và giấy phép của từng
 cái được áp dụng trực tiếp giữa bạn và chủ sở hữu.

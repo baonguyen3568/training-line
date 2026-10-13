@@ -908,7 +908,8 @@ assets:
     commercial: "yes"
     derivatives: "yes"
     obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
-    notice: "no copyright line in LICENSE file"
+    notice: "Copyright (c) Pagefind (package.json author; no LICENSE file in the package)"
+    note: "no LICENSE file in the npm tarball; license from package.json (MIT) + upstream repo Pagefind/pagefind at v1.5.2; standard MIT text shipped"
     scope: [site]
     reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
     date: 2026-10-13
@@ -2876,7 +2877,8 @@ assets:
     commercial: "yes"
     derivatives: "yes"
     obligations: "build tool for site/ (static generator), may ship client JS in site/dist: keep copyright + license text in THIRD_PARTY_LICENSES"
-    notice: "no copyright line in LICENSE file"
+    notice: "Copyright (c) Pagefind; bundles vscode-ripgrep: Copyright (c) Microsoft Corporation (both MIT)"
+    note: "LICENSE is a directory in the npm package (LICENSE/LICENSE + LICENSE/LICENSE-vscode-ripgrep); both texts shipped"
     scope: [site]
     reviewer: bao-security  # verified vs site/package-lock.json + package.json license 2026-10-13
     date: 2026-10-13

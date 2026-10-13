@@ -1,0 +1,32 @@
+---
+// Third-party notices for code shipped in this site, generated from configs/security/licenses.yaml (M2-8).
+import thirdParty from "~/generated/third-party.json";
+import Marketing from "~/layouts/Marketing.astro";
+---
+
+<Marketing title="Phần mềm bên thứ ba" description="Các thành phần mã nguồn mở có trong trang web này và giấy phép của chúng.">
+  <article class="prose">
+    <h1>Phần mềm bên thứ ba</h1>
+    <p>
+      Trang web này có dùng các thành phần mã nguồn mở dưới đây. Toàn văn giấy phép:
+      <a href="/THIRD_PARTY_LICENSES.txt">THIRD_PARTY_LICENSES.txt</a>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Thành phần</th><th>Phiên bản</th><th>Giấy phép</th><th>Bản quyền</th></tr>
+      </thead>
+      <tbody>
+        {
+          thirdParty.map((p) => (
+            <tr>
+              <td>{p.name}</td>
+              <td>{p.version}</td>
+              <td>{p.license}</td>
+              <td>{p.notice}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </article>
+</Marketing>
