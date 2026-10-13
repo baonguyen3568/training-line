@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -43,9 +44,16 @@ class BenchUnsupportedError(VlmPipelineError):
     code: ClassVar[str] = "CFG-011"
 
 
-def _check_supported(entry: CatalogEntry, params: BenchParams, node_id: str) -> None:
+def check_support(node_id: str, params: BenchParams, model: CatalogEntry | None, inputs: Mapping[str, str]) -> None:
+    """Pure "is this supported" check, shared by graph validate and the worker (validate clean => no refusal at run).
+
+    ``inputs``: wired ports -> kind (unused: bench.perf has only the model input). Raises CFG-011 when unsupported.
+    """
+    del inputs
+    if model is None:  # no model wired: CFG-003 from validate
+        return
     reason = None
-    if entry.loss != "nemotron_parse":
+    if model.loss != "nemotron_parse":
         reason = "chat models are benchmarked on the vLLM server (not available yet)"
     elif params.scenario != "single_user":
         reason = "multi-user needs a serving engine with batching (vLLM, not available yet)"
@@ -184,7 +192,7 @@ def run_bench(worker: RealWorker, job: NodeJob) -> NodeResult:
     assert isinstance(params, BenchParams)  # noqa: S101
     ref = job.inputs["model"]
     entry, base = base_of(worker, ref)
-    _check_supported(entry, params, job.node_id)
+    check_support(job.node_id, params, entry, {})  # backstop of validate (same function)
     model_dir = worker.host_path(ref.path)
     results = {"model": _measure(worker, job, entry, _trial(worker, model_dir, base, entry, params), "model")}
     is_base = ref.hash == f"{entry.repo}@{entry.revision}"
@@ -224,4 +232,4 @@ def run_bench(worker: RealWorker, job: NodeJob) -> NodeResult:
     return NodeResult(outputs={port: ArtifactRef(type="BenchReport", path=str(path), hash=f"sha256:{digest}")})
 
 
-__all__ = ["BenchUnsupportedError", "records", "run_bench"]
+__all__ = ["BenchUnsupportedError", "check_support", "records", "run_bench"]

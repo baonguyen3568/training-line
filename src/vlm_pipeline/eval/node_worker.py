@@ -21,7 +21,7 @@ import random
 import secrets
 import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
@@ -38,6 +38,7 @@ from vlm_pipeline.common.jobrun import (
     image_digest,
     run_job,
 )
+from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest
 from vlm_pipeline.eval import cord
 from vlm_pipeline.eval.config import EvalParams
@@ -112,14 +113,35 @@ class EvalOutcome:
 
 
 # ----------------------------------------------------------------------------------------------- plan
-def _suite(request: EvalRequest) -> str:
-    suite = request.params.suite
-    if suite in ("auto", "cord_test") and request.entry.loss == "nemotron_parse":
-        return "cord_test"
-    raise EvalSuiteUnsupportedError(
-        f"suite {suite!r} is not available for {request.entry.id} yet",
-        params={"node": request.node_id, "node_type": "eval.benchmarks"},
-    )
+def check_support(
+    node_id: str,
+    params: EvalParams,
+    model: CatalogEntry | None,
+    inputs: Mapping[str, str],
+    *,
+    root: Path | None = None,
+) -> None:
+    """Pure "is this supported" check, shared by graph validate and the worker.
+
+    Invariant: validate clean => the worker never refuses for support reasons. Reads only versioned repo config
+    (the template's decode_overrides), never user files or run outputs.
+
+    ``inputs``: wired ports -> "dataset:hub" | "dataset:local" | "model" | "other". Raises CFG-011 when unsupported.
+    """
+    del inputs  # cord_test always reads CORD-v2 test (heldout); a wired dataset matters once suite my_val exists
+    if model is None:  # no model wired: CFG-003 from validate, nothing to say about support
+        return
+
+    def refuse(why: str) -> EvalSuiteUnsupportedError:
+        return EvalSuiteUnsupportedError(why, params={"node": node_id, "node_type": "eval.benchmarks"})
+
+    if params.suite not in ("auto", "cord_test") or model.loss != "nemotron_parse":
+        raise refuse(f"suite {params.suite!r} is not available for {model.id} yet")
+    if params.thinking:
+        raise refuse("thinking mode does not apply to Nemotron-Parse")
+    unsupported = set(template_overrides(root or project_root(), model)) - SUPPORTED_OVERRIDES
+    if unsupported:  # never evaluate with a decoding other than the one "Chạy thử" uses
+        raise refuse(f"decode_overrides {sorted(unsupported)} not supported by the CORD eval worker")
 
 
 def _cord_snapshot(root: Path) -> tuple[Path, str]:
@@ -145,14 +167,7 @@ def template_overrides(root: Path, entry: CatalogEntry) -> dict[str, Any]:
     path = root / TEMPLATE_DIR / f"{entry.id}.yaml"
     if not path.is_file():
         return {}
-    overrides = decode_overrides_of(yaml.safe_load(path.read_text(encoding="utf-8")) or {}).as_dict()
-    unsupported = set(overrides) - SUPPORTED_OVERRIDES
-    if unsupported:  # never evaluate with a decoding other than the one "Chạy thử" uses
-        raise EvalSuiteUnsupportedError(
-            f"decode_overrides {sorted(unsupported)} not supported by the CORD eval worker",
-            params={"node_type": "eval.benchmarks"},
-        )
-    return overrides
+    return decode_overrides_of(yaml.safe_load(path.read_text(encoding="utf-8")) or {}).as_dict()
 
 
 def decoding_of(request: EvalRequest) -> dict[str, Any]:
@@ -336,12 +351,7 @@ def _records(m: dict[str, float], *, variant: str, n: int, common: dict[str, Any
 
 # ------------------------------------------------------------------------------------------------ run
 def run_eval_benchmarks(request: EvalRequest) -> EvalOutcome:
-    _suite(request)
-    if request.params.thinking:
-        raise EvalSuiteUnsupportedError(
-            "thinking mode does not apply to Nemotron-Parse",
-            params={"node": request.node_id, "node_type": "eval.benchmarks"},
-        )
+    check_support(request.node_id, request.params, request.entry, {}, root=request.root)  # backstop of validate
     ids = list(range(LEVEL_SAMPLES[request.params.level]))
     model_rows = _load(
         _generate(

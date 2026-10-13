@@ -234,3 +234,51 @@ def test_failed_cache_entry_is_set_aside_not_reused(root: Path, monkeypatch: pyt
     names = sorted(p.name for p in (root / "outputs" / "eval-cache").iterdir())
     assert any(".stale-" in n for n in names)
     assert [Path(a[a.index("--model") + 1]).name for a in jobs.jobs].count("base") == 2
+
+
+# ------------------------------------------------------------------- check_support (validate == worker)
+
+
+def _parse() -> Any:
+    entry = load_catalog().get("nemotron-parse-v1.1")
+    assert entry is not None
+    return entry
+
+
+@pytest.mark.parametrize(
+    ("params", "ok"),
+    [({}, True), ({"suite": "cord_test", "level": "full"}, True), ({"suite": "documents"}, False),
+     ({"thinking": True}, False)],
+)  # fmt: skip
+def test_check_support_is_what_the_worker_enforces(
+    root: Path, monkeypatch: pytest.MonkeyPatch, params: dict[str, Any], ok: bool
+) -> None:
+    """Invariant: when check_support passes, the worker does not refuse; when it raises, the worker raises the same."""
+    jobs = FakeJobs({"finetuned": GOOD, "base": GOOD})
+    monkeypatch.setattr(nw, "run_job", jobs)
+
+    def check() -> None:
+        nw.check_support("eval", EvalParams(**params), _parse(), {"model": "model"}, root=root)
+
+    if ok:
+        check()
+        nw.run_eval_benchmarks(_request(root, **params))
+    else:
+        with pytest.raises(nw.EvalSuiteUnsupportedError) as at_validate:
+            check()
+        with pytest.raises(nw.EvalSuiteUnsupportedError) as at_run:
+            nw.run_eval_benchmarks(_request(root, **params))
+        assert (at_validate.value.code, at_validate.value.params) == (at_run.value.code, at_run.value.params)
+
+
+def test_check_support_refuses_chat_models_and_ignores_unwired_model(root: Path) -> None:
+    qwen = load_catalog().get("qwen3.5-0.8b")
+    with pytest.raises(nw.EvalSuiteUnsupportedError):
+        nw.check_support("eval", EvalParams(), qwen, {"model": "model"}, root=root)
+    nw.check_support("eval", EvalParams(suite="documents"), None, {}, root=root)  # CFG-003 is validate's job
+
+
+def test_check_support_sees_template_overrides_without_running(root: Path) -> None:
+    _template(root, "decode_overrides:\n  num_beams: 2\n")
+    with pytest.raises(nw.EvalSuiteUnsupportedError, match="num_beams"):
+        nw.check_support("eval", EvalParams(), _parse(), {"model": "model"}, root=root)

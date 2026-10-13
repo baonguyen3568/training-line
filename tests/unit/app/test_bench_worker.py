@@ -142,3 +142,23 @@ def test_failed_job_is_a_container_exit(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.setattr(bench_worker, "run_job", FakeJobs({}, RunStatus.FAILED))
     with pytest.raises(ContainerExit):
         run_bench(w, _job({}, w.root / "r", _trained(w)))
+
+
+@pytest.mark.parametrize(
+    ("model_id", "params", "ok"),
+    [(PARSE, {}, True), (PARSE, {"scenario": "multi_user"}, False), (PARSE, {"compare_with": "unquantized"}, False),
+     ("qwen3.5-0.8b", {}, False)],
+)  # fmt: skip
+def test_check_support_matches_the_worker(model_id: str, params: dict[str, Any], ok: bool) -> None:
+    from vlm_pipeline.app.bench_worker import check_support
+    from vlm_pipeline.common.catalog import load_catalog
+    from vlm_pipeline.serve.config import BenchParams
+
+    model = load_catalog().get(model_id)
+    if ok:
+        check_support("bench", BenchParams(**params), model, {"model": "model"})
+    else:
+        with pytest.raises(BenchUnsupportedError) as exc:
+            check_support("bench", BenchParams(**params), model, {"model": "model"})
+        assert exc.value.params == {"node": "bench", "node_type": "bench.perf"}
+    check_support("bench", BenchParams(scenario="multi_user"), None, {})  # unwired model: validate's CFG-003
