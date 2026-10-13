@@ -19,8 +19,9 @@
         "$value": "#52514e"
       },
       "muted": {
+        "$description": "Small secondary text (>=4.5:1 on page/surface). Was #898781 (3.4:1, axe fail 2026-10-13).",
         "$type": "color",
-        "$value": "#898781"
+        "$value": "#6b6a65"
       }
     },
     "grid": {
