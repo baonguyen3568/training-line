@@ -12,11 +12,13 @@ describe("SettingsPanel", () => {
     const input = (await screen.findByLabelText("Token Hugging Face")) as HTMLInputElement;
     expect(input.type).toBe("password");
     expect(input.value).toBe("");
-    fireEvent.change(input, { target: { value: "hf_secretvalue1234" } });
+    // fake token built at run time, never a literal token shape in the repo (security, as test_scan_tokens.py)
+    const fake = ["hf", "fakevalue1234"].join("_");
+    fireEvent.change(input, { target: { value: fake } });
     fireEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0] as HTMLElement);
     expect(input.value).toBe(""); // cleared before the response even arrives
     await waitFor(() => expect(screen.getByText(/Đã đặt …1234/)).toBeTruthy());
-    expect(container.textContent).not.toContain("hf_secretvalue");
+    expect(container.textContent).not.toContain(fake.slice(0, -4));
   });
 
   it("explains server errors and shows policy read-only, with the broken-key card when key_ok is false", async () => {
