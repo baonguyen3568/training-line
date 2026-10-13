@@ -27,6 +27,15 @@ describe("StoragePanel", () => {
     expect(screen.getByText(/Bộ nhớ đệm đầy/)).toBeTruthy(); // DISK-003 rendered by the server
   });
 
+  it("shows how much the kept section holds once sizes are known", async () => {
+    const { api } = await import("../src/api");
+    const real = await api.storagePlan("vi");
+    real.items = real.items.map((i) => (i.section === "kept" ? { ...i, size_gb: 31.5 } : i));
+    vi.spyOn(api, "storagePlan").mockResolvedValue(real);
+    await setup();
+    expect(screen.getByText("Đang giữ 31.5 GB")).toBeTruthy();
+  });
+
   it("locks an item that needs typing but has no confirm_text (it could never pass)", async () => {
     const { api } = await import("../src/api");
     const real = await api.storagePlan("vi");

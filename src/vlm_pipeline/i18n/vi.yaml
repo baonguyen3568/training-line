@@ -60,6 +60,7 @@ storage:
     admin_command: Lệnh cho quản trị viên
     copy: Sao chép lệnh
     copied: Đã chép
+    kept_total: Đang giữ {gb} GB
   skip_reason:
     CONFIRM_REQUIRED: Chưa gõ đúng tên để xác nhận.
     NOT_IN_PLAN: Danh sách đã thay đổi, mục này không còn.
@@ -154,6 +155,13 @@ error:
   DATA-004:
     title: Thiếu ảnh trong dữ liệu
     what: '{sample_count} mẫu dữ liệu trỏ tới ảnh không tồn tại.'
+  DATA-005:
+    title: Ảnh để chạy thử chưa dùng được
+    what:
+      missing: Bước "{node}" chưa có ảnh. Hãy tải lên một ảnh JPG, PNG hoặc WEBP.
+      unreadable: Ảnh của bước "{node}" không mở được hoặc không phải JPG, PNG, WEBP. Hãy tải lên ảnh khác.
+      too_large: Ảnh của bước "{node}" lớn hơn 20 MB. Hãy dùng ảnh nhỏ hơn.
+      too_many_pixels: Ảnh của bước "{node}" có độ phân giải quá lớn (trên 40 triệu điểm ảnh). Hãy thu nhỏ ảnh rồi tải lại.
   MODEL-001:
     title: Không đọc được model sau khi chuyển đổi
     what: Các phần trong file model không khớp định dạng mong đợi, thường do khác phiên bản thư viện.
@@ -642,6 +650,12 @@ node:
       model: Model
       endpoint: Model đang chạy thử
     param:
+      image:
+        label: Ảnh để chạy thử
+        help: Tải lên một ảnh JPG, PNG hoặc WEBP (tối đa 20 MB). Ảnh chỉ lưu trên máy này, trong thư mục dự án.
+      prompt:
+        label: Câu hỏi
+        help: Bạn muốn hỏi gì về ảnh, ví dụ "Tổng tiền là bao nhiêu?". Model đọc hoá đơn (Nemotron Parse) luôn làm cùng một việc nên không dùng ô này.
       answer_length:
         label: Độ dài trả lời
         help: Câu trả lời tối đa dài bao nhiêu.

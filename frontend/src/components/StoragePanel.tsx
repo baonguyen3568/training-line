@@ -85,6 +85,9 @@ export function StoragePanel() {
   const needTyping = chosen.filter((i) => i.confirm_required);
   const allTyped = needTyping.every((i) => typed[i.item_id] === i.confirm_text);
   const chosenGb = chosen.reduce((sum, i) => sum + (i.size_gb ?? 0), 0);
+  const keptTotal = plan.items
+    .filter((i) => i.section === "kept")
+    .reduce((sum, i) => sum + (i.size_gb ?? 0), 0);
 
   const toggle = (id: string) =>
     setSelected((cur) => {
@@ -219,6 +222,10 @@ export function StoragePanel() {
             aria-label={t(`storage.section.${section}`)}
           >
             <h2>{t(`storage.section.${section}`)}</h2>
+            {section === "kept" && keptTotal > 0 && (
+              // Where the space goes even though nothing here can be deleted (bao-cleanup: ~60 GB of pinned runs).
+              <p className="muted">{t("storage.panel.kept_total", { gb: gb(keptTotal) })}</p>
+            )}
             <ul className="storage-items">
               {items.map((item) => {
                 const why = reason(item);

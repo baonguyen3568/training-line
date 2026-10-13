@@ -60,6 +60,7 @@ storage:
     admin_command: Command for an admin
     copy: Copy command
     copied: Copied
+    kept_total: Keeping {gb} GB
   skip_reason:
     CONFIRM_REQUIRED: The name was not typed correctly.
     NOT_IN_PLAN: The list changed and this item is gone.
@@ -154,6 +155,13 @@ error:
   DATA-004:
     title: Images missing from data
     what: '{sample_count} samples point to images that don''t exist.'
+  DATA-005:
+    title: The trial image can't be used
+    what:
+      missing: '"{node}" has no image yet. Upload a JPG, PNG or WEBP image.'
+      unreadable: The image of "{node}" can't be opened or isn't a JPG, PNG or WEBP. Upload another image.
+      too_large: The image of "{node}" is larger than 20 MB. Use a smaller image.
+      too_many_pixels: The image of "{node}" has too high a resolution (over 40 megapixels). Shrink it and upload it again.
   MODEL-001:
     title: Can't read the converted model
     what: Parts of the model file don't match the expected format, usually due to a library version difference.
@@ -642,6 +650,12 @@ node:
       model: Model
       endpoint: Model being served
     param:
+      image:
+        label: Image to try
+        help: Upload a JPG, PNG or WEBP image (up to 20 MB). It stays on this machine, in the project folder.
+      prompt:
+        label: Question
+        help: What you want to ask about the image, for example "What is the total?". The invoice-reading model (Nemotron Parse) always does the same task, so it ignores this box.
       answer_length:
         label: Answer length
         help: How long an answer can be at most.
