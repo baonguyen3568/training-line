@@ -62,6 +62,25 @@
         "$value": "#d03b3b"
       }
     },
+    "status_ink": {
+      "$description": "Status colour for non-text marks (icon, border, bar, dot): >=3:1 on page/surface. Status LABELS use text.primary/secondary, never a status colour (status hues are <4.5:1 as text in at least one mode).",
+      "good": {
+        "$type": "color",
+        "$value": "#0ca30c"
+      },
+      "warning": {
+        "$type": "color",
+        "$value": "#bb8004"
+      },
+      "serious": {
+        "$type": "color",
+        "$value": "#e7622f"
+      },
+      "critical": {
+        "$type": "color",
+        "$value": "#d03b3b"
+      }
+    },
     "series": {
       "1": {
         "$type": "color",
