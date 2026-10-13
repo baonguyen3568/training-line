@@ -1221,6 +1221,7 @@ standards:
     eval_downstream: "Model sau khi nén chưa được đo điểm. Nén có thể làm model kém hơn bản gốc; hãy nối thêm bước Đo điểm phía sau để biết chắc."
   data:
     broken_images_some: "Có ảnh hỏng hoặc quá nhỏ (cạnh ngắn dưới {min_short_side_px} px). App sẽ bỏ qua các ảnh đó."
+    leak_check_unwired: "Bước bỏ trùng chưa có dữ liệu kiểm tra để so. Nối tập kiểm tra vào cổng heldout để loại các ảnh train trùng với ảnh dùng để chấm điểm."
     broken_images_many: "Hơn {above}% ảnh hỏng hoặc quá nhỏ. Thư mục có thể chọn sai; hãy kiểm tra trước khi train."
     aspect_ratio: "Có ảnh quá dài hoặc quá hẹp (tỉ lệ cạnh trên {above}:1). Model không xử lý được ảnh này; hãy cắt hoặc bỏ đi."
     truncated: "Hơn {above}% câu trả lời dài hơn giới hạn của model và sẽ bị cắt khi train."

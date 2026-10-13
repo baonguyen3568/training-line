@@ -54,3 +54,11 @@ rules:
     level: warn
     message: standards.data.image_seen_in_eval
     source: ".team/proposals/P4-2-standards-as-data.md (same image, different question: benchmarks reuse COCO images)"
+
+  # validate phase (the check kind decides the phase): a leak check with nothing to compare against does nothing.
+  - id: DEDUPE-LEAK-NO-HELDOUT
+    applies_to: {node: data.dedupe, port: heldout}
+    check: {kind: port_wired_if, flag: check_leak}
+    level: info
+    message: standards.data.leak_check_unwired
+    source: "decontamination: train samples whose image is in val/test inflate scores, docs/adr/ADR-002-eval-benchmark-protocol.md"
