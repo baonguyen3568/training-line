@@ -30,6 +30,7 @@ import { selfAndDownstream, stepNumbers } from "../lib/topo";
 import { connectionBetween, type HandleRef, handleUnder } from "../lib/wire";
 import { useUi } from "../store/ui";
 import { graphKey, useWorkflow } from "../store/workflow";
+import { BugReportDialog } from "./BugReportDialog";
 import { CheckBar } from "./CheckBar";
 import { Icon } from "./Icon";
 import { Inspector } from "./Inspector";
@@ -150,6 +151,7 @@ function EditorInner() {
   // G-4: right-click menu of a node that already ran (its run-dir base is known from node_status)
   const [menu, setMenu] = useState<{ x: number; y: number; base: string } | null>(null);
   const resetNode = useUi((st) => st.resetNode);
+  const bugReport = useUi((st) => st.bugReport);
   useEffect(() => {
     const onToast = (e: Event) => setToast((e as CustomEvent<string>).detail);
     window.addEventListener("vlm:toast", onToast);
@@ -606,6 +608,14 @@ function EditorInner() {
               <Icon name="rotate-ccw" size={14} /> {t("storage.reset_step.menu")}
             </button>
           </div>
+        )}
+        {bugReport && (
+          <BugReportDialog
+            runId={bugReport.runId}
+            nodeId={bugReport.nodeId}
+            code={bugReport.code}
+            onClose={() => useUi.getState().setBugReport(null)}
+          />
         )}
         {resetNode && (
           <ResetStepDialog

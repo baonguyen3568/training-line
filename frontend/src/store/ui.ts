@@ -42,6 +42,9 @@ interface UiState {
   /** The wire being dragged (port it started from), so ports it cannot reach are dimmed (design). */
   wireDrag: WireDrag | null;
   setWireDrag(drag: WireDrag | null): void;
+  /** "Gửi báo cáo lỗi" dialog for one failed step of a run. */
+  bugReport: { runId: string; nodeId?: string; code?: string; title?: string } | null;
+  setBugReport(r: UiState["bugReport"]): void;
   /** G-4: node base ("<nid>-<key16>") whose "Đặt lại bước" dialog is open. */
   resetNode: string | null;
   setResetNode(node: string | null): void;
@@ -67,6 +70,10 @@ export const useUi = create<UiState>((set) => ({
   wireDrag: null,
   setWireDrag(wireDrag) {
     set({ wireDrag });
+  },
+  bugReport: null,
+  setBugReport(bugReport) {
+    set({ bugReport });
   },
   resetNode: null,
   setResetNode(resetNode) {

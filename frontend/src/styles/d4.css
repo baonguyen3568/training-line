@@ -951,3 +951,15 @@
   margin: 0 0 var(--space-8);
   padding-left: var(--space-16);
 }
+/* "Gửi báo cáo lỗi": exactly what will be copied, as machine text */
+.bug-report-preview {
+  margin: 0 0 var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  background: var(--color-page);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  user-select: all;
+}

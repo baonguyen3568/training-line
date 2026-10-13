@@ -383,6 +383,19 @@ export interface NodeResetPlan {
   confirm_text: string | null;
   next_generation: number;
 }
+/**
+ * "Gửi báo cáo lỗi" (design ba32c2c, security-approved fields): only these, any of them may be absent. Pasted into
+ * a PUBLIC GitHub issue, so no logs, paths, tokens or user data.
+ */
+export interface BugReport {
+  code?: string;
+  error_title?: string;
+  app_version?: string;
+  gpu?: string;
+  /** Short hashed reference the team can ask about; never the run's (user-named) id (design 262b579). */
+  ref_code?: string;
+}
+
 export interface NodeResetResult {
   deleted: string[];
   failed: string[];

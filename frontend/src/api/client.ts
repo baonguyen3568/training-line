@@ -3,6 +3,7 @@
 // readable cookie (cookies are not port-isolated on 127.0.0.1, so other local apps could toss/overwrite them)
 // and never localStorage. It changes on every server restart; a 403 csrf_invalid triggers one refresh + retry.
 import type {
+  BugReport,
   MetricsPage,
   MetricsQuery,
   NodeResetPlan,
@@ -114,6 +115,12 @@ export interface Api {
   storagePlan(locale: string): Promise<StoragePlan>;
   /** Rejects with ApiError: 409 {code: PLAN_EXPIRED|CLEANUP_IN_PROGRESS}, 403 {error: DISK-002 + admin_command}. */
   storageApply(body: StorageApplyRequest, locale: string): Promise<StorageApplyResult>;
+  /** The 5 safe fields of a bug report for one failed step (server-built, filtered). */
+  bugReport(
+    runId: string,
+    q: { nodeId?: string; code?: string },
+    locale: string,
+  ): Promise<BugReport>;
   /** G-4. 422 on a malformed node. */
   nodeResetPlan(node: string, locale: string): Promise<NodeResetPlan>;
   /** 400 {code: CONFIRM_REQUIRED}, 403 {error: DISK-002 + admin_command}, 409 {code: PLAN_EXPIRED | … }. */
@@ -157,6 +164,12 @@ export const httpApi: Api = {
   storagePlan: (locale) => request("GET", `/api/storage/plan?locale=${encodeURIComponent(locale)}`),
   storageApply: (body, locale) =>
     request("POST", `/api/storage/apply?locale=${encodeURIComponent(locale)}`, body),
+  bugReport: (runId, q, locale) => {
+    const qs = new URLSearchParams({ locale });
+    if (q.nodeId) qs.set("node_id", q.nodeId);
+    if (q.code) qs.set("code", q.code);
+    return request("GET", `/api/runs/${encodeURIComponent(runId)}/bug-report?${qs}`);
+  },
   nodeResetPlan: (node, locale) =>
     request(
       "GET",

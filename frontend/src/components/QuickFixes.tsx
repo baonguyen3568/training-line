@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
 import type { ResolvedAction, ValidationIssue } from "../api/types";
 import { t, tpOptional } from "../i18n";
+import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
 
@@ -113,6 +114,12 @@ function navigation(
   }
   if (target === "memory_panel" || target === "cleanup_dry_run") return () => navigate("storage");
   if (target === "queue_until_memory") return () => void s.startRun(); // the run waits for memory by itself
+  if (target === "bug_report") {
+    // the report is about one run: without a run there is nothing to report on
+    const runId = s.run?.id;
+    if (!runId) return undefined;
+    return () => useUi.getState().setBugReport({ runId, nodeId, code: issue.code });
+  }
   return undefined;
 }
 
