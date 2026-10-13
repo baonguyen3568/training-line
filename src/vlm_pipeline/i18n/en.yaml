@@ -1065,7 +1065,7 @@ run:
   progress: Running step {current_step}/{total_count} · {node}
   locked_while_running: Running — stop to edit the workflow
   finished: Finished in {duration}
-  finished_with_errors: Finished with {error_count} failed steps
+  finished_with_errors: Run stopped because steps failed ({error_count})
   view_results: View results
   connection_lost: Lost connection to the app, reconnecting… The run keeps going on the machine.
 workflow:

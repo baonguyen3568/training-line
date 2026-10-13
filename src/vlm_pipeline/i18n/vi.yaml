@@ -1065,7 +1065,7 @@ run:
   progress: Đang chạy bước {current_step}/{total_count} · {node}
   locked_while_running: Đang chạy — dừng lại để sửa workflow
   finished: Chạy xong sau {duration}
-  finished_with_errors: Chạy xong, có {error_count} bước lỗi
+  finished_with_errors: Lần chạy dừng vì có bước bị lỗi ({error_count})
   view_results: Xem kết quả
   connection_lost: Mất kết nối với app, đang thử nối lại… Lần chạy vẫn tiếp tục trên máy.
 workflow:
