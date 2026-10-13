@@ -19,6 +19,7 @@ storage:
     GPU_LOCK_HOLDER: Run này đang dùng GPU (hoặc app chưa đọc được trạng thái GPU) nên chưa xoá được. Thử lại khi run chạy xong.
     UNKNOWN_STATUS: Không đọc được trạng thái của run "{run}" nên app giữ lại cho an toàn.
     RUN_INTERRUPTED: Run "{run}" bị gián đoạn. App giữ các bản lưu tới {until} để bạn chạy tiếp; sau đó chỉ giữ lại bản lưu cuối cùng.
+    INPUT_OF_RUNNING_ATTEMPT: Lần chạy mới của bước "{node}" đang chạy tiếp từ bản lưu này. Xoá được khi lần chạy đó xong, hoặc khi nó không còn chạy tiếp được nữa.
   attention:
     RUN_INTERRUPTED_EXPIRING: Bước "{node}" (run "{run}") bị gián đoạn. Hãy chạy tiếp trước {until}; sau mốc đó app dọn các bản lưu cũ, chỉ giữ lại bản lưu cuối cùng.
   consequence:

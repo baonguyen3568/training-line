@@ -280,6 +280,30 @@ def _plan_items(client: TestClient) -> tuple[str, dict[str, dict[str, object]]]:
     return body["plan_id"], {i["item_id"]: i for i in body["items"]}
 
 
+def test_resume_source_is_shown_kept_and_cannot_be_applied(env: tuple[TestClient, ArtifactIndex, Path, Clock]) -> None:
+    """P017 C6: the run dir a later attempt resumes from is only shown (kept), even with a typed confirmation."""
+    client, idx, root, _ = env
+    src = _cached(root, idx, "n1-0123456789abcdef", train=True)
+    attempt = root / "outputs" / "runs" / "n1-0123456789abcdef-a2"
+    attempt.mkdir(parents=True)
+    ref = {"run": "n1-0123456789abcdef", "checkpoint": "epoch_0_step_9"}
+    (attempt / "run.json").write_text(json.dumps({"run_id": "a2", "status": "running", "resumed_from": ref}))
+    plan_id, items = _plan_items(client)
+    row = items["n1-0123456789abcdef"]
+    assert (row["section"], row["lock_reason"], row["confirm_required"]) == ("kept", "INPUT_OF_RUNNING_ATTEMPT", False)
+    assert set(row["lock_params"]) == {"run", "node"}  # the copy names the step (bao-design)
+    resp = client.post(
+        "/api/storage/apply",
+        json={
+            "plan_id": plan_id,
+            "item_ids": ["n1-0123456789abcdef"],
+            "confirm": {"n1-0123456789abcdef": "n1-0123456789abcdef"},
+        },
+    )
+    assert resp.json()["skipped"] == [{"item_id": "n1-0123456789abcdef", "reason": "NOT_IN_PLAN"}]
+    assert (src / "checkpoints").exists()
+
+
 def test_plan_merges_checkpoint_and_set_aside_items_by_section(
     env: tuple[TestClient, ArtifactIndex, Path, Clock],
 ) -> None:
@@ -400,7 +424,14 @@ def test_every_retention_lock_reason_and_item_has_copy(locale: str) -> None:
     from vlm_pipeline.i18n import load
 
     texts = load(locale)
-    for reason in ("PINNED_OR_KEEP", "GPU_LOCK_HOLDER", "UNKNOWN_STATUS", "RUN_NOT_FINISHED", "RUN_INTERRUPTED"):
+    for reason in (
+        "PINNED_OR_KEEP",
+        "GPU_LOCK_HOLDER",
+        "UNKNOWN_STATUS",
+        "RUN_NOT_FINISHED",
+        "RUN_INTERRUPTED",
+        "INPUT_OF_RUNNING_ATTEMPT",
+    ):
         assert f"storage.lock_reason.{reason}" in texts
     assert "storage.attention.RUN_INTERRUPTED_EXPIRING" in texts
     for key in ("checkpoint_of_run", "set_aside_of_run"):

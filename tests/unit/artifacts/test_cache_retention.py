@@ -274,3 +274,25 @@ def test_run_dir_outside_known_roots_is_never_touched(
 def test_relative_run_dir_is_rejected(idx: ArtifactIndex) -> None:
     with pytest.raises(ValueError, match="run_dir must be absolute"):
         idx.record("k", run_id="k", node_type="t", outputs={}, run_dir=Path("outputs/graph/runs/k"))
+
+
+def _resumes_from(root: Path, attempt: str, source: str, status: str = "running") -> None:
+    run = root / "outputs" / "runs" / attempt
+    run.mkdir(parents=True)
+    ref = {"run": source, "checkpoint": "epoch_0_step_9"}
+    (run / "run.json").write_text(json.dumps({"run_id": attempt, "status": status, "resumed_from": ref}))
+
+
+def test_the_source_of_a_running_attempt_is_never_evicted_even_confirmed(root: Path, idx: ArtifactIndex) -> None:
+    """P017 C6: a later attempt resumes from this run dir; no typed confirmation unlocks it."""
+    run = _cached_run(root, idx, "n1-0123456789abcdef", train=True)
+    _resumes_from(root, "n1-0123456789abcdef-a2", "n1-0123456789abcdef")
+    plan = plan_cache(root, idx, cap_gb=0.0)
+    assert [(i.cache_key, why) for i, why in plan.protected] == [("n1-0123456789abcdef", "INPUT_OF_RUNNING_ATTEMPT")]
+    res = evict(root, idx, ["n1-0123456789abcdef"], by="t", manual=True, confirmed={"n1-0123456789abcdef"})
+    assert res.skipped == [("n1-0123456789abcdef", "INPUT_OF_RUNNING_ATTEMPT")]
+    assert (run / "artifacts" / "model" / "weights.bin").exists()
+    (root / "outputs" / "runs" / "n1-0123456789abcdef-a2" / "run.json").write_text(
+        json.dumps({"run_id": "a2", "status": "completed", "resumed_from": {"run": "n1-0123456789abcdef"}})
+    )  # the attempt finished: the source follows the normal rules again (a trained model: confirmation)
+    assert evict(root, idx, ["n1-0123456789abcdef"], by="t", confirmed={"n1-0123456789abcdef"}).evicted

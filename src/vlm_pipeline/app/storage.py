@@ -15,11 +15,9 @@ There is no endpoint that deletes an arbitrary path. Text for the user is render
 
 from __future__ import annotations
 
-import json
 import os
 import secrets
 import shlex
-import stat
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -155,6 +153,26 @@ def _item(item: cache_retention.CacheItem, protected_reason: str | None) -> dict
     }
 
 
+def _cache_entry(item: cache_retention.CacheItem, reason: str | None, auto: set[str], node: str = "") -> dict[str, Any]:
+    """Panel row of a cache entry; one a later attempt resumes from (P017 C6) is only shown, never selectable."""
+    if reason == retention.INPUT_REASON:
+        row = _item(item, None)
+        return {
+            **row,
+            "auto": False,
+            "section": "kept",
+            "consequence_code": None,
+            "consequence_params": {},
+            "lock_reason": reason,
+            "lock_params": {"run": item.run_id, "node": node or item.run_id},
+        }
+    return {
+        **_item(item, reason),
+        "auto": item.cache_key in auto,
+        "section": "auto" if item.cache_key in auto else "manual",
+    }
+
+
 def _retention_section(item: retention.PlanItem) -> str | None:
     """Auto / manual / kept for a retention item; None = nothing to show (an ordinary keep, e.g. still young)."""
     if item.action != "keep" and item.blocked_by is None:
@@ -168,7 +186,9 @@ def _needs_confirm(item: retention.PlanItem) -> bool:
     return item.blocked_by == retention.CONFIRM_REASON or item.consequence_code == PERMANENT_LOSS
 
 
-def _retention_item(item: retention.PlanItem, section: str, kept_bytes: int = 0) -> dict[str, Any]:
+def _retention_item(
+    item: retention.PlanItem, section: str, kept_bytes: int = 0, lock_params: dict[str, str] | None = None
+) -> dict[str, Any]:
     """``kept_bytes``: on-disk size of a kept item, so the panel shows where space is held (KEEP, running...)."""
     ckpt = item.path.removeprefix("checkpoints/")
     confirm = section == "manual" and _needs_confirm(item)
@@ -189,7 +209,7 @@ def _retention_item(item: retention.PlanItem, section: str, kept_bytes: int = 0)
         "action": item.action,
         "protected_reason": retention.CONFIRM_REASON if item.blocked_by == retention.CONFIRM_REASON else None,
         "lock_reason": item.blocked_by if kept else None,
-        "lock_params": _lock_params(item) if kept else {},
+        "lock_params": (lock_params or {"run": item.run_id}) if kept else {},
         "regenerable": False,
         "consequence_code": item.consequence_code,
         "consequence_params": dict(item.consequence_params),
@@ -203,29 +223,38 @@ def _local_time(ts: float) -> str:
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(ts))
 
 
-def _lock_params(item: retention.PlanItem) -> dict[str, str]:
+def _lock_params(root: Path, item: retention.PlanItem, locale: str) -> dict[str, str]:
     if item.blocked_by == retention.INTERRUPTED_REASON and item.resume_until is not None:
         return {"run": item.run_id, "until": _local_time(item.resume_until)}
+    if item.blocked_by == retention.INPUT_REASON:
+        return {"run": item.run_id, "node": _step_title(root, item, locale)}
     return {"run": item.run_id}
 
 
-RUN_JSON_MAX = 1 << 20
 _UNTIL_FORMAT = {"vi": "%H:%M %d/%m", "en": "%b %d, %H:%M"}  # short date + time in a sentence (bao-design)
 
 
 def _step_title(root: Path, item: retention.PlanItem, locale: str) -> str:
     """Node title of the run (app runs are named ``"<node type> <entry>"``), else the run's name, else its id."""
-    run_json = root / item.runs_rel / item.run_id / "run.json"
-    name = ""
-    try:  # a job can rewrite its own run.json: a regular file only, at most RUN_JSON_MAX bytes,
-        # shown as a clean label (no bidi/control characters, short)
-        st = run_json.lstat()
-        if stat.S_ISREG(st.st_mode) and st.st_size <= RUN_JSON_MAX:
-            name = clean_label(str(json.loads(run_json.read_text(encoding="utf-8")).get("name") or ""))
-    except (OSError, ValueError, AttributeError):
+    return _title_of(root / item.runs_rel / item.run_id / "run.json", item.run_id, locale)
+
+
+def _cache_title(root: Path, item: cache_retention.CacheItem, locale: str) -> str:
+    for rel in cache_retention.RUN_ROOTS:
+        run_json = root / rel / item.run_id / "run.json"
+        if run_json.parent.is_dir() and not run_json.parent.is_symlink():
+            return _title_of(run_json, item.run_id, locale)
+    return item.run_id
+
+
+def _title_of(run_json: Path, fallback: str, locale: str) -> str:
+    try:  # a job can rewrite its own run.json: read safely, shown as a clean label (no bidi/control chars, short)
+        data = retention.read_small_json(run_json)
+        name = clean_label(str(data.get("name") or "")) if isinstance(data, dict) else ""
+    except (OSError, ValueError):
         name = ""
     key = f"node.{name.split(' ', 1)[0]}.title" if name else ""
-    return i18n.t(key, locale) if key in i18n.load(locale) else (name or item.run_id)
+    return i18n.t(key, locale) if key in i18n.load(locale) else (name or fallback)
 
 
 def _resume_warnings(root: Path, items: list[retention.PlanItem], now: float, locale: str) -> list[dict[str, Any]]:
@@ -286,17 +315,20 @@ class StorageApi:
         p = cache_retention.plan_cache(self.root, self.index, cap_gb=self.settings.node_cache_max_gb)
         auto = {i.cache_key for i in p.evict}
         items = [
-            {
-                **_item(item, reason),
-                "auto": item.cache_key in auto,
-                "section": "auto" if item.cache_key in auto else "manual",
-            }
+            _cache_entry(
+                item, reason, auto, _cache_title(self.root, item, locale) if reason == retention.INPUT_REASON else ""
+            )
             for item, reason in cache_retention.list_cache(self.root, self.index)
             if item.reclaim_bytes > 0
         ]
         kept_or_actionable = self._retention_items()
         items += [
-            _retention_item(item, section, self._kept_bytes(item) if section == "kept" else 0)
+            _retention_item(
+                item,
+                section,
+                self._kept_bytes(item) if section == "kept" else 0,
+                _lock_params(self.root, item, locale) if section == "kept" else None,
+            )
             for item, section in kept_or_actionable
         ]
         plan_id, expires = self.plans.add({i["item_id"]: i["source"] for i in items if i["section"] != "kept"})
@@ -392,6 +424,9 @@ class StorageApi:
                 skipped.append({"item_id": key, "reason": "NOT_EVICTABLE"})
                 continue
             item, why = found
+            if why == retention.INPUT_REASON:  # a later attempt resumes from it: no confirmation unlocks it
+                skipped.append({"item_id": key, "reason": why})
+                continue
             if why is not None:
                 if confirm.get(key) != item.run_id:
                     skipped.append({"item_id": key, "reason": "CONFIRM_REQUIRED"})

@@ -7,6 +7,9 @@ planned the same way (no time-of-check/time-of-use gap), then logs ``checkpoint_
 ``optim/``, ``dataloader/``, ``rng/`` sub-directories are.
 
 Rules (first match wins, per checkpoint; statuses are ``common.runinfo.RunStatus``):
+0. a later attempt that may still resume (running/queued, or interrupted inside its window) names this run dir in its
+   run.json ``resumed_from`` -> keep the whole run dir (``INPUT_OF_RUNNING_ATTEMPT``, P017 C6); no typed confirmation
+   overrides it, and an unreadable ``resumed_from`` keeps every attempt dir of that node (fail closed)
 1. run has a ``KEEP`` file, or is the run holding the GPU lock, or the lock is unreadable -> keep (blocked);
    a ``KEEP`` file inside one checkpoint directory pins only that checkpoint
 2. status is queued/running/evicted -> keep (blocked); missing/unknown status -> keep (UNKNOWN_STATUS);
@@ -42,9 +45,11 @@ from __future__ import annotations
 
 import fcntl
 import json
+import logging
 import os
 import re
 import shutil
+import stat
 import time
 import tomllib
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
@@ -73,6 +78,13 @@ DAY_S = 86_400.0
 PROJECT_NAME = "vlm-pipeline"  # [project].name in pyproject.toml; guards against a wrong VLM_PROJECT_ROOT
 CLEANUP_LOG_REL = Path("outputs") / "system" / "cleanup.jsonl"
 CLEANUP_LOCK_REL = Path("outputs") / "system" / "retention.lock"  # one deleting pass at a time (CLI, scheduler)
+RUN_JSON_MAX = 1 << 20  # run.json is written by the job too: never read more than this, never a fifo or a symlink
+INPUT_REASON = "INPUT_OF_RUNNING_ATTEMPT"  # P017 C6: a later attempt resumes from this run dir; nothing overrides it
+_NAME_RE = re.compile(r"[A-Za-z0-9._-]+", re.ASCII)  # fullmatch: a run dir / checkpoint name, never a path
+_ATTEMPT_RE = re.compile(r"(.+)-[0-9a-f]{16}(?:-a[0-9]+)?", re.ASCII)  # fullmatch: <node id>-<key16>[-aN]
+_LATER_ATTEMPT_RE = re.compile(r".+-[0-9a-f]{16}-a[0-9]+", re.ASCII)  # fullmatch: only these resume from a source
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -198,11 +210,30 @@ class ApplyResult:
         return sum(i.reclaim_bytes for i in self.done)
 
 
+def read_small_json(path: Path, max_bytes: int = RUN_JSON_MAX) -> object:
+    """JSON of a small regular file a job may have written (run.json). Never blocks, never follows a symlink.
+
+    Raises:
+        FileNotFoundError: no file.
+        OSError: a symlink (ELOOP) or unreadable.
+        ValueError: not a regular file (fifo, device...), larger than ``max_bytes``, or not JSON.
+    """
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with os.fdopen(fd, "rb") as fh:
+        st = os.fstat(fh.fileno())
+        if not stat.S_ISREG(st.st_mode) or st.st_size > max_bytes:
+            raise ValueError("not a small regular file")
+        data = fh.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError("file grew past the limit")
+    return json.loads(data.decode("utf-8"))
+
+
 def read_run_status(run_dir: Path) -> tuple[str, float | None]:
     """(status, ended_at) from run.json; status is "unknown"/"unreadable" when it cannot be read."""
     path = run_dir / "run.json"
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = read_small_json(path)
     except FileNotFoundError:
         return "unknown", None
     except (OSError, ValueError):
@@ -213,7 +244,7 @@ def read_run_status(run_dir: Path) -> tuple[str, float | None]:
     ended = data.get("ended_at")
     ended_at = float(ended) if isinstance(ended, int | float) and not isinstance(ended, bool) else None
     if ended_at is None:
-        ended_at = path.stat().st_mtime  # runner rewrites run.json when the status changes
+        ended_at = _newest_mtime(path)  # runner rewrites run.json when the status changes (lstat, never followed)
     return (str(status) if status else "unknown"), ended_at
 
 
@@ -359,11 +390,19 @@ def _set_aside_decision(
 
 
 def _plan_set_aside(
-    run_dir: Path, runs_rel: Path, lock: LockStatus | None, *, now: float, policy: RetentionPolicy
+    run_dir: Path,
+    runs_rel: Path,
+    lock: LockStatus | None,
+    *,
+    now: float,
+    policy: RetentionPolicy,
+    inputs: ResumeInputs | None = None,
 ) -> list[PlanItem]:
     """Items for ``*.not-resumable-<stamp>`` entries directly in ``run_dir`` (see module docstring)."""
     blocked = None
-    if (run_dir / "KEEP").exists():
+    if inputs is not None and inputs.blocks(run_dir):
+        blocked = INPUT_REASON
+    elif (run_dir / "KEEP").exists():
         blocked = "PINNED_OR_KEEP"
     elif lock is not None and lock.corrupt:
         blocked = "GPU_LOCK_HOLDER"
@@ -395,6 +434,91 @@ def _blocked_reason(run_dir: Path, run_id: str, status: str, lock: LockStatus | 
     return None
 
 
+@dataclass(frozen=True)
+class ResumeInputs:
+    """Run dirs a later attempt may still resume from (P017 C6). Blocks deletion of the WHOLE run dir.
+
+    ``prefixes``: (runs root, ``"<node id>-"``) of a node whose ``resumed_from`` could not be read: every attempt dir of
+    that node is blocked for this pass (fail closed).
+    """
+
+    dirs: frozenset[Path] = frozenset()
+    prefixes: frozenset[tuple[Path, str]] = frozenset()
+
+    def blocks(self, run_dir: Path) -> bool:
+        real = run_dir.resolve()
+        return real in self.dirs or any(real.parent == base and real.name.startswith(p) for base, p in self.prefixes)
+
+
+def _resume_target(base: Path, ref: object) -> Path | None:
+    """``base/<run>`` for a well-formed ``{"run", "checkpoint"}`` naming a real dir in the same runs root, else None."""
+    if not isinstance(ref, dict):
+        return None
+    run, ckpt = ref.get("run"), ref.get("checkpoint")
+    if not (isinstance(run, str) and isinstance(ckpt, str)):
+        return None
+    if not (_NAME_RE.fullmatch(run) and _NAME_RE.fullmatch(ckpt)) or run in {".", ".."}:
+        return None
+    if not ckpt.startswith(CKPT_PREFIX):
+        return None
+    target = base / run
+    return target if target.is_dir() and not target.is_symlink() else None
+
+
+def _node_prefix(run_dir_name: str) -> str:
+    match = _ATTEMPT_RE.fullmatch(run_dir_name)
+    return (match.group(1) if match else run_dir_name) + "-"
+
+
+def _may_still_resume(run_dir: Path, data: dict[str, object], now: float, policy: RetentionPolicy) -> bool:
+    """Running/queued, or interrupted and still inside its resume window (ADR-005 A2)."""
+    status = data.get("status")
+    if status in (RunStatus.RUNNING, RunStatus.QUEUED):
+        return True
+    if status != RunStatus.INTERRUPTED:
+        return False
+    ended = data.get("ended_at")
+    ended_at = float(ended) if isinstance(ended, int | float) and not isinstance(ended, bool) else 0.0
+    last = max(ended_at, _newest_mtime(run_dir / "run.json"), _newest_mtime(run_dir / "checkpoints"))
+    return now < last + policy.interrupted_days * DAY_S
+
+
+def resume_inputs(root: Path, *, now: float | None = None, policy: RetentionPolicy = DEFAULT_POLICY) -> ResumeInputs:
+    """Sources (``run.json`` ``resumed_from``) of every attempt that may still resume, in both runs roots."""
+    ts = time.time() if now is None else now
+    dirs: set[Path] = set()
+    prefixes: set[tuple[Path, str]] = set()
+    for rel in (RUNS_REL, GRAPH_RUNS_REL):
+        base = root / rel
+        if not base.is_dir() or base.is_symlink():
+            continue
+        for run_dir in sorted(base.iterdir()):
+            if run_dir.is_symlink() or not run_dir.is_dir():
+                continue
+            try:
+                data = read_small_json(run_dir / "run.json")
+            except FileNotFoundError:
+                continue  # no manifest yet: nothing it resumes from is recorded
+            except (OSError, ValueError):
+                data = None
+            if not isinstance(data, dict):  # unreadable: a later attempt may be resuming from its node (fail closed)
+                if _LATER_ATTEMPT_RE.fullmatch(run_dir.name):
+                    logger.warning("run %s: unreadable run.json, every attempt of its node is kept", run_dir.name)
+                    prefixes.add((base.resolve(), _node_prefix(run_dir.name)))
+                continue
+            if data.get("resumed_from") is None:
+                continue
+            if not _may_still_resume(run_dir, data, ts, policy):
+                continue
+            target = _resume_target(base, data["resumed_from"])
+            if target is not None:
+                dirs.add(target.resolve())
+            else:
+                logger.warning("run %s: unreadable resumed_from, every attempt of its node is kept", run_dir.name)
+                prefixes.add((base.resolve(), _node_prefix(run_dir.name)))
+    return ResumeInputs(frozenset(dirs), frozenset(prefixes))
+
+
 def plan(
     root: Path,
     *,
@@ -410,13 +534,14 @@ def plan(
     """
     ts = time.time() if now is None else now
     lock = lock_reader(lock_path if lock_path is not None else root / ".team" / "GPU_LOCK")
+    inputs = resume_inputs(root, now=ts, policy=policy)
     runs_dir = root / RUNS_REL
     runs: list[RunPlan] = []
     for run_dir in sorted(runs_dir.iterdir()) if runs_dir.is_dir() else []:
         if run_dir.is_symlink() or not run_dir.is_dir() or (run_ids is not None and run_dir.name not in run_ids):
             continue
         status, ended_at = read_run_status(run_dir)
-        blocked = _blocked_reason(run_dir, run_dir.name, status, lock)
+        blocked = INPUT_REASON if inputs.blocks(run_dir) else _blocked_reason(run_dir, run_dir.name, status, lock)
         failed_ended_at = resume_until = None
         if status in FAILED_STATUSES or status == RunStatus.INTERRUPTED:
             failed_ended_at = max(
@@ -447,13 +572,13 @@ def plan(
                         resume_until=resume_until,
                     )
                 )
-        items += _plan_set_aside(run_dir, RUNS_REL, lock, now=ts, policy=policy)
+        items += _plan_set_aside(run_dir, RUNS_REL, lock, now=ts, policy=policy, inputs=inputs)
         runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(items)))
     graph_dir = root / GRAPH_RUNS_REL
     for run_dir in sorted(graph_dir.iterdir()) if graph_dir.is_dir() else []:
         if run_dir.is_symlink() or not run_dir.is_dir() or (run_ids is not None and run_dir.name not in run_ids):
             continue
-        set_aside = _plan_set_aside(run_dir, GRAPH_RUNS_REL, lock, now=ts, policy=policy)
+        set_aside = _plan_set_aside(run_dir, GRAPH_RUNS_REL, lock, now=ts, policy=policy, inputs=inputs)
         if set_aside:  # node checkpoints themselves belong to the node cache (cache_retention), not to D3
             status, _ = read_run_status(run_dir)
             runs.append(RunPlan(run_dir.name, status, (run_dir / "KEEP").exists(), tuple(set_aside)))

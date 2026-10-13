@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from vlm_pipeline.artifacts.index import ArtifactIndex, CacheEntry
-from vlm_pipeline.artifacts.retention import RUNS_REL, check_project_root
+from vlm_pipeline.artifacts.retention import INPUT_REASON, RUNS_REL, ResumeInputs, check_project_root, resume_inputs
 from vlm_pipeline.artifacts.storage import du_bytes
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.common.runinfo import RunStatus, read_manifest, write_manifest
@@ -143,16 +143,21 @@ TRAINED_MODEL = "TRAINED_MODEL"
 MANIFEST_UNREADABLE = "MANIFEST_UNREADABLE"
 
 
-def protection_reason(root: Path, entry: CacheEntry) -> str | None:
+def protection_reason(root: Path, entry: CacheEntry, inputs: ResumeInputs | None = None) -> str | None:
     """Why automatic eviction must skip ``entry`` (None = may be evicted automatically). Fails closed.
+
+    ``INPUT_OF_RUNNING_ATTEMPT`` (a later attempt resumes from this run dir, P017 C6) is the one reason a typed
+    confirmation never overrides.
 
     Trained-ness comes from the index flag the executor sets from node registry metadata (never from matching the
     namespaced ``node_type`` string) or from run.json ``stage``; an unreadable run.json also protects the entry.
     """
-    if entry.trained_model:
-        return TRAINED_MODEL
     try:
         run_dir = entry_run_dir(root, entry)
+        if run_dir is not None and inputs is not None and inputs.blocks(run_dir):
+            return INPUT_REASON
+        if entry.trained_model:
+            return TRAINED_MODEL
         if run_dir is None:
             return MANIFEST_UNREADABLE
         stage = read_manifest(run_dir).stage
@@ -163,7 +168,8 @@ def protection_reason(root: Path, entry: CacheEntry) -> str | None:
 
 def list_cache(root: Path, index: ArtifactIndex) -> list[tuple[CacheItem, str | None]]:
     """Every evictable entry (LRU first) with its protection reason (None = may be evicted automatically)."""
-    return [(_item(root, e), protection_reason(root, e)) for e in index.evictable()]
+    inputs = resume_inputs(root)
+    return [(_item(root, e), protection_reason(root, e, inputs)) for e in index.evictable()]
 
 
 def plan_cache(
@@ -225,10 +231,11 @@ def evict(
     """
     check_project_root(root)
     result = CacheResult()
+    inputs = resume_inputs(root)
     for key in cache_keys:
         entry = index.get(key)
-        reason = protection_reason(root, entry) if entry is not None else None
-        if reason is not None and key not in confirmed:
+        reason = protection_reason(root, entry, inputs) if entry is not None else None
+        if reason is not None and (key not in confirmed or reason == INPUT_REASON):
             result.skipped.append((key, reason))
             continue
         if entry is None or not index.begin_evict(key):

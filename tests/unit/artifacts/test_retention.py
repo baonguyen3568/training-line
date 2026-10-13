@@ -11,7 +11,14 @@ from string import Formatter
 import pytest
 
 from vlm_pipeline.artifacts.cache_retention import RUN_ROOTS
-from vlm_pipeline.artifacts.retention import CONSEQUENCE_CODES, RetentionPolicy, apply, plan
+from vlm_pipeline.artifacts.retention import (
+    CONSEQUENCE_CODES,
+    RetentionPolicy,
+    apply,
+    plan,
+    read_run_status,
+    resume_inputs,
+)
 from vlm_pipeline.common.diskguard import LockStatus
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.i18n import load as load_i18n
@@ -318,6 +325,90 @@ def test_keep_still_wins_over_an_expired_interrupted_run(tmp_path: Path) -> None
     os.utime(run / "run.json", (NOW - 30 * DAY, NOW - 30 * DAY))
     (run / "KEEP").touch()
     assert _actions(tmp_path) == {"epoch_0_step_10": ("keep", "PINNED_OR_KEEP")}
+
+
+def _attempt(root: Path, name: str, source: object, *, status: str = "running", graph: bool = False) -> Path:
+    run = root / "outputs" / ("graph/runs" if graph else "runs") / name
+    run.mkdir(parents=True)
+    (run / "run.json").write_text(json.dumps({"run_id": name, "status": status, "resumed_from": source}))
+    return run
+
+
+def test_source_of_a_running_attempt_is_kept_whole(tmp_path: Path) -> None:
+    """P017 C6: every item of the run dir a later attempt resumes from is blocked, also old non-LATEST checkpoints."""
+    _standard_run(tmp_path, "src")
+    _attempt(tmp_path, "src-a2", {"run": "src", "checkpoint": "epoch_0_step_30"})
+    assert set(_actions(tmp_path).values()) == {("keep", "INPUT_OF_RUNNING_ATTEMPT")}
+    ids = [f"src/checkpoints/epoch_0_step_{n}" for n in (10, 20, 30, 50)]
+    assert apply(tmp_path, ids, by="t", now=NOW, lock_reader=no_lock, confirmed=set(ids)).done == []
+
+
+@pytest.mark.parametrize(
+    ("status", "age_days", "blocked"),
+    [
+        ("queued", 0, True),
+        ("interrupted", 2, True),  # may still resume (ADR-005 A2 window)
+        ("interrupted", 8, False),  # window over
+        ("completed", 0, False),
+        ("failed", 0, False),
+    ],
+)
+def test_which_attempts_keep_their_source(tmp_path: Path, status: str, age_days: float, blocked: bool) -> None:
+    _standard_run(tmp_path, "src")
+    run = _attempt(tmp_path, "src-a2", {"run": "src", "checkpoint": "epoch_0_step_30"}, status=status)
+    os.utime(run / "run.json", (NOW - age_days * DAY, NOW - age_days * DAY))
+    assert resume_inputs(tmp_path, now=NOW).blocks(tmp_path / "outputs" / "runs" / "src") is blocked
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        {"run": "../runs/other", "checkpoint": "epoch_0_step_1"},  # a path, not a name
+        {"run": "n1-0123456789abcdef", "checkpoint": "../../etc"},
+        {"run": "missing-dir", "checkpoint": "epoch_0_step_1"},
+        "n1-0123456789abcdef/checkpoints/epoch_0_step_1",  # wrong shape
+    ],
+)
+def test_unreadable_resumed_from_keeps_every_attempt_of_the_node(tmp_path: Path, source: object) -> None:
+    graph = tmp_path / "outputs" / "graph" / "runs"
+    for name in ("n1-0123456789abcdef", "n1-0123456789abcdef-a2", "n2-0123456789abcdef"):
+        (graph / name).mkdir(parents=True)
+    _attempt(tmp_path, "n1-0123456789abcdef-a3", source, graph=True)
+    inputs = resume_inputs(tmp_path, now=NOW)
+    assert inputs.blocks(graph / "n1-0123456789abcdef")
+    assert inputs.blocks(graph / "n1-0123456789abcdef-a2")
+    assert not inputs.blocks(graph / "n2-0123456789abcdef")  # another node is not affected
+
+
+@pytest.mark.parametrize("kind", ["fifo", "symlink", "huge"])
+def test_a_hostile_run_json_never_hangs_and_fails_closed(tmp_path: Path, kind: str) -> None:
+    """A job can write its own run.json: a fifo, a symlink or a huge file is "unreadable" at once (security R1)."""
+    run = _run(tmp_path, "r1", status=None)
+    path = run / "run.json"
+    if kind == "fifo":
+        os.mkfifo(path)
+    elif kind == "symlink":
+        path.symlink_to("/dev/zero")
+    else:
+        path.write_text('{"status": "completed", "pad": "' + "x" * (2 << 20) + '"}')
+    assert read_run_status(run) == ("unreadable", None)
+    graph = tmp_path / "outputs" / "graph" / "runs"
+    (graph / "n1-0123456789abcdef").mkdir(parents=True)
+    attempt = graph / "n1-0123456789abcdef-a2"
+    attempt.mkdir()
+    (path.rename(attempt / "run.json") if kind != "symlink" else (attempt / "run.json").symlink_to("/dev/zero"))
+    assert resume_inputs(tmp_path, now=NOW).blocks(graph / "n1-0123456789abcdef")  # its source may be in use
+
+
+def test_set_aside_of_a_resume_source_is_blocked(tmp_path: Path) -> None:
+    _run(tmp_path, "pyproject-holder")  # writes pyproject.toml
+    node = tmp_path / "outputs" / "graph" / "runs" / "n1-0123456789abcdef"
+    aside = node / "checkpoints.not-resumable-20200101-000000"
+    (aside / "epoch_0_step_9").mkdir(parents=True)
+    _attempt(tmp_path, "n1-0123456789abcdef-a2", {"run": "n1-0123456789abcdef", "checkpoint": "epoch_0_step_9"},
+             graph=True)  # fmt: skip
+    items = [i for r in plan(tmp_path, now=NOW, lock_reader=no_lock).runs for i in r.items if i.kind == "set_aside"]
+    assert [(i.action, i.blocked_by) for i in items] == [("keep", "INPUT_OF_RUNNING_ATTEMPT")]
 
 
 def _age_tree(path: Path, days: float) -> None:
