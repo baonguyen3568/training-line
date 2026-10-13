@@ -36,7 +36,6 @@ const current = (href: string) => (path.startsWith(href) ? "page" : undefined);
         {nav.map((item) => <a href={item.href} aria-current={current(item.href)}>{item.label}</a>)}
       </nav>
       <div class="right">
-        <a class="btn ghost sm hide-narrow" href="/docs/bat-dau/"><Icon name="book-open" size={14} />Tài liệu</a>
         <a class="btn primary sm" href={installHref}><Icon name="download" size={14} />Tải về &amp; cài đặt</a>
         <button class="ib menu-btn" popovertarget="site-menu" aria-label="Mở menu">
           <Icon name="panel-left" />

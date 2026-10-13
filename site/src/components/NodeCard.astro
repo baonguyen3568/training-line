@@ -1,0 +1,55 @@
+---
+// One node of the app's canvas, as HTML (the D4 node frame: step number + title, ports with their glyphs, state
+// line). Used by the editor preview and by the landing's "only what changed runs again" figure, so both show the
+// same node. Copy and port types come from the app (app-copy.json); `compact` drops the port rows.
+import copy from "~/generated/app-copy.json";
+
+type Port = { type: string; optional: boolean };
+type NodeType = { category: string; inputs: Record<string, Port>; outputs: Record<string, Port> };
+const types = copy.node_types as Record<string, NodeType>;
+const nodeCopy = copy.node as Record<string, { title: string; port?: Record<string, string> }>;
+const portTypes = copy.port_types as { id: string; color_token: string; parent: string | null }[];
+
+interface Props {
+  type: string;
+  step: number;
+  class?: string;
+  style?: string;
+  compact?: boolean;
+}
+const { type, step, class: cls, style, compact = false } = Astro.props;
+const t = types[type];
+const portColor = (pt: string) => {
+  const p = portTypes.find((x) => x.id === pt);
+  return p ? `var(--${p.color_token.replaceAll(".", "-")})` : "var(--color-port-value)";
+};
+const shape = (pt: string) => (pt === "Dataset" ? "sq" : pt === "Model" || pt === "Checkpoint" ? "ci" : "di");
+const label = (port: string, pt: string) =>
+  nodeCopy[type]?.port?.[port] ?? (copy.port as Record<string, string>)[pt.toLowerCase()] ?? pt;
+---
+
+<div class:list={["ep-node", compact && "compact", cls]} style={style}>
+  <div class="ep-head">
+    <span class="ep-step">{step}</span>
+    {nodeCopy[type]?.title ?? type}
+  </div>
+  {
+    !compact && (
+      <ul class="ep-ports">
+        {Object.entries(t?.inputs ?? {}).map(([name, p]) => (
+          <li class="in">
+            <i class={shape(p.type)} style={`--pc:${portColor(p.type)}`} />
+            {label(name, p.type)}
+          </li>
+        ))}
+        {Object.entries(t?.outputs ?? {}).map(([name, p]) => (
+          <li class="out">
+            {label(name, p.type)}
+            <i class={shape(p.type)} style={`--pc:${portColor(p.type)}`} />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  <div class="ep-state"><slot /></div>
+</div>

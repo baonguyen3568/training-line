@@ -2,6 +2,7 @@
 // Landing, direction D4 (contract: .impeccable/surfaces/site-src-pages-index-astro.md). Copy: design mock D4
 // (design/m2/directions/chuan); error-card text is the app's own MEM-001 copy; demo numbers are labelled "minh hoạ".
 import EditorPreview from "~/components/EditorPreview.astro";
+import NodeCard from "~/components/NodeCard.astro";
 import Icon from "~/components/Icon.astro";
 import copy from "~/generated/app-copy.json";
 import Marketing from "~/layouts/Marketing.astro";
@@ -12,6 +13,60 @@ import { installCommand, installHref, repoUrl } from "~/data/nav";
 const mem = copy.error["MEM-001"];
 const memWhat = mem.what.replace("{need_gb}", "14").replace("{avail_gb}", "9");
 const [memBefore, memAfter] = memWhat.split(/(?=máy chỉ còn)/);
+
+// Landing 1.0 sections (design/release-1.0/landing-copy.md): reference pipelines straight from the app's data
+// (bao-research configs/reference_pipelines.yaml), measured numbers with their source, never invented.
+type Pipe = {
+  id: string;
+  status: string;
+  difficulty: "basic" | "advanced" | null;
+  title: { vi: string };
+  license: { code: string | null; model: string | null; data: string | null };
+  steps: { node: string | null; label: { vi: string } }[];
+  measured?: {
+    train_minutes?: number;
+    peak_ram_gb?: number;
+    score?: { benchmark: string; metric: string; value: number; ci95?: [number, number]; n?: number };
+    config?: string;
+    sources?: string[];
+  } | null;
+};
+const pipes = (copy.pipelines_data as Pipe[]).filter((p) => p.status === "available");
+const est = copy.estimate as Record<string, string>;
+const fill = (tpl: string, v: Record<string, string | number>) =>
+  tpl.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? `{${k}}`));
+const minutes = (m: number) => {
+  const total = Math.round(m);
+  const h = Math.floor(total / 60);
+  const r = total % 60;
+  return h === 0 ? fill(est.dur_m, { m: r }) : r ? fill(est.dur_hm, { h, m: r }) : fill(est.dur_h, { h });
+};
+const pl = copy.pipelines as Record<string, any>;
+const LICENSE: Record<string, string> = {
+  "apache-2.0": "Apache-2.0",
+  mit: "MIT",
+  "cc-by-4.0": "CC-BY-4.0",
+  "nvidia-open-model-license": "NVIDIA Open Model License",
+  "openmdw-1.1": "OpenMDW-1.1",
+};
+const METRIC = (pl.metric ?? {}) as Record<string, string>; // pipelines.metric.<id> (design copy)
+const licenseOf = (p: Pipe) =>
+  [...new Set([p.license.code, p.license.model].filter(Boolean).map((x) => LICENSE[x as string] ?? x))].join(" · ");
+const measuredLine = (m: NonNullable<Pipe["measured"]>) =>
+  [
+    m.train_minutes ? `Dạy model: ~${minutes(m.train_minutes)}` : null,
+    m.peak_ram_gb ? fill(pl.ram_peak, { gb: m.peak_ram_gb }) : null,
+    m.score ? `${METRIC[m.score.metric] ?? m.score.metric} ${m.score.value.toFixed(2)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+// "only what changed runs again" figure: the invoice template's own nodes; the first three reuse their results
+const ns = copy.node_state as Record<string, string>;
+const cachedLabel = ns.cached_no_time;
+const runningLabel = ns.running_indeterminate; // no made-up percentage
+const rerunNodes = ["model.hf_pick", "data.split", "train.sft_vlm", "eval.benchmarks"];
+const invoiceMeasured = pipes.find((p) => p.id === "invoice-to-json")?.measured;
+
 ---
 
 <Marketing title="NTC Training" description="Dạy AI đọc hoá đơn, biểu đồ và ảnh của bạn bằng kéo thả. Miễn phí, mã nguồn mở Apache-2.0.">
@@ -130,5 +185,175 @@ const [memBefore, memAfter] = memWhat.split(/(?=máy chỉ còn)/);
         </details>
       </div>
     </article>
+  </section>
+  <section class="tpl wrap" aria-labelledby="tpl-h">
+    <h2 id="tpl-h">Mở một mẫu, bấm Chạy, rồi sửa theo ý bạn.</h2>
+    <p class="lead">
+      Mỗi mẫu là một workflow dựng bằng chính các bước trong app. Số đo bên dưới lấy từ lần chạy thật trên DGX Spark;
+      mẫu nào chưa đo thì ghi rõ.
+    </p>
+    <ul class="tpl-grid">
+      {
+        pipes.map((p) => (
+          <li class="tpl-card">
+            <ol class="mini" aria-hidden="true">
+              {(p.steps.length > 5 ? p.steps.slice(0, 4) : p.steps).map((st) => (
+                <li class={st.node ? undefined : "no-node"}>{st.label.vi}</li>
+              ))}
+              {p.steps.length > 5 && <li class="more">{fill(pl.more_steps, { step_count: p.steps.length - 4 })}</li>}
+            </ol>
+            <h3>{p.title.vi}</h3>
+            <p class="tpl-meta">
+              <span class="badge">{licenseOf(p)}</span>
+              <span>{p.difficulty ? pl.level[p.difficulty] : pl.not_assessed}</span>
+            </p>
+            {p.measured ? (
+              <p class="tpl-measured">
+                {measuredLine(p.measured)}
+                <button class="help" popovertarget={`pop-m-${p.id}`} aria-label="Về số đo này">
+                  <Icon name="circle-question-mark" size={14} />
+                </button>
+              </p>
+            ) : (
+              <p class="tpl-measured muted">Chưa có số đo</p>
+            )}
+            {p.measured && (
+              <div id={`pop-m-${p.id}`} popover>
+                Đo trên một máy DGX Spark.
+                {p.measured.score && (
+                  <>
+                    {" "}
+                    {METRIC[p.measured.score.metric] ?? p.measured.score.metric} {p.measured.score.value.toFixed(2)} trên{" "}
+                    {p.measured.score.n} mẫu {p.measured.score.benchmark}
+                    {p.measured.score.ci95 && (
+                      <>
+                        , khoảng tin cậy 95%: {p.measured.score.ci95[0].toFixed(2)}–{p.measured.score.ci95[1].toFixed(2)}
+                      </>
+                    )}
+                    .
+                  </>
+                )}
+                {p.measured.config && (
+                  <>
+                    {" "}
+                    Cấu hình: <span lang="en">{p.measured.config}</span>.
+                  </>
+                )}
+                {p.measured.sources && (
+                  <>
+                    {" "}
+                    Nguồn: {p.measured.sources.map((src, i) => (
+                      <>
+                        {i ? ", " : ""}
+                        <code>{src}</code>
+                      </>
+                    ))}
+                    .
+                  </>
+                )}
+              </div>
+            )}
+          </li>
+        ))
+      }
+      <li class="tpl-card tpl-more">
+        <a class="link" href="/template/">Xem tất cả pipeline tham chiếu →</a>
+      </li>
+    </ul>
+  </section>
+
+  <section class="rerun wrap" aria-labelledby="rerun-h">
+    <div>
+      <h2 id="rerun-h">Đổi một bước, chỉ bước đó chạy lại.</h2>
+      <p>
+        App nhớ kết quả của từng bước. Bạn đổi thiết lập ở bước đo điểm thì phần dạy model không chạy lại; workflow chỉ
+        chạy từ chỗ bạn sửa trở về sau.
+        <button class="help" popovertarget="pop-rerun" aria-label="Khi nào một bước chạy lại">
+          <Icon name="circle-question-mark" size={14} />
+        </button>
+      </p>
+      <div id="pop-rerun" popover>
+        Một bước chạy lại khi đầu vào hoặc thiết lập của nó đổi, hoặc khi kết quả đã lưu bị hỏng; trường hợp hỏng, app
+        báo trước. <a class="link" href="/tinh-nang/#chỉ-chạy-lại-phần-đã-thay-đổi">Đọc thêm</a>
+      </div>
+    </div>
+    <figure class="rerun-fig" aria-label="Ba bước đầu dùng lại kết quả, chỉ bước đo điểm chạy lại">
+      {
+        rerunNodes.map((type, i) => (
+          <>
+            {i > 0 && <span class="rerun-arrow" aria-hidden="true">→</span>}
+            <NodeCard type={type} step={i + 1} compact class={i < 3 ? "cached" : "running"}>
+              {i < 3 ? (
+                <span><Icon name="rotate-ccw-clock" size={14} class="si muted" /> {cachedLabel}</span>
+              ) : (
+                <span><Icon name="loader-circle" size={14} class="si run" /> {runningLabel}</span>
+              )}
+            </NodeCard>
+          </>
+        ))
+      }
+    </figure>
+  </section>
+
+  <section class="faq wrap" aria-labelledby="faq-h">
+    <h2 id="faq-h">Hỏi đáp</h2>
+    <details>
+      <summary><Icon name="chevron-right" size={16} class="chev" />Tôi không biết viết code, có dùng được không?</summary>
+      <p>
+        Được. Mở một mẫu, chọn thư mục dữ liệu của bạn rồi bấm Chạy. Chế độ Đơn giản chỉ hiện vài thiết lập quan trọng,
+        mỗi thiết lập đều có mặc định an toàn.
+      </p>
+    </details>
+    <details>
+      <summary><Icon name="chevron-right" size={16} class="chev" />Cần máy như thế nào?</summary>
+      <p>
+        Bản 1.0 được thử trên NVIDIA DGX Spark. Máy x86-64 có GPU NVIDIA cài được bằng Docker, nhưng chưa được thử với GPU
+        thật. Xem <a class="link" href="/docs/cai-dat/#yeu-cau-he-thong">Yêu cầu hệ thống</a>.
+      </p>
+    </details>
+    <details>
+      <summary><Icon name="chevron-right" size={16} class="chev" />Dữ liệu của tôi có bị gửi đi đâu không?</summary>
+      <p>
+        Không. App chạy trên máy của bạn. App chỉ kết nối ra ngoài để tải model hoặc bộ dữ liệu bạn chọn, ví dụ từ Hugging
+        Face.
+      </p>
+    </details>
+    <details>
+      <summary><Icon name="chevron-right" size={16} class="chev" />Có mất phí không?</summary>
+      <p>
+        Không. App miễn phí, mã nguồn theo giấy phép Apache-2.0. Mỗi model và bộ dữ liệu có giấy phép riêng; app cho bạn
+        xem trước khi tải. Xem <a class="link" href="/ma-nguon-mo/">Miễn phí &amp; mã nguồn mở</a>.
+      </p>
+    </details>
+    <details>
+      <summary><Icon name="chevron-right" size={16} class="chev" />Dạy một model mất bao lâu?</summary>
+      <p>
+        Tuỳ model, lượng dữ liệu và số lượt học. App ước lượng thời gian trước khi chạy. Ví dụ: mẫu Đọc hoá đơn mất khoảng
+        2 giờ trên DGX Spark.
+        <button class="help" popovertarget="pop-faq-time" aria-label="Về con số này">
+          <Icon name="circle-question-mark" size={14} />
+        </button>
+      </p>
+      <div id="pop-faq-time" popover>
+        {invoiceMeasured?.train_minutes ?? 116} phút, 3 lượt trên 800 ảnh CORD-v2. Nguồn
+        <code>configs/reference_pipelines.yaml</code>.
+      </div>
+    </details>
+    {/* Q6 (export + "Chạy thử") waits for tester's check before publishing (design landing-copy §5) */}
+    <details>
+      <summary><Icon name="chevron-right" size={16} class="chev" />Dùng được những model nào?</summary>
+      <p>
+        Các model trong danh mục của app, đã được kiểm tra giấy phép và nguồn tải, ví dụ Nemotron Parse, Qwen3.5, Gemma 4.
+        Xem <a class="link" href="/docs/catalog-model/">Catalog model</a>.
+      </p>
+    </details>
+  </section>
+
+  <section class="closing wrap" aria-labelledby="closing-h">
+    <h2 id="closing-h">Miễn phí, mã nguồn mở, chạy trên máy của bạn.</h2>
+    <p class="cta">
+      <a class="btn primary" href={installHref}><Icon name="download" />Tải về &amp; cài đặt</a>
+      <a class="btn" href="/template/">Xem template</a>
+    </p>
   </section>
 </Marketing>

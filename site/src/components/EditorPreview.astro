@@ -5,6 +5,7 @@
 // "Sẵn sàng" and the check bar turns green. CSS scroll-driven, no JS; without support or with reduced motion
 // the final state is shown.
 import Icon from "~/components/Icon.astro";
+import NodeCard from "~/components/NodeCard.astro";
 import copy from "~/generated/app-copy.json";
 
 type Port = { type: string; optional: boolean };
@@ -96,38 +97,22 @@ const missing = copy.error["CFG-003"].title;
     </svg>
     {
       wf.nodes.map((n) => {
-        const t = types[n.type];
         return (
-          <div class:list={["ep-node", n.id === "n4" && "hero-node"]} style={`left:${pos[n.id].x}px;top:${pos[n.id].y}px`}>
-            <div class="ep-head">
-              <span class="ep-step">{step[n.id]}</span>
-              {nodeCopy[n.type]?.title ?? n.type}
-            </div>
-            <ul class="ep-ports">
-              {Object.entries(t?.inputs ?? {}).map(([name, p]) => (
-                <li class="in">
-                  <i class={shape(p.type)} style={`--pc:${portColor(p.type)}`} />
-                  {label(n.type, name, p.type)}
-                </li>
-              ))}
-              {Object.entries(t?.outputs ?? {}).map(([name, p]) => (
-                <li class="out">
-                  {label(n.type, name, p.type)}
-                  <i class={shape(p.type)} style={`--pc:${portColor(p.type)}`} />
-                </li>
-              ))}
-            </ul>
-            <div class="ep-state">
-              {n.id === "n4" ? (
-                <span class="swap">
-                  <span class="s-before"><span class="si bad">✕</span> {notReady}</span>
-                  <span class="s-after"><span class="si ok">✓</span> {ready}</span>
-                </span>
-              ) : (
-                <span><span class="si ok">✓</span> {ready}</span>
-              )}
-            </div>
-          </div>
+          <NodeCard
+            type={n.type}
+            step={step[n.id]}
+            class={n.id === "n4" ? "hero-node" : undefined}
+            style={`left:${pos[n.id].x}px;top:${pos[n.id].y}px`}
+          >
+            {n.id === "n4" ? (
+              <span class="swap">
+                <span class="s-before"><span class="si bad">✕</span> {notReady}</span>
+                <span class="s-after"><span class="si ok">✓</span> {ready}</span>
+              </span>
+            ) : (
+              <span><span class="si ok">✓</span> {ready}</span>
+            )}
+          </NodeCard>
         );
       })
     }

@@ -15,7 +15,20 @@ import yaml
 
 SITE = Path(__file__).resolve().parent.parent
 ROOT = SITE.parent
-KEYS = ("node", "port", "preflight", "node_state", "template", "canvas", "app", "docs_placeholder", "docs_error")
+KEYS = (
+    "node",
+    "port",
+    "preflight",
+    "node_state",
+    "template",
+    "canvas",
+    "app",
+    "docs_placeholder",
+    "docs_error",
+    "reference_pipeline",
+    "pipelines",
+    "estimate",
+)
 ERRORS = ("MEM-001", "CFG-003")
 
 
@@ -32,6 +45,10 @@ def main() -> None:
     out["templates"] = {
         p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted((ROOT / "configs/templates").glob("*.json"))
     }
+    # Reference pipelines (bao-research configs/reference_pipelines.yaml), as the app's gallery reads them: the
+    # frontend's committed, schema-checked export; the landing shows only `available` ones with their measurements.
+    pipes = json.loads((ROOT / "frontend/src/generated/reference-pipelines.json").read_text(encoding="utf-8"))
+    out["pipelines_data"] = pipes["pipelines"]
     dest = SITE / "src/generated/app-copy.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
