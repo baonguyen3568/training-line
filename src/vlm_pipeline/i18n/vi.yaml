@@ -164,6 +164,9 @@ error:
   EXP-003:
     title: Bản xuất có thể chứa thông tin bí mật
     what: 'Bản xuất của bước "{node}" có chuỗi trông giống khoá truy cập (token) trong {files}, nên app đã dừng và chưa ghi gì ra ngoài. Xoá khoá đó khỏi file rồi xuất lại; nếu không chắc, hãy gửi báo cáo.'
+  EXP-004:
+    title: Bản xuất thiếu file model
+    what: 'Thư mục xuất của bước "{node}" thiếu {files}, nên app chưa ghi bản xuất ra ngoài. Đây không phải lỗi của bạn; hãy gửi báo cáo để team kiểm tra.'
   MEM-001:
     title: Không đủ bộ nhớ cho bước này
     what: Bước này cần khoảng {need_gb} GB nhưng máy chỉ còn {avail_gb} GB trống, vì máy đang dùng chung với ứng dụng khác.

@@ -39,10 +39,10 @@ def _setup(tmp_path: Path) -> tuple[RealWorker, Any, Path]:
     return w, entry, model
 
 
-def _job(model: Path, run_dir: Path, dest: str = "outputs/exports/my-model") -> NodeJob:
+def _job(model: Path, run_dir: Path, dest: str = "outputs/exports/my-model", ref: ArtifactRef | None = None) -> NodeJob:
     spec = REGISTRY.get("export.hf_dir")
     assert spec is not None
-    ref = ArtifactRef("Checkpoint", str(model), "merge-1:abc")
+    ref = ref or ArtifactRef("Checkpoint", str(model), "merge-1:abc")
     return NodeJob("x", spec, spec.validate_params({"dest": dest}), {"model": ref}, run_dir)
 
 
@@ -100,3 +100,67 @@ def test_a_token_inside_the_export_is_never_written(tmp_path: Path) -> None:
     assert str(ei.value) == "credential-shaped string (HF_TOKEN) in the export"
     exports = w.root / "outputs" / "exports"
     assert not exports.exists() or not any(exports.iterdir())  # temp folder removed, nothing published
+
+
+def _hub_snapshot(w: RealWorker, entry: Any) -> Path:
+    """A real HF hub layout: snapshot files are links into the repo's blobs/."""
+    repo = w.root / ".cache" / "hf" / "hub" / f"models--{entry.repo.replace('/', '--')}"
+    snap = repo / "snapshots" / entry.revision
+    (repo / "blobs").mkdir(parents=True, exist_ok=True)
+    for name, data in {"config.json": b'{"model_type": "qwen3_5"}', "model.safetensors": b"w",
+                       "tokenizer.json": b"{}"}.items():  # fmt: skip
+        blob = repo / "blobs" / f"sha-{name}"
+        blob.write_bytes(data)
+        (snap / name).symlink_to(f"../../blobs/{blob.name}")
+    return snap
+
+
+def test_a_catalog_model_exports_the_content_of_its_hub_links(tmp_path: Path) -> None:
+    """tester (release 1.0): a hub snapshot is all links into blobs/; they were skipped and an empty export passed."""
+    w, entry, _ = _setup(tmp_path)
+    snap = _hub_snapshot(w, entry)
+    outside = tmp_path / "secret.json"
+    outside.write_text('{"x": 1}')
+    (snap / "extra.json").symlink_to(outside)  # a link out of the repo's blobs/: never followed
+    picked = w.run(_job_pick(w))
+    w.run(_job(Path(picked.outputs["model"].path), w.root / "outputs" / "graph" / "runs" / "x-1",
+               ref=picked.outputs["model"]))  # fmt: skip
+    dest = w.root / "outputs" / "exports" / "my-model"
+    assert {"config.json", "model.safetensors", "tokenizer.json"} <= {p.name for p in dest.iterdir()}
+    assert not (dest / "extra.json").exists()
+    assert not any(p.is_symlink() for p in dest.iterdir())
+    assert (dest / "model.safetensors").read_bytes() == b"w"
+
+
+def test_an_export_without_model_files_fails_instead_of_completing(tmp_path: Path) -> None:
+    w, _entry, _ = _setup(tmp_path)  # the snapshot has only a LICENSE: nothing that makes a model
+    picked = w.run(_job_pick(w))
+    with pytest.raises(export_worker.ExportIncompleteError) as err:
+        w.run(_job(Path(picked.outputs["model"].path), w.root / "outputs" / "graph" / "runs" / "x-1",
+                   ref=picked.outputs["model"]))  # fmt: skip
+    assert err.value.code == "EXP-004"
+    assert err.value.params["files"] == "config.json, *.safetensors"
+    assert not (w.root / "outputs" / "exports" / "my-model").exists()
+
+
+def _job_pick(w: RealWorker) -> NodeJob:
+    spec = REGISTRY.get("model.hf_pick")
+    assert spec is not None
+    return NodeJob(
+        "m", spec, spec.validate_params({"model": "qwen3.5-0.8b"}), {}, w.root / "outputs" / "graph" / "runs" / "m-1"
+    )
+
+
+def test_a_sharded_export_needs_every_shard_its_index_names(tmp_path: Path) -> None:
+    folder = tmp_path / "x"
+    folder.mkdir()
+    (folder / "config.json").write_text("{}")
+    (folder / "model-00001-of-00002.safetensors").write_bytes(b"w")
+    index = {"weight_map": {"a": "model-00001-of-00002.safetensors", "b": "model-00002-of-00002.safetensors"}}
+    (folder / "model.safetensors.index.json").write_text(json.dumps(index))
+    job = _job(folder, tmp_path / "run")
+    with pytest.raises(export_worker.ExportIncompleteError) as err:
+        export_worker._check_complete(folder, job)
+    assert err.value.params["files"] == "model-00002-of-00002.safetensors"
+    (folder / "model-00002-of-00002.safetensors").write_bytes(b"w")
+    export_worker._check_complete(folder, job)

@@ -601,6 +601,18 @@ EXP-003:
     # Safe to report: the record carries file names and the pattern type only, never the matched value.
     - {id: send_report, kind: navigate, target: bug_report, confirm: false}
 
+EXP-004:
+  slug: EXPORT_INCOMPLETE
+  severity: error
+  prevent_in_preflight: false
+  # The export folder lacks what makes it a model (config.json, *.safetensors), e.g. an HF snapshot whose links
+  # could not be followed: never reported completed (tester, release 1.0). files = the missing names, ", ".
+  params: [{name: node, ref: node}, files]
+  match:
+    - {kind: executor, value: "app/export_worker.py completeness check before publish"}
+  actions:
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
 SEC-001:
   slug: PATH_OUTSIDE_WORKSPACE
   severity: error

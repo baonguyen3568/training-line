@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import secrets
 import shutil
 import stat
@@ -57,15 +58,60 @@ class ExportDestinationError(VlmPipelineError):
     code: ClassVar[str] = "CFG-005"
 
 
-def _copy_allowed(src: Path, dst: Path) -> list[str]:
+class ExportIncompleteError(VlmPipelineError):
+    """The export folder lacks the files that make it a model (config.json, weights): never reported completed."""
+
+    code: ClassVar[str] = "EXP-004"
+
+
+def _copy_allowed(src: Path, dst: Path, *, blobs: Path | None = None) -> list[str]:
+    """Copy the model files of ``src`` (plain files) into ``dst``; returns the names copied.
+
+    An HF hub snapshot is made of links into its repo's ``blobs/``: a link whose target is a plain file inside
+    ``blobs`` (that repo only) is copied as its content; any other link is skipped.
+    """
     copied = []
     for path in sorted(src.iterdir()):
-        st = path.lstat()
-        if not stat.S_ISREG(st.st_mode) or path.suffix not in COPY_SUFFIXES or path.name in NEVER_COPY:
+        if path.suffix not in COPY_SUFFIXES or path.name in NEVER_COPY:
             continue
-        shutil.copy2(path, dst / path.name)
+        source = path
+        if path.is_symlink():
+            target = Path(os.path.realpath(path))
+            if blobs is None or not target.is_relative_to(blobs):
+                continue
+            source = target
+        if not stat.S_ISREG(source.lstat().st_mode):
+            continue
+        shutil.copyfile(source, dst / path.name)
         copied.append(path.name)
     return copied
+
+
+def _hub_blobs(root: Path, src: Path) -> Path | None:
+    """``blobs/`` of the HF hub repo ``src`` is a snapshot of (resolved), or None when ``src`` is not in the hub."""
+    rel = src.resolve().relative_to(root.resolve()) if src.resolve().is_relative_to(root.resolve()) else None
+    if rel is None or rel.parts[:3] != (".cache", "hf", "hub") or len(rel.parts) < 4:
+        return None
+    return Path(os.path.realpath(root.resolve().joinpath(*rel.parts[:4], "blobs")))
+
+
+def _check_complete(folder: Path, job: NodeJob) -> None:
+    """A model folder has config.json and at least one weights file (tester, release 1.0 smoke)."""
+    missing = [name for name, ok in (
+        ("config.json", (folder / "config.json").is_file()),
+        ("*.safetensors", any(folder.glob("*.safetensors"))),
+    ) if not ok]  # fmt: skip
+    index = folder / "model.safetensors.index.json"
+    if index.is_file():  # sharded weights: every shard the index names must be there, or loading fails
+        try:
+            shards = set(json.loads(index.read_text(encoding="utf-8")).get("weight_map", {}).values())
+        except (ValueError, AttributeError):
+            shards = {"model.safetensors.index.json"}
+        missing += sorted(str(n) for n in shards if not (isinstance(n, str) and (folder / n).is_file()))
+    if missing:
+        raise ExportIncompleteError(
+            "export folder has no model", params={"node": job.node_id, "files": ", ".join(missing)}
+        )
 
 
 def _destination(worker: RealWorker, job: NodeJob, raw: str) -> Path:
@@ -92,7 +138,8 @@ def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
     tmp = dest.with_name(f".{dest.name}.tmp-{secrets.token_hex(4)}")
     tmp.mkdir()
     try:
-        _copy_allowed(src, tmp)
+        _copy_allowed(src, tmp, blobs=_hub_blobs(worker.root, src))
+        _check_complete(tmp, job)
         portable.neutralize_name_or_path(tmp, f"{entry.repo}@{entry.revision}")
         if portable.remote_code_findings(tmp) or portable.absolute_path_findings(tmp):
             raise ExportUnsupportedError("export is not portable", params=unsupported)
