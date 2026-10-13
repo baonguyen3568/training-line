@@ -1414,6 +1414,8 @@ settings_error:
 reference_pipeline:
   invoice-to-json:
     summary: Teach a model to read receipt images into JSON. Runs right away on the CORD-v2 samples.
+  invoice-qwen35-2b-lora:
+    summary: LoRA-tune Qwen3.5-2B to read receipts into JSON, scored on the receipt template's test set.
   image-video-understanding:
     summary: Teach a small model to answer questions about your images with LoRA. No video yet.
   quantize-fp8-benchmark:

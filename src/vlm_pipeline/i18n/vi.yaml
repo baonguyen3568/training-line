@@ -1414,6 +1414,8 @@ settings_error:
 reference_pipeline:
   invoice-to-json:
     summary: Dạy model đọc ảnh hoá đơn và trả về JSON. Chạy ngay với bộ hoá đơn mẫu CORD-v2.
+  invoice-qwen35-2b-lora:
+    summary: Dạy nhẹ Qwen3.5-2B bằng LoRA để đọc hoá đơn ra JSON, chấm cùng bộ kiểm tra với mẫu Đọc hoá đơn.
   image-video-understanding:
     summary: Dạy model nhỏ trả lời câu hỏi về ảnh của bạn bằng LoRA. Chưa hỗ trợ video.
   quantize-fp8-benchmark:
