@@ -8,7 +8,7 @@
 - Server của dự án ở dải **127.0.0.1:4001–4050** (4001 app compose, 4002 site, 4003 app dev, 4010–4019 dev server). Ở 1.0, dev server không được proxy.
 - **TLS bắt buộc**: CA nội bộ có Name Constraints (chỉ IP/hostname máy này). HTTP vào port 4000 → 301. HSTS chỉ khi Host là tên.
 - Host/Origin allowlist đúng các origin LAN + localhost; default_server trả 444. Cookie `__Host-` Secure/HttpOnly/SameSite=Strict, session idle 12h / tối đa 7 ngày, có "đăng xuất mọi thiết bị".
-- **Đăng nhập đổi**: link dạng `#t=…` (fragment), trang nhỏ POST vào /api/session. `?token=` chỉ còn nhận từ 127.0.0.1. Rate-limit 5/phút/IP, khoá 15 phút sau 20 lần sai.
+- **Đăng nhập đổi**: link dạng `#t=…` (fragment), trang nhỏ POST vào /api/session. `?token=` chỉ còn nhận từ 127.0.0.1. Rate-limit 5/phút/IP ở nginx; app chỉ cảnh báo sau 20 lần sai/10 phút và khoá đăng nhập LAN 15 phút sau 200 lần (chốt cuối); đăng nhập local không bao giờ bị khoá (tránh máy LAN khoá chủ máy, security 2026-10-13).
 - Header bảo mật; body 2MB (21MB cho /api/uploads, không buffer); WebSocket; access log dùng `$uri` (không query, không cookie).
 
 ## Rủi ro còn lại (user đã được báo)
