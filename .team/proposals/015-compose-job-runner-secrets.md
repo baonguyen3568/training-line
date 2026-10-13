@@ -43,7 +43,7 @@ version. C biến bài toán thành allowlist trên schema của chính ta.
 | `logs` | `run_id`, `since`, `tail` ≤ 10 000 | stream stdout/stderr, đã redact token (§4.4) |
 | `remove` | `run_id` | chỉ container đã exit và có label của ta |
 
-Không có lệnh nào nhận path, mount, cờ docker, tên image tự do, biến env tự do, hay tên container tuỳ ý.
+Không có lệnh nào nhận path TỰ DO, mount, cờ docker, tên image tự do, biến env tự do, hay tên container tuỳ ý. Ngoại lệ có luật đóng (review 2026-10-13): `run_dir` (đúng `/app/outputs/runs/<run_id>` hoặc graph run dir chứa run_id; runner tự mkdir, đã tồn tại thì từ chối) và `inputs` (≤ 32, dưới INPUT_ROOTS, không là cha/con của run_dir hay của nhau, qua HostPaths + check_mount_source, mount ro).
 **Không** có `exec`, `pull`, `build`, `image rm`, `volume`, `network`. Pull image chỉ làm tay (PM/user) theo D1.
 
 ### 3.2 Mount do runner tính (thu hẹp so với hiện tại)
