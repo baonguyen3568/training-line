@@ -82,6 +82,7 @@ def test_no_standards_dir_means_no_rules(tmp_path: Path) -> None:
         ({"check": {"kind": "ratio_to_param", "other": "rank", "min": 1, "max": 4}}, "no param"),
         ({"source": "see .team/proposals/does-not-exist.md"}, "does not exist"),
         ({"check": {"kind": "reaches_node", "target": "eval.nope"}}, "unknown target"),
+        ({"check": {"kind": "port_wired_if", "flag": "lora_dim"}}, "needs applies_to.port"),
     ],
 )
 def test_bad_rules_fail_loading(tmp_path: Path, override: dict[str, Any], needle: str) -> None:
@@ -208,6 +209,24 @@ def test_reaches_node_follows_the_wires_downstream(tmp_path: Path) -> None:
     assert len(_issues(tmp_path, wf, rule)) == 1
 
 
+def test_port_wired_if_follows_the_flag(tmp_path: Path) -> None:
+    rule = _rule(
+        id="TEST-LEAK",
+        applies_to={"node": "data.dedupe", "port": "heldout"},
+        check={"kind": "port_wired_if", "flag": "check_leak"},
+    )
+
+    def wf(check_leak: bool, *, wired: bool) -> dict[str, Any]:
+        nodes = [_n("d", "data.hf_load"), _n("v", "data.hf_load"), _n("x", "data.dedupe", check_leak=check_leak)]
+        edges = [_e("d", "dataset", "x", "dataset")] + ([_e("v", "dataset", "x", "heldout")] if wired else [])
+        return {"format": "vlm-workflow", "schema_version": 1, "name": "x", "nodes": nodes, "edges": edges}
+
+    [issue] = _issues(tmp_path, wf(True, wired=False), rule)
+    assert (issue.node_id, issue.port) == ("x", "heldout")
+    assert _issues(tmp_path, wf(True, wired=True), rule) == []
+    assert _issues(tmp_path, wf(False, wired=False), rule) == []
+
+
 def test_data_profile_kinds_load_but_never_run_at_validation(tmp_path: Path) -> None:
     rule = _rule(
         id="TEST-DUP",
@@ -275,3 +294,86 @@ def test_eval_only_dataset_wired_into_training_is_an_error(
     monkeypatch.setattr(standards, "_catalog_dataset", lambda upstream: eval_only if upstream else None)
     issues = [i for i in validate(_lora(), REGISTRY) if i.code == "STD-001" and i.params["rule"] == rule]
     assert [(i.severity, i.node_id, i.port) for i in issues] == [("error", node, port)]
+
+
+# ------------------------------------------------------------------------------------------------ dead rules
+# A rule whose threshold no reachable value can cross never warns anyone (TRAIN-EPOCHS-SMALL-DATA had max_epochs 5
+# while epochs offers 1|2|3|5). Exceptions need a reason and disappear when the reason does.
+CANNOT_FIRE_YET = {
+    "TRAIN-TOO-FEW-SAMPLES": "local folders are not counted at validate yet (backend data preview, research 10-13)",
+}
+
+
+def _domain(spec_params: dict[str, Any], name: str) -> list[float] | tuple[float, float]:
+    """Values a param can take: its enum (bools included), else its numeric (low, high) bounds."""
+    prop = spec_params[name]
+    if "enum" in prop:
+        return list(prop["enum"])
+    if prop.get("type") == "boolean":
+        return [True, False]
+    return (prop.get("minimum", prop.get("exclusiveMinimum", float("-inf"))), prop.get("maximum", float("inf")))
+
+
+def _reachable_sample_counts() -> list[int]:
+    from vlm_pipeline.common.catalog import load_dataset_catalog
+
+    limits = [n for n in REGISTRY.get("data.hf_load").params_schema()["properties"]["max_samples"]["enum"] if n]  # type: ignore[union-attr]
+    trainable = [d for d in load_dataset_catalog().datasets if d.trainable_splits]  # eval-only data never trains
+    return [min(d.num_train, n) for d in trainable for n in [*limits, d.num_train]]
+
+
+def _outside(domain: list[float] | tuple[float, float], low: float | None, high: float | None) -> bool:
+    if isinstance(domain, tuple):
+        return (low is not None and domain[0] < low) or (high is not None and domain[1] > high)
+    return any((low is not None and v < low) or (high is not None and v > high) for v in domain)
+
+
+def _can_fire(rule: Any) -> bool:
+    check = rule.check
+    for type_id in rule.applies_to.node:
+        props = REGISTRY.get(type_id).params_schema()["properties"]  # type: ignore[union-attr]
+        param = rule.applies_to.param
+        if check.kind == "range" and _outside(_domain(props, param), check.min, check.max):
+            return True
+        if check.kind == "equals" and any(v != check.value for v in _domain(props, param)):  # type: ignore[union-attr]
+            return True
+        if check.kind == "ratio_to_param":
+            (p_lo, p_hi), (o_lo, o_hi) = _domain(props, param), _domain(props, check.other)
+            if _outside((p_lo / o_hi, p_hi / o_lo), check.min, check.max):
+                return True
+        if check.kind == "epochs_vs_samples":
+            small = min(_reachable_sample_counts()) < check.small_data_below
+            if small and _outside(_domain(props, param), None, check.max_epochs):
+                return True
+        if check.kind == "sample_count" and min(_reachable_sample_counts()) < check.below:
+            return True
+        if check.kind not in {"range", "equals", "ratio_to_param", "epochs_vs_samples", "sample_count"}:
+            return True  # graph / catalog shaped checks: reachable by wiring
+    return False
+
+
+def test_every_validate_rule_can_fire() -> None:
+    from vlm_pipeline.common.paths import project_root
+
+    rules = [r for r in load_standards(project_root(), SPECS) if r.phase == "validate"]
+    dead = sorted(r.id for r in rules if not _can_fire(r) and r.id not in CANNOT_FIRE_YET)
+    assert dead == [], f"no reachable value crosses these thresholds: {dead}"
+    revived = sorted(r.id for r in rules if r.id in CANNOT_FIRE_YET and _can_fire(r))
+    assert revived == [], f"drop from CANNOT_FIRE_YET: {revived}"
+
+
+def test_dead_rule_checker_catches_the_two_real_cases(tmp_path: Path) -> None:
+    """The checker itself: the two rules found dead on 2026-10-13 must be reported (guards a vacuous checker)."""
+    calib = _rule(
+        id="TEST-CALIB",
+        applies_to={"node": "quantize.modelopt_ptq", "param": "calib_size"},
+        check={"kind": "range", "min": 128, "max": 512},
+    )
+    epochs = _rule(
+        id="TEST-EPOCHS",
+        applies_to={"node": "train.lora_vlm", "param": "epochs"},
+        check={"kind": "epochs_vs_samples", "max_epochs": 5, "small_data_below": 1000},
+    )
+    live = _rule(id="TEST-LIVE", check={"kind": "range", "min": 16, "max": 64})  # lora_dim offers 4..64
+    loaded = {r.id: r for r in load_standards(_write(tmp_path, calib, epochs, live), SPECS)}
+    assert [_can_fire(loaded[i]) for i in ("TEST-CALIB", "TEST-EPOCHS", "TEST-LIVE")] == [False, False, True]

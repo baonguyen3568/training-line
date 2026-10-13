@@ -151,6 +151,7 @@ STD-001:
     - min_short_side_px
     - limit_from_catalog
     - target
+    - flag
   match:
     - {kind: validate, value: "configs/standards rule failed (graph.standards)"}
   actions:

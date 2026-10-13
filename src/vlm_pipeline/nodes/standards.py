@@ -184,6 +184,18 @@ class SampleCount(_Check):
         return None if samples is None else (samples < self.below, samples)
 
 
+class PortWiredIf(_Check):
+    """The rule's input port is wired whenever the node's bool param ``flag`` is on (e.g. a leak check needs data)."""
+
+    kind: Literal["port_wired_if"]
+    flag: str
+
+    def violation(self, ctx: _Context, value: Any) -> Result:
+        if not getattr(ctx.params, self.flag, False):
+            return False, None
+        return not ctx.view.sources.get((ctx.node_id, ctx.port or "")), None
+
+
 class ReachesNode(_Check):
     """A node of type ``target`` is downstream of this node (direct wire today; transitive for multi-hop paths)."""
 
@@ -237,6 +249,7 @@ Check = Annotated[
     | WiredOrDatasetHasSplit
     | DatasetSplitNotHeldout
     | SampleCount
+    | PortWiredIf
     | ReachesNode
     | ImageStats
     | TokenLenStats
@@ -316,11 +329,14 @@ def _check_against_repo(rule: Rule, by_type: Mapping[str, NodeSpec], root: Path,
         if spec is None:
             raise StandardsError(f"{where}: unknown node {type_id!r}")
         params = spec.params_schema().get("properties", {})
-        names = [n for n in (rule.applies_to.param, getattr(rule.check, "other", None)) if n is not None]
+        fields = (rule.applies_to.param, getattr(rule.check, "other", None), getattr(rule.check, "flag", None))
+        names = [n for n in fields if n is not None]
         if missing := [n for n in names if n not in params]:
             raise StandardsError(f"{where}: {type_id} has no param {missing}")
         if rule.applies_to.port is not None and rule.applies_to.port not in spec.inputs:
             raise StandardsError(f"{where}: {type_id} has no input port {rule.applies_to.port!r}")
+    if rule.check.kind == "port_wired_if" and rule.applies_to.port is None:
+        raise StandardsError(f"{where}: port_wired_if needs applies_to.port")
     target = getattr(rule.check, "target", None)
     if target is not None and target not in by_type:
         raise StandardsError(f"{where}: unknown target node {target!r}")
