@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "pipeline": "image-video-understanding (R2, template image_video_understanding without eval node)",
+  "hardware": "1x NVIDIA GB10 (DGX Spark), driver 580.142, UMA",
+  "model": {
+    "repo": "Qwen/Qwen3.5-2B",
+    "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc"
+  },
+  "data": {
+    "source": "naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98 train (800) converted to data.local_folder (target = gt_parse JSON, prompt 'Read this receipt and return its fields as JSON.'), data.split val_fraction 0.1 seed 1234 -> 720 train / 80 val",
+    "license": "cc-by-4.0"
+  },
+  "config": {
+    "node": "train.lora_vlm",
+    "epochs": 3,
+    "lr_preset": "medium (1e-4)",
+    "global_batch_size": 8,
+    "lora_dim": 8,
+    "lora_alpha": 32,
+    "min_pixels": 200704,
+    "max_pixels": 1003520,
+    "max_image_side_px": 4608,
+    "steps": 272
+  },
+  "code": {
+    "worktree_commit": "d7253f4 (clean worktree, VLM_PROJECT_ROOT = main tree)",
+    "run_json_git_commit": "3441aa578ad00c80066cd6b059e3f081c4188cb3",
+    "run_json_git_dirty": true,
+    "note": "run.json records the main tree's commit/dirty flag, not the clean worktree the driver ran from"
+  },
+  "container": {
+    "image": "vlm-automodel:26.08-6",
+    "digest": "sha256:dc9da48fb5d79d62654b3594fd4139f28773ea73c832adfcd450f009ffc5a215"
+  },
+  "train": {
+    "run_id": "n4-96d12a932c04f055-a2",
+    "wall_minutes": 58.3,
+    "peak_mem_gb": 16.7,
+    "trainable_pct": 0.38,
+    "validation": [
+      {
+        "step": 90,
+        "val_loss": 0.0487
+      },
+      {
+        "step": 99,
+        "val_loss": 0.0431
+      },
+      {
+        "step": 181,
+        "val_loss": 0.0386
+      },
+      {
+        "step": 199,
+        "val_loss": 0.0448
+      },
+      {
+        "step": 272,
+        "val_loss": 0.0412
+      }
+    ],
+    "note": "5 validations/checkpoints instead of the 3 epoch boundaries: steps 99 and 199 extra (reported to bao-backend)"
+  },
+  "merge": {
+    "run_id": "n5-7f7b4d037b03cc1c",
+    "wall_minutes": 0.5,
+    "peak_mem_gb": 9.5,
+    "adapter": "checkpoints/LATEST (step 272)",
+    "merged_size_gb": 4.3
+  },
+  "score": null,
+  "score_note": "CORD test field F1 pending (bao-tester, eval_cord_chat_worker)"
+}

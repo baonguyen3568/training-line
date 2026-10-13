@@ -228,8 +228,8 @@ models:
     params_b: 2.3
     disk_gb: 5.0
     train_node: train.lora_vlm
-    ram_gb_train: 16
-    ram_source: estimated          # S-3b will measure
+    ram_gb_train: 17
+    ram_source: measured           # R2 2026-10-13 (run n4-96d12a932c04f055-a2): LoRA 3 epochs on 720 CORD images, pixel cap on, peak 16.7GB
     sft_trainable_pct_min: 0
     sft_trainable_pct_max: 0
     attn: sdpa

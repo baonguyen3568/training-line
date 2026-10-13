@@ -97,7 +97,15 @@
         "model": "apache-2.0",
         "data": null
       },
-      "measured": null,
+      "measured": {
+        "train_minutes": 58.8,
+        "peak_ram_gb": 16.7,
+        "score": null,
+        "config": "LoRA 3 epochs on 720 CORD receipt images (+ merge), GBS 8, lr 1e-4, pixels 200704-1003520; image vlm-automodel:26.08-6",
+        "sources": [
+          "benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json"
+        ]
+      },
       "steps": [
         {
           "node": "model.hf_pick",
