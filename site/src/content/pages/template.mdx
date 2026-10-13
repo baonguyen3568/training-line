@@ -1,41 +1,22 @@
 ---
-title: Template
-description: Mở một mẫu có sẵn, chạy được ngay, rồi sửa theo ý bạn.
+title: Template và pipeline tham chiếu
+description: Mở một mẫu có sẵn, chạy được ngay, rồi sửa theo ý bạn. Kèm các pipeline đã công bố của NVIDIA, Qwen, Hugging Face và cộng đồng.
 sources:
+  - configs/reference_pipelines.yaml
   - configs/templates/invoice_to_json.json
   - configs/templates/image_video_understanding.json
-  - configs/templates/quantize_bench.json
   - configs/catalog/models.yaml
   - src/vlm_pipeline/i18n/vi.yaml
   - configs/licenses/LICENSES.lock
-numbers_without_source: ["2", "3.5", "2B", "1.1", "2.0"]
+numbers_without_source: []
 ---
 import Hint from '~/components/Hint.astro';
 import PipelineLibrary from '~/components/PipelineLibrary.astro';
 
-Mỗi mẫu là một workflow dựng sẵn bằng chính các khối trong app. Bạn mở mẫu, bấm Chạy để xem nó chạy, rồi thay dữ liệu hay đổi bước tuỳ ý. Mẫu không có gì đặc biệt: mọi thứ trong mẫu bạn đều tự ghép lại được.
+Mỗi mẫu là một workflow dựng sẵn bằng chính các bước trong app. Bạn mở mẫu, bấm Chạy để xem nó chạy, rồi thay dữ liệu hay đổi bước tuỳ ý. Mẫu không có gì đặc biệt: mọi thứ trong mẫu bạn đều tự ghép lại được.
 
-## Đọc hoá đơn → JSON
+Bên dưới là toàn bộ thư viện. Thẻ **Mẫu của app** mở được ngay trong app. Các thẻ khác là pipeline do NVIDIA, Qwen, Hugging Face hay cộng đồng công bố; app đang dựng lại chúng bằng chính các bước của mình, hoặc chỉ ghi lại để tham khảo. <Hint title="Đọc một thẻ thế nào">Mỗi thẻ ghi các bước chính, giấy phép của mã, model và dữ liệu, độ khó, và nguồn công bố gốc. Thời gian, RAM và điểm chỉ ghi khi đã đo thật trên một máy DGX Spark; bấm "?" cạnh số để xem cấu hình đã chạy và nguồn của số. Chưa đo thì thẻ ghi "chưa có số đo".</Hint>
 
-Dạy model đọc ảnh hoá đơn và trả về các trường như cửa hàng, món, tổng tiền ở dạng JSON. Mẫu chạy được ngay với dữ liệu mẫu CORD-v2 và không cần tài khoản. Đây là mẫu mặc định khi bạn mở app.
-
-- **Model:** NVIDIA Nemotron-Parse v1.1, dạy lại toàn bộ. <Hint title="Dạy lại toàn bộ là gì">Mọi tham số của model đều được cập nhật theo dữ liệu của bạn. Cách này cần nhiều bộ nhớ hơn LoRA, nhưng đây là cách model này hỗ trợ.</Hint>
-- **Dữ liệu mẫu:** CORD-v2, bộ ảnh hoá đơn công khai, giấy phép CC BY 4.0.
-- **Mức độ:** cơ bản.
-
-## Hiểu ảnh
-
-Dạy model trả lời câu hỏi về ảnh theo dữ liệu của bạn. Mẫu này cần bạn chuẩn bị dữ liệu, gồm ảnh kèm câu hỏi và đáp án. Video chưa được hỗ trợ ở bản này, xem [Lộ trình](/lo-trinh/).
-
-- **Model:** Qwen3.5-2B, dạy nhẹ bằng LoRA, không cần tài khoản. <Hint title="LoRA là gì">LoRA chỉ dạy thêm một phần nhỏ của model. Cách này nhanh hơn và tốn ít bộ nhớ hơn, hợp với máy dùng chung.</Hint>
-- **Mức độ:** cơ bản.
-
-## Nén model & đo lại điểm
-
-Nén model cho nhỏ và nhanh hơn, rồi đo điểm trong cùng điều kiện với bản gốc để thấy chất lượng giảm bao nhiêu. Bước nén đang được hoàn thiện.
-
-## Thời gian và bộ nhớ
-
-Trang này không ghi thời gian chạy hay bộ nhớ cần dùng. Các con số đó phụ thuộc vào máy và dữ liệu của bạn. App hiển thị ước lượng ngay trên mẫu khi bạn mở nó, kèm nguồn của số; chỗ nào chưa đo thì ghi "chưa có số đo".
+Trên máy của bạn, thời gian và bộ nhớ có thể khác. Khi bạn mở một mẫu, app ước lượng lại theo thiết lập và phần bộ nhớ còn trống thật của máy.
 
 <PipelineLibrary />
