@@ -8,7 +8,6 @@ from a fixed permission table, never from user/plugin input. Stdlib + pydantic o
 from __future__ import annotations
 
 import dataclasses
-import json
 import logging
 import math
 import os
@@ -25,6 +24,7 @@ from typing import ClassVar
 from vlm_pipeline.common import gpu_lock
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 from vlm_pipeline.common.images import check_pinned_image
+from vlm_pipeline.common.launcher import JobLauncher, LocalDockerLauncher
 from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS, MemGuard, MemThresholds, read_meminfo
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
@@ -269,7 +269,7 @@ class MemoryPreemptedBeforeStartError(RuntimeError):
 
 
 def run_guarded(
-    argv: Sequence[str],
+    argv: Sequence[str] | Callable[[], int],
     log_path: Path,
     *,
     on_abort: Callable[[], None],
@@ -279,7 +279,7 @@ def run_guarded(
     thresholds: MemThresholds = DEFAULT_THRESHOLDS,
     on_guard_ready: Callable[[MemGuard], None] | None = None,
 ) -> tuple[int, MemGuard]:
-    """Run ``argv`` (logged) under a MemGuard that polls BEFORE the process starts and every ``interval_s``.
+    """Run ``argv`` (logged) or a launcher's blocking start, under a MemGuard polling before start and every interval.
 
     Below ``abort_gb``: ``on_abort`` (graceful stop); after the grace or below ``emergency_gb``: ``hard_exit``.
     Returns the exit code and the guard (``guard.should_stop`` tells whether the watchdog stopped the job).
@@ -298,21 +298,10 @@ def run_guarded(
     try:
         if guard.should_stop.is_set():
             raise MemoryPreemptedBeforeStartError(f"MemAvailable {guard.min_available_gb:.1f} GB below abort")
-        return _run_logged(argv, log_path), guard
+        rc = argv() if callable(argv) else _run_logged(argv, log_path)
+        return rc, guard
     finally:
         guard.stop()
-
-
-def _docker_stop_async(name: str, grace_s: int = STOP_GRACE_S) -> None:
-    # Non-blocking: the watchdog thread must keep polling (emergency kill) while docker waits for the grace period.
-    subprocess.Popen(  # noqa: S603
-        ["docker", "stop", "-t", str(grace_s), name],  # noqa: S607
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )  # fmt: skip
-
-
-def _docker_kill(name: str) -> None:
-    subprocess.run(["docker", "kill", name], capture_output=True, check=False)  # noqa: S603,S607
 
 
 _SIGNAL_STOP_RE = re.compile(r"Received signal \d+, initiating graceful stop")
@@ -363,15 +352,6 @@ def _engine_warnings(log_path: Path) -> list[str]:
     return [code for code in ENGINE_WARNINGS if code in found]
 
 
-def _docker_state(name: str) -> ExitInfo:
-    out = subprocess.run(  # noqa: S603
-        ["docker", "inspect", "-f", "{{json .State}}", name],  # noqa: S607 - docker from PATH
-        capture_output=True, text=True, check=True,
-    ).stdout  # fmt: skip
-    state = json.loads(out)
-    return ExitInfo(exit_code=int(state.get("ExitCode", -1)), oom_killed=bool(state.get("OOMKilled", False)))
-
-
 _CODE_DIRS = ("src", "configs", "docker", "scripts")
 
 
@@ -397,18 +377,8 @@ def git_state(root: Path, dirs: tuple[str, ...] = _CODE_DIRS) -> tuple[str | Non
 
 
 def image_digest(image: str) -> str | None:
-    """Local image content id (``sha256:...``): identifies exactly what ran, also for local builds."""
-    try:
-        return subprocess.run(  # noqa: S603
-            ["docker", "image", "inspect", "-f", "{{.Id}}", image],  # noqa: S607
-            capture_output=True, text=True, check=True,
-        ).stdout.strip() or None  # fmt: skip
-    except (OSError, subprocess.CalledProcessError):
-        return None
-
-
-def _docker_rm(name: str) -> None:
-    subprocess.run(["docker", "rm", name], capture_output=True, check=False)  # noqa: S603,S607
+    """Local image id of ``image`` (None when docker or the image is missing): ``LocalDockerLauncher.image_id``."""
+    return LocalDockerLauncher().image_id(image)
 
 
 def _check_gate(job: ContainerJob, manifest: RunManifest, project_root: Path) -> None:
@@ -478,6 +448,7 @@ def run_job(
     require_approved_image: bool = True,
     on_wait: Callable[[dict[str, float]], None] | None = None,
     memory_wait_s: float = 1800.0,
+    launcher: JobLauncher | None = None,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock.
 
@@ -489,6 +460,8 @@ def run_job(
     without starting a container; still no memory after ``memory_wait_s`` -> FAILED with SYS-002 (raised).
     """
     from vlm_pipeline.common.preflight import preflight
+
+    launcher = launcher or LocalDockerLauncher()
 
     if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
         _check_gate(job, manifest, project_root)
@@ -534,16 +507,17 @@ def run_job(
             while not done.is_set():
                 if cancel.wait(0.5):
                     cancelled.set()
-                    _docker_stop_async(container)
+                    launcher.stop(container, STOP_GRACE_S)
                     return
 
         if cancel is not None:
             threading.Thread(target=_watch_cancel, name=f"cancel-{container}", daemon=True).start()
+        log_path = run_dir / "logs" / "stdout.log"
         _, guard = run_guarded(
-            docker_args(job, project_root, lock_token=handle.info.token, image_id=image_digest(job.image)),
-            run_dir / "logs" / "stdout.log",
-            on_abort=lambda: _docker_stop_async(container),
-            hard_exit=lambda: _docker_kill(container),
+            lambda: launcher.run(job, project_root, lock_token=handle.info.token, log_path=log_path),
+            log_path,
+            on_abort=lambda: launcher.stop(container, STOP_GRACE_S),
+            hard_exit=lambda: launcher.kill(container),
             thresholds=mem_thresholds,
             # Publish the resolved stop level while the job runs, not only at the end: the E2E gate (bao-tester) waits
             # for MemAvailable >= max(16, abort of the lock holder + 4) and reads it from this run.json.
@@ -552,7 +526,7 @@ def run_job(
             ),
         )
         done.set()
-        state = _docker_state(container)
+        state = launcher.state(container)
         info = dataclasses.replace(
             state, preempted_by_memguard=guard.should_stop.is_set(), cancelled_by_executor=cancelled.is_set()
         )
@@ -590,5 +564,5 @@ def run_job(
             )
         raise
     finally:
-        _docker_rm(container)
+        launcher.remove(container)
         gpu_lock.release(handle)
