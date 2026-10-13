@@ -23,11 +23,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-import pwd
-import stat
 import threading
 import time
-import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +33,10 @@ from typing import Any, Literal
 from vlm_pipeline.app.storage import APPROVAL_WINDOW_S, CLEANUP_LOG_REL, PERMANENT_LOSS, PROFILE_ENV, StorageSettings
 from vlm_pipeline.artifacts import cache_retention, retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
+from vlm_pipeline.common.app_config import (  # noqa: F401 - policy_path re-exported (tests, callers)
+    policy_path,
+    read_policy,
+)
 from vlm_pipeline.common.paths import GIB
 
 logger = logging.getLogger(__name__)
@@ -49,40 +50,6 @@ INTERVAL_S = 6 * 3600.0
 
 
 _RANK: dict[str, int] = {"off": 0, "dry_run": 1, "apply": 2}
-POLICY_REL = Path(".config") / "vlm-app" / "policy.toml"  # admin-owned (P003 D17), never written by the app
-
-
-def policy_path() -> Path:
-    """``~/.config/vlm-app/policy.toml`` of the *process user* from the passwd database, never from ``$HOME``."""
-    return Path(pwd.getpwuid(os.getuid()).pw_dir) / POLICY_REL
-
-
-def _unsafe(st: os.stat_result) -> bool:
-    return bool(st.st_mode & 0o022) or st.st_uid not in (0, os.getuid())
-
-
-def _read_policy(path: Path) -> dict[str, Any] | None:
-    """The parsed policy file, or None when absent or unusable (reason logged). Checks the opened fd itself."""
-    try:
-        if _unsafe(path.parent.stat()):  # others could swap the file by rename
-            logger.warning("policy dir %s is group/other-writable or foreign-owned: ignored", path.parent)
-            return None
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-    except FileNotFoundError:
-        return None
-    except OSError as exc:  # ELOOP for a symlink
-        logger.warning("policy file %s unusable (%s): ignored", path, exc)
-        return None
-    with os.fdopen(fd, "rb") as fh:
-        st = os.fstat(fh.fileno())
-        if _unsafe(st) or not stat.S_ISREG(st.st_mode):
-            logger.warning("policy file %s is not a regular file owned by this user/root and 0644: ignored", path)
-            return None
-        try:
-            return tomllib.load(fh)
-        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-            logger.warning("policy file %s invalid (%s): ignored", path, exc)
-            return None
 
 
 def admin_schedule(path: Path | None = None) -> Mode | None:
@@ -92,7 +59,7 @@ def admin_schedule(path: Path | None = None) -> Mode | None:
     Fails closed: a symlink, a file or parent dir writable by group/others or not owned by this user or root, an
     unreadable file or an unknown value is ignored (logged), leaving the profile default (dry_run on a shared host).
     """
-    data = _read_policy(path if path is not None else policy_path())
+    data = read_policy(path)  # the one reader of the admin file (common.app_config)
     storage = data.get("storage") if data is not None else None
     value = storage.get("schedule") if isinstance(storage, dict) else None
     if value is None:
