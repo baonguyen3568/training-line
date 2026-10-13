@@ -325,11 +325,13 @@ const unknownEstimate = {
   source: "unknown" as const,
 };
 
-// Templates come from configs/templates/*.json (same files the backend serves); the server adds estimates.
-const templates: Template[] = (templatesBundle as Omit<Template, "estimate">[]).map((tpl) => ({
-  ...tpl,
-  estimate: unknownEstimate,
-}));
+// Templates come from configs/templates/*.json (same files the backend serves); the server adds estimates and,
+// like the server (app/templates.py), never offers a hidden one (e.g. quantize_bench until its worker can run it).
+const templates: Template[] = (
+  templatesBundle as (Omit<Template, "estimate"> & { hidden?: boolean })[]
+)
+  .filter((tpl) => !tpl.hidden)
+  .map(({ hidden: _hidden, ...tpl }) => ({ ...tpl, estimate: unknownEstimate }));
 
 function issue(
   code: string,
