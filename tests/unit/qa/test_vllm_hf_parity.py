@@ -137,6 +137,17 @@ def test_hf_stopping_where_vllm_goes_on_is_ranked_with_the_eos() -> None:
     assert report["diverged"][0]["kind"] == "near_tie"
 
 
+def test_vllm_stopping_where_hf_goes_on_is_ranked_at_vllm_eos() -> None:
+    # Symmetric case: vLLM's EOS (token 7, finish "stop") at position 1 has its own logprobs; HF's token 2 is rank 2.
+    hf, vl = _pair(10, differ=1)
+    vl[0]["token_ids"] = [1, 7]
+    vl[0]["top_logprobs"] = [[[1, -0.01], [5, -5.0]], [[7, -0.70], [2, -0.75]]]
+    report = _mod().compare(hf, vl)
+    assert report["diverged"][0]["first_diff_token"] == 1
+    assert report["diverged"][0]["hf_choice_rank_in_vllm"] == "2"
+    assert report["diverged"][0]["kind"] == "near_tie"
+
+
 def test_no_predictions_is_an_error() -> None:
     with pytest.raises(SystemExit, match="no HF predictions"):
         _mod().compare({}, {})
