@@ -80,7 +80,7 @@ def test_exception_carries_code_and_params_only() -> None:
 
 
 def test_exit_codes_are_stable() -> None:
-    assert [int(c) for c in ExitCode] == [0, 2, 3, 4, 75]
+    assert [int(c) for c in ExitCode] == [0, 2, 3, 4, 5, 75]
 
 
 def test_typo_in_entry_key_is_rejected() -> None:

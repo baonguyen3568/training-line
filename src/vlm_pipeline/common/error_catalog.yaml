@@ -30,7 +30,8 @@ MEM-001:
   severity: error
   prevent_in_preflight: true
   # max_free_pct: share of the free memory a job may use (user rule ADR-005 A1, default 80).
-  params: [need_gb, avail_gb, est_peak_gb, est_gb, max_free_pct]
+  # memory: host (default) | vram (discrete GPU budget, D-4).
+  params: [need_gb, avail_gb, est_peak_gb, est_gb, max_free_pct, {name: memory, type: enum, values: [host, vram]}]
   match:
     - {kind: preflight, value: NO_MEM}
   actions:
@@ -210,9 +211,11 @@ GPU-001:
   slug: GPU_ENV_INCOMPATIBLE
   severity: error
   prevent_in_preflight: true
-  params: []
+  # Preflight (D-4): a GeForce card (no CUDA forward compatibility) with a driver older than the image's CUDA needs.
+  params: [driver_version, min_driver]
   match:
     - {kind: regex, value: "libcudart\\.so\\.12|libcublas\\.so\\.12|no kernel image is available|torch .*\\+cpu"}
+    - {kind: preflight, value: GPU_ENV}
   actions:
     - {id: use_app_environment, kind: navigate, target: settings_environment, confirm: false}
     - {id: send_report, kind: navigate, target: bug_report, confirm: false}

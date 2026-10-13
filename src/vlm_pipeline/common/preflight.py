@@ -21,6 +21,14 @@ from typing import ClassVar
 from vlm_pipeline.common.diskguard import DiskSnapshot, LockStatus, check_disk, check_lock, read_disk, required_disk_gb
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
 from vlm_pipeline.common.gpu_lock import default_lock_path
+from vlm_pipeline.common.gpu_mem import (
+    MIN_NATIVE_DRIVER_CUDA_13_3,
+    GpuInfo,
+    driver_too_old,
+    memory_model,
+    query_gpus,
+    vram_required_gb,
+)
 from vlm_pipeline.common.memguard import (
     DEFAULT_THRESHOLDS,
     MemSnapshot,
@@ -33,7 +41,8 @@ from vlm_pipeline.common.paths import project_root
 
 # When several checks fail, the reported exit code follows this order; all findings are still listed.
 # A busy lock first: low memory is then usually caused by the job holding the lock.
-_EXIT_PRIORITY = (ExitCode.LOCK_BUSY, ExitCode.NO_MEM, ExitCode.NO_DISK)
+# A GPU that cannot run the image is permanent: it wins over the transient lock/memory/disk refusals.
+_EXIT_PRIORITY = (ExitCode.GPU_ENV, ExitCode.LOCK_BUSY, ExitCode.NO_MEM, ExitCode.NO_DISK)
 
 
 @dataclass(frozen=True)
@@ -148,6 +157,44 @@ def check_lock_status(status: LockStatus | None) -> list[Finding]:
     return [Finding("SYS-001", ExitCode.LOCK_BUSY, reason, params)]
 
 
+def check_gpu(
+    gpus: list[GpuInfo], est_vram_gb: float, *, thresholds: MemThresholds = DEFAULT_THRESHOLDS
+) -> list[Finding]:
+    """Discrete-GPU checks (D-4, NOT tested on real discrete hardware): free VRAM budget and native driver."""
+    if memory_model(gpus) != "discrete":
+        return []
+    gpu = max(gpus, key=lambda g: g.free_gb or 0.0)  # jobs run on one GPU; the freest one is the best case
+    findings: list[Finding] = []
+    if driver_too_old(gpu):
+        findings.append(
+            Finding(
+                "GPU-001",
+                ExitCode.GPU_ENV,
+                f"{gpu.name}: driver {gpu.driver_version} < {MIN_NATIVE_DRIVER_CUDA_13_3} (no forward compatibility)",
+                {"driver_version": gpu.driver_version, "min_driver": MIN_NATIVE_DRIVER_CUDA_13_3},
+            )
+        )
+    need = vram_required_gb(est_vram_gb, thresholds.max_free_frac)
+    free = gpu.free_gb or 0.0
+    if free < need:
+        findings.append(
+            Finding(
+                "MEM-001",
+                ExitCode.NO_MEM,
+                f"{gpu.name}: free VRAM {free:.1f} GB < required {need:.1f} GB "
+                f"(est {est_vram_gb:.1f} GB may use at most {round(100 * thresholds.max_free_frac)}% of the free VRAM)",
+                {
+                    "need_gb": round(need, 2),
+                    "avail_gb": round(free, 2),
+                    "est_peak_gb": est_vram_gb,
+                    "max_free_pct": round(100 * thresholds.max_free_frac),
+                    "memory": "vram",
+                },
+            )
+        )
+    return findings
+
+
 def combine(findings: Iterable[Finding], *, details: Mapping[str, object] | None = None) -> Verdict:
     """Merge findings from all checks; exit code follows ``_EXIT_PRIORITY``, every finding is kept."""
     found = tuple(findings)
@@ -167,8 +214,15 @@ def preflight(
     lock_holder: Callable[[], LockStatus | None] | None = None,
     root: Path | None = None,
     thresholds: MemThresholds = DEFAULT_THRESHOLDS,
+    gpus: list[GpuInfo] | None = None,
+    est_vram_gb: float | None = None,
 ) -> Verdict:
-    """Run every pre-run check; defaults read the live host so no caller can skip disk or lock by accident."""
+    """Run every pre-run check; defaults read the live host so no caller can skip disk or lock by accident.
+
+    Discrete GPU (D-4): VRAM is a second budget, ``est_vram_gb`` (default ``est_peak_gb``) <= max_free_frac x free
+    VRAM, and a GeForce card needs a native driver for the image's CUDA. UMA (GB10) and CPU-only hosts: host memory
+    only, as before. ``gpus=None`` queries nvidia-smi only when the memory is live too (tests pass a snapshot).
+    """
     base = root if root is not None else project_root()
     mem = snapshot if snapshot is not None else read_meminfo()
     # The container's own cgroup limit only matters when the caller reads live memory in that container.
@@ -179,12 +233,17 @@ def preflight(
     else:
         lock = check_lock(base / ".team" / "GPU_LOCK" if root is not None else default_lock_path())
 
+    if gpus is None:
+        gpus = query_gpus() if snapshot is None else []
+    model = memory_model(gpus)
+
     need_disk_gb = required_disk_gb(ckpt_gb)
     disk_params = {"need_gb": round(need_disk_gb, 2), "avail_gb": round(dsk.free_gb, 2)}
     findings = [
         *check_lock_status(lock),
         *check_memory(est_peak_gb, snapshot=mem, cgroup_available_gb=cgroup_gb, thresholds=thresholds),
         *(Finding("DISK-001", ExitCode.NO_DISK, r, disk_params) for r in check_disk(need_disk_gb, dsk)),
+        *check_gpu(gpus, est_peak_gb if est_vram_gb is None else est_vram_gb, thresholds=thresholds),
     ]
     details: dict[str, object] = {
         "mem": {
@@ -199,6 +258,19 @@ def preflight(
         "lock": None
         if lock is None
         else {"who": lock.who, "job": lock.job, "alive": lock.alive, "corrupt": lock.corrupt},
+        "gpu": {
+            "memory_model": model,
+            "devices": [
+                {
+                    "name": g.name,
+                    "free_gb": g.free_gb,
+                    "total_gb": g.total_gb,
+                    "cc": list(g.compute_capability),
+                    "driver": g.driver_version,
+                }
+                for g in gpus
+            ],
+        },
         "thresholds": {
             "max_free_frac": thresholds.max_free_frac,
             "abort_gb": thresholds.abort_gb,
@@ -258,6 +330,7 @@ __all__ = [
     "Finding",
     "MemoryWaitTimeoutError",
     "Verdict",
+    "check_gpu",
     "check_lock_status",
     "check_memory",
     "combine",

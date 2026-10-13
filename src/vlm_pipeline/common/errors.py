@@ -19,6 +19,7 @@ class ExitCode(IntEnum):
     NO_MEM = 2
     NO_DISK = 3
     LOCK_BUSY = 4
+    GPU_ENV = 5  # GPU/driver cannot run the image (D-4: GeForce without a native driver), never retried
     MEM_PREEMPT = 75  # worker stopped by the memory watchdog after checkpointing -> run status "interrupted"
 
 
