@@ -62,3 +62,4 @@
 - 2026-10-13 Policy chuyển sang ~/.config/ntc-training/policy.toml (700/600, shared_dev, schedule=apply). Xoá ~/.config/vlm-app sau khi 7870 restart lên code mới.
 - 2026-10-13 M3(b) data root: không sửa path trong code; compose bind-mount VLM_DATA_ROOT vào /app/{.cache,outputs,data}; chỉ vlm-runner dịch path container→host khi mount cho job. Dev trên host không dùng VLM_DATA_ROOT (cảnh báo nếu đặt).
 - 2026-10-13 P-3b chốt (20 ảnh val): F1 s99 59.9 / s199 70.8 / s299 74.4; penalty 1.0 (1.1 tệ hơn). Preset: Tiêu chuẩn=3 epoch (mặc định), Nhanh=2 epoch, Thử nhanh=1 epoch (chất lượng thấp). Số công bố = CORD test ckpt 299 (tester, worktree --gate).
+- 2026-10-13 Template Parse: ckpt + val chỉ ở ranh giới epoch (AutoModel 26.08-6 luôn val khi ckpt, không tách được). Ước ~115–118 phút cho 3 lượt (trước 153'). Resume lùi tối đa 1 epoch. Epochs = 1|2|3|5, mặc định 3.
