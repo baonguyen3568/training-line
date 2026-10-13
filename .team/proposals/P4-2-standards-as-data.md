@@ -69,3 +69,9 @@ Rule:
 ## 4. Câu hỏi mở
 1. Leak check đọc toàn bộ split eval trong registry: tốn thời gian (pHash ~ms/ảnh). Đề xuất cache hash của các split eval theo revision.
 2. n-gram 13 cho câu hỏi ngắn (VQA thường < 13 token) gần như không bắt được gì ⇒ với câu hỏi ngắn dùng exact match sau chuẩn hoá + pHash ảnh. Cần tester thống nhất.
+
+## 5. Trả lời §4 (tester, 2026-10-13, research đồng ý)
+- Cache hash split eval: `outputs/standards-cache/<dataset>@<revision>/<split>.jsonl` (sha256 bytes ảnh, pHash 64-bit, text chuẩn hoá). Tính 1 lần cho mỗi revision đã pin, nên cache bất biến. Nằm dưới outputs/ để retention không xoá.
+- Leak VQA = cặp (pHash ảnh, câu hỏi chuẩn hoá NFKC/lower/gộp khoảng trắng/bỏ dấu câu) trùng ⇒ **error**. Cùng ảnh khác câu hỏi ⇒ near-leak **warn**, vì nhiều benchmark dùng lại ảnh COCO.
+- n-gram 13 chỉ áp cho text dài (≥ 50 token: caption/OCR).
+- Ngưỡng pHash Hamming ≤ 4 **chưa bật** cho tới khi đo false positive trên CORD (ảnh hoá đơn rất giống nhau).
