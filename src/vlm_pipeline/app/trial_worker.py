@@ -21,7 +21,7 @@ from vlm_pipeline.app.uploads import UPLOADS_DIR, upload_path
 from vlm_pipeline.common.catalog import CatalogEntry
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.jobrun import ContainerJob, MemoryPreemptedBeforeStartError, run_job
-from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest
+from vlm_pipeline.common.runinfo import RunManifest, RunStatus
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import ArtifactRef, NodeJob, NodeResult
 from vlm_pipeline.serve.config import InferenceParams
@@ -61,33 +61,16 @@ def _parents_in(root: Path, path: Path) -> list[Path]:
     return [p for p in path.resolve().parents if top in p.parents]
 
 
-def _base_snapshot(worker: RealWorker, entry: CatalogEntry) -> Path:
-    """The pinned base snapshot of ``entry``, as ``model.hf_pick`` resolves it (prepared dir for remote-code models)."""
-    from vlm_pipeline.app.workers import PREPARED_DIRS, NotCachedError, _hub_snapshot
-
-    if entry.remote_code == "pinned_prepared":
-        prepared = PREPARED_DIRS.get(entry.id)
-        path = worker.root / ".cache" / "prepared" / (prepared or "") / "model"
-        if prepared is None or not (path / "config.json").is_file():
-            raise NotCachedError("prepared snapshot missing", params={"repo": entry.repo, "reason": "not_prepared"})
-        return path.resolve()
-    return _hub_snapshot(worker.root, entry.repo, entry.revision, "model").resolve()
-
-
 def base_of(worker: RealWorker, ref: ArtifactRef) -> tuple[CatalogEntry, Path]:
-    """Catalog entry + host base snapshot of a model artifact (a catalog base, or the output of a fine-tune run)."""
-    from vlm_pipeline.app.workers import UnknownModelError
+    """Catalog entry + host base snapshot of a model artifact.
 
-    model_path = worker.host_path(ref.path)
-    for entry in worker.catalog.models:
-        if ref.hash == f"{entry.repo}@{entry.revision}":
-            return entry, model_path
-    run_dir = next((p for p in _parents_in(worker.root, model_path) if (p / "run.json").is_file()), None)
-    manifest = read_manifest(run_dir) if run_dir is not None else None
-    for entry in worker.catalog.models:
-        if manifest is not None and (manifest.base_model, manifest.base_model_revision) == (entry.repo, entry.revision):
-            return entry, _base_snapshot(worker, entry)
-    raise UnknownModelError("model artifact has no catalog base", params={"hash": ref.hash})
+    The catalog model itself, or the base recorded in the run.json of the fine-tune that produced it (one resolver:
+    ``RealWorker.base_of``, shared with eval and bench).
+    """
+    entry = worker.base_of(ref)
+    if "@" in ref.hash.split(":", 1)[0]:  # a catalog model: the artifact is the base snapshot
+        return entry, worker.host_path(ref.path)
+    return entry, worker._catalog_model_path(entry).resolve()
 
 
 def _pixels(worker: RealWorker, entry: CatalogEntry, ref: ArtifactRef) -> tuple[int, int]:
@@ -109,7 +92,7 @@ def _pixels(worker: RealWorker, entry: CatalogEntry, ref: ArtifactRef) -> tuple[
     return int(processor.get("min_pixels") or 0), int(processor.get("max_pixels") or 0)
 
 
-def _template_overrides(worker: RealWorker, entry: CatalogEntry) -> dict[str, Any]:
+def template_overrides(worker: RealWorker, entry: CatalogEntry) -> dict[str, Any]:
     """The training template's decode_overrides (001a §10.7), the same source eval uses; {} without a template."""
     import yaml
 
@@ -146,7 +129,7 @@ def build_request(worker: RealWorker, job: NodeJob, image: Path) -> tuple[TrialR
         min_pixels=min_px,
         max_pixels=max_px,
         attn=entry.attn,
-        decode_overrides=_template_overrides(worker, entry),
+        decode_overrides=template_overrides(worker, entry),
     )
     return request, entry
 
@@ -222,4 +205,14 @@ def run_trial(worker: RealWorker, job: NodeJob) -> NodeResult:
     return NodeResult(outputs={port: ArtifactRef(type="Endpoint", path=str(result_path), hash=f"sha256:{digest}")})
 
 
-__all__ = ["UPLOADS_DIR", "TrialImageError", "build_request", "check_image", "est_peak_gb", "run_trial", "upload_path"]
+__all__ = [
+    "UPLOADS_DIR",
+    "TrialImageError",
+    "base_of",
+    "build_request",
+    "check_image",
+    "est_peak_gb",
+    "run_trial",
+    "template_overrides",
+    "upload_path",
+]

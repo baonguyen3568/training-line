@@ -17,7 +17,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from vlm_pipeline.app.trial_worker import _template_overrides, base_of, est_peak_gb
+from vlm_pipeline.app.trial_worker import base_of, est_peak_gb, template_overrides
 from vlm_pipeline.common.catalog import CatalogEntry, load_dataset_catalog
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.jobrun import ContainerJob, MemoryPreemptedBeforeStartError, run_job
@@ -75,7 +75,7 @@ def _trial(worker: RealWorker, model_dir: Path, base: Path, entry: CatalogEntry,
         temperature=0.0,
         top_p=1.0,
         attn=entry.attn,
-        decode_overrides=_template_overrides(worker, entry),
+        decode_overrides=template_overrides(worker, entry),
     )
 
 

@@ -8,8 +8,8 @@ writes ``result.json`` next to the request. Parity with training (ADR-001 amendm
 - Chat VLMs (Qwen3-VL, Cosmos, Qwen3.5, Gemma): the processor's chat template with the catalog's min/max pixels.
 - Decoding: the pinned BASE snapshot's generation_config.json (Parse: repetition_penalty 1.1); only max_new_tokens,
   temperature and top_p come from the node, and every override is recorded.
-Images (bao-security): format allowlist at open, decompression bomb is an error, first frame only, EXIF orientation
-applied, nothing from the image is logged. Imports torch/transformers lazily; stdlib + Pillow otherwise.
+Images: ``common.image_rules.open_image`` (bao-security rules: format allowlist at open, decompression bomb is an error,
+first frame only, EXIF orientation, nothing from the image is logged). Imports torch/transformers lazily.
 """
 
 from __future__ import annotations
@@ -17,24 +17,23 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-IMAGE_FORMATS = ("PNG", "JPEG", "WEBP")
-MAX_IMAGE_BYTES = 20 * 1024 * 1024
-MAX_IMAGE_PIXELS = 40_000_000
+from vlm_pipeline.common.image_rules import (
+    IMAGE_FORMATS,
+    MAX_IMAGE_BYTES,
+    MAX_IMAGE_PIXELS,
+    ImageRuleError,
+    open_image,
+)
+
 PARSE_TASK_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown>"
 TRIAL_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-
-
-class TrialInputError(ValueError):
-    """The image cannot be used (format, size, corrupt): reported to the user without a stack trace."""
-
-    def __init__(self, reason: str) -> None:
-        super().__init__(reason)
-        self.reason = reason
+# The image rules live in one place for uploads, local datasets, eval and this job (common.image_rules); the old
+# names stay importable for callers of this module.
+TrialInputError = ImageRuleError
 
 
 @dataclass(frozen=True)
@@ -58,32 +57,6 @@ class TrialRequest:
     @classmethod
     def from_json(cls, text: str) -> TrialRequest:
         return cls(**json.loads(text))
-
-
-def open_image(path: Path) -> Any:
-    """RGB image from ``path`` under bao-security's rules, or ``TrialInputError``."""
-    from PIL import Image, ImageOps  # type: ignore[import-not-found,unused-ignore]  # host venv may lack Pillow
-
-    try:
-        st = path.lstat()
-    except OSError:
-        raise TrialInputError("not_a_file") from None
-    if not path.is_file() or path.is_symlink():
-        raise TrialInputError("not_a_file")
-    if st.st_size > MAX_IMAGE_BYTES:
-        raise TrialInputError("too_large")
-    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", Image.DecompressionBombWarning)
-        try:
-            img: Any = Image.open(path, formats=list(IMAGE_FORMATS))
-            img.load()  # first frame only for animated images: no seek
-            img = ImageOps.exif_transpose(img)
-            return img.convert("RGB")
-        except (Image.DecompressionBombError, Image.DecompressionBombWarning):
-            raise TrialInputError("too_many_pixels") from None
-        except (OSError, ValueError, SyntaxError):  # UnidentifiedImageError is an OSError
-            raise TrialInputError("unreadable") from None
 
 
 def decoding_overrides(req: TrialRequest) -> dict[str, Any]:

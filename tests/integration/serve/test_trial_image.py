@@ -32,7 +32,7 @@ def test_other_formats_are_refused_at_open(tmp_path: Path, fmt: str) -> None:
 
 
 def test_decompression_bomb_is_an_error_not_a_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from vlm_pipeline.serve import trial
+    from vlm_pipeline.common import image_rules as trial  # the rules moved to common.image_rules
 
     path = _save(tmp_path / "big.png", "PNG", size=(200, 200))
     monkeypatch.setattr(trial, "MAX_IMAGE_PIXELS", 30_000)  # 40_000 px is over the limit but under 2x (a warning)
