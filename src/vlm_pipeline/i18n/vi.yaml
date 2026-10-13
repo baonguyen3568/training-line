@@ -832,8 +832,8 @@ template:
     desc: Dạy model đọc ảnh hoá đơn và trả về các trường (cửa hàng, món, tổng tiền…) dạng JSON. Chạy được ngay với dữ liệu mẫu CORD-v2, không cần tài khoản.
     built_on: Dùng NVIDIA Nemotron-Parse v1.1 · dữ liệu CORD-v2
   image_video_understanding:
-    title: Hiểu ảnh và video
-    desc: Dạy model trả lời câu hỏi về ảnh và video theo dữ liệu của bạn. Dùng Qwen3.5-2B, train nhẹ bằng LoRA, không cần tài khoản.
+    title: Hiểu ảnh
+    desc: Dạy model trả lời câu hỏi về ảnh theo dữ liệu của bạn. Dùng Qwen3.5-2B, train nhẹ bằng LoRA, không cần tài khoản.
     needs_account: Cần tài khoản Hugging Face
 inspector:
   steps: '{step_count} bước học'

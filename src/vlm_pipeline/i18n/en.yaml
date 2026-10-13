@@ -832,8 +832,8 @@ template:
     desc: Teach a model to read receipt photos and return fields (store, items, total…) as JSON. Runs right away on the CORD-v2 sample data, no account needed.
     built_on: Uses NVIDIA Nemotron-Parse v1.1 · CORD-v2 data
   image_video_understanding:
-    title: Understand images & video
-    desc: Teach a model to answer questions about images and videos from your data. Uses Qwen3.5-2B with lightweight LoRA training; no account needed.
+    title: Understand images
+    desc: Teach a model to answer questions about images from your data. Uses Qwen3.5-2B with lightweight LoRA training; no account needed.
     needs_account: Needs a Hugging Face account
 inspector:
   steps: '{step_count} steps'
