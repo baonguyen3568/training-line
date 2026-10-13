@@ -6,7 +6,7 @@ description: Run the local CI quality gates (ruff format/lint, mypy, import-lint
 # Local CI gates (no GPU, no network beyond uv cache)
 
 Run from repo root. All commands are CPU-only and must never take the GPU lock.
-**After EVERY code commit (ADR-004 A4):** `bash scripts/check.sh --clean` — host gates on a pristine worktree of HEAD (~30 s); red = the commit depends on an uncommitted file.
+**After EVERY code commit (ADR-004 A4):** `bash scripts/check.sh --clean` — on a pristine worktree of HEAD: import layers, API schema drift (`export_schemas.py --check`), unit tests (~60 s); plus the frontend gate when HEAD touches `frontend/`, `schemas/` or `configs/templates/`, and the site gate when it touches `site/`, `docs/legal/` or tokens (`CLEAN_FRONTEND=1` forces both). Red = the commit depends on an uncommitted file or left a generated file stale.
 
 ```bash
 uv sync --locked --group dev                 # tooling env, fails if uv.lock stale
