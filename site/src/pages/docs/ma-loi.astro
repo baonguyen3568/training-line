@@ -1,0 +1,185 @@
+---
+// /docs/ma-loi/: every user-facing error code, generated at build from error_catalog.yaml + i18n (bao-fixcode's
+// scripts/error_codes.py → src/generated/error-codes.json). Each code has a stable anchor (#MEM-001) for the app's
+// error cards ("Đọc thêm"). Only title / what / action labels are shown, never internal match rules or slugs.
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import Icon from "~/components/Icon.astro";
+import copy from "~/generated/app-copy.json";
+import data from "~/generated/error-codes.json";
+
+type Text = { vi: string; en: string };
+type Code = {
+  code: string;
+  anchor: string;
+  severity: "error" | "warn" | "info";
+  title: Text;
+  what: { vi: string[]; en: string[] };
+  actions: Text[];
+  guide: string | null;
+};
+const groups = data.groups as { prefix: string; title: Text; codes: Code[] }[];
+const SEV = {
+  error: { icon: "circle-x", label: "Lỗi, chặn chạy" },
+  warn: { icon: "triangle-alert", label: "Cảnh báo, vẫn chạy được" },
+  info: { icon: "info", label: "Thông tin" },
+} as const;
+/** "{node}" placeholders become muted chips with a plain label ("tên bước", "…" for numbers); the tooltip keeps
+ * the technical name for engineers. The text itself is the app's own copy (plain text). */
+const parts = (s: string) => s.split(/(\{\w+\})/g).filter(Boolean);
+const labels = (copy.docs_placeholder ?? {}) as Record<string, string>;
+const label = (name: string) => labels[name] ?? labels._fallback ?? "…";
+const actionsLead = (copy.docs_error as { actions_lead?: string } | undefined)?.actions_lead;
+const total = groups.reduce((n, g) => n + g.codes.length, 0);
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Tra mã lỗi",
+    description: "Mỗi mã lỗi của app: chuyện gì xảy ra và cách sửa.",
+    tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 2 },
+  }}
+  headings={groups.map((g) => ({ depth: 2, slug: `nhom-${g.prefix.toLowerCase()}`, text: g.title.vi }))}
+>
+  <p>
+    App có {total} mã lỗi. Mỗi thẻ lỗi trong app ghi mã (ví dụ MEM-001) và link tới đúng mục ở trang này.
+  </p>
+  <label class="err-filter">
+    <span>Lọc theo mã hoặc tiêu đề</span>
+    <input type="search" id="err-filter" placeholder="vd: MEM, bộ nhớ" autocomplete="off" />
+  </label>
+  <p class="err-empty" id="err-empty" hidden>Không có mã nào khớp.</p>
+
+  {
+    groups.map((g) => (
+      <section class="err-group" data-group>
+        <h2 id={`nhom-${g.prefix.toLowerCase()}`}>{g.title.vi}</h2>
+        {g.codes.map((c) => (
+          <article class="err-code" id={c.anchor} data-search={`${c.code} ${c.title.vi}`.toLowerCase()}>
+            <h3>
+              <code>{c.code}</code> {c.title.vi}
+            </h3>
+            <p class={`err-sev ${c.severity}`}>
+              <Icon name={SEV[c.severity].icon} size={14} />
+              {SEV[c.severity].label}
+            </p>
+            <p class="err-lbl">Chuyện gì xảy ra</p>
+            {c.what.vi.length === 1 ? (
+              <p>{parts(c.what.vi[0] ?? "").map((p) => (/^\{\w+\}$/.test(p) ? <em class="ph" title={p.slice(1, -1)}>{label(p.slice(1, -1))}</em> : p))}</p>
+            ) : (
+              <ul>
+                {c.what.vi.map((w) => (
+                  <li>{parts(w).map((p) => (/^\{\w+\}$/.test(p) ? <em class="ph" title={p.slice(1, -1)}>{label(p.slice(1, -1))}</em> : p))}</li>
+                ))}
+              </ul>
+            )}
+            {c.actions.length > 0 && (
+              <>
+                <p class="err-lbl">Cách sửa</p>
+                {actionsLead && <p class="err-lead">{actionsLead}</p>}
+                <ul>
+                  {c.actions.map((a) => (
+                    <li>{parts(a.vi).map((p) => (/^\{\w+\}$/.test(p) ? <em class="ph" title={p.slice(1, -1)}>{label(p.slice(1, -1))}</em> : p))}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {c.guide && (
+              <p>
+                <a href={c.guide}>Hướng dẫn chi tiết →</a>
+              </p>
+            )}
+          </article>
+        ))}
+      </section>
+    ))
+  }
+</StarlightPage>
+
+<script>
+  // Quick filter on this page only (Pagefind covers the whole site). Bundled module: hashed by the CSP.
+  const input = document.getElementById("err-filter") as HTMLInputElement | null;
+  const empty = document.getElementById("err-empty");
+  input?.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    let shown = 0;
+    for (const group of document.querySelectorAll<HTMLElement>("[data-group]")) {
+      let any = false;
+      for (const card of group.querySelectorAll<HTMLElement>(".err-code")) {
+        const hit = !q || (card.dataset.search ?? "").includes(q);
+        card.hidden = !hit;
+        if (hit) any = true;
+        if (hit) shown++;
+      }
+      group.hidden = !any;
+    }
+    if (empty) empty.hidden = shown > 0;
+  });
+</script>
+
+<style>
+  .err-filter {
+    display: grid;
+    gap: 6px;
+    margin: 16px 0 8px;
+    font-size: 14px;
+  }
+  .err-filter input {
+    max-width: 360px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--color-axis);
+    border-radius: var(--radius-md);
+    background: var(--sl-color-bg);
+    color: var(--sl-color-white);
+    font: inherit;
+  }
+  /* 13 groups: section heads at Starlight's h3 size, still h2 for the TOC (design r1 #3) */
+  .err-group > h2 {
+    font-size: var(--sl-text-h3, 1.5rem);
+  }
+  .err-lead {
+    margin: 0 0 4px;
+    color: var(--sl-color-gray-2);
+  }
+  .err-code {
+    margin: 20px 0;
+    padding: 14px 16px;
+    border: 1px solid var(--color-grid);
+    border-radius: var(--radius-md);
+    scroll-margin-top: 80px;
+  }
+  .err-code:target {
+    border-color: var(--color-accent-focus);
+  }
+  .err-code h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+  .err-sev {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--sl-color-gray-2);
+  }
+  .err-sev.error :global(.ico) {
+    color: var(--color-status-ink-critical);
+  }
+  .err-sev.warn :global(.ico) {
+    color: var(--color-status-ink-warning);
+  }
+  .err-lbl {
+    margin: 12px 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sl-color-gray-3);
+  }
+  .ph {
+    font-style: italic;
+    padding: 0 4px;
+    border-radius: var(--radius-sm);
+    background: var(--color-canvas-placeholder-bg);
+    color: var(--sl-color-gray-2);
+  }
+</style>

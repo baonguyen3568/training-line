@@ -7,8 +7,9 @@
   --sl-font: var(--font-family-ui);
   --sl-font-mono: var(--font-family-mono);
   --sl-color-accent: var(--color-accent-brand);
-  --sl-color-accent-high: var(--color-action-link);
-  --sl-color-text-accent: var(--color-action-link);
+  /* active sidebar item / links: indigo in both themes (light #6e56cf, dark #b3a6ff) */
+  --sl-color-accent-high: var(--color-accent-focus);
+  --sl-color-text-accent: var(--color-accent-focus);
   --sl-color-bg: var(--color-page);
   --sl-color-bg-nav: var(--color-surface);
   --sl-color-bg-sidebar: var(--color-surface);
@@ -55,4 +56,8 @@
 .hint-title {
   display: block;
   margin-bottom: 4px;
+}
+/* the site title is not a link accent (One Indigo Rule: indigo = action, selection, focus) */
+.site-title {
+  color: var(--sl-color-white);
 }

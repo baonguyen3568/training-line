@@ -45,10 +45,15 @@ export default defineConfig({
       title: productName,
       defaultLocale: "root",
       locales: { root: { label: "Tiếng Việt", lang: "vi" } },
-      customCss: ["./src/generated/tokens.css", "./src/styles/starlight.css"],
+      customCss: ["./src/generated/tokens.css", "./src/styles/fonts.css", "./src/styles/starlight.css"],
       disable404Route: true, // the marketing 404 page covers the whole site
       lastUpdated: false,
-      sidebar: [{ label: "Tài liệu", items: [{ autogenerate: { directory: "docs" } }] }],
+      sidebar: [
+        {
+          label: "Tài liệu",
+          items: [{ autogenerate: { directory: "docs" } }, { label: "Tra mã lỗi", link: "/docs/ma-loi/" }],
+        },
+      ],
     }),
   ],
 });

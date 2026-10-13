@@ -15,7 +15,7 @@ import yaml
 
 SITE = Path(__file__).resolve().parent.parent
 ROOT = SITE.parent
-KEYS = ("node", "port", "preflight", "node_state", "template", "canvas", "app")
+KEYS = ("node", "port", "preflight", "node_state", "template", "canvas", "app", "docs_placeholder", "docs_error")
 ERRORS = ("MEM-001", "CFG-003")
 
 

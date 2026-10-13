@@ -3,3 +3,4 @@
 /.astro/
 /src/generated/
 /public/THIRD_PARTY_LICENSES.txt
+/scripts/__pycache__/

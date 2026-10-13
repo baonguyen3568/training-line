@@ -7,7 +7,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "tokens": "node ../frontend/scripts/build-tokens.mjs --out src/generated/tokens.css && uv run --quiet python scripts/third_party.py && uv run --quiet python scripts/app_copy.py",
+    "tokens": "node ../frontend/scripts/build-tokens.mjs --out src/generated/tokens.css && uv run --quiet python scripts/third_party.py && uv run --quiet python scripts/app_copy.py && uv run --quiet python scripts/error_codes.py",
     "dev": "npm run tokens && ASTRO_TELEMETRY_DISABLED=1 astro dev --host 127.0.0.1 --port 7877",
     "build": "npm run tokens && ASTRO_TELEMETRY_DISABLED=1 astro build",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview --host 127.0.0.1 --port 7877",
