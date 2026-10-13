@@ -178,6 +178,8 @@ EOF
   - driver chậm trả bộ nhớ sau khi container 20–30 GiB thoát: MemFree hồi ngay;
   - page cache sạch từ việc đọc checkpoint 3.7 GB chặn cudaMalloc;
   - dirty/writeback: job trước là eval, không ghi checkpoint.
+  - container trước dùng /dev/shm lớn (7 GiB, --shm-size 8g), hoặc bị SIGKILL: Shmem và MemFree hồi trong ≤ 2 s, B 16/16 OK
+    (20:48–20:51).
 - Đang có: 2 VLLM::EngineCore ngoài dự án (khoảng 58 GB) và stack vss-* chạy song song (đã báo PM để hỏi user).
 - Biện pháp hiện tại:
   - log CUDA OOM → MEM-003 (d83e0db);
