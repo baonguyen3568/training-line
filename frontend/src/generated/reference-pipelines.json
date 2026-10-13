@@ -253,7 +253,25 @@
         "model": "apache-2.0",
         "data": null
       },
-      "measured": null,
+      "measured": {
+        "train_minutes": null,
+        "peak_ram_gb": 17.8,
+        "score": {
+          "benchmark": "OCRBench regression_500 (in-app, vLLM)",
+          "metric": "accuracy_delta_fp8_minus_bf16",
+          "value": -0.6,
+          "ci95": [
+            -1.8,
+            0.4
+          ],
+          "n": 500
+        },
+        "config": "Qwen3.5-2B, ModelOpt FP8 per-tensor, 128 CORD train images for calibration, vision tower and lm_head kept BF16; 4.57 GB -> 3.07 GB. Only the difference to BF16 is meaningful, not the absolute score",
+        "sources": [
+          "benchmarks/eval/r3-qwen3.5-2b-fp8-ocrbench-gate-20261013.json",
+          ".team/proposals/001-stack-model-catalog.md"
+        ]
+      },
       "steps": [
         {
           "node": "model.hf_pick",

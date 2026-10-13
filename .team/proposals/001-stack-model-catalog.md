@@ -151,3 +151,5 @@ Run `outputs/runs/20261013-0937-b4-fp8-probe-q35-08b-b28b`, script `scripts/rese
   - est_peak = disk×2 + 18 GB.
   - Gate chất lượng thật vẫn là Δ benchmark (`quant_vs_parent`).
   - Đo lại khi nén model thứ hai (Qwen3.5-2B).
+- (2026-10-13 tối) **Qwen3.5-2B FP8 qua node** (per-tensor, calib 128, run `outputs/graph/runs/n3-beaf85b927870c8d`): parity top-1 0.949 / KL 0.013 (pass); 4.57 → 3.07 GB; peak 17.8 GB (run.json); 11.0 phút trong container. **Gate R3 PASS** (tester, `benchmarks/eval/r3-qwen3.5-2b-fp8-ocrbench-gate-20261013.json`): OCRBench regression_500 qua vLLM 0.31, FP8 − bf16 = −0.6, CI95 [−1.8, 0.4], n 500; nhiễu sàn engine −0.2. Chỉ công bố delta (số tuyệt đối đo trong app, không so được với model card).
+- 0.8B FP8 per-tensor/per-channel: chờ gate. Block: vLLM 0.31 không load được (in_proj_a/b), re-export có exclude (59bf1f9) đang xếp hàng.
