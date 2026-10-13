@@ -94,3 +94,13 @@ Hai chỗ cần sửa nhỏ để làm được G-1:
 1. G-1 API (không xoá gì mới, chỉ gom nguồn): làm ngay sau khi PM chốt; frontend gắn UI sau M2.
 2. G-2 scheduler: sau khi PM chốt Q1–Q4. Security review bắt buộc vì đây là đường xoá tự động; backend review vì là
    thread trong app.
+
+## Bổ sung sau security review G-2 (2026-10-13)
+- `VLM_RETENTION_SCHEDULE` chỉ được siết (D17):
+  - Trên `shared_dev`, env chỉ nhận `off|dry_run`; giá trị `apply` bị bỏ qua.
+  - Bật `apply` cho máy chung chỉ qua policy file của admin (`[storage] schedule = "apply"`), làm khi có loader chung.
+  - Chưa có loader thì máy chung không bao giờ tự xoá theo lịch.
+- Mỗi lúc chỉ 1 lượt xoá (`outputs/system/retention.lock`, flock, O_NOFOLLOW). Scheduler, CLI `--apply` và panel
+  apply dùng chung lock này; panel trả 409 `CLEANUP_IN_PROGRESS` khi lock đang bận.
+- **Còn mở (N3)**: thiếu `VLM_PROFILE` thì mặc định là `personal`, tức fail-open trên máy chung nếu app không chạy qua
+  `scripts/dev/app.sh`. Sửa cùng policy loader (TODO trong `StorageSettings.from_env`, chủ: bao-backend + bao-cleanup).
