@@ -708,7 +708,7 @@
             "type": "string",
             "x-ui": {
               "option_keys": "answer_length",
-              "order": 0,
+              "order": 2,
               "widget": "segmented"
             }
           },
@@ -735,6 +735,16 @@
               "advanced": true
             }
           },
+          "image": {
+            "default": "",
+            "pattern": "^([0-9a-f]{32})?$",
+            "title": "Image",
+            "type": "string",
+            "x-ui": {
+              "order": 0,
+              "widget": "image_upload"
+            }
+          },
           "max_model_len": {
             "default": 8192,
             "maximum": 32768,
@@ -743,6 +753,16 @@
             "type": "integer",
             "x-ui": {
               "advanced": true
+            }
+          },
+          "prompt": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Prompt",
+            "type": "string",
+            "x-ui": {
+              "order": 1,
+              "widget": "textarea"
             }
           },
           "temperature": {
