@@ -18,6 +18,7 @@ export const footer = [
     links: [
       { href: "/tinh-nang/", label: "Tính năng" },
       { href: "/template/", label: "Template" },
+      { href: "/truong-hop-su-dung/", label: "Trường hợp sử dụng" },
     ],
   },
   {

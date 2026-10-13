@@ -16,3 +16,39 @@
   outline: 2px solid var(--color-accent-focus);
   outline-offset: 2px;
 }
+/* Hint ("?" + native popover) inside docs: same look as the marketing pages (DESIGN.md "?" Popover). */
+.sl-markdown-content .help {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sl-color-gray-3);
+  cursor: pointer;
+  vertical-align: -6px;
+}
+.sl-markdown-content .help:hover {
+  color: var(--sl-color-white);
+  background: var(--color-canvas-placeholder-bg);
+}
+.hint-pop[popover] {
+  margin: auto;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas-placeholder-bg);
+  color: var(--color-text-primary);
+  font: 400 13px/1.5 var(--font-family-ui);
+  box-shadow: 0 1px 0 #ffffff08 inset, 0 12px 32px -8px #000000b0, 0 2px 6px #00000080;
+}
+.hint-pop[popover]::backdrop {
+  background: #00000066;
+}
+.hint-title {
+  display: block;
+  margin-bottom: 4px;
+}

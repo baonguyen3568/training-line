@@ -5,7 +5,7 @@
   --bg0: var(--color-page);
   --bg1: var(--color-canvas-background);
   --bg2: var(--color-surface);
-  --bg3: var(--color-canvas-placeholder);
+  --bg3: var(--color-canvas-placeholder-bg);
   --line: var(--color-grid);
   --line2: var(--color-axis);
   --tx: var(--color-text-primary);
@@ -327,41 +327,18 @@ main > .prose {
   color: var(--tx3);
 }
 
-/* Hint component ("?" + popover inside MDX) */
-.hint {
-  display: inline-block;
-  position: relative;
+/* Hint component ("?" + native popover inside MDX); panel styles come from [popover] above */
+.hint-pop {
+  max-width: min(320px, calc(100vw - 32px));
 }
-.hint summary {
-  cursor: pointer;
-  list-style: none;
-  display: inline-grid;
-  place-items: center;
-  width: 1.4em;
-  height: 1.4em;
-  border-radius: 50%;
-  border: 1px solid var(--line2);
-  color: var(--tx2);
-  font-size: 13px;
-}
-.hint summary::-webkit-details-marker {
-  display: none;
-}
-.hint-body {
-  position: absolute;
-  z-index: 10;
-  width: min(20rem, 80vw);
-  padding: 12px;
-  border-radius: var(--r);
-  background: var(--bg3);
-  border: 1px solid var(--line2);
-  box-shadow: var(--shadow);
-  color: var(--tx);
-}
-.hint-body strong {
+.hint-title {
   display: block;
+  margin-bottom: 4px;
 }
-
+/* Starlight docs pages use the same trigger without the marketing tokens */
+.sl-markdown-content .help {
+  color: var(--sl-color-gray-3);
+}
 @media (max-width: 960px) {
   .nav-main,
   .hide-narrow {

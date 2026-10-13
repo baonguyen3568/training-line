@@ -1,16 +1,19 @@
 ---
-// "?" + popover for secondary explanations (M2: no filler text in the main flow).
-// Stub: plain <details>, works without JS and under CSP; bao-design styles it later.
+// "?" + popover for secondary explanations (DESIGN.md "?" Popover): the same native popover as the landing, so it
+// opens on click/Enter, closes on Esc or outside click, never on hover, and needs no JS (strict CSP).
+import Icon from "~/components/Icon.astro";
+
 interface Props {
   title: string;
 }
 const { title } = Astro.props;
+const id = `hint-${crypto.randomUUID().slice(0, 8)}`;
 ---
 
-<details class="hint">
-  <summary aria-label={title} title={title}>?</summary>
-  <div class="hint-body" role="note">
-    <strong>{title}</strong>
-    <slot />
-  </div>
-</details>
+<button type="button" class="help hint" popovertarget={id} aria-label={title}>
+  <Icon name="circle-question-mark" size={16} />
+</button>
+<span id={id} popover class="hint-pop" role="note">
+  <b class="hint-title">{title}</b>
+  <slot />
+</span>
