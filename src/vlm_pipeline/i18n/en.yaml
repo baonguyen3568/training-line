@@ -1358,7 +1358,6 @@ pipelines:
     basic: Basic
     advanced: Advanced
   not_assessed: not assessed
-  time: Time
   measured: Measured on DGX Spark
   ram_peak: peak RAM {gb} GB
   hf_terms: Accept the model's terms on Hugging Face before downloading

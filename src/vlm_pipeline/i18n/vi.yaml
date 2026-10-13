@@ -1358,7 +1358,6 @@ pipelines:
     basic: Cơ bản
     advanced: Nâng cao
   not_assessed: chưa đánh giá
-  time: Thời gian
   measured: Đo trên DGX Spark
   ram_peak: RAM đỉnh {gb} GB
   hf_terms: Cần tự đồng ý điều khoản của model trên Hugging Face trước khi tải
