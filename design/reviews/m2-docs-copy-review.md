@@ -142,3 +142,7 @@ Người review: design (copy). Ngày 2026-10-13. Chỉ ghi nhận xét, không 
 Về hai cặp được hỏi riêng:
 - **phan-cung-va-bo-nho ↔ xu-ly-su-co-bo-nho**: ít trùng nội dung, nhưng phân vai chưa rõ. phan-cung trả lời "vì sao" (máy dùng chung, số đo), xu-ly trả lời "làm gì" (theo mã lỗi). Mỗi mục MEM-* ở xu-ly nên có 1 link "Vì sao máy hay thiếu bộ nhớ?" sang phan-cung, thay vì lặp lại giải thích. Phần trùng thật sự là với kiem-tra (ngưỡng) và yeu-cau (thông số).
 - **faq-ky-thuat ↔ gioi-han-da-biet**: gioi-han chỉ liệt kê "chưa làm được + trạng thái" dạng bảng, không giải thích. faq trả lời "vì sao/làm sao" và link sang gioi-han khi câu trả lời là "chưa có". Hiện hai trang chồng nhau ở: đối chiếu số công bố, giấy phép/điều khoản, thời gian train ("trang template sẽ ghi số khi có"). Mục "Train bao lâu thì đủ?" nên chuyển sang gioi-han thành dòng "Chưa có số epoch mặc định".
+
+## Đính chính sau khi tester kiểm (2026-10-13)
+Các số bị nghi ở dòng 58, 73, 84 (Parse 19,8 GB / 5,3% / 63,8% / ~1,6 GB, val loss 0,195 / 86%, driver 580.142) **đều có nguồn**: 001a, research.md và IMAGES.lock. Bỏ các ghi chú về nguồn của những số này. Gate đổi được dấu phẩy thập phân sang dấu chấm khi so (19,8 → 19.8).
+Gate từng có lỗ hổng khớp số với chuỗi hex (hash). Tester đã sửa, và sau khi sửa gate tìm ra một số thật sự thiếu nguồn: `yeu-cau-he-thong.mdx` "khoảng 74 GB". Số này là kết quả phép tính, nên ghi rõ phép tính hoặc thêm vào `numbers_without_source` (cleanup).
