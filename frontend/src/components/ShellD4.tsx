@@ -175,8 +175,8 @@ export function HomeBarD4() {
   const go = (to: string) => window.dispatchEvent(new CustomEvent("vlm:navigate", { detail: to }));
   return (
     <header className="tb" role="toolbar" aria-label={t("app.name")}>
-      <span className="tb-brand" aria-hidden="true">
-        <svg width="32" height="32" viewBox="0 0 32 32">
+      <span className="tb-brand">
+        <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
           <rect width="32" height="32" rx="8" fill="var(--color-accent-brand)" />
           <path
             d="M10.25 22.5V9.5l11.5 13V9.5"
