@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import time
 from collections.abc import Iterable
@@ -61,6 +62,7 @@ class Modification(BaseModel):
     ended_at: float | None
     # A quantization run's parity check (ptq/report.json): "warn" = handed over with QNT-002, quality not measured.
     quant_check: Literal["pass", "warn"] | None = None
+    quant_note: str | None = None  # the "warn" sentence, with the report's own numbers
 
 
 class Attribution(BaseModel):
@@ -171,6 +173,7 @@ def lineage(
     base = base_ref
     while run_dir is not None:
         manifest: RunManifest = read_manifest(run_dir)
+        quant = _quant_check(run_dir, manifest.task) if manifest.stage == "quantize" else (None, None)
         if manifest.run_id in seen:
             gaps.append(f"run {manifest.run_id}: parent chain loops")
             break
@@ -181,7 +184,8 @@ def lineage(
                 task=manifest.task,
                 dataset=public_dataset_ref(manifest.dataset),
                 ended_at=manifest.ended_at,
-                quant_check=_quant_check(run_dir) if manifest.stage == "quantize" else None,
+                quant_check=quant[0],
+                quant_note=quant[1],
             )
         )
         if manifest.dataset:
@@ -239,21 +243,62 @@ def fill_notices(components: list[Component], *, tool: str, date: str) -> list[C
     return [c.model_copy(update={"notices": tuple(fill(c, n) for n in c.notices)}) for c in components]
 
 
-def _quant_check(run_dir: Path) -> Literal["pass", "warn"] | None:
-    """The parity verdict a quantization job wrote (job output: read no-follow, bounded); None if not readable."""
+def _finite(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return None
+    return float(value)
+
+
+def _parity_sentence(parity: dict[str, object], name: str) -> str:
+    """The middle of the "warn" sentence, in plain words; only finite numbers from the report reach it."""
+    raw_limits = parity.get("thresholds")
+    limits = raw_limits if isinstance(raw_limits, dict) else {}
+    top1, kl = _finite(parity.get("top1_agreement_mean")), _finite(parity.get("kl_mean"))
+    limit_top1, limit_kl = _finite(limits.get("warn_top1")), _finite(limits.get("warn_kl"))
+    samples = _finite(parity.get("samples"))
+    in_range = (
+        top1 is not None
+        and limit_top1 is not None
+        and 0 <= top1 <= 1
+        and 0 <= limit_top1 <= 1
+        and kl is not None
+        and limit_kl is not None
+        and kl >= 0
+        and limit_kl >= 0
+        and samples is not None
+        and samples.is_integer()
+        and 1 <= samples <= 100_000
+    )  # fmt: skip - this text leaves with the model (NOTICE): never "9470.0%"
+    if not in_range or top1 is None or kl is None or limit_top1 is None or limit_kl is None or samples is None:
+        return f"its outputs differ from the original model's more than the usual level for {name}"
+    if top1 >= limit_top1 and kl > limit_kl:  # only the distribution drifted
+        return (f"on {int(samples)} held-out images, its word choices drifted from the original's more than usual "
+                f"(KL {kl:.4f} > {limit_kl:.4f})")  # fmt: skip
+    return (f"on {int(samples)} held-out images, the quantized model picked the same next word as the original "
+            f"{top1 * 100:.1f}% of the time (the usual level is at least {limit_top1 * 100:.1f}%)")  # fmt: skip
+
+
+def _quant_check(run_dir: Path, fmt: str) -> tuple[Literal["pass", "warn"] | None, str | None]:
+    """A quantization run's parity verdict and, for "warn", the sentence the export shows (research 2026-10-13).
+
+    The report is job output: read no-follow and bounded.
+    """
     try:
         report = read_small_json(run_dir / "ptq" / "report.json")
     except (OSError, ValueError):
-        return None
-    parity = report.get("parity") if isinstance(report, dict) else None
-    verdict = parity.get("verdict") if isinstance(parity, dict) else None
-    return verdict if verdict in ("pass", "warn") else None
+        return None, None
+    raw = report.get("parity") if isinstance(report, dict) else None
+    parity: dict[str, object] = raw if isinstance(raw, dict) else {}
+    verdict = parity.get("verdict")
+    if verdict == "pass":
+        return "pass", None
+    if verdict != "warn":
+        return None, None
+    name = fmt.upper() if re.fullmatch(r"[a-z0-9_]{1,16}", fmt) else "Quantization"
+    return "warn", f"{name} quantization check: {_parity_sentence(parity, name)}. {QUANT_NOT_MEASURED}"
 
 
-QUANT_WARN_NOTE = (
-    "quantization check: its outputs differ from the original model more than the warning limit, and accuracy "
-    "after quantization was not measured; evaluate it on your own data before use"
-)
+QUANT_NOT_MEASURED = "Accuracy after quantization was not measured; evaluate the model on your own data before use."
 
 
 def _notice(components: list[Component], modifications: list[Modification], gaps: list[str]) -> str:
@@ -276,8 +321,8 @@ def _notice(components: list[Component], modifications: list[Modification], gaps
         for m in modifications:
             when = time.strftime("%Y-%m-%d", time.gmtime(m.ended_at)) if m.ended_at else "unknown date"
             out.append(f"  - {m.task} run {m.run_id} on {m.dataset or 'unrecorded data'} ({when})")
-            if m.quant_check == "warn":
-                out.append(f"    Warning - {QUANT_WARN_NOTE}.")
+            if m.quant_note:
+                out.append(f"    Warning - {m.quant_note}")
         out.append("")
     if gaps:
         out.append("Provenance that could not be established:")
@@ -337,8 +382,7 @@ def _limitations(base: CatalogEntry | None, modifications: list[Modification]) -
         lines.append(f"FP8 quantization: {base.quant_fp8}.")
     if base.remote_code != "none":
         lines.append("Loading runs model code from this folder (trust_remote_code).")
-    if any(m.quant_check == "warn" for m in modifications):
-        lines.append(f"Quantized model, {QUANT_WARN_NOTE}.")
+    lines += [m.quant_note for m in modifications if m.quant_note]
     if modifications:
         lines.append("Quality depends on the fine-tuning data; evaluate on your own documents before use.")
     return lines

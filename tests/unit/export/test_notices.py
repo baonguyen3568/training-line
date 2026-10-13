@@ -229,13 +229,23 @@ def test_a_parent_run_id_is_never_used_as_a_path(tmp_path: Path, bad: str) -> No
     assert gaps == ["run r1: invalid parent run id"]
 
 
-def _quant_run(root: Path, parent: str, verdict: str | None) -> Path:
+PARITY_WARN = {
+    "verdict": "warn",
+    "top1_agreement_mean": 0.871,
+    "kl_mean": 0.02,
+    "samples": 16,
+    "thresholds": {"warn_top1": 0.90, "warn_kl": 0.05},
+}  # fmt: skip - ptq's real limits / sample count
+
+
+def _quant_run(root: Path, parent: str, verdict: str | None, parity: dict[str, object] | None = None) -> Path:
     run_dir = root / "outputs" / "runs" / "q1"
     run_dir.mkdir(parents=True)
     write_manifest(run_dir, RunManifest(run_id="q1", name="q1", stage="quantize", task="fp8", parent_run_id=parent))
     if verdict is not None:
         (run_dir / "ptq").mkdir()
-        (run_dir / "ptq" / "report.json").write_text(json.dumps({"parity": {"verdict": verdict}}))
+        body = parity if parity is not None else {"verdict": verdict}
+        (run_dir / "ptq" / "report.json").write_text(json.dumps({"parity": body}))
     return run_dir
 
 
@@ -250,14 +260,37 @@ def test_a_quantization_runs_parity_verdict_is_in_the_lineage(tmp_path: Path, ve
 def test_a_parity_warning_reaches_the_notice_and_the_model_card(tmp_path: Path) -> None:
     """PM/research 2026-10-13: a warn-quantized model is handed over, and the export says it was not measured."""
     _run(tmp_path, "r1", base_model=PARSE.repo, base_model_revision=PARSE.revision, ended_at=0.0)
-    components, mods, gaps = _lineage(tmp_path, _quant_run(tmp_path, "r1", "warn"))
+    components, mods, gaps = _lineage(tmp_path, _quant_run(tmp_path, "r1", "warn", PARITY_WARN))
     _vendor(tmp_path, PARSE.license, *(part.license for part in PARSE.model_parts))  # tokenizer: CC-BY-4.0
     dest = tmp_path / "export"
     dest.mkdir()
     (dest / "model.safetensors").write_bytes(b"w")
     notices.write_notices(dest, root=tmp_path, components=components, modifications=mods, gaps=gaps,
                           catalog=load_catalog())  # fmt: skip
-    assert "accuracy after quantization was not measured" in (dest / "NOTICE").read_text()
-    card = (dest / "README.md").read_text()
-    assert "Quantized model, quantization check" in card
-    assert "not measured" in card.split("Known limitations", 1)[1]
+    expected = ("FP8 quantization check: on 16 held-out images, the quantized model picked the same next word as the "
+                "original 87.1% of the time (the usual level is at least 90.0%). Accuracy after quantization was not "
+                "measured; evaluate the model on your own data before use.")  # fmt: skip
+    assert f"Warning - {expected}" in (dest / "NOTICE").read_text()
+    assert f"- {expected}" in (dest / "README.md").read_text().split("Known limitations", 1)[1]
+
+
+@pytest.mark.parametrize(
+    ("parity", "middle"),
+    [
+        ({**PARITY_WARN, "top1_agreement_mean": 0.99, "kl_mean": 0.08},
+         "on 16 held-out images, its word choices drifted from the original's more than usual (KL 0.0800 > 0.0500)"),
+        ({"verdict": "warn", "samples": float("nan")},
+         "its outputs differ from the original model's more than the usual level for FP8"),
+        ({**PARITY_WARN, "samples": True}, "its outputs differ from the original model's more than the usual level"),
+        ({**PARITY_WARN, "top1_agreement_mean": 94.7}, "more than the usual level for FP8"),  # a percent: out of range
+        ({**PARITY_WARN, "samples": 16.5}, "more than the usual level for FP8"),
+    ],
+)  # fmt: skip
+def test_the_quantization_note_uses_only_the_reports_finite_numbers(tmp_path: Path, parity: dict[str, object],
+                                                                    middle: str) -> None:  # fmt: skip
+    _run(tmp_path, "r1", base_model=PARSE.repo, base_model_revision=PARSE.revision, ended_at=0.0)
+    run_dir = _quant_run(tmp_path, "r1", "warn", parity)
+    _components, mods, _gaps = _lineage(tmp_path, run_dir)
+    assert mods[0].quant_note is not None
+    assert middle in mods[0].quant_note
+    assert "nan" not in mods[0].quant_note
