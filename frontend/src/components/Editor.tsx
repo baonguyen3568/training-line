@@ -533,8 +533,13 @@ function EditorInner() {
           deleteKeyCode={locked ? null : ["Delete", "Backspace"]}
           defaultViewport={{ x: 16, y: 40, zoom: 1 }}
           // D4 "one screen": empty lanes are compact, so the whole chain fits at ≥75% (design r1 B3).
-          fitView={d4 && workflow.nodes.length > 0}
-          fitViewOptions={{ minZoom: 0.75, maxZoom: 1, padding: 0.06 }}
+          // Both skins: an opened template shows every step (tester: classic left step 5 off-screen at scale 1).
+          fitView={workflow.nodes.length > 0}
+          fitViewOptions={
+            d4
+              ? { minZoom: 0.75, maxZoom: 1, padding: 0.06 }
+              : { minZoom: 0.6, maxZoom: 1, padding: 0.1 }
+          }
           minZoom={0.3}
           proOptions={{ hideAttribution: false }}
         >

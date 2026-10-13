@@ -93,7 +93,7 @@ export function Gallery({
               ● {t(`gallery.level_${it.difficulty}`)}
               {it.sample_data && <> · {t("gallery.sample_data_included")} ✓</>}
               {it.requires_hf_account && (
-                <span className="chip needs-account">
+                <span data-testid="needs-hf-account" className="chip needs-account">
                   {" "}
                   🔑 {tp(["template", it.id, "needs_account"])}
                 </span>

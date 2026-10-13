@@ -1,6 +1,9 @@
-import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import { api } from "../api";
+import type { Range } from "../api/types";
 import data from "../generated/reference-pipelines.json";
 import { getLocale, t } from "../i18n";
+import { formatMinutesRange } from "../lib/format";
 import { portShape, tokenVar } from "../lib/ports";
 import { fold } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
@@ -107,6 +110,14 @@ export function PipelineGallery() {
   const { openTemplate, newWorkflow } = useWorkflow.getState();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  // App templates carry the server's measured time (estimate.minutes); never a number from the data file.
+  const [minutes, setMinutes] = useState<Map<string, Range | null>>(new Map());
+  useEffect(() => {
+    api.templates().then(
+      (list) => setMinutes(new Map(list.map((x) => [x.id, x.estimate.minutes]))),
+      () => {},
+    );
+  }, []);
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {
       all: pipelines.length,
@@ -217,11 +228,13 @@ export function PipelineGallery() {
                 </div>
                 <div>
                   <dt>{t("pipelines.time")}</dt>
-                  <dd>{t("estimate.source.unknown")}</dd>
+                  <dd>
+                    {formatMinutesRange((p.template_id && minutes.get(p.template_id)) || null)}
+                  </dd>
                 </div>
               </dl>
               {p.requires_hf_terms && (
-                <p className="rp-gated">
+                <p className="rp-gated" data-testid="needs-hf-account">
                   <Icon name="key-round" size={14} />
                   {t("pipelines.hf_terms")}
                   <Help id={`hf-${p.id}`} title={t("pipelines.hf_terms")}>

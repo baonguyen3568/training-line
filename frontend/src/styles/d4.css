@@ -601,7 +601,8 @@
   flex-wrap: wrap;
   gap: 6px;
   min-height: 92px;
-  align-content: center;
+  /* safe: when chips wrap past the box, keep the first row visible instead of clipping both ends */
+  align-content: safe center;
   background-color: var(--color-canvas-background);
   background-image: radial-gradient(var(--color-canvas-grid-dot) 1px, transparent 1px);
   background-size: 16px 16px;
@@ -683,10 +684,6 @@
 }
 .pop p {
   margin: 0 0 4px;
-}
-.mini {
-  max-height: 92px;
-  overflow: hidden;
 }
 .mini li.more {
   border-style: dashed;
