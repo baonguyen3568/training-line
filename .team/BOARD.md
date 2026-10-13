@@ -60,9 +60,9 @@ YÊU CẦU USER: (1) liên tục dọn dẹp + xoá rác; (2) chạy được c�
 | B-0 | GraphRule: node chưa có worker thật / model chưa hỗ trợ (vd Parse export) → lỗi validate | bao-backend | DONE (84d44f9) |
 | B-1 | train.merge_lora (PEFT merge_and_unload trong container) | bao-backend | DONE (f6854b2) |
 | B-2 | export.hf_dir cho model native (ADR-012) → sau đó Parse (B3) | bao-backend | TODO |
-| B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | TODO |
+| B-3 | data.local_folder + data.split (CPU, nhanh) | bao-backend | split DONE (d8b8bb6); local_folder DOING |
 | B-4 | quantize.modelopt_ptq (FP8, ModelOpt 0.47; NVFP4 sau) + gate parity | bao-research | DOING (probe 0.44 trên Qwen3.5-0.8B) |
-| B-5 | eval.benchmarks (từ CORD worker + lmms-eval, ADR-002) | bao-tester | DOING (thiết kế gửi backend/research 09:25; CORD trước, lmms-eval sau) |
+| B-5 | eval.benchmarks (từ CORD worker + lmms-eval, ADR-002) | bao-tester | DOING (engine f234dd6 + gate db0ba7d; chờ adapter _eval của backend rồi smoke GPU; lmms-eval sau) |
 | B-6 | bench.perf (latency/throughput/peak mem theo tester-perf-bench) | bao-tester | DOING (thiết kế: Parse HF in-process trước, vLLM theo B-7) |
 | B-7 | serve.vllm = node "Chạy thử" (vLLM ≥0.31, mem-util ≤0.3, prefix parity) | bao-fixcode | TODO |
 DoD: cả 3 template chạy thật end-to-end trên canvas (template 2 cần user accept Cosmos trên HF).
