@@ -117,6 +117,43 @@ DISK-003:
   actions:
     - {id: free_space, kind: navigate, target: cleanup_dry_run, confirm: false}
 
+STD-001:
+  slug: STANDARD_NOT_MET
+  severity: error
+  prevent_in_preflight: true
+  # One code for every rule of configs/standards/*.yaml (P4-2, bao-cleancode): adding a rule = YAML + i18n only.
+  # The Issue carries its own severity (error | warn | info, "hint" maps to info). The app renders `what` from the
+  # rule's own i18n key in `message` (must be under standards.*); error.STD-001.what is only the fallback.
+  # rule = rule id; node = the node id (ref); param = the node param the rule checks (ref); the rest is the UNION of
+  # the check fields of every kind in graph/standards.py (a cleancode test keeps this list in sync).
+  params:
+    - rule
+    - message
+    - {name: node, ref: node}
+    - {name: param, ref: param}
+    - value
+    - values
+    - min
+    - max
+    - other
+    - catalog_field
+    - allowed
+    - max_epochs
+    - small_data_below
+    - split
+    - below
+    - above
+    - metric
+    - method
+    - match
+    - above_count
+    - min_short_side_px
+    - limit_from_catalog
+  match:
+    - {kind: validate, value: "configs/standards rule failed (graph.standards)"}
+  actions:
+    - {id: open_node, kind: navigate, target: "node:self", confirm: false}
+
 SYS-001:
   slug: GPU_LOCK_BUSY
   severity: info

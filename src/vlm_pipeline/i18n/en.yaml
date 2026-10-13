@@ -201,6 +201,9 @@ error:
   SEC-004:
     title: The runtime environment was changed outside the app
     what: The "{image}" environment on this machine no longer matches the version the app verified, so no step was run. This isn't something you did; send a report so the team can restore the right version.
+  STD-001:
+    title: Something in this step needs a look
+    what: 'A setting or the data of "{node}" differs from what is recommended. Open the step to see the details.'
   SYS-000:
     title: An unrecognized error occurred
     what: The app doesn't recognize this error. Progress was saved if possible; you can send a report so the team can fix it.
