@@ -4,7 +4,7 @@
   "reference_bf16": "Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17",
   "fp8_per_tensor": "outputs/graph/runs/n3-f03d17784e408456/ptq/quantized",
   "fp8_per_channel": "outputs/runs/20261013-1631-research-quant-perchannel-calib128/ptq/quantized",
-  "fp8_block_weight_only": "outputs/runs/20261013-2133-research-quant-block-calib128/ptq/quantized (quant_algo fp8_pb_wo: block-scaled FP8 weights, bf16 activations; research re-export)"
+  "fp8_block": "outputs/runs/20261013-2133-research-quant-block-calib128/ptq/quantized (quant_algo fp8_pb_wo, research re-export)"
  },
  "benchmark": {
   "name": "OCRBench",
@@ -105,7 +105,7 @@
     "reasons": []
    }
   },
-  "fp8_block_wo_minus_bf16": {
+  "fp8_block_minus_bf16": {
    "delta": -0.2,
    "ci95": [
     -1.8,
@@ -116,13 +116,13 @@
     "status": "PASS",
     "reasons": []
    },
-   "note": "same accuracy as per-channel by coincidence: 24/500 questions score differently between the two FP8 models; weight-only, so not the same speed class as W8A8 per-tensor/per-channel"
+   "note": "same accuracy as per-channel by coincidence: 24/500 questions score differently between the two FP8 models"
   }
  },
  "reading": "both FP8 exports are within noise of bf16 on the point estimate (-0.4 and -0.2); per-tensor gets WARN uncertain_run_full because its CI reaches -2.2 (500 questions cannot exclude a -2 drop); per-channel PASS. Engine noise for 0.8B is larger than for 2B (+0.4 points, 4 answers).",
  "caveats": [
   "vLLM batched greedy is not bit-reproducible run to run (4/500 answers changed between two bf16 runs)",
   "one benchmark only; P002 forgetting check on general benchmarks not part of this gate",
-  "block run is weight-only FP8 (fp8_pb_wo, re-exported by research after the first block export failed to load on vLLM 0.31); it is compared on accuracy only"
+  "block: ModelOpt export weight-only (fp8_pb_wo); vLLM 0.31 serves it W8A8 with dynamic per-block activation scales (fixcode, run 20261013-2206-vllm-batch-q08-block2-06da; this run's log selects CutlassFp8BlockScaledMMKernel), so it is the same W8A8 class as per-tensor/per-channel; speed not compared (enforce_eager)"
  ]
 }
