@@ -339,6 +339,24 @@ DATA-006:
   actions:
     - {id: pick_workspace_folder, kind: navigate, target: folder_picker, confirm: false}
 
+
+DATA-007:
+  slug: HELDOUT_DATA_IN_TRAINING
+  severity: error
+  prevent_in_preflight: true
+  # Benchmark test data extracted to files lives under data/eval/ (e.g. OCRBench for the vLLM gate). A data.local_folder
+  # reading it (symlinks followed) must never reach a fine-tune node's train_data/val_data or a quantize node's
+  # calib_data, through any data step: scores on that benchmark would be meaningless. node = the folder node;
+  # target_node = the fine-tune / quantize node that would use it.
+  params:
+    - {name: node, ref: node}
+    - {name: target_node, ref: node}
+  match:
+    - {kind: validate, value: "data.local_folder under data/eval/ reaches train_data/val_data/calib_data (nodes/rules.py)"}
+    - {kind: executor, value: "app/workers.py RealWorker._train guard, before run_job (common/heldout_data.py)"}
+  actions:
+    - {id: pick_workspace_folder, kind: navigate, target: folder_picker, confirm: false}
+
 MODEL-001:
   slug: CKPT_LOAD_KEY_MISMATCH
   severity: error

@@ -221,6 +221,9 @@ error:
       image_too_large: Có {problem_count} ảnh quá lớn (dung lượng hoặc kích thước), ảnh đầu tiên ở dòng {first_line}. Thu nhỏ ảnh rồi bấm Kiểm tra lại.
       image_unreadable: Có {problem_count} ảnh không mở được, ảnh đầu tiên ở dòng {first_line}. Dùng ảnh JPG, PNG hoặc WEBP còn nguyên vẹn.
       no_samples: Thư mục của bước "{node}" không có mẫu nào dùng được. Thêm ảnh và dòng tương ứng vào labels.jsonl.
+  DATA-007:
+    title: Không dùng dữ liệu chấm điểm để train hay nén
+    what: 'Bước "{node}" đọc thư mục data/eval, nơi lưu đề thi dùng để chấm điểm model; học hay hiệu chỉnh khi nén trên chính đề thi thì điểm số mất ý nghĩa, nên bước "{target_node}" chưa chạy. Hãy chọn thư mục dữ liệu khác.'
   MODEL-001:
     title: Không đọc được model sau khi chuyển đổi
     what: Các phần trong file model không khớp định dạng mong đợi, thường do khác phiên bản thư viện.

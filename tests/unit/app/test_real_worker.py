@@ -550,3 +550,27 @@ def test_a_retry_resumes_from_the_earlier_attempt_checkpoint(tmp_path: Path, mon
     assert "restore_from: /workspace/outputs/graph/runs/t-0123456789abcdef/checkpoints/epoch_0_step_9" in cfg
     assert "checkpoint_dir: /workspace/outputs/graph/runs/t-0123456789abcdef-a2/checkpoints" in cfg
     assert seen[0].resumed_from == {"run": "t-0123456789abcdef", "checkpoint": "epoch_0_step_9"}  # C6 lease key
+
+def test_train_on_a_data_eval_folder_is_refused_before_the_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """DATA-007 at run time (the canvas rule's twin): benchmark test data under data/eval never trains."""
+    from vlm_pipeline.common.heldout_data import HeldoutDataInTrainingError
+
+    pil = pytest.importorskip("PIL.Image")
+    root = _root(tmp_path)
+    data = root / "data" / "eval" / "ocrbench-92a54bd1"
+    data.mkdir(parents=True)
+    pil.new("RGB", (32, 24)).save(data / "a.png")
+    (data / "labels.jsonl").write_text(json.dumps({"image": "a.png", "target": "x"}) + "\n")
+    (root / "data" / "mine").symlink_to(data)  # a symlink into data/eval is the same folder
+    w = RealWorker(root)
+    src = w.run(_job("data.local_folder", {"path": "data/mine"}, root / "outputs" / "graph" / "runs" / "lf"))
+    monkeypatch.setattr(workers, "run_job", lambda *a, **k: pytest.fail("no job may start"))
+    qwen = w.catalog.get("qwen3.5-0.8b")
+    assert qwen is not None
+    base = ArtifactRef("Model", str(root / "m"), f"{qwen.repo}@{qwen.revision}")
+    train = _job("train.lora_vlm", {}, root / "outputs" / "graph" / "runs" / "t", {"base_model": base,
+                 "train_data": src.outputs["dataset"]})  # fmt: skip
+    with pytest.raises(HeldoutDataInTrainingError) as err:
+        w.run(train)
+    assert err.value.code == "DATA-007"
+

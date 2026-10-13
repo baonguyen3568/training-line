@@ -25,6 +25,7 @@ from vlm_pipeline.app.trial_worker import run_trial
 from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
 from vlm_pipeline.common.dataset_ref import DatasetRef, read_dataset_ref, write_dataset_ref
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
+from vlm_pipeline.common.heldout_data import HeldoutDataInTrainingError, is_heldout_folder
 from vlm_pipeline.common.host_paths import hub_repo_dir
 from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
 from vlm_pipeline.common.jobrun import (
@@ -410,6 +411,11 @@ class RealWorker:
             (run_dir / NOT_RESUMABLE_MARKER).touch()  # executor: no "resume" offer, warn on the next run
         train = self.dataset_input(data)
         val = self.dataset_input(job.inputs["val_data"]) if "val_data" in job.inputs else None
+        for used in (train, val):  # DATA-007 at run time too: a canvas edited outside the app never trains on test data
+            if used is not None and used.repo is None and is_heldout_folder(self.root, self.host_path(used.path)):
+                raise HeldoutDataInTrainingError(
+                    "train data under data/eval", params={"node": job.node_id, "target_node": job.node_id}
+                )
         template = load_template(template_path(self.root, entry))
         if val is not None and "validation_dataset" not in template:
             logger.warning("%s: template has no validation_dataset; the wired val_data is not used", entry.id)

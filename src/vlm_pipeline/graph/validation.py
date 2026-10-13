@@ -244,7 +244,7 @@ def _validate(
             for node_id, spec in specs.items()
             if not can_run(spec)
         ]
-    view = GraphView(specs=specs, params=_valid_params(specs, raw_params), sources=sources)
+    view = GraphView(specs=specs, params=_valid_params(specs, raw_params), sources=sources, workspace=workspace)
     for rule in registry.rules:
         issues.extend(rule(view))
     if support is not None:

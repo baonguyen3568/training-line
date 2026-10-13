@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -143,6 +144,7 @@ class GraphView:
     specs: Mapping[str, NodeSpec]  # node id -> spec
     params: Mapping[str, BaseModel]  # node id -> validated params (nodes with invalid params are absent)
     sources: Mapping[tuple[str, str], tuple[str, ...]]  # (node id, input port) -> upstream node ids
+    workspace: Path | None = None  # project root of local-path params (None: rules check the path text only)
 
     def source(self, node_id: str, port: str) -> str | None:
         """The single upstream node of ``port`` (None when unwired or fanned in)."""
