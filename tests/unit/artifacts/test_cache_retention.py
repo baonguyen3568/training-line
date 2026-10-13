@@ -305,3 +305,61 @@ def test_a_keep_file_pins_a_cache_entry_even_against_a_typed_confirmation(root: 
     res = evict(root, idx, ["eval-keep"], by="t", manual=True, confirmed={"eval-keep"})
     assert res.skipped == [("eval-keep", "PINNED_OR_KEEP")]
     assert (run / "artifacts" / "model" / "weights.bin").exists()
+
+
+GID = "g-20261013-150000-abc123"
+
+
+def _cache_cli(root: Path, monkeypatch: pytest.MonkeyPatch) -> object:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("cache_cli", Path(__file__).parents[3] / "scripts/cleanup/cache.py")
+    assert spec is not None
+    assert spec.loader is not None
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    monkeypatch.setattr(cli, "project_root", lambda: root)
+    monkeypatch.setattr(cli, "default_index_path", lambda _r: root / "outputs" / "app.db")
+    monkeypatch.setattr(cli, "default_lock_path", lambda: root / ".team" / "lock" / "GPU_LOCK")
+    return cli
+
+
+def test_admin_releases_an_unjudgeable_lease_with_a_typed_confirmation(
+    root: Path, idx: ArtifactIndex, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``cache.py --release-lease``: owner in another pid namespace (host script vs compose app) needs --confirm."""
+    from vlm_pipeline.artifacts.index import LeaseOwner
+
+    cli = _cache_cli(root, monkeypatch)
+    _cached_run(root, idx, "eval-1")
+    idx.lease(["eval-1"], GID, owner=LeaseOwner(4242, "99", "pid:[1]"))
+    assert cli.main(["--release-lease", GID]) == 0  # type: ignore[attr-defined]  # dry-run lists it
+    assert "eval-1" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        cli.main(["--release-lease", GID, "--apply", "--by", "admin"])  # type: ignore[attr-defined]
+    assert idx.leased_by("eval-1") == [GID]
+    assert cli.main(["--release-lease", GID, "--apply", "--by", "admin", "--confirm", GID]) == 0  # type: ignore[attr-defined]
+    assert idx.leased_by("eval-1") == []
+    rec = json.loads((root / "outputs" / "system" / "cleanup.jsonl").read_text().splitlines()[-1])
+    assert (rec["event"], rec["cache_keys"]) == ("lease_released", ["eval-1"])
+
+
+def test_release_lease_refuses_a_live_owner_a_held_gpu_and_bad_ids(
+    root: Path, idx: ArtifactIndex, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vlm_pipeline.artifacts.index import LeaseOwner
+
+    cli = _cache_cli(root, monkeypatch)
+    _cached_run(root, idx, "eval-1")
+    idx.lease(["eval-1"], GID)  # this very process: alive, same namespace
+    args = ["--release-lease", GID, "--apply", "--by", "admin", "--confirm", GID]
+    assert cli.main(args) == 1  # type: ignore[attr-defined]
+    idx.release_run(GID)
+    idx.lease(["eval-1"], GID, owner=LeaseOwner(4242, "99", "pid:[1]"))
+    lock = root / ".team" / "lock" / "GPU_LOCK"
+    lock.parent.mkdir(parents=True)
+    lock.write_text("{}")
+    assert cli.main(args) == 1  # type: ignore[attr-defined]
+    assert idx.leased_by("eval-1") == [GID]
+    with pytest.raises(SystemExit):
+        cli.main(["--release-lease", "../x"])  # type: ignore[attr-defined]

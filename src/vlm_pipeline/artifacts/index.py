@@ -330,6 +330,23 @@ class ArtifactIndex:
             )
             return db.total_changes - before
 
+    def leases_of(self, run_id: str) -> list[tuple[str, LeaseOwner | None, float]]:
+        """(cache_key, owner or None for legacy rows, since) of every lease graph run ``run_id`` holds."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT cache_key, since, owner_pid, owner_start, owner_ns FROM artifact_leases WHERE run_id = ?"
+                " ORDER BY cache_key",
+                (run_id,),
+            ).fetchall()
+        return [
+            (
+                r["cache_key"],
+                LeaseOwner(r["owner_pid"], r["owner_start"], r["owner_ns"]) if r["owner_pid"] is not None else None,
+                r["since"],
+            )
+            for r in rows
+        ]
+
     def leased_by(self, cache_key: str) -> list[str]:
         with self._lock:
             rows = self._db.execute(
