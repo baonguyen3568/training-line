@@ -1,14 +1,17 @@
 // Static marketing + docs site (M2-3). Static output only, no CDN, no telemetry (set in npm scripts),
 // CSP via Astro's hashed <meta> policy. Docs are served by Starlight under /docs/.
+import { satteri } from "@astrojs/markdown-satteri";
 import starlight from "@astrojs/starlight";
 import { defineConfig, passthroughImageService } from "astro/config";
 import { productName } from "./src/data/product.mjs";
+import { focusableTables } from "./src/lib/focusable-tables.mjs";
 
 export default defineConfig({
   site: "http://localhost",
   output: "static",
   trailingSlash: "always",
   image: { service: passthroughImageService() }, // no sharp until we actually need it
+  markdown: { processor: satteri({ hastPlugins: [focusableTables] }) },
   security: {
     csp: {
       directives: [

@@ -12,3 +12,7 @@
   --sl-color-gray-2: var(--color-text-secondary);
   --sl-color-gray-3: var(--color-text-muted);
 }
+.sl-markdown-content table:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}
