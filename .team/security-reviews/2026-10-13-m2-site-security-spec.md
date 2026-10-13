@@ -4,9 +4,9 @@ Owner: bao-security · 2026-10-13 · Áp dụng cho: `site/` (M2-3/4/5), dashboa
 Mức độ: các mục **[BẮT BUỘC]** là điều kiện merge (security review theo ADR-004); **[NÊN]** là khuyến nghị.
 
 ## 0. Tóm tắt 1 dòng cho từng vai trò
-- **frontend/cleancode (dựng site):** mọi tài nguyên (JS, CSS, font, icon, ảnh) nằm trong `site/` và được build vào `dist/`. Không `<script src="https://…">`, không Google Fonts, không analytics. Chạy `scripts/security/check_site.py site/dist` trước khi xin review.
+- **frontend/cleancode (dựng site):** mọi tài nguyên (JS, CSS, font, icon, ảnh) nằm trong `site/` và được build vào `dist/`. Không `<script src="https://…">`, không Google Fonts, không analytics. Chạy `uv run python scripts/security/site_check.py site/dist` trước khi xin review.
 - **design (copy + hình):** ảnh/illustration phải tự vẽ hoặc có license ghi rõ (CC0/CC-BY/Unsplash License…) và được ghi vào `site/ASSETS.md`. Không dùng logo NVIDIA. Không bịa số liệu, khách hàng hay testimonial.
-- **tester (M2-7):** chạy `check_site.py` trong CI. Kiểm CSP bằng Playwright: console không có lỗi CSP, và tab Network chỉ có request tới origin của site.
+- **tester (M2-7):** chạy `site_check.py` trong CI. Kiểm CSP bằng Playwright: console không có lỗi CSP, và tab Network chỉ có request tới origin của site.
 - **PM/user:** cần chốt các mục ở §7 (U7–U10) trước khi publish trang chính sách.
 
 ## 1. Không tracker / không tài nguyên bên thứ ba [BẮT BUỘC]
@@ -100,7 +100,7 @@ Quy tắc:
 
 Nội dung trang chính sách đặt tại `docs/legal/*.md` (nguồn sự thật, tiếng Việt). `SECURITY.md` ở gốc repo (tiếng Anh). Site import từ đó, **không chép tay** để tránh lệch. Mỗi khi code thay đổi một mệnh đề ở bảng trên (thêm cookie, thêm kết nối mạng, thêm telemetry), PR đó **phải** sửa trang chính sách. Mục này nằm trong checklist security review.
 
-## 6. Kiểm tự động: `scripts/security/check_site.py <dist>` [BẮT BUỘC trong CI của M2-7]
+## 6. Kiểm tự động: `uv run python scripts/security/site_check.py <dist> [--publish]` [BẮT BUỘC trong CI của M2-7]
 Exit ≠ 0 nếu gặp:
 - tài nguyên tải từ origin khác (`script/link/img/source/video/audio/iframe/embed/object src|href|srcset|poster`, `@import`/`url()` trong CSS, `@font-face` từ xa);
 - domain tracker đã biết (google-analytics, googletagmanager, plausible, umami, segment, hotjar, mixpanel, posthog, clarity, facebook, doubleclick, cloudflareinsights, vercel-insights…);
@@ -118,7 +118,7 @@ Exit ≠ 0 nếu gặp:
 - **U10** Ngày hiệu lực cho các trang chính sách (đặt khi publish).
 
 ## 8. Checklist security review PR site/dashboard
-- [ ] `check_site.py site/dist` pass (dán output vào PR)
+- [ ] `site_check.py site/dist --publish` pass (trước khi publish) (dán output vào PR)
 - [ ] Lockfile và `.npmrc` (ignore-scripts, min-release-age) giữ nguyên; package mới có trong `licenses.yaml`
 - [ ] `ASSETS.md` có đủ asset mới (font, icon, ảnh, video)
 - [ ] Không logo NVIDIA hay ngụ ý bảo trợ; footer có dòng nhãn hiệu
