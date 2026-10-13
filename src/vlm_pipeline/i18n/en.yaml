@@ -1266,7 +1266,7 @@ reference_pipeline:
   quantize-fp8-benchmark:
     summary: Quantize a model to FP8 so it is smaller and faster, then re-score it on the same test set to see how much quality drops.
   gemma4-e4b-lora:
-    summary: LoRA-tune Gemma 4 E4B on the CORD-v2 receipts, then score each field to compare it with other models.
+    summary: LoRA-tune Gemma 4 E4B on the CORD-v2 receipts, then score each field on the same test set as the receipt template, so models can be compared.
   qwen35-4b-lora:
     summary: LoRA-tune Qwen3.5-4B on your own data. A bigger model than the "Image understanding" template, so it needs more memory.
   grpo-geometry:

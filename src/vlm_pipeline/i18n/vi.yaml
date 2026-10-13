@@ -1266,7 +1266,7 @@ reference_pipeline:
   quantize-fp8-benchmark:
     summary: Nén model xuống FP8 cho nhỏ và nhanh hơn, rồi đo lại điểm trên cùng bộ kiểm tra để thấy chất lượng giảm bao nhiêu.
   gemma4-e4b-lora:
-    summary: Dạy nhẹ Gemma 4 E4B bằng LoRA trên bộ hoá đơn CORD-v2, rồi chấm theo từng trường để so với các model khác.
+    summary: Dạy nhẹ Gemma 4 E4B bằng LoRA trên bộ hoá đơn CORD-v2, rồi chấm theo từng trường trên cùng bộ kiểm tra với mẫu Đọc hoá đơn, để so các model với nhau.
   qwen35-4b-lora:
     summary: Dạy nhẹ Qwen3.5-4B bằng LoRA trên dữ liệu của bạn. Model lớn hơn mẫu "Hiểu ảnh", cần nhiều bộ nhớ hơn.
   grpo-geometry:
