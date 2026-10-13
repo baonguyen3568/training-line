@@ -277,6 +277,7 @@ def run_guarded(
     meminfo_path: Path = Path("/proc/meminfo"),
     interval_s: float = WATCHDOG_INTERVAL_S,
     thresholds: MemThresholds = DEFAULT_THRESHOLDS,
+    on_guard_ready: Callable[[MemGuard], None] | None = None,
 ) -> tuple[int, MemGuard]:
     """Run ``argv`` (logged) under a MemGuard that polls BEFORE the process starts and every ``interval_s``.
 
@@ -292,6 +293,8 @@ def run_guarded(
         hard_exit=hard_exit,
     )
     guard.start()  # first poll happens here, before anything is launched
+    if on_guard_ready is not None:  # levels are resolved from A0 now: let the caller publish them while the job runs
+        on_guard_ready(guard)
     try:
         if guard.should_stop.is_set():
             raise MemoryPreemptedBeforeStartError(f"MemAvailable {guard.min_available_gb:.1f} GB below abort")
@@ -542,6 +545,11 @@ def run_job(
             on_abort=lambda: _docker_stop_async(container),
             hard_exit=lambda: _docker_kill(container),
             thresholds=mem_thresholds,
+            # Publish the resolved stop level while the job runs, not only at the end: the E2E gate (bao-tester) waits
+            # for MemAvailable >= max(16, abort of the lock holder + 4) and reads it from this run.json.
+            on_guard_ready=lambda g: write_manifest(
+                run_dir, manifest.model_copy(update={"memguard_abort_gb": round(g.thresholds.abort_gb, 2)})
+            ),
         )
         done.set()
         state = _docker_state(container)

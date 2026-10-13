@@ -163,3 +163,22 @@ def test_replay_of_the_p1_incident_curve(tmp_path: Path) -> None:
     assert guard.should_stop.is_set()
     assert rc == 137  # fast fall: killed, not a 60 s graceful stop
     assert guard.fast_fall_killed
+
+
+def test_resolved_levels_are_published_before_the_job_starts(tmp_path: Path) -> None:
+    """The E2E gate reads the lock holder's stop level from run.json WHILE it runs (bao-tester): run_guarded hands
+    the resolved guard over right after the first poll, before launching anything."""
+    meminfo = tmp_path / "meminfo"
+    _meminfo(meminfo, 40.0)  # A0 = 40 GB on a 40 GB device: abort = max(8, 0.2 x 40) = 8
+    marker = tmp_path / "launched"
+    seen: list[tuple[float, bool]] = []
+    rc, _ = run_guarded(
+        [sys.executable, "-c", f"open({str(marker)!r}, 'w').close()"],
+        tmp_path / "log",
+        on_abort=lambda: None,
+        hard_exit=lambda: None,
+        meminfo_path=meminfo,
+        on_guard_ready=lambda g: seen.append((g.thresholds.abort_gb, marker.exists())),
+    )
+    assert rc == 0
+    assert seen == [(8.0, False)]  # resolved level, and the process had not started yet
