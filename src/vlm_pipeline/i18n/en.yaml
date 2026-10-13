@@ -1051,7 +1051,7 @@ gated:
     risk: A Read token can read all your repos, including private ones — don't share it.
   step4:
     title: Paste the token into the app
-    body: Paste the token below and click Check. The app stores it privately on this machine, never in workflows or logs.
+    body: Paste the token below and click Save. The app stores it privately on this machine, never in workflows or logs.
     field: Hugging Face token
     check: Check
   status:

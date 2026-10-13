@@ -1051,7 +1051,7 @@ gated:
     risk: Token Read cho phép đọc mọi repo của bạn, kể cả repo riêng tư — đừng chia sẻ token này.
   step4:
     title: Dán token vào app
-    body: Dán token vào ô dưới đây rồi bấm Kiểm tra. App lưu token riêng trên máy này, không ghi vào workflow hay nhật ký.
+    body: Dán token vào ô dưới đây rồi bấm Lưu. App lưu token riêng trên máy này, không ghi vào workflow hay nhật ký.
     field: Token Hugging Face
     check: Kiểm tra
   status:
