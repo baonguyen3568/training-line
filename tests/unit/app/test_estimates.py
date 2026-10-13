@@ -127,19 +127,26 @@ def test_no_measurement_is_null(tmp_path: Path) -> None:
     assert estimate_train(300, 25, _timings(tmp_path)) is None
     out = workflow_duration(tmp_path, TEMPLATE, IMAGE)
     assert out["duration_min"] is None
-    assert out["per_node"]["n4"] == {"steps": 300, "minutes": None, "based_on": []}
+    assert out["per_node"]["n4"]["steps"] == 300
+    assert out["per_node"]["n4"]["minutes"] is None
+    assert out["per_node"]["n4"]["by_epochs"] == {"1": None, "2": None, "3": None, "5": None}
     assert out["unmeasured"] == ["n5"]
 
 
-def test_the_default_template_counts_its_validations(tmp_path: Path) -> None:
-    """CORD num_train 800 (its own validation split), 3 epochs, GBS 8 -> 300 steps; the Parse template saves and
-    validates every 25 steps -> 11 pauses between steps."""
+def test_the_default_template_validates_once_per_epoch(tmp_path: Path) -> None:
+    """CORD num_train 800 (its own validation split), 3 epochs, GBS 8 -> 300 steps; the node recipe saves and
+    validates at epoch ends only (build_recipe) -> 2 pauses between steps, the third is the final one."""
     _run(tmp_path, "p3b", steps=300, every=100)
     out = workflow_duration(tmp_path, TEMPLATE, IMAGE)
-    assert out["per_node"]["n4"]["steps"] == 300
-    expected = round((STARTUP + 299 * STEP + 11 * (VAL + CKPT) + FINAL) / 60, 1)
+    n4 = out["per_node"]["n4"]
+    assert n4["steps"] == 300
+    expected = round((STARTUP + 299 * STEP + 2 * (VAL + CKPT) + FINAL) / 60, 1)
     assert out["duration_min"] == {"lo": expected, "hi": expected}
-    assert out["per_node"]["n4"]["based_on"] == ["p3b"]
+    assert n4["based_on"] == ["p3b"]
+    assert set(n4["by_epochs"]) == {"1", "2", "3", "5"}  # every option of the epochs param
+    assert n4["by_epochs"]["3"] == n4["minutes"]
+    one = round((STARTUP + 99 * STEP + FINAL) / 60, 1)  # one epoch: no pause between steps
+    assert n4["by_epochs"]["1"] == {"lo": one, "hi": one}
 
 
 @pytest.mark.parametrize(

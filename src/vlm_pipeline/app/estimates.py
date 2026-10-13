@@ -2,8 +2,9 @@
 
 For each train node: the base model (upstream ``model.hf_pick``), the training data size (upstream ``data.hf_load``
 catalog ``num_train`` or its quick-run limit, through ``data.split`` which keeps the hub train split whole) and the
-node's own epochs / batch shape -> steps; the model's training template gives the checkpoint/validation cadence;
+node's own epochs / batch shape -> steps; the recipe saves + validates once per epoch (``build_recipe``);
 ``train.estimate`` turns them into minutes from measured runs (same model, image, task, batch, dataset).
+``by_epochs`` gives the same estimate for every option of the epochs param (the UI's preset buttons).
 A train node whose size or speed is unknown makes the whole duration unknown (``None``): a partial sum would read as
 a full answer. Other heavy nodes (eval, quantize, bench) have no measurement yet and are listed in ``unmeasured``.
 """
@@ -12,10 +13,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from vlm_pipeline.common.catalog import CatalogEntry, load_catalog, load_dataset_catalog
 from vlm_pipeline.nodes import REGISTRY
+from vlm_pipeline.train.config import Epochs
 from vlm_pipeline.train.estimate import estimate_train, measured_timings, train_steps
 
 TRAIN_TASKS = {"train.sft_vlm": "sft", "train.lora_vlm": "lora"}
@@ -71,34 +73,30 @@ def _base_model(workflow: Mapping[str, Any], train_id: str) -> CatalogEntry | No
     return load_catalog().get(str(getattr(params, "model", ""))) if params is not None else None
 
 
-def _cadence(root: Path, entry: CatalogEntry) -> int | None:
-    """Checkpoint (= validation) cadence the recipe will use: the model's training template ``ckpt_every_steps``."""
-    from vlm_pipeline.train.recipe import RecipeError, load_template, template_path
-
-    try:
-        sched = load_template(template_path(root, entry)).get("step_scheduler") or {}
-        return int(sched["ckpt_every_steps"])
-    except (RecipeError, OSError, KeyError, TypeError, ValueError):
-        return None
-
-
 def train_node_estimate(root: Path, workflow: Mapping[str, Any], node: Mapping[str, Any], image: str) -> dict[str, Any]:
     """``{steps, minutes: {lo, hi} | None, based_on}`` for one train node (steps None when the data size is unknown)."""
     node_id, type_id = str(node.get("id")), str(node.get("type"))
     data, entry, params = _train_data(workflow, node_id), _base_model(workflow, node_id), _params(node)
-    every = _cadence(root, entry) if entry is not None else None
-    if data is None or entry is None or params is None or every is None:
-        return {"steps": None, "minutes": None, "based_on": []}
+    if data is None or entry is None or params is None:
+        return {"steps": None, "minutes": None, "based_on": [], "by_epochs": {}}
     samples, dataset = data
     gbs, local, epochs = (int(getattr(params, k)) for k in ("global_batch_size", "local_batch_size", "epochs"))
-    steps = train_steps(samples, gbs, epochs)
+    per_epoch = train_steps(samples, gbs, 1)  # the recipe saves + validates once per epoch (build_recipe)
     timings = measured_timings(
         root, base_model=entry.repo, image=image, task=TRAIN_TASKS[type_id], batch=(gbs, local), dataset=dataset
     )
-    est = estimate_train(steps, every, timings)
-    if est is None:
-        return {"steps": steps, "minutes": None, "based_on": []}
-    return {"steps": steps, "minutes": {"lo": est.minutes_lo, "hi": est.minutes_hi}, "based_on": list(est.based_on)}
+
+    def minutes(n_epochs: int) -> dict[str, float] | None:
+        est = estimate_train(per_epoch * n_epochs, per_epoch, timings)
+        return {"lo": est.minutes_lo, "hi": est.minutes_hi} if est is not None else None
+
+    choices = get_args(Epochs)
+    return {
+        "steps": per_epoch * epochs,
+        "minutes": minutes(epochs),
+        "based_on": [t.run_id for t in timings] if timings else [],
+        "by_epochs": {str(n): minutes(n) for n in choices},  # every option of the epochs param, same measurements
+    }
 
 
 def workflow_duration(root: Path, workflow: Mapping[str, Any], image: str) -> dict[str, Any]:

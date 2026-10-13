@@ -61,9 +61,6 @@ def _apply_data(
     if drop_validation:
         r.pop("validation_dataset", None)
         r.pop("validation_dataloader", None)
-    sched = _section(r, "step_scheduler")
-    if "validation_dataset" in r and "ckpt_every_steps" in sched:
-        sched["val_every_steps"] = sched["ckpt_every_steps"]  # nodes count epochs, not steps: validate per checkpoint
     if not train_meta and val_dataset_dir is not None and isinstance(r.get("validation_dataset"), dict):
         r["validation_dataset"]["path_or_dataset"] = val_dataset_dir
         if val_split:
@@ -113,6 +110,12 @@ def build_recipe(
     sched["local_batch_size"] = params.local_batch_size
     sched["num_epochs"] = params.epochs
     sched.pop("max_steps", None)  # the node trains whole epochs; smoke step caps belong to smoke configs
+    # Save + validate at epoch boundaries only (research 2026-10-13): with no step cadence the engine saves every
+    # epoch_len steps (= each epoch end, the last step included) and validates exactly when it saves. A step cadence
+    # from the template (smoke runs) would add a ~4 min validation every 25 steps (+48 min on the default template).
+    sched.pop("ckpt_every_steps", None)
+    sched.pop("val_every_steps", None)
+    sched["save_checkpoint_every_epoch"] = True
 
     opt = _section(r, "optimizer")
     opt["lr"] = params.learning_rate

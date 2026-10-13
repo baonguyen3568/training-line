@@ -74,23 +74,26 @@ def test_decode_overrides_never_reach_automodel() -> None:
     assert template["decode_overrides"] == {"repetition_penalty": 1.0}  # input untouched
 
 
-def test_validation_follows_the_wired_data_and_the_checkpoint_cadence() -> None:
+def test_validation_follows_the_wired_data_at_epoch_boundaries() -> None:
     tpl = _tpl("nemotron-parse-v1.1")
     r = build_recipe(tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r",
                      val_dataset_dir="/w/v", val_split="validation", class_token_start_idx=50000)  # fmt: skip
     assert (r["validation_dataset"]["path_or_dataset"], r["validation_dataset"]["split"]) == ("/w/v", "validation")
-    assert r["step_scheduler"]["val_every_steps"] == r["step_scheduler"]["ckpt_every_steps"]
+    sched = r["step_scheduler"]
+    assert "ckpt_every_steps" not in sched  # engine default: every epoch_len steps
+    assert "val_every_steps" not in sched  # validate exactly when saving
+    assert sched["save_checkpoint_every_epoch"] is True
     dropped = build_recipe(tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r",
                            drop_validation=True, class_token_start_idx=50000)  # fmt: skip
     assert "validation_dataset" not in dropped
     assert "validation_dataloader" not in dropped
 
 
-def test_val_cadence_is_left_alone_without_validation() -> None:
+def test_a_template_step_cadence_never_reaches_a_node_recipe() -> None:
+    """The Parse template saves/validates every 25 steps for smoke runs; a node trains whole epochs."""
     tpl = {**_tpl("nemotron-parse-v1.1")}
-    tpl.pop("validation_dataset")
-    tpl["step_scheduler"] = {**tpl["step_scheduler"], "val_every_steps": 100000}
+    tpl["step_scheduler"] = {**tpl["step_scheduler"], "val_every_steps": 25, "ckpt_every_steps": 25}
     r = build_recipe(
         tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r", class_token_start_idx=50000
     )
-    assert r["step_scheduler"]["val_every_steps"] == 100000
+    assert {"val_every_steps", "ckpt_every_steps"} & set(r["step_scheduler"]) == set()
