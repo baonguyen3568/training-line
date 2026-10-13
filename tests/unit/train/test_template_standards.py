@@ -31,3 +31,15 @@ def test_full_finetune_template_keeps_fp32_master_weights(entry: CatalogEntry) -
 
 def test_there_is_a_full_finetune_model_to_check() -> None:
     assert FULL_FINETUNE, "no catalog model uses train.sft_vlm: the invariant above checks nothing"
+
+
+QWEN_PIXELS = [m for m in load_catalog().models if m.image_policy == "qwen_pixels" and m.train_node != "none"]
+
+
+@pytest.mark.parametrize("entry", QWEN_PIXELS, ids=lambda m: m.id)
+def test_qwen_pixel_limits_reach_the_processor(entry: CatalogEntry) -> None:
+    # Without them the Qwen3.5 processor keeps up to 16.7 MP per image (~9.8k image tokens for a large receipt
+    # instead of ~0.9k): the catalog limits were dead data until 2026-10-13 (research, R2 preparation).
+    template = load_template(template_path(project_root(), entry))
+    processor = template["processor"]
+    assert (processor.get("min_pixels"), processor.get("max_pixels")) == (entry.min_pixels, entry.max_pixels), entry.id

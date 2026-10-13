@@ -38,6 +38,8 @@ model:
 processor:
   _target_: transformers.AutoProcessor.from_pretrained
   pretrained_model_name_or_path: /workspace/.cache/hf/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+  min_pixels: 200704  # catalog qwen_pixels (= 196 tokens at patch 16, merge 2)
+  max_pixels: 1003520  # without it the processor keeps up to 16.7 MP: ~9.8k tokens for a 2376x4224 receipt
 
 peft:
   _target_: nemo_automodel.components._peft.lora.PeftConfig
