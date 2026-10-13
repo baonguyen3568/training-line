@@ -13,9 +13,18 @@
   "validation": "CORD-v2 validation[0:100]",
   "latest_272_field_f1": 89.39,
   "lowest_val_181_field_f1": 90.45,
-  "paired_181_minus_272": {"delta": 1.06, "ci95": [-1.64, 4.37]},
+  "paired_181_minus_272": {
+   "delta": 1.06,
+   "ci95": [
+    -1.64,
+    4.37
+   ]
+  },
   "decision": "LATEST-272 (CI contains 0)",
-  "runs": ["20261013-1554-r2val-latest272-fe58", "20261013-1604-r2val-lowest181-b944"],
+  "runs": [
+   "20261013-1554-r2val-latest272-fe58",
+   "20261013-1604-r2val-lowest181-b944"
+  ],
   "note": "181 ran as base + adapter, 272 as merged weights; the difference may include merge effects, the decision is unchanged"
  },
  "image": "vlm-automodel:26.08-6",
@@ -34,32 +43,49 @@
   "max_new_tokens": 1024,
   "enable_thinking": false,
   "generation_config": "none in the base snapshot -> transformers defaults (repetition_penalty 1.0)",
-  "pixels": {"min_pixels": 200704, "max_pixels": 1003520}
+  "pixels": {
+   "min_pixels": 200704,
+   "max_pixels": 1003520
+  }
  },
  "eval_run": "20261013-1712-r2test-clean-df246f4-merged272-378e",
  "dataset": "naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98, test[0:100] (full test split)",
  "results": {
   "test": {
    "field_f1": 86.42,
-   "field_f1_ci95": [81.38, 90.34],
+   "field_f1_ci95": [
+    81.38,
+    90.34
+   ],
    "parse_fail_rate": 1.0,
    "truncated_rate": 0.0,
    "n": 100,
-   "nted_accuracy": null,
-   "json_exact": null,
-   "pending": "nTED / json_exact (CPU scoring running) and the base Qwen3.5-2B delta are added later"
+   "nted_accuracy": 93.06,
+   "json_exact": 38.0,
+   "pending": "the base Qwen3.5-2B delta is added later",
+   "scores": "outputs/tester/r2-test-score.json (score_cord_runs)"
   }
  },
  "vs_r0": {
   "r0_record": "benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json",
   "r0_field_f1": 70.97,
-  "r2_minus_r0": {"delta": 15.45, "ci95": [10.42, 20.6]},
+  "r2_minus_r0": {
+   "delta": 15.45,
+   "ci95": [
+    10.42,
+    20.6
+   ]
+  },
   "method": "paired bootstrap over the same 100 test images (1000 resamples, seed 0), field F1 on the same ground truth",
   "fairness_notes": [
    "R0 answers Donut-style CORD tokens (read with token2json), R2 answers JSON (read with json_answer); both are scored as dicts with the same field F1",
    "R0: full SFT 3 epochs (300 steps); R2: LoRA 3 epochs then merged; one training seed each, run-to-run variance not measured",
    "R0 is the app default by user decision; both numbers are published"
-  ]
+  ],
+  "r0_other_metrics": {
+   "nted_accuracy": 78.67,
+   "json_exact": 13.0
+  }
  },
  "speed": "582 s for 100 images including model load (~10 images/min, HF bf16, batch 1, GB10); R0 Parse ~7 images/min",
  "ci_method": "bootstrap over images, 1000 resamples, seed 0, micro F1 from per-image (tp, errors) counts"
