@@ -125,13 +125,13 @@ class _ParseParams(BaseModel):
     """Shape of the Nemotron-Parse v1.1 NodeSpec (default template = full fine-tune; PEFT untested for Parse)."""
 
     method: Literal["full"] = "full"
-    micro_batch_size: int = Field(1, ge=1)
-    gradient_checkpointing: bool = True
+    local_batch_size: int = Field(1, ge=1)
+    activation_checkpointing: bool = True
     max_seq_len: int = Field(9000, ge=9000, le=9000)  # fixed 2048x1648 images -> fixed token budget
 
 
 PARSE_TEMPLATE = NodeContext.from_schema(
-    {"method": "full", "micro_batch_size": 1, "gradient_checkpointing": True, "max_seq_len": 9000},
+    {"method": "full", "local_batch_size": 1, "activation_checkpointing": True, "max_seq_len": 9000},
     _ParseParams.model_json_schema(),
 )
 
@@ -158,9 +158,9 @@ def test_lora_offered_only_when_nodespec_allows_it() -> None:
 
 def test_scaling_respects_int_floor_and_bounds() -> None:
     err = SimpleNamespace(code="MEM-003", params={})
-    big = NodeContext(params={"micro_batch_size": 4, "max_seq_len": 8192}, ranges={"micro_batch_size": Range(1)})
+    big = NodeContext(params={"local_batch_size": 4, "max_seq_len": 8192}, ranges={"local_batch_size": Range(1)})
     assert {"reduce_batch", "reduce_max_length"} <= set(available_actions(err, big))
-    one = NodeContext(params={"micro_batch_size": 1}, ranges={"micro_batch_size": Range(1)})
+    one = NodeContext(params={"local_batch_size": 1}, ranges={"local_batch_size": Range(1)})
     assert "reduce_batch" not in available_actions(err, one)  # floor(0.5) = 0 < min 1
 
 
@@ -177,7 +177,7 @@ def test_codes_without_memory_actions_are_never_already_optimized() -> None:
 def test_scale_never_takes_positive_int_below_one_even_without_bounds() -> None:
     # bao-cleancode repro: batch=1, no bounds passed -> must NOT offer "reduce batch" to 0
     err = SimpleNamespace(code="MEM-003", params={})
-    assert "reduce_batch" not in available_actions(err, NodeContext(params={"micro_batch_size": 1}))
+    assert "reduce_batch" not in available_actions(err, NodeContext(params={"local_batch_size": 1}))
     op = PatchOp(param="b", op="scale", value=0.5)
     assert apply_patch(op, 1) == 1
     assert apply_patch(op, 3) == 1
@@ -187,12 +187,12 @@ def test_scale_never_takes_positive_int_below_one_even_without_bounds() -> None:
 
 def test_bounds_come_from_pydantic_schema() -> None:
     class Params(BaseModel):
-        micro_batch_size: int = Field(4, ge=2)
+        local_batch_size: int = Field(4, ge=2)
         max_seq_len: int = Field(4096, gt=1024, le=8192)
 
-    node = NodeContext.from_schema({"micro_batch_size": 2, "max_seq_len": 2048}, Params.model_json_schema())
+    node = NodeContext.from_schema({"local_batch_size": 2, "max_seq_len": 2048}, Params.model_json_schema())
     assert node.ranges == {
-        "micro_batch_size": Range(2),
+        "local_batch_size": Range(2),
         "max_seq_len": Range(1024, 8192, low_exclusive=True),
     }
     actions = available_actions(SimpleNamespace(code="MEM-003", params={}), node)
@@ -202,18 +202,18 @@ def test_bounds_come_from_pydantic_schema() -> None:
 
 def test_apply_patches_matches_what_was_offered() -> None:
     action = next(a for a in load_catalog()["MEM-003"].actions if a.id == "reduce_batch")
-    assert apply_patches(action, {"micro_batch_size": 8, "other": "x"}) == {"micro_batch_size": 4, "other": "x"}
+    assert apply_patches(action, {"local_batch_size": 8, "other": "x"}) == {"local_batch_size": 4, "other": "x"}
 
 
 class _OptionalImageParams(BaseModel):
     max_pixels: int | None = Field(1024, ge=256)  # None = model default
-    micro_batch_size: int = Field(4, ge=1)
+    local_batch_size: int = Field(4, ge=1)
 
 
 @pytest.mark.parametrize("build", ["model", "schema"])
 def test_optional_field_constraints_are_respected(build: str) -> None:
     # bao-cleancode repro: Optional[int] with ge=256 -> anyOf in JSON schema; 300 * 0.5 = 150 violates ge
-    params = {"max_pixels": 300, "micro_batch_size": 4}
+    params = {"max_pixels": 300, "local_batch_size": 4}
     node = (
         NodeContext.from_model(params, _OptionalImageParams)
         if build == "model"
@@ -228,17 +228,17 @@ def test_model_validation_catches_custom_validators() -> None:
     from pydantic import field_validator
 
     class Params(BaseModel):
-        micro_batch_size: int = 8
+        local_batch_size: int = 8
 
-        @field_validator("micro_batch_size")
+        @field_validator("local_batch_size")
         @classmethod
         def _even(cls, v: int) -> int:
             if v % 2:
                 raise ValueError("must be even")
             return v
 
-    ok = NodeContext.from_model({"micro_batch_size": 8}, Params)  # 8 -> 4, even
-    odd = NodeContext.from_model({"micro_batch_size": 6}, Params)  # 6 -> 3, rejected by the validator
+    ok = NodeContext.from_model({"local_batch_size": 8}, Params)  # 8 -> 4, even
+    odd = NodeContext.from_model({"local_batch_size": 6}, Params)  # 6 -> 3, rejected by the validator
     err = SimpleNamespace(code="MEM-003", params={})
     assert "reduce_batch" in available_actions(err, ok)
     assert "reduce_batch" not in available_actions(err, odd)
@@ -324,3 +324,26 @@ def test_variant_key_coerces_bool_strings_and_never_leaves_a_raw_key() -> None:
     assert variant_key("CFG-009", {"migratable": "true"}) == "migratable"
     assert variant_key("CFG-009", {"migratable": "false"}) == "not_migratable"
     assert variant_key("CFG-010", {"supported": "train.unknown"}) == "full_finetune_only"  # first variant + warning
+
+
+# Patch params no node has YET, each with the reason it is pending. Anything else must exist on a registered node,
+# or the quick fix silently never shows up (2026-10-13: micro_batch_size / gradient_checkpointing had drifted).
+PENDING_PATCH_PARAMS = {
+    "method": "use_lora/use_qlora switch the train node type; QLoRA node = P4-3",
+    "max_pixels": "image size lives in the engine Advanced file (P016 §3, advanced.<key>)",
+    "max_seq_len": "sequence length lives in the engine Advanced file (P016 §3)",
+    "torch_compile": "no compile option exposed on any node yet",
+    "skip_invalid_samples": "data nodes do not skip samples yet (B-3b reports them, DATA-006)",
+    "convert_images_rgb": "no automatic image conversion node yet",
+}
+
+
+def test_every_patch_param_exists_on_a_node_or_is_explicitly_pending() -> None:
+    from vlm_pipeline.nodes import REGISTRY
+
+    node_params = {name for spec in REGISTRY.all() for name in spec.params_schema().get("properties") or {}}
+    for code, entry in load_catalog().items():
+        for action in entry.actions:
+            for op in action.patch or ():
+                assert op.param in node_params or op.param in PENDING_PATCH_PARAMS, (code, action.id, op.param)
+    assert not set(PENDING_PATCH_PARAMS) & node_params, "a pending param now exists: drop it from the list"

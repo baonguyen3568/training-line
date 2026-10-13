@@ -38,7 +38,7 @@ MEM-001:
     - {id: use_lora, kind: patch, patch: [{param: method, op: set, value: lora}], confirm: false, effect: memory}
     - {id: use_qlora, kind: patch, patch: [{param: method, op: set, value: qlora}], confirm: false, effect: memory}
     - {id: reduce_image_size, kind: patch, patch: [{param: max_pixels, op: scale, value: 0.5}], confirm: false, effect: memory}
-    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false, effect: memory}
+    - {id: reduce_batch, kind: patch, patch: [{param: local_batch_size, op: scale, value: 0.5}], confirm: false, effect: memory}
     - {id: smaller_model, kind: navigate, target: "node:model", confirm: false}
     - {id: queue_until_memory, kind: navigate, target: queue_until_memory, confirm: false}
     - {id: see_memory_usage, kind: navigate, target: memory_panel, confirm: false}
@@ -52,7 +52,7 @@ MEM-002:
     - {kind: exit, value: "75"}
   actions:
     - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
-    - {id: resume_lighter, kind: resume, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: true, when: {resumable: true}, effect: memory}
+    - {id: resume_lighter, kind: resume, patch: [{param: activation_checkpointing, op: set, value: true}], confirm: true, when: {resumable: true}, effect: memory}
 
 MEM-003:
   slug: UMA_OOM
@@ -64,8 +64,8 @@ MEM-003:
     - {kind: exit, value: "137+oom_killed"}
   actions:
     - {id: reduce_max_length, kind: patch, patch: [{param: max_seq_len, op: scale, value: 0.5}], confirm: false, effect: memory}
-    - {id: enable_grad_checkpointing, kind: patch, patch: [{param: gradient_checkpointing, op: set, value: true}], confirm: false, effect: memory}
-    - {id: reduce_batch, kind: patch, patch: [{param: micro_batch_size, op: scale, value: 0.5}], confirm: false, effect: memory}
+    - {id: enable_grad_checkpointing, kind: patch, patch: [{param: activation_checkpointing, op: set, value: true}], confirm: false, effect: memory}
+    - {id: reduce_batch, kind: patch, patch: [{param: local_batch_size, op: scale, value: 0.5}], confirm: false, effect: memory}
     - {id: resume_checkpoint, kind: resume, confirm: true, when: {resumable: true}}
     - {id: queue_until_memory, kind: navigate, target: queue_until_memory, confirm: false}
     - {id: see_memory_usage, kind: navigate, target: memory_panel, confirm: false}
