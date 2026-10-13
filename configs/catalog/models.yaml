@@ -69,7 +69,7 @@ models:
     revision: 9ce19a195e423419c349abfc86fd07178b230561
     display_name: "NVIDIA Cosmos Reason2 2B"
     vendor: nvidia
-    tier: template
+    tier: catalog                  # ADR-001 am.2: reference pipeline only (repo in limited maintenance; Spark = inference only)
     gated: true                    # user must accept on HF + read-only fine-grained token (wizard)
     remote_code: none              # Qwen3VLForConditionalGeneration native (config unread until gate accepted)
     auto_class: AutoModelForImageTextToText   # from the model card (Qwen3-VL); config gated: re-check when the gate is accepted
@@ -217,7 +217,7 @@ models:
     revision: 15852e8c16360a2fea060d615a32b45270f8a8fc
     display_name: "Qwen3.5 2B"
     vendor: qwen
-    tier: catalog
+    tier: template                 # ADR-001 am.2: template 2 "Hiểu ảnh/video" (LoRA; FP8 official in ModelOpt)
     gated: false
     remote_code: none
     auto_class: AutoModelForImageTextToText
