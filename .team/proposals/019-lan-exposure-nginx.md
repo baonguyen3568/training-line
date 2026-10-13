@@ -75,9 +75,10 @@ host-only:  127.0.0.1:4001..4050  dev servers, app debug port: never reachable f
   checked), and clears it with `history.replaceState`. `GET ?token=` stays accepted ONLY from 127.0.0.1 and is
   refused through nginx.
 - Token: ≥ 256 bits (`token_urlsafe(32)` today: OK). Constant-time compare (as today).
-- Rate limit: nginx `limit_req` on `/api/session` (5/min per IP, burst 5). The app keeps a global failure counter:
-  after 20 failures in 10 min, refuse logins for 15 min and log a warning. With a 256-bit token brute force is not
-  the risk; this is noise and DoS control.
+- Rate limit: nginx `limit_req` on `/api/session` (5/min per IP, burst 5) is the main control. The app logs a warning
+  after 20 failures in 10 min, and only as a last resort refuses LAN logins for 15 min after 200 failures in 10 min.
+  Local logins (Host 127.0.0.1) are never locked, so the owner can always get in. A low global lock would let any
+  LAN device lock the owner out (security 2026-10-13). With a 256-bit token brute force is not the risk.
 
 ## 6. Headers, sizes, WebSocket, logs (nginx)
 
