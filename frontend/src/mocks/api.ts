@@ -8,6 +8,8 @@ import type {
   ParamsSchema,
   PortType,
   RunInfo,
+  SecretState,
+  SettingsView,
   StorageApplyResult,
   StorageItem,
   StoragePlan,
@@ -325,6 +327,25 @@ const unknownEstimate = {
   source: "unknown" as const,
 };
 
+const unsetSecret = (): SecretState => ({
+  set: false,
+  updated_at: null,
+  last4: "",
+  readable: true,
+  scope: "unchecked",
+});
+const mockSettings: SettingsView = {
+  secrets: { HF_TOKEN: unsetSecret(), NGC_API_KEY: unsetSecret(), WANDB_API_KEY: unsetSecret() },
+  admin_policy: {
+    "deployment.profile": { value: "shared_dev", source: "deployment" },
+    "storage.schedule": { value: "dry_run", source: "deployment" },
+    "storage.approval_policy": { value: "threshold", source: "deployment" },
+    "storage.approval_threshold_gb": { value: 20, source: "deployment" },
+    "plugins.allowlist": { value: null, source: "default" },
+  },
+  key_ok: true,
+};
+
 // Templates come from configs/templates/*.json (same files the backend serves); the server adds estimates and,
 // like the server (app/templates.py), never offers a hidden one (e.g. quantize_bench until its worker can run it).
 const templates: Template[] = (
@@ -462,6 +483,29 @@ export const mockApi: Api = {
   cancelRun: (id) => {
     fakeCancel.get(id)?.();
     return delay(undefined);
+  },
+  // D-7 settings: the mock keeps only what the server would return (never the value itself).
+  settings: () => delay<SettingsView>(structuredClone(mockSettings)),
+  putSecret: (field, value) => {
+    const state: SecretState = {
+      set: true,
+      updated_at: Date.now() / 1000,
+      last4: value.slice(-4),
+      readable: true,
+      scope: "unchecked",
+    };
+    mockSettings.secrets[field] = state;
+    return delay(state);
+  },
+  deleteSecret: (field) => {
+    mockSettings.secrets[field] = {
+      set: false,
+      updated_at: null,
+      last4: "",
+      readable: true,
+      scope: "unchecked",
+    };
+    return delay({ set: false as const });
   },
   // B-7: the server keeps only a re-encoded PNG and a random id; the mock mirrors the response shape.
   upload: (file) =>

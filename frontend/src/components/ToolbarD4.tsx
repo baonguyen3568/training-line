@@ -139,6 +139,13 @@ export function ToolbarD4({ locked }: { locked: boolean }) {
           </span>
         </>
       )}
+      <IconButton
+        icon="settings"
+        label={t("settings.title")}
+        onClick={() =>
+          window.dispatchEvent(new CustomEvent("vlm:navigate", { detail: "settings" }))
+        }
+      />
       <span className="tb-sep" />
       {running ? (
         <button type="button" className="btn ghost sm run-btn" onClick={() => void cancelRun()}>

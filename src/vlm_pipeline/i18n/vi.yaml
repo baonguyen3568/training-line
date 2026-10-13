@@ -1130,3 +1130,66 @@ pipelines:
 param_unsupported:
   default: chưa hỗ trợ
   worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.
+settings:
+  no_password_manager: Nếu trình duyệt hỏi có lưu mật khẩu không, hãy chọn "Không bao giờ". Token chỉ nên lưu trong app.
+  policy_default: Mặc định của app
+  locked_default: App đang dùng giá trị mặc định có sẵn. Chỉ quản trị viên đổi được khi cài app.
+  policy_value:
+    deployment.profile:
+      personal: Máy cá nhân
+      shared_dev: Máy dùng chung
+    storage.schedule:
+      "off": Tắt
+      dry_run: Chỉ liệt kê, không tự xoá
+      apply: Tự dọn theo lịch
+    storage.approval_policy:
+      none: Không cần duyệt
+      threshold: Cần duyệt khi xoá vượt ngưỡng
+  secret_help:
+    HF_TOKEN: Tạo token loại Read trong phần Settings → Access Tokens của Hugging Face. App không nhận token có quyền ghi.
+    NGC_API_KEY: Chỉ cần khi tải container hoặc model từ NVIDIA NGC. Tạo khoá trong phần Setup của tài khoản NGC.
+    WANDB_API_KEY: Không bắt buộc. Chỉ cần nếu bạn muốn gửi số đo các lần chạy lên Weights & Biases.
+  policy:
+    deployment.profile: Kiểu cài đặt
+    storage.schedule: Lịch dọn dẹp
+    storage.approval_policy: Duyệt khi xoá nhiều
+    storage.approval_threshold_gb: Ngưỡng cần duyệt (GB)
+    plugins.allowlist: Node bên thứ 3 được phép
+  title: Cài đặt
+  section_connect: Kết nối
+  section_admin: Do quản trị viên đặt
+  secret:
+    HF_TOKEN: Token Hugging Face
+    NGC_API_KEY: Khoá NGC
+    WANDB_API_KEY: Khoá Weights & Biases
+  secret_set: "Đã đặt …{last4}"
+  updated: "cập nhật {time}"
+  secret_unset: Chưa đặt
+  secret_unreadable: Token lưu trước đây không đọc được, hãy nhập lại.
+  scope_unchecked: Chưa kiểm được quyền của token.
+  enter_placeholder: Dán token vào đây
+  replace_placeholder: Dán token mới để thay
+  save: Lưu
+  delete: Xoá token
+  delete_confirm: Xoá token này khỏi máy?
+  none: không có
+  locked_why: Vì sao không sửa được?
+  locked_by_admin: Quản trị viên đặt giá trị này khi cài app. Muốn đổi, hãy liên hệ quản trị viên.
+  key_broken_title: Không dùng được khoá mã hoá của app
+  key_broken_what: File khoá có quyền truy cập sai nên app không lưu hay đọc được token. Hãy báo quản trị viên kiểm tra.
+settings_error:
+  invalid:
+    not_json: App gửi dữ liệu sai định dạng. Đây là lỗi của app; hãy gửi báo cáo.
+    extra_field: App gửi dữ liệu sai định dạng. Đây là lỗi của app; hãy gửi báo cáo.
+    not_text: Token phải là chữ.
+    empty: Chưa nhập token.
+    whitespace: Token có khoảng trắng ở đầu hoặc cuối; hãy xoá đi rồi lưu lại.
+    not_printable: Token chỉ gồm chữ, số và ký hiệu thường; có thể bạn đã dán thừa xuống dòng.
+    too_long: Token quá dài (tối đa 4096 ký tự).
+    rejected: Token không được chấp nhận. Kiểm tra token rồi dán lại.
+  generic: Không lưu được. Thử lại sau ít phút.
+  settings_admin_only: Mục này do quản trị viên đặt, không sửa được ở đây.
+  settings_unknown_key: Mục cài đặt không tồn tại.
+  settings_invalid: Token không hợp lệ (trống, có khoảng trắng ở đầu hoặc cuối, hoặc quá dài).
+  settings_body_too_large: Nội dung gửi lên quá lớn.
+  settings_key_unusable: File khoá có quyền truy cập sai, cần quản trị viên sửa.

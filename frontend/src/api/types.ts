@@ -368,3 +368,23 @@ export interface TrialResult {
   overrides: Record<string, unknown>;
   model_class?: string;
 }
+
+/** D-7 settings (backend, P015 §4.5). The token value never leaves the server again. */
+export type SecretField = "HF_TOKEN" | "NGC_API_KEY" | "WANDB_API_KEY";
+export interface SecretState {
+  set: boolean;
+  updated_at: number | null;
+  last4: string;
+  readable: boolean;
+  scope: "unchecked" | "read" | "write";
+}
+export interface SettingsView {
+  secrets: Record<SecretField, SecretState>;
+  /** Deployment policy: read-only in the UI (403 settings_admin_only on write). source "default" = value null:
+   * the app's built-in default applies. reason_key may come later (optional). */
+  admin_policy: Record<
+    string,
+    { value: unknown; source: "deployment" | "default"; reason_key?: string }
+  >;
+  key_ok: boolean;
+}

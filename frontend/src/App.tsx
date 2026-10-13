@@ -16,11 +16,19 @@ const RunMonitor = lazy(() =>
   import("./components/RunMonitor").then((m) => ({ default: m.RunMonitor })),
 );
 const RunsList = lazy(() => import("./components/RunsList").then((m) => ({ default: m.RunsList })));
+const SettingsPanel = lazy(() =>
+  import("./components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
+);
 const StoragePanel = lazy(() =>
   import("./components/StoragePanel").then((m) => ({ default: m.StoragePanel })),
 );
 
-type View = { kind: "home" } | { kind: "runs" } | { kind: "storage" } | { kind: "run"; id: string };
+type View =
+  | { kind: "home" }
+  | { kind: "runs" }
+  | { kind: "storage" }
+  | { kind: "settings" }
+  | { kind: "run"; id: string };
 
 export function App() {
   const workflow = useWorkflow((s) => s.workflow);
@@ -40,7 +48,7 @@ export function App() {
   useEffect(() => {
     const go = (e: Event) => {
       const to = (e as CustomEvent).detail;
-      if (to === "runs" || to === "storage") setView({ kind: to });
+      if (to === "runs" || to === "storage" || to === "settings") setView({ kind: to });
       // D4 toolbar mark = back to the gallery (the classic header is not shown in the D4 editor)
       if (to === "home") {
         useWorkflow.getState().closeWorkflow();
@@ -72,7 +80,7 @@ export function App() {
 
   // M2-6: the D4 editor owns the whole screen (its toolbar replaces the header); other views keep the header.
   const d4Editor = skin === "d4" && view.kind === "home" && !!workflow;
-  const d4Home = skin === "d4" && view.kind === "home" && !workflow;
+  const d4Home = skin === "d4" && ((view.kind === "home" && !workflow) || view.kind === "settings");
 
   const navigate = (to: Nav) => {
     if (to === "home") closeWorkflow();
@@ -131,6 +139,15 @@ export function App() {
         {view.kind === "runs" && <RunsList onOpen={(id) => setView({ kind: "run", id })} />}
         {view.kind === "run" && <RunMonitor runId={view.id} />}
         {view.kind === "storage" && <StoragePanel />}
+        {view.kind === "settings" &&
+          (skin === "d4" ? (
+            <div className="editor d4 d4-home">
+              <HomeBarD4 />
+              <SettingsPanel />
+            </div>
+          ) : (
+            <SettingsPanel />
+          ))}
       </Suspense>
       {/* First screen is the template gallery, never a blank canvas (P010 §8). */}
       {view.kind === "home" &&

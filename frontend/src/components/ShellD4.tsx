@@ -191,6 +191,7 @@ export function HomeBarD4() {
       <span className="tb-grow" />
       <IconButton icon="scroll-text" label={t("app.nav_runs")} onClick={() => go("runs")} />
       <IconButton icon="hard-drive" label={t("app.nav_storage")} onClick={() => go("storage")} />
+      <IconButton icon="settings" label={t("settings.title")} onClick={() => go("settings")} />
     </header>
   );
 }

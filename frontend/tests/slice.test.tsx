@@ -18,7 +18,7 @@ describe("vertical slice", () => {
       timeout: 4000,
     });
     expect(screen.getByRole("button", { name: /▶ Chạy/ })).toHaveProperty("disabled", false);
-  });
+  }, 15_000); // full-App integration test: under a parallel full run it can pass 5 s on this shared host
 
   it("blocks Run when a required input is disconnected via the 'Nhận từ' picker", async () => {
     const { useWorkflow } = await import("../src/store/workflow");

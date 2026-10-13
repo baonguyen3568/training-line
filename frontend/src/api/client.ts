@@ -8,6 +8,9 @@ import type {
   NodeTypesResponse,
   RunEvent,
   RunInfo,
+  SecretField,
+  SecretState,
+  SettingsView,
   StorageApplyRequest,
   StorageApplyResult,
   StoragePlan,
@@ -67,7 +70,7 @@ export interface RawBody {
 const isRaw = (b: unknown): b is RawBody => typeof b === "object" && b !== null && "raw" in b;
 
 async function request<T>(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
   retried = false,
@@ -113,6 +116,10 @@ export interface Api {
   upload(file: File, locale: string): Promise<UploadInfo>;
   /** 404 {error: {code: RESULT_NOT_READY}}, 502 {error: {code: RESULT_TOO_LARGE}}. */
   nodeResult(runId: string, nodeId: string): Promise<TrialResult>;
+  /** D-7 settings (P015 §4.5). Secrets never come back: only set / last4 / updated_at. */
+  settings(): Promise<SettingsView>;
+  putSecret(field: SecretField, value: string): Promise<SecretState>;
+  deleteSecret(field: SecretField): Promise<{ set: false }>;
 }
 
 /** Preview URL of an upload (served as image/png, same origin, cookie-authenticated). */
@@ -147,6 +154,10 @@ export const httpApi: Api = {
       contentType: file.type || "application/octet-stream", // a hint only: the server sniffs the bytes
       headers: { "X-Upload-Label": encodeURIComponent(file.name) },
     } satisfies RawBody),
+  settings: () => request("GET", "/api/settings"),
+  putSecret: (field, value) =>
+    request("PUT", `/api/settings/${encodeURIComponent(field)}`, { value }),
+  deleteSecret: (field) => request("DELETE", `/api/settings/${encodeURIComponent(field)}`),
   nodeResult: (runId, nodeId) =>
     request(
       "GET",

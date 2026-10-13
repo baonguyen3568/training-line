@@ -1130,3 +1130,66 @@ pipelines:
 param_unsupported:
   default: not supported yet
   worker_v1: This option is still being built and the app cannot run it yet. Choose another value.
+settings:
+  no_password_manager: If the browser offers to save a password, choose "Never". The token should only be stored in the app.
+  policy_default: App default
+  locked_default: The app uses its built-in default. Only an admin can change it when installing the app.
+  policy_value:
+    deployment.profile:
+      personal: Personal machine
+      shared_dev: Shared machine
+    storage.schedule:
+      "off": "Off"
+      dry_run: List only, never delete automatically
+      apply: Clean up on schedule
+    storage.approval_policy:
+      none: No approval needed
+      threshold: Approval needed above the threshold
+  secret_help:
+    HF_TOKEN: Create a Read token under Settings → Access Tokens on Hugging Face. The app rejects tokens with write access.
+    NGC_API_KEY: Only needed to pull containers or models from NVIDIA NGC. Create the key under Setup in your NGC account.
+    WANDB_API_KEY: Optional. Only needed if you want to send run metrics to Weights & Biases.
+  policy:
+    deployment.profile: Install profile
+    storage.schedule: Cleanup schedule
+    storage.approval_policy: Approval for large deletions
+    storage.approval_threshold_gb: Approval threshold (GB)
+    plugins.allowlist: Allowed third-party nodes
+  title: Settings
+  section_connect: Connections
+  section_admin: Set by your admin
+  secret:
+    HF_TOKEN: Hugging Face token
+    NGC_API_KEY: NGC key
+    WANDB_API_KEY: Weights & Biases key
+  secret_set: "Set …{last4}"
+  updated: "updated {time}"
+  secret_unset: Not set
+  secret_unreadable: The saved token can't be read; enter it again.
+  scope_unchecked: The token's permissions have not been checked.
+  enter_placeholder: Paste the token here
+  replace_placeholder: Paste a new token to replace it
+  save: Save
+  delete: Delete token
+  delete_confirm: Delete this token from the machine?
+  none: none
+  locked_why: Why can't I change this?
+  locked_by_admin: Your admin set this when installing the app. Contact them to change it.
+  key_broken_title: The app's encryption key can't be used
+  key_broken_what: The key file has the wrong permissions, so the app can't save or read tokens. Ask your admin to check it.
+settings_error:
+  invalid:
+    not_json: The app sent data in the wrong format. This is the app's fault; please send a report.
+    extra_field: The app sent data in the wrong format. This is the app's fault; please send a report.
+    not_text: The token must be text.
+    empty: No token entered.
+    whitespace: The token has leading or trailing spaces; remove them and save again.
+    not_printable: Tokens contain only letters, digits and plain symbols; you may have pasted an extra line break.
+    too_long: The token is too long (4096 characters at most).
+    rejected: The token was not accepted. Check it and paste it again.
+  generic: Couldn't save. Try again in a few minutes.
+  settings_admin_only: Your admin sets this; it can't be changed here.
+  settings_unknown_key: This setting does not exist.
+  settings_invalid: Invalid token (empty, leading or trailing spaces, or too long).
+  settings_body_too_large: The request is too large.
+  settings_key_unusable: The key file has the wrong permissions; an admin must fix it.

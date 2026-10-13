@@ -721,3 +721,55 @@
   border-left: 0;
   border-top: 0;
 }
+/* settings (D-7): label/control rows, locked rows read-only with a lock "?" (DESIGN.md Inputs: Locked) */
+.settings-panel {
+  grid-area: main;
+  overflow: auto;
+  padding: var(--space-24) var(--space-32);
+  max-width: 880px;
+}
+.settings-panel h1 {
+  margin: 0 0 var(--space-16);
+  font-size: var(--font-size-panel);
+}
+.settings-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: var(--space-24) 0 var(--space-8);
+  font-size: var(--font-size-body);
+}
+.set-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--space-16);
+  min-height: 52px;
+  padding: var(--space-12) 0;
+  border-bottom: 1px solid var(--color-grid);
+}
+.set-row.locked .set-label {
+  color: var(--color-text-secondary);
+}
+.set-state {
+  margin: 0 0 var(--space-4);
+}
+.set-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+.set-input input {
+  width: 320px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-md);
+  background: var(--color-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+}
+.pop-p {
+  display: block;
+  margin-bottom: 4px;
+}
