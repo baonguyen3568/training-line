@@ -295,7 +295,6 @@ class RealWorker:
     def _eval(self, job: NodeJob) -> NodeResult:
         """Benchmark node (B-5): bao-tester's engine (eval/node_worker.py) on the model and its catalog base."""
         from vlm_pipeline.eval.node_worker import EvalJobFailed, EvalRequest, ModelRef, run_eval_benchmarks
-        from vlm_pipeline.serve.vllm_runner import run_vllm_batch
 
         model = job.inputs["model"]
         entry = self.base_of(model)
@@ -306,7 +305,6 @@ class RealWorker:
             base=ModelRef(base_path.resolve(), f"{entry.repo}@{entry.revision}"),
             entry=entry, run_dir=job.run_dir.resolve(), image=self.image, who=self.who,
             cancel=job.cancel, on_wait=job.on_wait,
-            vllm_batch=run_vllm_batch,  # suite ocrbench (eval may not import serve: injected here)
         )  # fmt: skip
         try:
             outcome = run_eval_benchmarks(request)
