@@ -40,7 +40,8 @@
             66.33,
             75.38
           ],
-          "n": 100
+          "n": 100,
+          "compare_with": "invoice-qwen35-2b-lora"
         },
         "config": "3 epochs on the 800 CORD train images, GBS 8, lr 1e-5, FusedAdam fp32 master; image vlm-automodel:26.08-6",
         "sources": [
@@ -108,7 +109,8 @@
             81.38,
             90.34
           ],
-          "n": 100
+          "n": 100,
+          "compare_with": "invoice-to-json"
         },
         "config": "LoRA 3 epochs on 720 CORD train images (+ merge), answer = the receipt fields as JSON; one training seed. Same 100 test images and field F1 as the Nemotron Parse pipeline, which reads its own CORD tokens instead of JSON",
         "sources": [

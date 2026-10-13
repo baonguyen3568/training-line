@@ -13,7 +13,8 @@
 #   summary_key i18n key of the one-line "what it does" (bao-design writes vi/en): reference_pipeline.<id>.summary
 #   measured    our own run on one DGX Spark (GB10), or null = "chưa có số đo". Every number cites `sources`
 #               (committed repo paths; site gate check_site_numbers). Fields: train_minutes, peak_ram_gb (run.json, whole
-#               container), score {benchmark, metric, value, ci95, n} or null, config (what exactly was run), sources.
+#               container), score {benchmark, metric, value, ci95, n, compare_with?} or null, config (what exactly was
+#               run), sources. compare_with = id of a pipeline scored on the same benchmark/images/metric (both ways).
 schema_version: 1
 pipelines:
   - id: invoice-to-json
@@ -32,7 +33,7 @@ pipelines:
     measured:
       train_minutes: 116
       peak_ram_gb: 23.7
-      score: {benchmark: "CORD v2 test", metric: field_f1, value: 70.97, ci95: [66.33, 75.38], n: 100}
+      score: {benchmark: "CORD v2 test", metric: field_f1, value: 70.97, ci95: [66.33, 75.38], n: 100, compare_with: invoice-qwen35-2b-lora}
       config: "3 epochs on the 800 CORD train images, GBS 8, lr 1e-5, FusedAdam fp32 master; image vlm-automodel:26.08-6"
       sources: [benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json, .team/proposals/001a-nvidia-default-model.md]
     steps:
@@ -55,7 +56,7 @@ pipelines:
     measured:
       train_minutes: 58.8
       peak_ram_gb: 16.7
-      score: {benchmark: "CORD v2 test", metric: field_f1, value: 86.42, ci95: [81.38, 90.34], n: 100}
+      score: {benchmark: "CORD v2 test", metric: field_f1, value: 86.42, ci95: [81.38, 90.34], n: 100, compare_with: invoice-to-json}
       config: "LoRA 3 epochs on 720 CORD train images (+ merge), answer = the receipt fields as JSON; one training seed. Same 100 test images and field F1 as the Nemotron Parse pipeline, which reads its own CORD tokens instead of JSON"
       sources: [benchmarks/eval/r2-qwen3.5-2b-lora-cord-test-20261013.json, benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json]
     steps:
