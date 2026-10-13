@@ -73,7 +73,7 @@ def _publish(
     sha = write_records(run_dir / "records.jsonl", kept)
     dataset = DatasetRef(path=src.path, split="all", records=worker.container_path(run_dir / "records.jsonl"),
                          records_sha256=sha, seed=src.seed)  # fmt: skip
-    return NodeResult(outputs={"dataset": worker._dataset_artifact(run_dir / "dataset.json", dataset)})
+    return NodeResult(outputs={"dataset": worker.dataset_artifact(run_dir / "dataset.json", dataset)})
 
 
 def _target_chars(target: Any) -> int:

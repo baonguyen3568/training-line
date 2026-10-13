@@ -143,7 +143,7 @@ def run_caption(worker: RealWorker, job: NodeJob) -> NodeResult:
     (run_dir / REPORT_NAME).write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     dataset = DatasetRef(path=src.path, split="all", records=worker.container_path(run_dir / "records.jsonl"),
                          records_sha256=sha, seed=src.seed)  # fmt: skip
-    return NodeResult(outputs={"dataset": worker._dataset_artifact(run_dir / "dataset.json", dataset)})
+    return NodeResult(outputs={"dataset": worker.dataset_artifact(run_dir / "dataset.json", dataset)})
 
 
 __all__ = ["MAX_CAPTION_CHARS", "REPORT_NAME", "check_support", "clean_caption", "run_caption"]

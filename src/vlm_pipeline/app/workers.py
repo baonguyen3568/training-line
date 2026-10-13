@@ -330,9 +330,10 @@ class RealWorker:
         limit = int(getattr(job.params, "max_samples", 0) or 0)
         # The artifact is a small descriptor (snapshot + split + sample limit), so "quick run" sizes cost no copy.
         ref = DatasetRef(repo=repo, revision=revision, path=self.container_path(path), limit=limit)
-        return NodeResult(outputs={"dataset": self._dataset_artifact(job.run_dir / "dataset.json", ref)})
+        return NodeResult(outputs={"dataset": self.dataset_artifact(job.run_dir / "dataset.json", ref)})
 
-    def _dataset_artifact(self, path: Path, ref: DatasetRef) -> ArtifactRef:
+    def dataset_artifact(self, path: Path, ref: DatasetRef) -> ArtifactRef:
+        """Write ``ref`` as a node's Dataset output (also used by the data / caption worker modules)."""
         write_dataset_ref(path, ref)
         return ArtifactRef(type="Dataset", path=str(path.resolve()), hash=ref.hash)
 
@@ -369,7 +370,7 @@ class RealWorker:
             path=self.container_path(folder), split="all", records=self.container_path(records), records_sha256=sha,
             seed=int(getattr(params, "seed", 0)),
         )  # fmt: skip
-        return NodeResult(outputs={"dataset": self._dataset_artifact(job.run_dir / "dataset.json", ref)})
+        return NodeResult(outputs={"dataset": self.dataset_artifact(job.run_dir / "dataset.json", ref)})
 
     def _split(self, job: NodeJob) -> NodeResult:
         """Train / val of a dataset; held-out test splits never appear.
@@ -383,9 +384,9 @@ class RealWorker:
             rule = {"val_fraction": fraction, "seed": seed}
             return NodeResult(
                 outputs={
-                    "train": self._dataset_artifact(job.run_dir / "train.json",
+                    "train": self.dataset_artifact(job.run_dir / "train.json",
                                                     src.model_copy(update={"split": "train", **rule})),
-                    "val": self._dataset_artifact(job.run_dir / "val.json",
+                    "val": self.dataset_artifact(job.run_dir / "val.json",
                                                   src.model_copy(update={"split": "validation", "limit": 0, **rule})),
                 }
             )  # fmt: skip
@@ -398,8 +399,8 @@ class RealWorker:
         val = src.model_copy(update={"split": "validation", "limit": 0})  # quick-run size limits training only
         return NodeResult(
             outputs={
-                "train": self._dataset_artifact(job.run_dir / "train.json", train),
-                "val": self._dataset_artifact(job.run_dir / "val.json", val),
+                "train": self.dataset_artifact(job.run_dir / "train.json", train),
+                "val": self.dataset_artifact(job.run_dir / "val.json", val),
             }
         )
 
