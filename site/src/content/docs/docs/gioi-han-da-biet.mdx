@@ -8,6 +8,7 @@ sources:
   - .team/proposals/002-eval-benchmark-protocol.md
   - configs/catalog/models.yaml
   - .team/bugs/BUG-001-parse-native-generate-ignores-kv-cache.md
+  - .team/proposals/P4-1-reference-pipelines.md
 ---
 import Hint from '~/components/Hint.astro';
 
@@ -31,7 +32,7 @@ Parse chạy bằng mã gốc của NVIDIA, sinh từng token một. Một hoá 
 | Giới hạn | Trạng thái |
 |---|---|
 | **Cosmos Reason2 2B/8B cần chấp nhận điều khoản** | Bạn phải đăng nhập Hugging Face và đồng ý điều khoản của NVIDIA trên trang model trước; app không tải hộ |
-| **Template ảnh/video (Cosmos) chưa chạy thật** | Đang chờ kiểm trên máy |
+| **Cosmos Reason2 chỉ ở mức ứng viên** | Chưa có template chính thức. NVIDIA chỉ hỗ trợ chính thức chạy suy luận (không phải train) dòng model này trên DGX Spark, và dòng Cosmos Reason2 đã chuyển sang bảo trì hạn chế |
 | **Gemma 4 không nén FP8** | App ẩn lựa chọn FP8 cho Gemma 4 |
 | **RAM của đa số model là ước tính** | Chỉ Nemotron Parse v1.1 và Qwen3.5 0.8B đã đo thật; con số khác có thể lệch |
 | **Nemotron Parse 2.0 chưa vào template** | Đang so với v1.1, chỉ đổi khi tốt hơn rõ |
