@@ -91,6 +91,9 @@ uv run pytest -q -m "not gpu and not slow and not eval and not integration"
 step "secrets in git history (gitleaks)"
 scripts/tools/gitleaks.sh git --redact --no-banner -c .gitleaks.toml
 
+step "credential-shaped strings in tracked files (hf_/nvapi-/W&B; PM 2026-10-13)"
+uv run --quiet python scripts/security/scan_tokens.py tracked
+
 if [[ -f frontend/package.json ]]; then
   step "frontend (biome, tsc, vitest)"
   # `npm run check` = build generated tokens/i18n -> biome ci -> tsc --noEmit -> vitest run (owner: bao-frontend)
