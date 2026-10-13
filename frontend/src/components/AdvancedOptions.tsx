@@ -190,6 +190,9 @@ export function AdvancedOptions({
             return (
               <details key={group} className="adv-group" open={changed > 0 || hasError || !!query}>
                 <summary>
+                  <span className="chev" aria-hidden="true">
+                    <Icon name="chevron-right" size={14} />
+                  </span>
                   <code>{group}</code>
                   {changed > 0 && (
                     <span className="muted small">

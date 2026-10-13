@@ -1004,6 +1004,25 @@
 .adv-group summary {
   cursor: pointer;
   font-size: var(--font-size-caption);
+  list-style: none; /* Lucide chevron instead of the default marker */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.adv-group summary::-webkit-details-marker {
+  display: none;
+}
+.adv-group summary .chev {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+.adv-group[open] summary .chev {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .adv-group summary .chev {
+    transition: none;
+  }
 }
 .adv-group ul {
   list-style: none;
