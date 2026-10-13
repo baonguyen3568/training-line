@@ -11,6 +11,7 @@ Units: every ``*_gb`` value is GiB (1024**3 bytes), like ``free -g``; ``df -H`` 
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import math
 import os
@@ -29,15 +30,19 @@ from vlm_pipeline.common.paths import GIB, KIB_PER_GIB
 logger = logging.getLogger(__name__)
 
 GuardState = Literal["ok", "warn", "abort"]
+MAX_FREE_FRAC = 0.80  # a job may use at most this share of the memory FREE at its start (user, ADR-005 A1)
 
 
 @dataclass(frozen=True)
 class MemThresholds:
-    """Memory thresholds in GiB (ADR-005 D8). Recalibrate from outputs/system/meminfo-*.jsonl."""
+    """Memory thresholds in GiB (ADR-005 D8 + A1). Recalibrate from outputs/system/meminfo-*.jsonl.
 
-    min_margin_gb: float = 10.0
-    margin_frac: float = 0.2
-    hard_floor_gb: float = 20.0
+    User rule 2026-10-13 ("đừng quá 80% phần VRAM còn lại"): with A0 = MemAvailable when the job starts, the job may
+    take at most ``max_free_frac`` x A0. Preflight: est_peak <= max_free_frac x available (and the job must not land
+    below ``abort_gb``). Runtime: warn below (1 - warn_free_frac) x A0, stop below (1 - max_free_frac) x A0; the
+    absolute ``warn_gb``/``abort_gb``/``emergency_gb`` stay as floors and the stricter level wins.
+    """
+
     min_swap_free_gb: float = 2.0
     warn_gb: float = 14.0
     abort_gb: float = 8.0
@@ -52,11 +57,35 @@ class MemThresholds:
     fast_horizon_s: float = 5.0
     slope_window_s: float = 2.0
     slope_min_samples: int = 3
+    # Share of the start-time free memory a job may use / after which memguard warns. Settings: stricter only.
+    max_free_frac: float = MAX_FREE_FRAC
+    warn_free_frac: float = 0.75
+
+    def __post_init__(self) -> None:
+        if not 0.0 < self.max_free_frac <= MAX_FREE_FRAC:
+            raise ValueError(f"max_free_frac must be in (0, {MAX_FREE_FRAC}] (stricter only), got {self.max_free_frac}")
+        if not 0.0 < self.warn_free_frac < self.max_free_frac:
+            raise ValueError(f"warn_free_frac must be in (0, max_free_frac), got {self.warn_free_frac}")
+
+    def for_start(self, start_available_gb: float) -> MemThresholds:
+        """GB levels for a job that starts with ``start_available_gb`` free (A0); the stricter level wins.
+
+        stop below (1 - max_free_frac) x A0 (the job used more than 80 % of A0), warn below (1 - warn_free_frac) x A0.
+        ``emergency_gb`` stays absolute: the last layer (immediate kill) whatever the % rule says.
+        """
+        return dataclasses.replace(
+            self,
+            abort_gb=max(self.abort_gb, (1.0 - self.max_free_frac) * start_available_gb),
+            warn_gb=max(self.warn_gb, (1.0 - self.warn_free_frac) * start_available_gb),
+        )
 
     def required_available_gb(self, est_peak_gb: float) -> float:
-        """MemAvailable needed to start a job with the given estimated peak."""
-        margin = max(self.min_margin_gb, self.margin_frac * est_peak_gb)
-        return max(est_peak_gb + margin, self.hard_floor_gb)
+        """MemAvailable needed to start a job of ``est_peak_gb``.
+
+        est <= max_free_frac x available (exactly at the limit is allowed), and est + abort_gb <= available so the job
+        does not start already at its stop level.
+        """
+        return max(est_peak_gb / self.max_free_frac, est_peak_gb + self.abort_gb)
 
 
 DEFAULT_THRESHOLDS = MemThresholds()
@@ -119,6 +148,11 @@ def _hard_exit() -> None:
 class MemGuard:
     """Background watchdog: warn below ``warn_gb``, request a controlled stop below ``abort_gb``.
 
+    Both levels are resolved at the first poll from A0 = MemAvailable before the job starts
+    (``MemThresholds.for_start``): with the defaults the stop comes when the job has used more than 80 % of A0 (warn
+    above 75 %), never later than the absolute ``abort_gb``; fast-fall kills when the slope predicts crossing that
+    level within ``fast_horizon_s``. ``emergency_gb`` stays an absolute last layer.
+
     The trainer polls ``should_stop`` every step, saves a checkpoint and exits with ``ExitCode.MEM_PREEMPT``.
     Wrap checkpoint writes in ``with guard.saving():``. If the process is still alive ``abort_grace_s`` after the
     stop request (``saving_grace_s`` while a save is in progress), or memory falls below ``emergency_gb``,
@@ -139,12 +173,14 @@ class MemGuard:
         """Configure the watchdog (it starts with ``start()`` / ``with``).
 
         ``cgroup_root=None``: host MemAvailable only (host-side watchdog of a container job, where the job's
-        CUDA/UMA memory lives outside any cgroup). ``on_abort`` is called once when the stop is requested (e.g.
+        CUDA/UMA memory lives outside any cgroup). run_job always watches from the host with ``cgroup_root=None``,
+        so A0 is the host's free memory. ``on_abort`` is called once when the stop is requested (e.g.
         ``docker stop -t <grace>``); ``hard_exit`` once when the grace expires or memory is below ``emergency_gb``.
         """
         if not thresholds.emergency_gb < thresholds.abort_gb < thresholds.warn_gb:
             raise ValueError("thresholds must satisfy emergency_gb < abort_gb < warn_gb")
-        self.thresholds = thresholds
+        self.thresholds = thresholds  # resolved against the first poll's MemAvailable (A0, max_free_frac rule)
+        self._resolved = False
         self.interval_s = interval_s
         self.should_stop: threading.Event = threading.Event()
         self.state: GuardState = "ok"
@@ -165,6 +201,10 @@ class MemGuard:
     def poll_once(self) -> MemSnapshot:
         """Read memory once and update state; safe to call without the background thread (tests)."""
         snapshot = read_meminfo(self._meminfo_path)
+        if not self._resolved:  # levels are fixed for the whole job
+            # A0 = host MemAvailable before the job starts (run_guarded polls once before launching).
+            self.thresholds = self.thresholds.for_start(snapshot.mem_available_gb)
+            self._resolved = True
         cgroup_gb = read_cgroup_available_gb(self._cgroup_root) if self._cgroup_root is not None else None
         available = effective_available_gb(snapshot, cgroup_gb)
         self.min_available_gb = min(self.min_available_gb, available)

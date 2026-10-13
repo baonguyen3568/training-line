@@ -31,11 +31,20 @@ def _busy_lock() -> LockStatus | None:
 
 
 def test_adr005_examples_with_43gb_available() -> None:
-    # ADR-005 D8: LoRA 4B (~16 GB) OK, full-FT 8B (~70 GB) refused, at MemAvailable 43 GB.
+    # ADR-005 D8 examples under A1 (job <= 80 % of the free memory, and leaves >= abort 8 GB): at 43 GB free a
+    # LoRA 4B (~16 GB) fits, a full-FT 8B (~70 GB) needs 70 / 0.8 = 87.5 GB free.
     assert check_memory(16.0, snapshot=_snap(43.0)) == []
     [f] = check_memory(70.0, snapshot=_snap(43.0))
     assert f.exit_code is ExitCode.NO_MEM
-    assert f.params["need_gb"] == pytest.approx(84.0)
+    assert f.params["need_gb"] == pytest.approx(87.5)
+    assert f.params["max_free_pct"] == 80
+
+
+@pytest.mark.parametrize(("avail", "est", "ok"), [(50.0, 40.0, True), (50.0, 40.1, False), (30.0, 22.0, True),
+                                                   (30.0, 22.5, False)])  # fmt: skip
+def test_exactly_80_percent_of_free_memory_is_allowed(avail: float, est: float, ok: bool) -> None:
+    snap = MemSnapshot(mem_total_gb=121.7, mem_available_gb=avail, cached_gb=0.0, swap_free_gb=6.0)
+    assert (check_memory(est, snapshot=snap) == []) is ok
 
 
 def test_low_swap_refuses_even_with_ram() -> None:
@@ -90,7 +99,7 @@ def test_preflight_ok_json_shape() -> None:
     assert data["reasons"] == []
     assert {"mem", "disk", "lock", "thresholds", "findings"} <= data.keys()
     assert "details" not in data  # one source: details are flattened at top level
-    assert data["mem"]["required_gb"] == pytest.approx(26.0)
+    assert data["mem"]["required_gb"] == pytest.approx(24.0)  # 16 + abort 8 beats 16 / 0.8
     assert data["lock"] is None
 
 
@@ -140,3 +149,11 @@ def test_every_finding_code_is_in_the_catalog_with_its_params() -> None:
         declared = {p.name for p in catalog[f.code].params}
         assert set(f.params) <= declared, (f.code, set(f.params) - declared)
     assert all("code" in f for f in json.loads(v.to_json())["findings"])
+
+
+def test_cgroup_limit_is_a_second_budget_and_the_stricter_binds() -> None:
+    """App inside a memory-limited container: host free memory and the cgroup headroom are both budgets."""
+    host = MemSnapshot(mem_total_gb=121.7, mem_available_gb=60.0, cached_gb=0.0, swap_free_gb=6.0)
+    assert check_memory(10.0, snapshot=host, cgroup_available_gb=30.0) == []  # 10 <= 0.8 x 30, 18 <= 30
+    [f] = check_memory(10.0, snapshot=host, cgroup_available_gb=15.0)  # 10 + 8 > 15
+    assert f.params["avail_gb"] == pytest.approx(15.0)

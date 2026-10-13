@@ -85,8 +85,13 @@ def check_memory(
     """Memory/swap conditions for starting a heavy job. Swap is never counted as available memory."""
     if est_peak_gb < 0:
         raise ValueError(f"est_peak_gb must be >= 0, got {est_peak_gb}")
-    available = effective_available_gb(snapshot, cgroup_available_gb)
+    # User rule (ADR-005 A1): the job may take at most max_free_frac of the memory free NOW. The host's MemAvailable is
+    # the budget; a container memory limit is a second, separate budget checked the same way (the stricter binds).
+    available = snapshot.mem_available_gb
     required = thresholds.required_available_gb(est_peak_gb)
+    if cgroup_available_gb is not None and cgroup_available_gb < available:
+        available = cgroup_available_gb
+    max_free_pct = round(100 * thresholds.max_free_frac)
     findings: list[Finding] = []
     if available < required:
         findings.append(
@@ -94,8 +99,14 @@ def check_memory(
                 "MEM-001",
                 ExitCode.NO_MEM,
                 f"MemAvailable {available:.1f} GB < required {required:.1f} GB "
-                f"(est_peak {est_peak_gb:.1f} GB + margin, hard floor {thresholds.hard_floor_gb:.0f} GB)",
-                {"need_gb": round(required, 2), "avail_gb": round(available, 2), "est_peak_gb": est_peak_gb},
+                f"(est_peak {est_peak_gb:.1f} GB may use at most {max_free_pct}% of the free memory and must leave "
+                f">= {thresholds.abort_gb:.0f} GB)",
+                {
+                    "need_gb": round(required, 2),
+                    "avail_gb": round(available, 2),
+                    "est_peak_gb": est_peak_gb,
+                    "max_free_pct": max_free_pct,
+                },
             )
         )
     if snapshot.swap_free_gb < thresholds.min_swap_free_gb:
@@ -105,7 +116,12 @@ def check_memory(
                 ExitCode.NO_MEM,
                 f"SwapFree {snapshot.swap_free_gb:.1f} GB < {thresholds.min_swap_free_gb:.0f} GB "
                 "(host under memory pressure)",
-                {"need_gb": round(required, 2), "avail_gb": round(available, 2), "est_peak_gb": est_peak_gb},
+                {
+                    "need_gb": round(required, 2),
+                    "avail_gb": round(available, 2),
+                    "est_peak_gb": est_peak_gb,
+                    "max_free_pct": max_free_pct,
+                },
             )
         )
     return findings
@@ -173,15 +189,15 @@ def preflight(
             "cached_gb": round(mem.cached_gb, 2),
             "est_peak_gb": est_peak_gb,
             "required_gb": round(thresholds.required_available_gb(est_peak_gb), 2),
+            "max_free_pct": round(100 * thresholds.max_free_frac),
         },
         "disk": {"path": dsk.path, "free_gb": round(dsk.free_gb, 2), "required_gb": round(need_disk_gb, 2)},
         "lock": None
         if lock is None
         else {"who": lock.who, "job": lock.job, "alive": lock.alive, "corrupt": lock.corrupt},
         "thresholds": {
-            "min_margin_gb": thresholds.min_margin_gb,
-            "margin_frac": thresholds.margin_frac,
-            "hard_floor_gb": thresholds.hard_floor_gb,
+            "max_free_frac": thresholds.max_free_frac,
+            "abort_gb": thresholds.abort_gb,
             "min_swap_free_gb": thresholds.min_swap_free_gb,
         },
     }

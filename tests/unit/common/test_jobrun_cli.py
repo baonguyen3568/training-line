@@ -19,6 +19,7 @@ def _args(**kw: object) -> argparse.Namespace:
         "rw_dir": [],
         "allow_unapproved_image": False,
         "unapproved_image_rw": False,
+        "entrypoint": None,
     }
     return argparse.Namespace(**{**base, **kw})
 
@@ -75,3 +76,63 @@ def test_validate_rw_dirs_accepts_outputs_subdirs_only(tmp_path: Path) -> None:
     for bad in (root / "outputs", root / "outputs" / "system", Path("/abs/x")):
         with pytest.raises(ValueError, match="must be inside"):
             validate_rw_dirs(root, [bad])
+
+
+def test_entrypoint_override_goes_before_the_image(tmp_path: Path) -> None:
+    _, _, args = _job(tmp_path, allow_unapproved_image=True, entrypoint="python3")
+    i = args.index("vlm-vllm:0.31.0")
+    assert args[i - 2 : i] == ["--entrypoint", "python3"]
+    assert args[i + 1 :] == ["python", "x.py"]  # argv follows the image unchanged
+    _, _, default = _job(tmp_path / "b")
+    assert "--entrypoint" not in default
+
+
+@pytest.mark.parametrize("bad", ["-v /:/host", "--privileged", "python3 -c x", "", "a;b"])
+def test_entrypoint_must_be_one_plain_token(tmp_path: Path, bad: str) -> None:
+    with pytest.raises(ValueError, match="invalid entrypoint"):
+        _job(tmp_path, entrypoint=bad)
+
+
+# ------------------------------------------------------------------------- --max-used-pct (80% rule)
+
+
+def _main(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *flags: str) -> tuple[int | None, dict[str, object]]:
+    """Run jobrun_cli.main with run_job captured (no docker); returns the exit and run_job's keyword args."""
+    import vlm_pipeline.common.jobrun_cli as cli
+    from vlm_pipeline.common.runinfo import RunStatus
+
+    captured: dict[str, object] = {}
+
+    def fake_run_job(job: object, manifest: object, run_dir: Path, **kw: object) -> object:
+        captured.update(kw)
+        return argparse.Namespace(status=RunStatus.COMPLETED, error_code=None)
+
+    monkeypatch.setattr(cli, "project_root", lambda: tmp_path)
+    monkeypatch.setattr(cli, "run_job", fake_run_job)
+    argv = ["--image", "vlm-automodel:26.08-5", "--tag", "t", "--est-peak-gb", "8", *flags, "--", "python", "x.py"]
+    return cli.main(argv), captured
+
+
+def test_max_free_pct_tightens_the_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    code, kw = _main(tmp_path, monkeypatch, "--max-free-pct", "70")
+    assert code in (0, None)
+    thresholds = kw["mem_thresholds"]
+    assert thresholds.max_free_frac == pytest.approx(0.70)  # type: ignore[attr-defined]
+    assert thresholds.warn_free_frac < thresholds.max_free_frac  # type: ignore[attr-defined]
+
+
+def test_default_ceiling_is_80(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _, kw = _main(tmp_path, monkeypatch)
+    assert kw["mem_thresholds"].max_free_frac == pytest.approx(0.80)  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("pct", ["90", "80.5", "0", "nan"])
+def test_a_looser_ceiling_is_refused_before_any_run_dir_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pct: str
+) -> None:
+    from vlm_pipeline.common.jobrun import ThresholdTooLooseError
+
+    with pytest.raises((ThresholdTooLooseError, SystemExit)):
+        _main(tmp_path, monkeypatch, "--max-free-pct", pct)
+    runs = tmp_path / "outputs" / "runs"
+    assert not runs.exists() or list(runs.iterdir()) == []  # no orphan run.json stuck in "running"

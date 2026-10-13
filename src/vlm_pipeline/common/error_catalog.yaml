@@ -29,7 +29,8 @@ MEM-001:
   slug: MEM_INSUFFICIENT
   severity: error
   prevent_in_preflight: true
-  params: [need_gb, avail_gb, est_peak_gb, est_gb]
+  # max_free_pct: share of the free memory a job may use (user rule ADR-005 A1, default 80).
+  params: [need_gb, avail_gb, est_peak_gb, est_gb, max_free_pct]
   match:
     - {kind: preflight, value: NO_MEM}
   actions:

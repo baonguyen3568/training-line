@@ -52,6 +52,8 @@ class ContainerJob:
     # container path. Jobs that run untrusted input (trial inference on user images, remote model code) write their
     # result here and nowhere else (bao-security, B-7).
     rw_dirs: tuple[Path, ...] = ()
+    # Replaces the image's ENTRYPOINT (e.g. vllm/vllm-openai's ["vllm", "serve"]) so ``argv`` is the whole command.
+    entrypoint: str | None = None
     uid: int = field(default_factory=os.getuid)
     gid: int = field(default_factory=os.getgid)
 
@@ -80,6 +82,18 @@ _FORBIDDEN_ENV_PREFIXES = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "NGC_", "WANDB_
 _SECRET_NAME = re.compile(r"(?:^|_)(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD|CREDENTIALS?)(?:_|$)", re.IGNORECASE)
 # Explicit exceptions only (none yet; a first-party download job receiving a scoped token would be listed here, D12).
 SECRET_ENV_ALLOWLIST: frozenset[str] = frozenset()
+
+
+_ENTRYPOINT = re.compile(r"[A-Za-z0-9_./-]{1,64}")
+
+
+def _entrypoint_args(entrypoint: str | None) -> list[str]:
+    """One plain token (bao-security): no spaces, never starting with "-", so it can't become a docker flag."""
+    if entrypoint is None:
+        return []
+    if not _ENTRYPOINT.fullmatch(entrypoint) or entrypoint.startswith("-"):
+        raise ValueError(f"invalid entrypoint {entrypoint!r}")
+    return ["--entrypoint", entrypoint]
 
 
 def validate_rw_dirs(project_root: Path, dirs: Iterable[Path]) -> list[Path]:
@@ -134,6 +148,7 @@ def docker_args(job: ContainerJob, project_root: Path, *, lock_token: str | None
         args += ["--gpus", "all"]
     for key, value in sorted(env.items()):
         args += ["-e", f"{key}={value}"]
+    args += _entrypoint_args(job.entrypoint)
     return [*args, job.image, *job.argv]
 
 
@@ -186,17 +201,34 @@ class ThresholdTooLooseError(VlmPipelineError):
     code: ClassVar[str] = "CFG-005"
 
 
-def tightened_thresholds(abort_gb: float | None = None) -> MemThresholds:
-    """ADR-005 thresholds, optionally with a HIGHER abort level (e.g. 10 GB for a first measurement run)."""
-    if abort_gb is None:
-        return DEFAULT_THRESHOLDS
-    if not math.isfinite(abort_gb) or abort_gb < DEFAULT_THRESHOLDS.abort_gb:
-        raise ThresholdTooLooseError(
-            "abort threshold below ADR-005",
-            params={"param": "abort_gb", "rule": f">={DEFAULT_THRESHOLDS.abort_gb}", "value": abort_gb},
-        )
-    warn = max(DEFAULT_THRESHOLDS.warn_gb, abort_gb + 4.0)  # keep warn > abort for the fast-fall rule
-    return dataclasses.replace(DEFAULT_THRESHOLDS, abort_gb=abort_gb, warn_gb=warn)
+MIN_FREE_FRAC = 0.1  # below this no job could ever start; keeps warn_free_frac (ceiling - 0.05) positive
+
+
+def tightened_thresholds(abort_gb: float | None = None, max_free_frac: float | None = None) -> MemThresholds:
+    """ADR-005 thresholds, optionally STRICTER; anything looser is refused (CFG-005).
+
+    ``abort_gb``: a higher abort level (e.g. 10 GB for a first measurement run). ``max_free_frac``: a lower share
+    of the free memory a job may use than the user's 80 %.
+    """
+    thresholds = DEFAULT_THRESHOLDS
+    if abort_gb is not None:
+        if not math.isfinite(abort_gb) or abort_gb < DEFAULT_THRESHOLDS.abort_gb:
+            raise ThresholdTooLooseError(
+                "abort threshold below ADR-005",
+                params={"param": "abort_gb", "rule": f">={DEFAULT_THRESHOLDS.abort_gb}", "value": abort_gb},
+            )
+        warn = max(DEFAULT_THRESHOLDS.warn_gb, abort_gb + 4.0)  # keep warn > abort for the fast-fall rule
+        thresholds = dataclasses.replace(thresholds, abort_gb=abort_gb, warn_gb=warn)
+    if max_free_frac is not None:
+        ceiling = DEFAULT_THRESHOLDS.max_free_frac
+        if not math.isfinite(max_free_frac) or not MIN_FREE_FRAC <= max_free_frac <= ceiling:
+            raise ThresholdTooLooseError(
+                "free-memory share outside the allowed range",
+                params={"param": "max_free_frac", "rule": f"[{MIN_FREE_FRAC}, {ceiling}]", "value": max_free_frac},
+            )
+        warn_frac = min(DEFAULT_THRESHOLDS.warn_free_frac, max_free_frac - 0.05)
+        thresholds = dataclasses.replace(thresholds, max_free_frac=max_free_frac, warn_free_frac=warn_frac)
+    return thresholds
 
 
 class MemoryPreemptedBeforeStartError(RuntimeError):
@@ -444,7 +476,9 @@ def run_job(
                 "trainable_pct": _trainable_pct(run_dir / "logs" / "stdout.log"),
                 "engine_warnings": _engine_warnings(run_dir / "logs" / "stdout.log"),
                 "memguard_fast_fall": bool(guard.fast_fall_killed),
-                "memguard_abort_gb": mem_thresholds.abort_gb,
+                "memguard_abort_gb": round(
+                    guard.thresholds.abort_gb, 2
+                ),  # resolved (80 % of the start-time free memory vs absolute)
             }
         )
         write_manifest(run_dir, manifest)

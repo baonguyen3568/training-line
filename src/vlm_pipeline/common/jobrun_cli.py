@@ -19,7 +19,14 @@ import secrets
 import time
 from pathlib import Path
 
-from vlm_pipeline.common.jobrun import CONTAINER_ROOT, ContainerJob, run_job, tightened_thresholds, validate_rw_dirs
+from vlm_pipeline.common.jobrun import (
+    CONTAINER_ROOT,
+    ContainerJob,
+    ThresholdTooLooseError,
+    run_job,
+    tightened_thresholds,
+    validate_rw_dirs,
+)
 from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, write_manifest
 
@@ -33,7 +40,7 @@ def build_job(a: argparse.Namespace, root: Path, run_id: str, run_dir: Path, arg
         logger.warning("unapproved image %s runs with the project mounted READ-WRITE (--unapproved-image-rw)", a.image)
     rw_dirs = (run_dir, *(root / d for d in a.rw_dir)) if read_only else ()
     return ContainerJob(name=run_id, image=a.image, argv=argv_c, gpu=not a.no_gpu,
-                        read_only_project=read_only, rw_dirs=rw_dirs)  # fmt: skip
+                        read_only_project=read_only, rw_dirs=rw_dirs, entrypoint=a.entrypoint)  # fmt: skip
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--stage", default="eval", choices=["data", "train", "quantize", "eval", "bench", "serve", "export"])
     p.add_argument("--est-peak-gb", type=float, required=True)
     p.add_argument("--abort-gb", type=float)
+    p.add_argument("--max-free-pct", type=float, help="use at most this %% of the free memory (< 80, the user rule)")
     p.add_argument("--no-gpu", action="store_true")
     p.add_argument("--who", default="cli")
     p.add_argument("--allow-unapproved-image", action="store_true",
@@ -52,11 +60,16 @@ def main(argv: list[str] | None = None) -> int:
                    help="extra writable dir under outputs/ (with a read-only project), repeatable")  # fmt: skip
     p.add_argument("--unapproved-image-rw", action="store_true",
                    help="with --allow-unapproved-image: keep the repo writable (not recommended, logged)")  # fmt: skip
+    p.add_argument("--entrypoint", help="override the image ENTRYPOINT (vLLM image: the command's first word)")
     p.add_argument("cmd", nargs=argparse.REMAINDER, help="-- command ...")
     a = p.parse_args(argv)
     cmd = a.cmd[1:] if a.cmd[:1] == ["--"] else a.cmd
     if not cmd:
         p.error("missing command after --")
+    try:  # before any run dir/manifest exists: a refused setting never leaves a "running" run behind
+        thresholds = tightened_thresholds(a.abort_gb, None if a.max_free_pct is None else a.max_free_pct / 100)
+    except ThresholdTooLooseError as exc:
+        p.error(f"{exc} ({exc.params})")
 
     root = project_root()
     run_id = f"{time.strftime('%Y%m%d-%H%M')}-{a.tag}-{secrets.token_hex(2)}"
@@ -75,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     for d in rw_dirs:  # docker would create a missing bind source as root
         d.mkdir(parents=True, exist_ok=True)
     final = run_job(job, manifest, run_dir, project_root=root, who=a.who, est_peak_gb=a.est_peak_gb,
-                    mem_thresholds=tightened_thresholds(a.abort_gb),
+                    mem_thresholds=thresholds,
                     require_approved_image=not a.allow_unapproved_image)  # fmt: skip
     print(json.dumps({"run_id": run_id, "run_dir": str(run_dir), "status": final.status,
                       "error_code": final.error_code}))  # fmt: skip

@@ -35,7 +35,8 @@ while True:
 def _meminfo(path: Path, avail_gb: float) -> None:
     # Atomic like the real /proc/meminfo: the watchdog must never see a half-written file.
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(f"MemTotal: {int(121.7 * KB)} kB\nMemAvailable: {int(avail_gb * KB)} kB\nSwapFree: {6 * KB} kB\n")
+    # 40 GB device: the absolute ADR-005 levels bind (the 80 % rule is tested in test_memguard.py).
+    tmp.write_text(f"MemTotal: {int(40 * KB)} kB\nMemAvailable: {int(avail_gb * KB)} kB\nSwapFree: {6 * KB} kB\n")
     tmp.replace(path)
 
 
@@ -56,7 +57,7 @@ def _drop_later(meminfo: Path, avail_gb: float, after_s: float) -> threading.Thr
 def test_thresholds_are_locked_to_adr_005() -> None:
     t = DEFAULT_THRESHOLDS
     assert (t.warn_gb, t.abort_gb, t.emergency_gb) == (14.0, 8.0, 4.0)
-    assert (t.min_margin_gb, t.margin_frac, t.hard_floor_gb, t.min_swap_free_gb) == (10.0, 0.2, 20.0, 2.0)
+    assert (t.max_free_frac, t.warn_free_frac, t.min_swap_free_gb) == (0.80, 0.75, 2.0)  # ADR-005 A1
 
 
 def test_slow_crossing_stops_the_job_gracefully(tmp_path: Path) -> None:
