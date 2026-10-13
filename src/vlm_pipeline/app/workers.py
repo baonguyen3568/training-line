@@ -45,6 +45,7 @@ from vlm_pipeline.graph.worker import (
     NodeResult,
     SupportQuery,
     checkpoint_dirs,
+    port_of,
 )
 from vlm_pipeline.nodes.spec import NodeSpec, is_compatible
 from vlm_pipeline.train.advanced import AdvancedNotForModelError, keys_not_for
@@ -191,7 +192,8 @@ class RealWorker:
         """The run-time SupportQuery of ``job`` (same fields graph validate derives from the canvas)."""
         model: CatalogEntry | None = None
         inputs: dict[str, str] = {}
-        for port, ref in job.inputs.items():
+        for key, ref in job.inputs.items():
+            port = port_of(key)  # a many-port's extra wires (heldout.1...) have the same kind as the port
             port_spec = job.spec.inputs.get(port)
             if port_spec is not None and is_compatible(port_spec.type, "Model"):
                 inputs[port] = "model"

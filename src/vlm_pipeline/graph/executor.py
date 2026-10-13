@@ -175,6 +175,24 @@ class _Node:
     params: BaseModel
 
 
+def gather_inputs(spec: NodeSpec, wired: list[tuple[str, str, str, ArtifactRef]]) -> dict[str, ArtifactRef]:
+    """Input port -> artifact; a ``many`` port's wires become ``port``, ``port.1``, ``port.2``... (``port_inputs``).
+
+    Wires of one many-port are ordered by their artifact's content hash (node ids only break ties), so neither the
+    wiring order nor renaming a node changes the cache key; a plain dict by port kept only the last wire (data.dedupe
+    lost all but one heldout set).
+    """
+    inputs: dict[str, ArtifactRef] = {}
+    for _src, _out, inp, ref in sorted(wired, key=lambda w: (w[2], w[3].hash, w[0], w[1])):
+        port = spec.inputs.get(inp)
+        if port is not None and port.many and inp in inputs:
+            n = sum(1 for k in inputs if k.startswith(inp + "."))
+            inputs[f"{inp}.{n + 1}"] = ref
+        else:
+            inputs[inp] = ref
+    return inputs
+
+
 def _topo_order(node_ids: list[str], edges: list[tuple[str, str, str, str]]) -> list[str]:
     """Kahn's algorithm; ties keep the workflow file order (stable, predictable for users and tests)."""
     indeg = dict.fromkeys(node_ids, 0)
@@ -315,7 +333,7 @@ class Executor:
         if cancel.is_set() or any(run.status.get(src) not in DONE for src, _, _ in upstream):
             self._set(run, nid, "skipped")
             return
-        inputs = {inp: run.outputs[src][out] for src, out, inp in upstream}
+        inputs = gather_inputs(node.spec, [(src, out, inp, run.outputs[src][out]) for src, out, inp in upstream])
         key = compute_cache_key(
             node.spec,
             node.params,

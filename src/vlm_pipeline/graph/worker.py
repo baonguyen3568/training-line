@@ -69,6 +69,17 @@ class Worker(Protocol):
     def run(self, job: NodeJob) -> NodeResult: ...
 
 
+def port_inputs(inputs: Mapping[str, ArtifactRef], port: str) -> list[ArtifactRef]:
+    """Every artifact wired to ``port``: one for a plain port, all of them for a ``many`` port (executor order)."""
+    extra = sorted((int(k.rsplit(".", 1)[1]), ref) for k, ref in inputs.items() if k.startswith(port + "."))
+    return ([inputs[port]] if port in inputs else []) + [ref for _, ref in extra]
+
+
+def port_of(input_key: str) -> str:
+    """The port name of a ``job.inputs`` key (``heldout.2`` -> ``heldout``)."""
+    return input_key.split(".", 1)[0]
+
+
 @dataclass(frozen=True)
 class SupportQuery:
     """What decides whether a worker can run a node, known both on the canvas and at run time (no file access).
