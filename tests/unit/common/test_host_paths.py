@@ -121,3 +121,16 @@ def test_a_source_outside_the_root_is_refused(tmp_path: Path) -> None:
     root = _tree(tmp_path)
     with pytest.raises(UnsafeMountSourceError, match="outside"):
         check_mount_source(root, tmp_path, directory=True)
+
+
+def test_mount_unit_of_hub_and_prepared_paths(tmp_path: Path) -> None:
+    """A prepared model's config names sibling folders of its bundle (Parse: the RADIO encoder): mount the bundle."""
+    from vlm_pipeline.common.host_paths import hub_repo_dir
+
+    hub = tmp_path / ".cache" / "hf" / "hub" / "models--org--m"
+    assert hub_repo_dir(tmp_path, hub / "snapshots" / "rev") == hub
+    bundle = tmp_path / ".cache" / "prepared" / "nemotron-parse-v1.1_fd1e3c6b"
+    assert hub_repo_dir(tmp_path, bundle / "model") == bundle
+    prepared_root = tmp_path / ".cache" / "prepared"
+    assert hub_repo_dir(tmp_path, prepared_root) == prepared_root  # never widened to the root itself
+    assert hub_repo_dir(tmp_path, tmp_path / "data" / "mine") == tmp_path / "data" / "mine"

@@ -205,14 +205,18 @@ def link_units(root: Path, top: Path) -> tuple[str | None, set[Path]]:
 
 
 def hub_repo_dir(root: Path, path: Path) -> Path:
-    """``.cache/hf/hub/<repo>`` for a path inside an HF hub repo (its snapshot links point into ``blobs/``), else path.
+    """The unit a narrowed job mounts read-only to read ``path`` (P017 step 6, bao-security Q1), else ``path``.
 
-    What a narrowed job mounts read-only to read ``path`` (P017 step 6, bao-security Q1).
+    ``.cache/hf/hub/<repo>`` for a path inside an HF hub repo (its snapshot links point into ``blobs/``), and
+    ``.cache/prepared/<bundle>`` for a prepared model: its ``model/`` config names sibling folders of the bundle
+    (Nemotron-Parse: the RADIO encoder in ``c-radiov2-h_*``), which must be there too.
     """
     if path.is_relative_to(root):
         rel = path.relative_to(root)
         if rel.parts[:3] == (".cache", "hf", "hub") and len(rel.parts) > 3:
             return root.joinpath(*rel.parts[:4])
+        if rel.parts[:2] == (".cache", "prepared") and len(rel.parts) > 2:
+            return root.joinpath(*rel.parts[:3])
     return path
 
 
