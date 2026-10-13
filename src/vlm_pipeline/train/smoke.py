@@ -65,6 +65,66 @@ def _complete_main(argv: list[str]) -> int:
     return 0
 
 
+def _with_restore_from(text: str, ckpt_c: str) -> str:
+    """Set ``checkpoint.restore_from`` (AutoModel resumes model + optimizer + dataloader state from that dir)."""
+    if re.search(r"^\s+restore_from:", text, re.M):
+        raise ValueError("config already sets checkpoint.restore_from")
+    out, n = re.subn(r"^checkpoint:\n", f"checkpoint:\n  restore_from: {ckpt_c}\n", text, count=1, flags=re.M)
+    if n != 1:
+        raise ValueError("config has no top-level checkpoint: block")
+    return out
+
+
+_CKPT_PARTS = ("model", "optim", "step_scheduler.pt")
+
+
+def _optimizer_target(text: str) -> str | None:
+    m = re.search(r"^optimizer:\n(?:[ \t]+.*\n)*?[ \t]+_target_:\s*(\S+)", text, re.M)
+    return m.group(1) if m else None
+
+
+def _check_restore_source(ckpt: Path, text: str) -> str | None:
+    """Why ``ckpt`` cannot be resumed by ``text`` (fail before the GPU lock, not after loading the model), or None."""
+    if missing := [part for part in _CKPT_PARTS if not (ckpt / part).exists()]:
+        return f"{ckpt} is not a training checkpoint (missing {', '.join(missing)})"
+    parent_cfg = ckpt / "config.yaml"
+    parent = _optimizer_target(parent_cfg.read_text(encoding="utf-8")) if parent_cfg.is_file() else None
+    if parent != _optimizer_target(text):  # different optimizer state layout: could load partly, re-init silently
+        return f"optimizer differs from the checkpoint's ({parent} != {_optimizer_target(text)})"
+    return None
+
+
+def _render_config(a: argparse.Namespace, p: argparse.ArgumentParser, root: Path, code: Path, run_dir_c: str) -> str:
+    """The recipe as the container sees it: placeholders substituted, CLI overrides applied."""
+    text: str = (code / a.config).read_text(encoding="utf-8").replace("RUN_DIR", run_dir_c)
+    if "PREPARED_MODEL_DIR" in text:
+        if a.prepared is None:
+            p.error("config uses PREPARED_MODEL_DIR: pass --prepared")
+        prepared = json.loads((root / a.prepared / "prepared.json").read_text(encoding="utf-8"))
+        text = text.replace("PREPARED_MODEL_DIR", str(prepared["container_dir"]))
+    if a.max_steps is not None:
+        text = re.sub(r"^(\s*)max_steps:.*$", rf"\g<1>max_steps: {a.max_steps}", text, count=1, flags=re.M)
+    if a.restore_from is not None:
+        ckpt = (root / a.restore_from).resolve()
+        if not ckpt.is_dir() or not ckpt.is_relative_to(root / "outputs" / "runs"):
+            p.error("--restore-from must be an existing checkpoint dir under outputs/runs/")
+        if problem := _check_restore_source(ckpt, text):
+            p.error(problem)
+        try:
+            text = _with_restore_from(text, f"{CONTAINER_ROOT}/{ckpt.relative_to(root).as_posix()}")
+        except ValueError as exc:
+            p.error(str(exc))
+    return text
+
+
+def _restored_tags(root: Path, restore_from: Path | None) -> list[str]:
+    """``resumed`` + ``restored_from:<run_id>/<ckpt>``: the result depends on the parent run (see its run.json)."""
+    if restore_from is None:
+        return []
+    rel = (root / restore_from).resolve().relative_to(root / "outputs" / "runs")
+    return ["resumed", f"restored_from:{rel.parts[0]}/{rel.parts[-1]}"]
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m vlm_pipeline.train.smoke")
     p.add_argument("--config", type=Path, required=True)
@@ -81,6 +141,12 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--gate", action="store_true", help="refuse to run unless reproducibility_gaps() == []")
     p.add_argument("--abort-gb", type=float, help="memguard abort level; may only be HIGHER than ADR-005 (8 GB)")
     p.add_argument("--max-steps", type=int, help="override step_scheduler.max_steps (measurement runs)")
+    p.add_argument(
+        "--restore-from",
+        type=Path,
+        metavar="CKPT_DIR",
+        help="resume from a checkpoint dir of an earlier run (outputs/runs/<run>/checkpoints/epoch_*_step_*)",
+    )
     p.add_argument("--expect-trainable-pct", metavar="LO:HI", help="fail fast if the trainable share is outside")
     return p
 
@@ -104,14 +170,7 @@ def main(argv: list[str] | None = None) -> int:
             ["git", "-C", str(root), "worktree", "add", "--detach", str(code_root), a.worktree],  # noqa: S607
             check=True, capture_output=True,
         )  # fmt: skip
-    text = ((code_root or root) / a.config).read_text(encoding="utf-8").replace("RUN_DIR", run_dir_c)
-    if "PREPARED_MODEL_DIR" in text:
-        if a.prepared is None:
-            p.error("config uses PREPARED_MODEL_DIR: pass --prepared")
-        prepared = json.loads((root / a.prepared / "prepared.json").read_text(encoding="utf-8"))
-        text = text.replace("PREPARED_MODEL_DIR", prepared["container_dir"])
-    if a.max_steps is not None:
-        text = re.sub(r"^(\s*)max_steps:.*$", rf"\g<1>max_steps: {a.max_steps}", text, count=1, flags=re.M)
+    text = _render_config(a, p, root, code_root or root, run_dir_c)
     (run_dir / "config.yaml").write_text(text, encoding="utf-8")
 
     manifest = RunManifest(
@@ -127,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=int(m.group(1)) if (m := re.search(r"^\s*seed:\s*(\d+)", text, re.M)) else None,
         max_steps=int(m2.group(1)) if (m2 := re.search(r"^\s*max_steps:\s*(\d+)", text, re.M)) else None,
         container_image=a.image,
-        tags=["smoke"],
+        tags=["smoke", *_restored_tags(root, a.restore_from)],
     )
     write_manifest(run_dir, manifest)
     job = ContainerJob(
