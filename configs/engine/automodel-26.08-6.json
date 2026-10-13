@@ -253,27 +253,6 @@
    "type": "bool"
   },
   {
-   "choices": null,
-   "default": -100,
-   "key": "loss_fn.ignore_index",
-   "max": -100,
-   "min": -100,
-   "templates": [
-    "cosmos-reason2-2b",
-    "cosmos-reason2-8b",
-    "gemma-4-e2b-it",
-    "gemma-4-e4b-it",
-    "nemotron-parse-2.0",
-    "nemotron-parse-v1.1",
-    "qwen3-vl-2b-instruct",
-    "qwen3.5-0.8b",
-    "qwen3.5-2b",
-    "qwen3.5-4b",
-    "qwen3.5-9b"
-   ],
-   "type": "int"
-  },
-  {
    "choices": [
     "te",
     "sdpa",

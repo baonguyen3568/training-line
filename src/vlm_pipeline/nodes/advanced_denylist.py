@@ -63,7 +63,6 @@ OFFERED_TYPES = frozenset({"bool", "int", "float", "enum", "list"})
 _SECTION_ONLY = "scalar, denied only for its section name  # approved: bao-security 2026-10-13"
 EXCEPTIONS: Mapping[str, Mapping[str, str]] = {
     "train.*": {
-        "loss_fn.ignore_index": _SECTION_ONLY,
         "loss_fn.fp32_upcast": _SECTION_ONLY,
         "dataloader.collate_fn.drop_overlong": _SECTION_ONLY,
         "dataloader.collate_fn.max_length": _SECTION_ONLY,
@@ -81,7 +80,6 @@ RANGES: tuple[tuple[str, float, float], ...] = (
     ("*dataloader.timeout", 0, 600),
     ("dataloader.collate_fn.max_length", 128, 32_768),
     ("dist_env.timeout_minutes", 1, 120),
-    ("loss_fn.ignore_index", -100, -100),  # the HF convention; anything else silently trains on padding
     ("optimizer.eps", 1e-12, 1e-3),
 )
 
