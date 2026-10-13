@@ -64,3 +64,4 @@
 - 2026-10-13 P-3b chốt (20 ảnh val): F1 s99 59.9 / s199 70.8 / s299 74.4; penalty 1.0 (1.1 tệ hơn). Preset: Tiêu chuẩn=3 epoch (mặc định), Nhanh=2 epoch, Thử nhanh=1 epoch (chất lượng thấp). Số công bố = CORD test ckpt 299 (tester, worktree --gate).
 - 2026-10-13 Template Parse: ckpt + val chỉ ở ranh giới epoch (AutoModel 26.08-6 luôn val khi ckpt, không tách được). Ước ~115–118 phút cho 3 lượt (trước 153'). Resume lùi tối đa 1 epoch. Epochs = 1|2|3|5, mặc định 3.
 - 2026-10-13 ✅ SỐ CÔNG BỐ template Đọc hoá đơn (Parse v1.1, P-3b s299): CORD test F1 70.97 CI95 [66.3, 75.4], nTED 78.7, parse_fail 0%, truncated 0%, 100 ảnh, worktree sạch, tất định 100/100. benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json.
+- 2026-10-13 P017 (run claims + attempt dir) duyệt hướng đi; tối đa 10 attempt/node. Stale running runs tự chuyển interrupted (SYS-003) khi app khởi động + mỗi lượt scheduler. GPU_LOCK who ghi caller thật.
