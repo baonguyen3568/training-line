@@ -348,28 +348,39 @@ def _set_aside(run: Path, name: str, *, age_days: float) -> Path:
     return entry
 
 
-def _graph_node(root: Path, name: str = "n2-ft-abc") -> Path:
+def _graph_node(
+    root: Path, name: str = "n2-ft-abc", *, status: str = "completed", ended_days_ago: float | None = 0.5
+) -> Path:
+    """A node run dir whose current training is ``status`` (ended ``ended_days_ago``), with its own checkpoints/."""
     if not (root / "pyproject.toml").exists():
         (root / "pyproject.toml").write_text('[project]\nname = "vlm-pipeline"\n')
     node = root / "outputs" / "graph" / "runs" / name
     (node / "checkpoints" / "epoch_0_step_9").mkdir(parents=True)
     (node / ".not-resumable").touch()
-    (node / "run.json").write_text(json.dumps({"run_id": name, "status": "running", "stage": "train"}))
+    manifest: dict[str, object] = {"run_id": name, "status": status, "stage": "train"}
+    if ended_days_ago is not None:
+        manifest["ended_at"] = NOW - ended_days_ago * DAY
+    (node / "run.json").write_text(json.dumps(manifest))
     return node
 
 
-def test_set_aside_resume_attempts_expire_after_three_days(tmp_path: Path) -> None:
-    node = _graph_node(tmp_path)
+def _items(root: Path, **kw: object) -> dict[str, tuple[str, str | None, str | None]]:
+    p = plan(root, now=NOW, lock_reader=no_lock, **kw)  # type: ignore[arg-type]
+    return {i.path: (i.action, i.blocked_by, i.consequence_code) for r in p.runs for i in r.items}
+
+
+def test_set_aside_expires_after_three_days_once_a_newer_training_completed(tmp_path: Path) -> None:
+    node = _graph_node(tmp_path)  # retrained and completed half a day ago
     old = _set_aside(node, "checkpoints", age_days=4)
     old_metrics = _set_aside(node, "metrics.jsonl", age_days=4)
     young = _set_aside(node, "checkpoints", age_days=1)
     p = plan(tmp_path, now=NOW, lock_reader=no_lock)
     got = {i.item_id: (i.action, i.rule, i.consequence_code) for r in p.runs for i in r.items}
     assert got == {
-        f"graph:n2-ft-abc/{old.name}": ("delete", "D3.set_aside", "PERMANENT_LOSS"),  # may be the only weights
+        f"graph:n2-ft-abc/{old.name}": ("delete", "D3.set_aside", "PERMANENT_LOSS"),
         f"graph:n2-ft-abc/{old_metrics.name}": ("delete", "D3.set_aside", None),
         f"graph:n2-ft-abc/{young.name}": ("keep", "D3.set_aside_wait", None),
-    }  # the node's own checkpoints/ belong to the node cache; the running status does not block set-aside data
+    }  # the node's own checkpoints/ belong to the node cache, not to D3
 
     result = apply(tmp_path, [i.item_id for i in p.actionable], by="t", now=NOW, lock_reader=no_lock)
     assert len(result.done) == 2
@@ -380,22 +391,62 @@ def test_set_aside_resume_attempts_expire_after_three_days(tmp_path: Path) -> No
     assert (event["event"], event["rule"]) == ("checkpoint_pruned", "D3.set_aside")
 
 
+@pytest.mark.parametrize(
+    ("status", "ended_days_ago", "own_checkpoints"),
+    [
+        ("running", None, True),  # retraining still going
+        ("failed", 0.5, True),  # retraining failed: the set-aside copy may be the only weights
+        ("cancelled", 0.5, True),
+        ("evicted", 0.5, False),  # the newer weights were evicted from the node cache
+        ("completed", 0.5, False),  # completed but its checkpoints are gone
+        ("completed", 6, True),  # the completed training is older than the set-aside (stamp 5 days ago)
+    ],
+)
+def test_set_aside_without_a_newer_completed_training_is_never_auto_deleted(
+    tmp_path: Path, status: str, ended_days_ago: float | None, own_checkpoints: bool
+) -> None:
+    node = _graph_node(tmp_path, status=status, ended_days_ago=ended_days_ago)
+    if not own_checkpoints:
+        (node / "checkpoints" / "epoch_0_step_9").rmdir()
+        (node / "checkpoints").rmdir()
+    entry = _set_aside(node, "checkpoints", age_days=5)
+    assert _items(tmp_path)[entry.name] == ("delete", "TRAINED_MODEL", "PERMANENT_LOSS")
+    p = plan(tmp_path, now=NOW, lock_reader=no_lock)
+    assert p.actionable == []
+    assert p.total_reclaim_bytes == 0
+
+
+def test_only_copy_set_aside_is_deleted_only_with_typed_confirmation(tmp_path: Path) -> None:
+    node = _graph_node(tmp_path, status="failed")
+    entry = _set_aside(node, "checkpoints", age_days=5)
+    item_id = f"graph:n2-ft-abc/{entry.name}"
+    result = apply(tmp_path, [item_id], by="t", now=NOW, lock_reader=no_lock)
+    assert result.done == []
+    assert entry.exists()
+    result = apply(tmp_path, [item_id], by="t", now=NOW, lock_reader=no_lock, confirmed={item_id})
+    assert [i.item_id for i in result.done] == [item_id]
+    assert not entry.exists()
+
+
 def test_set_aside_in_outputs_runs_and_its_blockers(tmp_path: Path) -> None:
-    run = _run(tmp_path, "r1", status="failed", ended_days_ago=0)
+    run = _run(tmp_path, "r1", status="completed", ended_days_ago=0)
     entry = _set_aside(run, "checkpoints", age_days=5)
-    assert _actions(tmp_path)[entry.name] == ("delete", None)  # failed-run grace does not apply to abandoned data
+    assert _items(tmp_path)[entry.name] == ("delete", None, "PERMANENT_LOSS")
     p = plan(tmp_path, now=NOW, lock_reader=lambda _p: _lock(None, corrupt=True))
     assert [(i.path, i.blocked_by) for r in p.runs for i in r.items] == [(entry.name, "GPU_LOCK_HOLDER")]
     (run / "KEEP").touch()
-    assert _actions(tmp_path)[entry.name] == ("keep", "PINNED_OR_KEEP")
+    assert _items(tmp_path)[entry.name] == ("keep", "PINNED_OR_KEEP", None)
+    item_id = f"r1/{entry.name}"
+    result = apply(tmp_path, [item_id], by="t", now=NOW, lock_reader=no_lock, confirmed={item_id})
+    assert result.done == []  # confirmation never overrides KEEP
 
 
 def test_set_aside_stamp_newer_than_mtime_wins(tmp_path: Path) -> None:
-    node = _graph_node(tmp_path)
+    node = _graph_node(tmp_path, ended_days_ago=0.1)
     entry = node / f"checkpoints.not-resumable-{time.strftime('%Y%m%d-%H%M%S', time.localtime(NOW - DAY))}"
     entry.mkdir()
     _age_tree(entry, 30)  # rename keeps old mtimes; the stamp says it was set aside yesterday
-    assert _actions(tmp_path)[entry.name] == ("keep", None)
+    assert _items(tmp_path)[entry.name] == ("keep", None, None)
 
 
 @pytest.mark.parametrize(

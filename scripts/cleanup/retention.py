@@ -1,11 +1,13 @@
 """Checkpoint retention (ADR-005 D3/D7). DRY-RUN by default; nothing is deleted without ``--apply``.
 
-Thin CLI over ``vlm_pipeline.artifacts.retention``. Only ``outputs/runs/*/checkpoints/epoch_*`` are candidates.
+Thin CLI over ``vlm_pipeline.artifacts.retention``. Candidates: ``outputs/runs/*/checkpoints/epoch_*`` and set-aside
+``*.not-resumable-<stamp>`` entries in ``outputs/runs/*`` and ``outputs/graph/runs/*``.
 
     uv run python scripts/cleanup/retention.py                      # dry-run table for all runs
     uv run python scripts/cleanup/retention.py --run <id> --json    # dry-run plan JSON for one run
     uv run python scripts/cleanup/retention.py --apply --by bao-cleanup [--approved-by bao-pm]
     uv run python scripts/cleanup/retention.py --items <id1,id2> --apply --by ... --approved-by ...
+    uv run python scripts/cleanup/retention.py --items <id> --confirm <id> --apply --by ...   # TRAINED_MODEL item
 """
 
 from __future__ import annotations
@@ -15,9 +17,22 @@ import json
 import sys
 import time
 
-from vlm_pipeline.artifacts.retention import apply, plan
+from vlm_pipeline.artifacts.retention import Plan, apply, plan
 from vlm_pipeline.common.gpu_lock import default_lock_path
 from vlm_pipeline.common.paths import GIB, project_root
+
+
+def _print_table(plan_: Plan) -> None:
+    for run in plan_.runs:
+        print(f"== {run.run_id}  status={run.status}{'  KEEP' if run.keep else ''}")
+        for item in run.items:
+            roles = ",".join(item.roles) or "-"
+            why = item.blocked_by or item.reason
+            if item.consequence_code:
+                why += f"  ⚠ {item.consequence_code}"
+            print(f"   {item.action:11} {item.reclaim_bytes / GIB:8.3f} GiB  {item.path}  [{roles}]  {why}")
+    total = plan_.total_reclaim_bytes / GIB
+    print(f"total reclaimable: {total:.3f} GiB" + ("  (needs --approved-by)" if plan_.needs_approval else ""))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,6 +42,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="print the plan as JSON")
     parser.add_argument("--apply", action="store_true", help="actually delete/strip (default is dry-run)")
     parser.add_argument("--by", help="who runs --apply (required with --apply)")
+    parser.add_argument(
+        "--confirm",
+        help="comma-separated item ids blocked by TRAINED_MODEL (may be the only weights) that you delete on purpose",
+    )
     parser.add_argument("--approved-by", help="PM/security approval, required above the approval threshold")
     args = parser.parse_args(argv)
 
@@ -36,16 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(current.as_dict(), ensure_ascii=False, indent=2))
     else:
-        for run in current.runs:
-            print(f"== {run.run_id}  status={run.status}{'  KEEP' if run.keep else ''}")
-            for item in run.items:
-                roles = ",".join(item.roles) or "-"
-                why = item.blocked_by or item.reason
-                if item.consequence_code:
-                    why += f"  ⚠ {item.consequence_code}"
-                print(f"   {item.action:11} {item.reclaim_bytes / GIB:8.3f} GiB  {item.path}  [{roles}]  {why}")
-        total = current.total_reclaim_bytes / GIB
-        print(f"total reclaimable: {total:.3f} GiB" + ("  (needs --approved-by)" if current.needs_approval else ""))
+        _print_table(current)
 
     if not args.apply:
         if current.actionable:
@@ -55,8 +65,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--apply requires --by <name>")
 
     ids = args.items.split(",") if args.items else [i.item_id for i in current.actionable]
+    confirmed = set(args.confirm.split(",")) if args.confirm else set()
+    if confirmed - set(ids):
+        parser.error("--confirm ids must also be listed in --items")
     try:
-        result = apply(root, ids, by=args.by, approved_by=args.approved_by, lock_path=lock_path)
+        result = apply(root, ids, by=args.by, approved_by=args.approved_by, lock_path=lock_path, confirmed=confirmed)
     except PermissionError as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 1

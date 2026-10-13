@@ -20,9 +20,13 @@ Rules (first match wins, per checkpoint; statuses are ``common.runinfo.RunStatus
 7. any other checkpoint -> delete once older than ``other_keep_days``
 
 Set-aside resume attempts (the worker renames ``checkpoints``/``metrics.jsonl`` of a model that cannot resume to
-``<name>.not-resumable-<YYYYmmdd-HHMMSS>`` and trains again) are deleted ``set_aside_days`` after the later of the
-stamp in the name and their mtime, in run dirs under ``outputs/runs`` and ``outputs/graph/runs``. Only a run ``KEEP``
-file or an unreadable GPU lock blocks that; the ``.not-resumable`` marker itself is never a candidate.
+``<name>.not-resumable-<YYYYmmdd-HHMMSS>`` and trains again), in run dirs under ``outputs/runs`` and
+``outputs/graph/runs``, may hold the only trained weights of that node, and training outputs are never deleted
+automatically (PM). So they are deleted ``set_aside_days`` after the later of the stamp and their mtime only once the
+same run dir has a newer *completed* training (status ``completed``, a real ``checkpoints/`` dir, last activity after
+the stamp). Until then they are planned as ``delete`` blocked by ``TRAINED_MODEL`` (PERMANENT_LOSS for checkpoints):
+only ``apply(..., confirmed={item_id})`` (a person's typed confirmation) removes them. A run ``KEEP`` file or an
+unreadable GPU lock blocks everything; the ``.not-resumable`` marker itself is never a candidate.
 
 Age is the checkpoint directory mtime. Stripping sub-directories updates that mtime, so a stripped checkpoint
 starts a new window; this errs on the side of keeping data longer.
@@ -282,8 +286,26 @@ def _plan_checkpoint(  # noqa: PLR0911, PLR0912 - flat ADR-005 D3 decision table
     return item("delete", du_bytes(ckpt), "D3.other_after_days", "not LATEST/best and older than window")
 
 
+CONFIRM_REASON = "TRAINED_MODEL"  # blocked_by of items a person may still delete with a typed confirmation
+
+
+def _superseded_at(run_dir: Path) -> float | None:
+    """Last activity of a newer completed training in ``run_dir`` (None = no completed training with checkpoints)."""
+    status, ended_at = read_run_status(run_dir)
+    ckpts = run_dir / "checkpoints"
+    if status != RunStatus.COMPLETED or ckpts.is_symlink() or not ckpts.is_dir():
+        return None
+    return ended_at
+
+
 def _set_aside_decision(
-    entry: Path, stamp_text: str, blocked: str | None, *, now: float, policy: RetentionPolicy
+    entry: Path,
+    stamp_text: str,
+    blocked: str | None,
+    superseded_at: float | None,
+    *,
+    now: float,
+    policy: RetentionPolicy,
 ) -> tuple[Action, int, str, str, str | None]:
     """(action, reclaim_bytes, rule, reason, blocked_by) for one set-aside entry."""
     if blocked is not None:
@@ -292,6 +314,9 @@ def _set_aside_decision(
         stamp = time.mktime(time.strptime(stamp_text, "%Y%m%d-%H%M%S"))
     except (ValueError, OverflowError):
         return "keep", 0, "D3.set_aside_unparsed", "unreadable time stamp in the name", None
+    if superseded_at is None or superseded_at <= stamp:
+        reason = "may be the only trained weights: no newer completed training (delete by hand, confirmed)"
+        return "delete", du_bytes(entry), "D3.set_aside_only_copy", reason, CONFIRM_REASON
     if (now - max(stamp, _newest_mtime(entry))) / DAY_S < policy.set_aside_days:
         return "keep", 0, "D3.set_aside_wait", f"set aside < {policy.set_aside_days:g} days ago", None
     return "delete", du_bytes(entry), "D3.set_aside", "abandoned resume attempt (not resumable)", None
@@ -307,11 +332,12 @@ def _plan_set_aside(
     elif lock is not None and lock.corrupt:
         blocked = "GPU_LOCK_HOLDER"
     items: list[PlanItem] = []
+    superseded_at = _superseded_at(run_dir)
     for entry in sorted(run_dir.iterdir()):
         match = SET_ASIDE_RE.fullmatch(entry.name)
         if match is None or entry.is_symlink():
             continue
-        decision = _set_aside_decision(entry, match.group(2), blocked, now=now, policy=policy)
+        decision = _set_aside_decision(entry, match.group(2), blocked, superseded_at, now=now, policy=policy)
         code, params = None, {}
         if decision[0] == "delete" and match.group(1) == "checkpoints":  # may hold the only weights of that node
             code, params = "PERMANENT_LOSS", {"name": f"{run_dir.name}/{entry.name}"}
@@ -451,8 +477,12 @@ def apply(
     now: float | None = None,
     lock_reader: Callable[[Path], LockStatus | None] = check_lock,
     lock_path: Path | None = None,
+    confirmed: Collection[str] = (),
 ) -> ApplyResult:
     """Execute the given planned items after re-planning; items whose plan changed are skipped.
+
+    ``confirmed``: item ids a person confirmed by typing them; only these may remove items blocked by
+    ``CONFIRM_REASON`` (set-aside data that may be the only trained weights).
 
     Raises:
         PermissionError: the selected items exceed ``approval_threshold_gb`` and no ``approved_by`` was given.
@@ -462,6 +492,12 @@ def apply(
     wanted = set(item_ids)
     fresh = plan(root, policy=policy, now=ts, lock_reader=lock_reader, lock_path=lock_path)
     by_id = {i.item_id: i for i in fresh.actionable}
+    by_id |= {
+        i.item_id: i
+        for r in fresh.runs
+        for i in r.items
+        if i.blocked_by == CONFIRM_REASON and i.action == "delete" and i.item_id in confirmed
+    }
     result = ApplyResult()
     selected = [by_id[i] for i in sorted(wanted) if i in by_id]
     result.skipped.extend((i, "no longer planned (state changed)") for i in sorted(wanted - by_id.keys()))
