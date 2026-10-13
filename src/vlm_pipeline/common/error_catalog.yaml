@@ -410,6 +410,9 @@ NET-002:
   # network or sign-in problem (that is NET-001, PM 2026-10-13). not_prepared: downloaded, but a model that needs a
   # preparation step (prepared snapshot) has not had it; not_pinned: a dataset outside the vetted catalog (never
   # downloaded by the app). download = G-5 (backend); until its handler exists the UI hides the button (G-3 rule).
+  # Severity error is the run's (NotCachedError); validate emits it as warn (P018 §3.1, rule
+  # catalog_assets_on_this_machine) so Run stays enabled and the UI offers "download all missing". The UI colours by
+  # issue.severity, like DATA-006.
   # catalog_id + kind feed the download API (POST /api/downloads {kind, catalog_id}: the server resolves repo, revision
   # and include from the catalog, a client never sends a repo); size_gb shows the download size on the card.
   params:
