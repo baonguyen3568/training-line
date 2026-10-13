@@ -43,6 +43,7 @@ storage:
     confirm: Reset step
     done: Step "{node}" was reset; {gb} GB freed.
     nothing: This step has not run yet; there is nothing to reset.
+    partial: "Folders not deleted yet: {failed_count}. Reset this step again in a few minutes."
   dialog:
     title: Delete {item_count} items and free {gb} GB?
     typed_confirm: Type  {confirm_text}  to confirm
@@ -273,8 +274,7 @@ error:
     what: The app's runtime environment is missing a library this model needs ({packages}). This isn't something you did; the app's environment needs an update.
   DISK-003:
     title: Saved results are full; pick what to delete
-    what: Saved results are {gb_over} GB over the {cap_gb} GB limit, but the {protected_count} remaining items are protected (trained models, pinned items, exports), so the app won't delete anything itself. Choose what to
-      remove in the Storage panel.
+    what: Saved results are {gb_over} GB over the {cap_gb} GB limit, but every remaining item ({protected_count}) is protected (trained models, pinned items, exports), so the app won't delete anything itself. Choose what to delete in the Storage panel.
 action:
   migrate_node: Review changes and update
   open_node: Open this step
