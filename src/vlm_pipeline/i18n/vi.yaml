@@ -1033,3 +1033,26 @@ d4:
   dock_expand: Mở bảng
   dock_collapse: Thu gọn bảng
   explain: Giải thích
+standards:
+  train:
+    lora_rank: "Hạng LoRA {value} nằm ngoài khoảng thường dùng ({min}–{max}). Vẫn chạy được, nhưng khó so kết quả với các công bố."
+    lora_alpha: "lora_alpha nên bằng {min}–{max} lần hạng LoRA. Giá trị hiện tại khiến mỗi bước học quá nhỏ hoặc quá lớn."
+    overfit_risk: "Dữ liệu ít (dưới {small_data_below} mẫu) mà học {value} lượt thì model dễ học thuộc. Nên giữ tối đa {max_epochs} lượt."
+    unfreeze_vision: "Bạn đang train cả phần nhìn ảnh. Chỉ nên làm vậy khi ảnh của bạn rất khác ảnh thường gặp; tốn thêm bộ nhớ và dễ làm model kém đi."
+    no_validation: "Chưa có dữ liệu kiểm tra, nên app không chọn được bản lưu tốt nhất và không phát hiện được học thuộc. Hãy nối vào cổng \"Dữ liệu kiểm tra\" hoặc dùng bước Chia dữ liệu."
+    test_split_in_training: "Dữ liệu học đang lấy từ bộ chấm điểm. Bộ này chỉ dùng để chấm điểm cuối; học trên nó làm điểm số không còn ý nghĩa."
+    too_few_samples: "Chỉ có dưới {below} mẫu dữ liệu học. Model dễ học thuộc thay vì học cách làm."
+  quant:
+    format_not_supported_by_model: "Model này chưa nén được theo định dạng đã chọn. Hãy chọn model khác hoặc bỏ bước nén."
+    experimental_needs_benchmark: "Nén model này mới ở mức thử nghiệm. Hãy đo điểm trước và sau khi nén để chắc model không kém đi."
+    calib_size: "Số mẫu hiệu chỉnh {value} nằm ngoài khoảng khuyến nghị ({min}–{max}). Ít quá thì bản nén kém chính xác, nhiều quá thì chạy lâu mà không tốt hơn."
+    calib_from_heldout: "Dữ liệu hiệu chỉnh đang lấy từ bộ chấm điểm. Hãy dùng dữ liệu học để điểm sau khi nén còn đáng tin."
+    vision_quant: "Bạn đang nén cả phần nhìn ảnh. Cách mặc định chỉ nén phần ngôn ngữ, vì phần nhìn ảnh dễ mất chính xác hơn."
+  data:
+    broken_images_some: "Có ảnh hỏng hoặc quá nhỏ (cạnh ngắn dưới {min_short_side_px} px). App sẽ bỏ qua các ảnh đó."
+    broken_images_many: "Hơn {above}% ảnh hỏng hoặc quá nhỏ. Thư mục có thể chọn sai; hãy kiểm tra trước khi train."
+    aspect_ratio: "Có ảnh quá dài hoặc quá hẹp (tỉ lệ cạnh trên {above}:1). Model không xử lý được ảnh này; hãy cắt hoặc bỏ đi."
+    truncated: "Hơn {above}% câu trả lời dài hơn giới hạn của model và sẽ bị cắt khi train."
+    duplicates: "Hơn {above}% mẫu bị trùng lặp. Mẫu trùng làm model học lệch; nên bỏ bớt."
+    train_eval_leak: "Có mẫu train trùng với câu hỏi trong bộ chấm điểm. Điểm sẽ cao giả; hãy bỏ các mẫu đó."
+    image_seen_in_eval: "Có ảnh train cũng xuất hiện trong bộ chấm điểm (với câu hỏi khác). Điểm có thể cao hơn thực tế một chút."

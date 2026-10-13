@@ -1033,3 +1033,26 @@ d4:
   dock_expand: Open panel
   dock_collapse: Collapse panel
   explain: Explanation
+standards:
+  train:
+    lora_rank: "LoRA rank {value} is outside the usual range ({min}–{max}). It still runs, but results are harder to compare with published ones."
+    lora_alpha: "lora_alpha should be {min}–{max}× the LoRA rank. The current value makes updates too small or too large."
+    overfit_risk: "With little data (under {small_data_below} samples), {value} epochs can make the model memorise. Keep it to {max_epochs} epochs or fewer."
+    unfreeze_vision: "You are training the vision part too. Only do this when your images are very different from common photos; it uses more memory and can make the model worse."
+    no_validation: "No validation data, so the app cannot pick the best saved version or detect memorising. Connect the \"Validation data\" port or use Split data."
+    test_split_in_training: "Training data comes from the benchmark set. That set is only for the final score; training on it makes the score meaningless."
+    too_few_samples: "Fewer than {below} training samples. The model may memorise instead of learning the task."
+  quant:
+    format_not_supported_by_model: "This model cannot be quantized in the selected format yet. Pick another model or remove the quantize step."
+    experimental_needs_benchmark: "Quantizing this model is experimental. Benchmark before and after to make sure it did not get worse."
+    calib_size: "Calibration size {value} is outside the recommended range ({min}–{max}). Too few makes the quantized model less accurate; too many takes longer without helping."
+    calib_from_heldout: "Calibration data comes from the benchmark set. Use training data so the post-quantization score stays trustworthy."
+    vision_quant: "You are quantizing the vision part too. By default only the language part is quantized, because vision loses accuracy more easily."
+  data:
+    broken_images_some: "Some images are broken or too small (short side under {min_short_side_px} px). The app will skip them."
+    broken_images_many: "More than {above}% of images are broken or too small. The folder may be wrong; check it before training."
+    aspect_ratio: "Some images are extremely long or narrow (aspect ratio above {above}:1). The model cannot process them; crop or remove them."
+    truncated: "More than {above}% of answers exceed the model's length limit and will be cut during training."
+    duplicates: "More than {above}% of samples are duplicates. Duplicates skew training; consider removing them."
+    train_eval_leak: "Some training samples match questions in the benchmark. Scores would be inflated; remove those samples."
+    image_seen_in_eval: "Some training images also appear in the benchmark (with different questions). Scores may be slightly higher than reality."

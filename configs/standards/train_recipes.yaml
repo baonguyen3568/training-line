@@ -1,0 +1,56 @@
+# Train-recipe standards (P4-2 §2.3), phase `validate`.
+# Schema: nodes/standards.py (bao-cleancode). Each rule: one level (error|warn|info), one `check` (discriminated by kind),
+# message in the `standards.` i18n namespace, non-empty source (repo paths must exist). Owner of content: bao-research.
+# Not runtime rules (cleancode review): "full SFT needs fp32 master weights" is a template invariant tested in
+# tests/unit/train/test_template_standards.py; lr ranges wait for an Advanced lr override; "samples seen vs upstream
+# recipe" waits for a catalog field with the upstream budget (001a §10.8).
+schema_version: 1
+rules:
+  - id: TRAIN-LORA-RANK
+    applies_to: {node: train.lora_vlm, param: lora_dim}
+    check: {kind: range, min: 8, max: 64}
+    level: info
+    message: standards.train.lora_rank
+    source: "LoRA (Hu et al. 2021) and QLoRA (Dettmers et al. 2023) ranks; AutoModel VLM LoRA recipes use dim 8-16"
+
+  - id: TRAIN-LORA-ALPHA
+    applies_to: {node: train.lora_vlm, param: lora_alpha}
+    check: {kind: ratio_to_param, other: lora_dim, min: 1.0, max: 4.0}
+    level: info
+    message: standards.train.lora_alpha
+    source: "alpha 1-2x rank is the usual default in PEFT, TRL and LLaMA-Factory examples; .claude/skills/research-model-selection/SKILL.md"
+
+  - id: TRAIN-EPOCHS-SMALL-DATA
+    applies_to: {node: [train.sft_vlm, train.lora_vlm], param: epochs}
+    check: {kind: epochs_vs_samples, max_epochs: 5, small_data_below: 1000}
+    level: warn
+    message: standards.train.overfit_risk
+    source: "team-default: O-1 (20 images x 12 epochs) memorised its train set, .team/proposals/001a-nvidia-default-model.md"
+
+  - id: TRAIN-FREEZE-VISION
+    applies_to: {node: train.sft_vlm, param: freeze_vision_tower}
+    check: {kind: equals, value: true}
+    level: info
+    message: standards.train.unfreeze_vision
+    source: "AutoModel freeze_config defaults; .claude/skills/research-model-selection/SKILL.md (unfreeze only with domain shift, lr x0.1)"
+
+  - id: TRAIN-NO-VALIDATION
+    applies_to: {node: [train.sft_vlm, train.lora_vlm], port: val_data}
+    check: {kind: wired_or_dataset_has_split, split: validation}
+    level: warn
+    message: standards.train.no_validation
+    source: "docs/adr/ADR-002-eval-benchmark-protocol.md; .team/proposals/001a-nvidia-default-model.md (choices are made on validation, never test)"
+
+  - id: TRAIN-HELDOUT-DATA
+    applies_to: {node: [train.sft_vlm, train.lora_vlm], port: train_data}
+    check: {kind: dataset_split_not_heldout}
+    level: error
+    message: standards.train.test_split_in_training
+    source: "docs/adr/ADR-002-eval-benchmark-protocol.md; configs/catalog/datasets.yaml heldout_splits"
+
+  - id: TRAIN-TOO-FEW-SAMPLES
+    applies_to: {node: [train.sft_vlm, train.lora_vlm], port: train_data}
+    check: {kind: sample_count, below: 100}
+    level: warn
+    message: standards.train.too_few_samples
+    source: "team-default: 20 images were memorised, .team/proposals/001a-nvidia-default-model.md"

@@ -1,0 +1,56 @@
+# Data-quality standards (P4-2 §2.2 + §5), phase `data_profile`: evaluated by the data node worker on profile.json
+# (bao-backend B-3) with bao-tester's check functions and the eval-split hash cache
+# outputs/standards-cache/<dataset>@<revision>/<split>.jsonl.
+# Schema: nodes/standards.py (bao-cleancode). Each rule: one level (error|warn|info), one `check` (discriminated by kind),
+# message in the `standards.` i18n namespace, non-empty source (repo paths must exist). Owner of content: bao-research.
+# Not enabled: near-duplicate pHash Hamming <= 4 (needs a false-positive measurement on CORD first, P4-2 §5).
+schema_version: 1
+rules:
+  - id: DATA-IMAGE-BROKEN-WARN
+    applies_to: {node: [data.hf_load, data.local_folder]}
+    check: {kind: image_stats, metric: broken_pct, above: 0.0, min_short_side_px: 28}
+    level: warn
+    message: standards.data.broken_images_some
+    source: "Qwen-VL processor min_pixels (patch 14 x merge 2 = 28 px); src/vlm_pipeline/i18n/vi.yaml DATA-002"
+
+  - id: DATA-IMAGE-BROKEN
+    applies_to: {node: [data.hf_load, data.local_folder]}
+    check: {kind: image_stats, metric: broken_pct, above: 5.0, min_short_side_px: 28}
+    level: error
+    message: standards.data.broken_images_many
+    source: "team-default (more than 5% unusable images means the folder is wrong, not noisy); src/vlm_pipeline/i18n/vi.yaml DATA-002"
+
+  - id: DATA-ASPECT-EXTREME
+    applies_to: {node: [data.hf_load, data.local_folder]}
+    check: {kind: image_stats, metric: max_aspect_ratio, above: 200}
+    level: error
+    message: standards.data.aspect_ratio
+    source: "Qwen2.5/3-VL smart_resize rejects absolute aspect ratio > 200"
+
+  - id: DATA-TRUNCATED
+    applies_to: {node: [data.hf_load, data.local_folder]}
+    check: {kind: token_len_stats, metric: over_limit_pct, above: 1.0, limit_from_catalog: min_answer_tokens}
+    level: warn
+    message: standards.data.truncated
+    source: "team-default; .team/proposals/002-eval-benchmark-protocol.md (truncated_rate)"
+
+  - id: DATA-EXACT-DUP
+    applies_to: {node: [data.hf_load, data.local_folder]}
+    check: {kind: dup_rate, method: sha256_image_text, above: 1.0}
+    level: warn
+    message: standards.data.duplicates
+    source: "team-default; NeMo Curator exact/semantic dedup tutorials (tutorials/image)"
+
+  - id: DATA-LEAK-VQA
+    applies_to: {node: [data.hf_load, data.local_folder]}
+    check: {kind: eval_leak, match: phash_and_normalized_question, above_count: 0}
+    level: error
+    message: standards.data.train_eval_leak
+    source: ".team/proposals/P4-2-standards-as-data.md; .team/proposals/002-eval-benchmark-protocol.md (G5)"
+
+  - id: DATA-NEAR-LEAK-IMAGE
+    applies_to: {node: [data.hf_load, data.local_folder]}
+    check: {kind: eval_leak, match: phash_image_only, above_count: 0}
+    level: warn
+    message: standards.data.image_seen_in_eval
+    source: ".team/proposals/P4-2-standards-as-data.md (same image, different question: benchmarks reuse COCO images)"

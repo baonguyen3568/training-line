@@ -1,0 +1,41 @@
+# Quantization standards (P4-2 §2.4), phase `validate`.
+# Schema: nodes/standards.py (bao-cleancode). Each rule: one level (error|warn|info), one `check` (discriminated by kind),
+# message in the `standards.` i18n namespace, non-empty source (repo paths must exist). Owner of content: bao-research.
+# Waiting for GraphView machine info: "format needs GPU capability" (FP8 >= sm_89, NVFP4 >= sm_100,
+# .team/knowledge/multiarch-gpu.md).
+schema_version: 1
+rules:
+  - id: QUANT-FORMAT-MODEL
+    applies_to: {node: quantize.modelopt_ptq, param: format}
+    check: {kind: catalog_field_in, catalog_field: quant_fp8, allowed: [official, experimental]}
+    level: error
+    message: standards.quant.format_not_supported_by_model
+    source: "ModelOpt examples/hf_ptq support matrix (Qwen3-VL / Qwen3.5 / Gemma 3: FP8 only); configs/catalog/models.yaml quant_fp8"
+
+  - id: QUANT-FORMAT-EXPERIMENTAL
+    applies_to: {node: quantize.modelopt_ptq, param: format}
+    check: {kind: catalog_field_not_in, catalog_field: quant_fp8, values: [experimental]}
+    level: warn
+    message: standards.quant.experimental_needs_benchmark
+    source: "configs/catalog/models.yaml (Nemotron Parse quant_fp8 experimental: no ModelOpt recipe yet)"
+
+  - id: QUANT-CALIB-SIZE
+    applies_to: {node: quantize.modelopt_ptq, param: calib_size}
+    check: {kind: range, min: 128, max: 512}
+    level: warn
+    message: standards.quant.calib_size
+    source: "ModelOpt hf_ptq default calib_size 512; .team/proposals/001-stack-model-catalog.md (B-4 probe)"
+
+  - id: QUANT-CALIB-NOT-HELDOUT
+    applies_to: {node: quantize.modelopt_ptq, port: calib_data}
+    check: {kind: dataset_split_not_heldout}
+    level: error
+    message: standards.quant.calib_from_heldout
+    source: "docs/adr/ADR-002-eval-benchmark-protocol.md; configs/catalog/datasets.yaml heldout_splits"
+
+  - id: QUANT-VISION-OFF
+    applies_to: {node: quantize.modelopt_ptq, param: quantize_vision}
+    check: {kind: equals, value: false}
+    level: info
+    message: standards.quant.vision_quant
+    source: "ModelOpt hf_ptq README: by default only the language model is quantized"

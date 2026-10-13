@@ -127,7 +127,7 @@ class Issue:
     """One pre-run finding: error-catalog code + where + params (text comes from i18n at the API edge)."""
 
     code: str
-    severity: Literal["error", "warn"] = "error"
+    severity: Literal["error", "warn", "info"] = "error"  # info: shown, never blocks (P4-2 hint)
     node_id: str | None = None
     port: str | None = None
     param: str | None = None

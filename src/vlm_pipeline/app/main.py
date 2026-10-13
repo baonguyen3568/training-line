@@ -22,6 +22,7 @@ from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
 from vlm_pipeline.app.services import BadRequestError, NotAvailableError, Services
 from vlm_pipeline.common.error_catalog import Labels, display_params, variant_key
+from vlm_pipeline.nodes.standards import MESSAGE_PATTERN, STANDARD_CODE
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 Workflow = Annotated[dict[str, Any], Body()]
@@ -48,7 +49,7 @@ def _labels(workflow: Mapping[str, Any], registry: Any, locale: str) -> Labels:
     )
 
 
-_STD_MESSAGE = re.compile(r"^standards\.[a-z0-9_.]+$")  # only standards.* keys may replace error.STD-001.what
+_STD_MESSAGE = re.compile(MESSAGE_PATTERN)  # only standards.* keys may replace error.STD-001.what
 
 
 def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None = None) -> dict[str, Any]:
@@ -63,7 +64,7 @@ def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None =
         key = f"error.{code}.{part}"
         if part == "what" and variant:
             key = f"{key}.{variant}"
-        if part == "what" and code == "STD-001" and _STD_MESSAGE.match(str(raw.get("message", ""))):
+        if part == "what" and code == STANDARD_CODE and _STD_MESSAGE.match(str(raw.get("message", ""))):
             key = str(raw["message"])  # the standard's own sentence (configs/standards/*.yaml -> i18n standards.*)
         if part == "why" and key not in texts:  # "why" is optional in the catalog
             out[part] = None
