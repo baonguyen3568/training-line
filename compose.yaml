@@ -62,7 +62,12 @@ services:
       - "${VLM_HOST_PROJECT_ROOT}/configs:${VLM_HOST_PROJECT_ROOT}/configs:ro"
       - "${VLM_HOST_PROJECT_ROOT}/docker/IMAGES.lock:${VLM_HOST_PROJECT_ROOT}/docker/IMAGES.lock:ro"
       - "${VLM_HOST_PROJECT_ROOT}/scripts/qa/eval_cord_worker.py:${VLM_HOST_PROJECT_ROOT}/scripts/qa/eval_cord_worker.py:ro"
-      - "${VLM_DATA_ROOT}:${VLM_DATA_ROOT}"  # run logs are appended in run dirs
+      # The data dirs only, at their host paths (run logs are appended in run dirs; claims in outputs/system).
+      # Never the data root itself: by default it IS the project folder (.env.local, .git).
+      - "${VLM_DATA_ROOT}/outputs:${VLM_DATA_ROOT}/outputs"
+      - "${VLM_DATA_ROOT}/.cache:${VLM_DATA_ROOT}/.cache:ro"
+      - "${VLM_DATA_ROOT}/data:${VLM_DATA_ROOT}/data:ro"
+      - "${VLM_DATA_ROOT}/uploads:${VLM_DATA_ROOT}/uploads:ro"
       - "${VLM_GPU_LOCK_DIR}:/run/vlm-lock:ro"  # verifies a GPU job's token, never takes the lock
       - "runner-sock:/run/vlm-runner"
       - "runner-state:/var/lib/vlm-runner"  # started markers + audit: never mounted into the app or a job
