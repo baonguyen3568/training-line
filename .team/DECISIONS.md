@@ -49,3 +49,4 @@
 - 2026-10-13 USER: cấu hình phân tầng env (.env.local) vs DB, có trang Cài đặt trong dashboard để chỉnh → D-7.
 - 2026-10-13 PM tạo ~/.config/vlm-app/policy.toml (profile=shared_dev, storage.schedule=apply) theo yêu cầu dọn rác liên tục của user. Tắt nhanh: VLM_RETENTION_SCHEDULE=dry_run|off.
 - 2026-10-13 USER định hướng cốt lõi: user tự xây pipeline cực sâu, theo chuẩn mực hiện tại (data/model/build/train/nén), có 5–10 pipeline tham chiếu của các bên lớn/cộng đồng → CLAUDE.md + MILESTONE M4. Điều chỉnh P010 'node to': giữ node to cho Simple, thêm subgraph + node chi tiết cho Advanced.
+- 2026-10-13 D-6 lượt 1 (PM duyệt): prune build cache builder vlm-builder (giữ 24h, ~46G); xoá image vlm-automodel 26.08-1..-3 sau cập nhật IMAGES.lock; checkpoint run thí nghiệm đã kết luận → xoá (giữ run.json/metrics/eval), chủ run có 30' phản đối; xoá 3 run rác g-20261012-*.
