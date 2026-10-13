@@ -61,7 +61,7 @@ storage:
   item:
     temp_result_of_run: Temporary results of run {run_name}
     checkpoint_of_run: Checkpoint {checkpoint} of run {run_name}
-    eval_cache_leftover: "Leftovers of scoring \"{dataset}\" (the saved scores stay)"
+    eval_cache_leftover: "Logs and raw outputs from scoring \"{dataset}\" (saved scores are kept)"
     eval_data_invalid: "Faulty scoring data \"{dataset}\" (set aside by the app at {stamp})"
     eval_data_unfinished: "Unfinished install of scoring data \"{dataset}\""
     set_aside_of_run: Earlier training set aside in run {run_name}

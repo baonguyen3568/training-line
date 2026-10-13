@@ -214,6 +214,10 @@ def _needs_confirm(item: retention.PlanItem) -> bool:
     return item.blocked_by == retention.CONFIRM_REASON or item.consequence_code == PERMANENT_LOSS
 
 
+# Proper names of eval suites as people know them (bao-design); no catalog field holds them yet.
+EVAL_SUITE_NAMES = {"ocrbench": "OCRBench", "cord": "CORD v2"}
+
+
 def _retention_display_key(item: retention.PlanItem) -> str:
     if item.kind == "eval_cache":
         return "storage.item.eval_cache_leftover"
@@ -226,11 +230,12 @@ def _retention_display_key(item: retention.PlanItem) -> str:
 def _eval_display(item: retention.PlanItem) -> dict[str, str]:
     """``{dataset, stamp}`` of ``.<dataset>.invalid-<YYYYmmdd-HHMMSS>-<hex>`` / ``.<dataset>.<hex8>.tmp``.
 
-    For an eval-cache leftover ``dataset`` is its suite (``ocrbench``, or "CORD" for the bare-hash Parse cache).
+    For an eval-cache leftover ``dataset`` is its suite's display name (``EVAL_SUITE_NAMES``, else the suite id).
     """
     if item.kind == "eval_cache":
         suite = item.run_id.lstrip(".").split("-", 1)[0]
-        return {"dataset": "CORD" if len(suite) == 24 or "." in suite else suite, "stamp": ""}
+        suite = "cord" if len(suite) == 24 or "." in suite else suite  # the bare-hash cache is the Parse/CORD one
+        return {"dataset": EVAL_SUITE_NAMES.get(suite, suite), "stamp": ""}
     invalid = retention.EVAL_INVALID_RE.fullmatch(item.run_id)
     if invalid is not None:
         stamp = invalid.group(2)

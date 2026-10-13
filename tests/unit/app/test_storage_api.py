@@ -782,7 +782,7 @@ def test_an_old_eval_cache_leftover_is_an_auto_row(env: tuple[TestClient, Artifa
         "temp_result",
         True,
     )
-    assert (row["display_key"], row["display_params"]["dataset"]) == ("storage.item.eval_cache_leftover", "ocrbench")
+    assert (row["display_key"], row["display_params"]["dataset"]) == ("storage.item.eval_cache_leftover", "OCRBench")
     resp = client.post("/api/storage/apply", json={"plan_id": plan_id, "item_ids": [f"evalcache:{name}"]})
     assert resp.status_code == 200, resp.text
     assert not run.exists()
