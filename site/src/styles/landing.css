@@ -167,6 +167,9 @@
   /* design r2: the command wraps after "&&" instead of being cut at the right edge */
   .install code {
     white-space: normal;
+    overflow-wrap: anywhere; /* the repo URL is one long word: break it instead of pushing "?" off the box */
+    min-width: 0;
+    flex: 1;
   }
   .install {
     padding: 8px 12px;

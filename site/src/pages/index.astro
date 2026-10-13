@@ -7,7 +7,7 @@ import copy from "~/generated/app-copy.json";
 import Marketing from "~/layouts/Marketing.astro";
 import "~/styles/landing.css";
 import "~/styles/editor-preview.css";
-import { installHref } from "~/data/nav";
+import { installCommand, installHref, repoUrl } from "~/data/nav";
 
 const mem = copy.error["MEM-001"];
 const memWhat = mem.what.replace("{need_gb}", "14").replace("{avail_gb}", "9");
@@ -22,9 +22,9 @@ const [memBefore, memAfter] = memWhat.split(/(?=máy chỉ còn)/);
       tra kết nối, bộ nhớ và dung lượng trước khi chạy, để một lần train dài không hỏng giữa chừng.
     </p>
     <div class="cta">
-      <div class="install" aria-label="Lệnh cài đặt (minh hoạ)">
+      <div class="install" aria-label="Lệnh cài đặt từ mã nguồn">
         <Icon name="terminal" size={14} class="prompt" />
-        <code>git clone …/ntc-training &amp;&amp;<wbr /> ./install.sh</code>
+        <code>{installCommand.split(" && ").map((part, i) => (i ? <> &amp;&amp; <wbr />{part}</> : part))}</code>
         <button class="help" popovertarget="pop-install" aria-label="Về lệnh cài đặt">
           <Icon name="circle-question-mark" size={14} />
         </button>
@@ -32,11 +32,14 @@ const [memBefore, memAfter] = memWhat.split(/(?=máy chỉ còn)/);
       <a class="btn primary" href={installHref}><Icon name="download" />Tải về &amp; cài đặt</a>
     </div>
     <div id="pop-install" popover>
-      Lệnh <b>minh hoạ</b>: đường dẫn repo chính thức sẽ cập nhật khi phát hành.
+      Lệnh cài từ mã nguồn. Bản cài một lệnh bằng Docker Compose đang được làm.
       <a class="link" href={installHref}>Hướng dẫn cài đặt</a>
     </div>
     <div class="facts">
-      <span><Icon name="check" size={14} />Miễn phí · mã nguồn mở Apache-2.0</span>
+      <span>
+        <Icon name="check" size={14} />Miễn phí ·{" "}
+        <a class="link" href={repoUrl} rel="noopener noreferrer">mã nguồn mở Apache-2.0</a>
+      </span>
       <span><Icon name="layers" size={14} />Chạy trên NVIDIA NeMo AutoModel</span>
       <span>
         <Icon name="cpu" size={14} />Tối ưu cho DGX Spark

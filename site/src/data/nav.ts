@@ -11,6 +11,10 @@ export const nav = [
 ] as const;
 
 export const installHref = "/docs/cai-dat/";
+/** Public source repository (PM 2026-10-13). Agents never push; the PM pushes when the user asks. */
+export const repoUrl = "https://github.com/baonguyen3568/training-line";
+/** The real install-from-source command (matches /docs/cai-dat); a one-command Docker Compose install is in progress. */
+export const installCommand = `git clone ${repoUrl}.git ntc-training && cd ntc-training && uv sync`;
 
 export const footer = [
   {
