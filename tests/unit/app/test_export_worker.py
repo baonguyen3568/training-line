@@ -177,24 +177,29 @@ def _shared_blob(w: RealWorker, data: bytes, *, name: str | None = None) -> Path
 
 
 def test_weights_reached_through_the_shared_blob_store_are_exported(tmp_path: Path) -> None:
-    """tester BUG 1: snapshot -> repo blobs/<x> (a link) -> .cache/hf/hub/blobs/<xx>/<sha256> (the file)."""
+    """tester BUG 1: snapshot -> repo blobs/<sha256 of content> (a link) -> shared store (any dedupe name, the file)."""
+    import hashlib
+
     w, entry, _ = _setup(tmp_path)
     snap = _hub_snapshot(w, entry)
     (snap / "model.safetensors").unlink()
-    repo_blob = snap.parent.parent / "blobs" / "04b1c3"
-    repo_blob.symlink_to(_shared_blob(w, b"big weights"))
-    (snap / "model.safetensors").symlink_to("../../blobs/04b1c3")
+    data = b"big weights"
+    etag = hashlib.sha256(data).hexdigest()
+    (snap.parent.parent / "blobs" / etag).symlink_to(_shared_blob(w, data, name="f0" + "1" * 62))
+    (snap / "model.safetensors").symlink_to(f"../../blobs/{etag}")
     picked = w.run(_job_pick(w))
     w.run(_job(Path(picked.outputs["model"].path), w.root / "outputs" / "graph" / "runs" / "x-1",
                ref=picked.outputs["model"]))  # fmt: skip
-    assert (w.root / "outputs" / "exports" / "my-model" / "model.safetensors").read_bytes() == b"big weights"
+    assert (w.root / "outputs" / "exports" / "my-model" / "model.safetensors").read_bytes() == data
 
 
-def test_a_shared_blob_whose_content_is_not_its_name_is_left_out(tmp_path: Path) -> None:
+@pytest.mark.parametrize("repo_blob", ["0" * 64, "not-a-sha"])
+def test_weights_whose_repo_blob_does_not_name_their_hash_are_left_out(tmp_path: Path, repo_blob: str) -> None:
     w, entry, _ = _setup(tmp_path)
     snap = _hub_snapshot(w, entry)
     (snap / "model.safetensors").unlink()
-    (snap / "model.safetensors").symlink_to(_shared_blob(w, b"tampered", name="0" * 64))
+    (snap.parent.parent / "blobs" / repo_blob).symlink_to(_shared_blob(w, b"tampered", name="ab" * 32))
+    (snap / "model.safetensors").symlink_to(f"../../blobs/{repo_blob}")
     picked = w.run(_job_pick(w))
     with pytest.raises(export_worker.ExportIncompleteError) as err:
         w.run(_job(Path(picked.outputs["model"].path), w.root / "outputs" / "graph" / "runs" / "x-1",

@@ -90,10 +90,10 @@ def _copy_verified(source: Path, dest: Path, *, expect: str | None) -> bool:
 def _copy_allowed(src: Path, dst: Path, *, blobs: tuple[Path, ...] = ()) -> list[str]:
     """Copy the model files of ``src`` (plain files) into ``dst``; returns the names copied.
 
-    An HF hub snapshot is made of links into its repo's ``blobs/``, which may link again into the shared,
-    deduplicated store ``.cache/hf/hub/blobs/<xx>/<sha256>`` (tester, release 1.0). A link whose final target is a
-    plain file inside one of ``blobs`` is copied as its content (a shared-store file must hash to its name); any
-    other link is skipped.
+    An HF hub snapshot is made of links into its repo's ``blobs/<etag>``, which may link again into the shared,
+    deduplicated store ``.cache/hf/hub/blobs/<xx>/<key>`` (tester, release 1.0). A link whose final target is a plain
+    file inside one of ``blobs`` is copied as its content; when the repo blob's name is a sha256 (HF LFS etag) the
+    bytes must hash to it, and a shared-store file is only taken with such a hash to check. Other links are skipped.
     """
     copied = []
     for path in sorted(src.iterdir()):
@@ -105,9 +105,12 @@ def _copy_allowed(src: Path, dst: Path, *, blobs: tuple[Path, ...] = ()) -> list
             if not any(target.is_relative_to(b) for b in blobs):
                 continue
             source = target
-            expect = target.name if blobs[-1:] and target.is_relative_to(blobs[-1]) else None
-            if expect is not None and not _SHA256_NAME.fullmatch(expect):
-                continue  # the shared store names blobs by sha256: anything else is not one of its blobs
+            # The first hop is the repo blob, named by HF's sha256 of the content for LFS files (tester): that is the
+            # hash to check. The shared store's own names are dedupe keys, not content hashes.
+            first = path.parent / path.readlink()
+            expect = first.name if _SHA256_NAME.fullmatch(first.name) else None
+            if expect is None and blobs[-1:] and target.is_relative_to(blobs[-1]):
+                continue  # into the shared store with no published hash to check it against: left out
         if not stat.S_ISREG(source.lstat().st_mode):
             continue
         if _copy_verified(source, dst / path.name, expect=expect):
@@ -118,8 +121,10 @@ def _copy_allowed(src: Path, dst: Path, *, blobs: tuple[Path, ...] = ()) -> list
 def _hub_blobs(root: Path, src: Path) -> tuple[Path, ...]:
     """Where the links of hub snapshot ``src`` may lead: its repo's ``blobs/``, then the shared store (resolved).
 
-    Empty when ``src`` is not in the hub. The shared ``.cache/hf/hub/blobs`` store is last: its files are checked
-    against their sha256 names.
+    Empty when ``src`` is not in the hub. The shared ``.cache/hf/hub/blobs`` store is last. huggingface_hub writes it
+    (marker ``.huggingface-shared-blobs``, ``<name>.refs``; hf_xet downloads): its names are internal dedupe keys that
+    may change between versions, never a checksum, so a file there is only taken when the repo blob linking to it
+    names the content's sha256 (the LFS etag).
     """
     base = root.resolve()
     real = src.resolve()
