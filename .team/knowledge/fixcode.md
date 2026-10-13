@@ -187,6 +187,11 @@ EOF
   - Đi qua jobrun_cli (vlm-automodel 26.08-6, memguard bật, A làm matmul 180 s, khoảng nghỉ 0–1 s): 6/6 OK (22:12–22:25).
     Tổng 36 lần chuyển job sát nhau, 0 OOM. Đặc điểm chung duy nhất còn lại của 6 lần OOM thật: job B đều là
     Nemotron-Parse (HF remote code, AutoModel 26.08). Bước tiếp: dùng chính job Parse làm B ngay sau một job GPU.
+- **NGUYÊN NHÂN (đã tái hiện, 22:47–23:00):** process materialize khoảng 2 GB tensor trên CPU RỒI MỚI tạo CUDA context →
+  `CUDA_ERROR_OUT_OF_MEMORY from cuDevicePrimaryCtxRetain`, lỗi ~55% (5/9), dù có hay không có job GPU trước.
+  Tạo context TRƯỚC (`torch.empty(1, device="cuda")` ở dòng đầu) → 0/5. "Vừa có job thoát" chỉ là trùng hợp: job Parse
+  luôn nạp trên CPU trước. Cách sửa: `common.cuda_init.ensure_cuda_context()` ở đầu mọi entrypoint job GPU.
+  Ghi chú upstream (chưa gửi): `.team/upstream/nvidia-gb10-ctx-create-oom-after-cpu-alloc.md`.
 - Đang có: 2 VLLM::EngineCore ngoài dự án (khoảng 58 GB) và stack vss-* chạy song song (đã báo PM để hỏi user).
 - Biện pháp hiện tại:
   - log CUDA OOM → MEM-003 (d83e0db);
