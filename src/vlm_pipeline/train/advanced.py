@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import functools
 import json
+import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, ClassVar
+
+from pydantic_core import PydanticCustomError
 
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
@@ -70,18 +73,35 @@ def _problem(entry: Mapping[str, Any], value: object) -> str | None:
     return "type" if check is None else check(entry, value)
 
 
+ERROR_TYPE = "advanced_options"  # pydantic error type; ctx["problems"] = [{"key", "rule"}] (graph.validation)
+_SAFE_KEY = re.compile(
+    r"^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*){0,7}$"
+)  # an unknown key is echoed only if it looks like one
+
+
 def check_advanced(values: Mapping[str, object]) -> dict[str, object]:
-    """``values`` when every key is offered and every value fits its type / choices / range, else ValueError."""
+    """``values`` when every key is offered and every value fits, else ONE error listing every bad key.
+
+    Raises ``PydanticCustomError(ERROR_TYPE)`` with ``ctx["problems"] = [{"key": dotted key, "rule": rule}]``, rule in
+    not_offered | type | range | choice | resolver | too_many, so the UI shows each problem under its own row. A key
+    that is not offered comes from the file: it is echoed only when it has the shape of a key (else ``""``).
+    """
+    problems: list[dict[str, str]] = []
     if len(values) > MAX_KEYS:
-        raise ValueError(f"at most {MAX_KEYS} advanced options")
-    options = engine_options()
-    for key, value in values.items():
-        entry = options.get(key)
-        if entry is None:
-            raise ValueError(f"{key!r} is not an offered engine option")
-        problem = _problem(entry, value)
-        if problem is not None:
-            raise ValueError(f"{key!r}: invalid value ({problem})")
+        problems.append({"key": "", "rule": "too_many"})
+    else:
+        options = engine_options()
+        for key, value in values.items():
+            entry = options.get(key)
+            if entry is None:
+                shown = key if len(key) <= 120 and _SAFE_KEY.fullmatch(key) else ""
+                problems.append({"key": shown, "rule": "not_offered"})
+            elif (rule := _problem(entry, value)) is not None:
+                problems.append({"key": key, "rule": rule})
+    if problems:
+        raise PydanticCustomError(
+            ERROR_TYPE, "{count} advanced option(s) invalid", {"count": len(problems), "problems": problems}
+        )
     return dict(values)
 
 
@@ -107,4 +127,4 @@ def set_dotted(recipe: dict[str, Any], key: str, value: object) -> None:
     node[leaf] = value
 
 
-__all__ = ["AdvancedNotForModelError", "check_advanced", "engine_options", "keys_not_for", "set_dotted"]
+__all__ = ["ERROR_TYPE", "AdvancedNotForModelError", "check_advanced", "engine_options", "keys_not_for", "set_dotted"]

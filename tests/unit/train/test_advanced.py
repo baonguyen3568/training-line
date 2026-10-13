@@ -6,10 +6,11 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from pydantic_core import PydanticCustomError
 
 from vlm_pipeline.common.catalog import load_catalog
 from vlm_pipeline.common.paths import project_root
-from vlm_pipeline.train.advanced import check_advanced, keys_not_for, set_dotted
+from vlm_pipeline.train.advanced import ERROR_TYPE, check_advanced, keys_not_for, set_dotted
 from vlm_pipeline.train.config import LoraParams
 from vlm_pipeline.train.recipe import build_recipe, load_template, template_path
 
@@ -21,23 +22,39 @@ def test_offered_values_pass() -> None:
 
 
 @pytest.mark.parametrize(
-    ("values", "needle"),
+    ("values", "rule"),
     [
-        ({"model._target_": "os.system"}, "not an offered"),  # denied keys never reach the file
-        ({"optimizer.lr": 1.0}, "not an offered"),  # the node's own field
+        ({"model._target_": "os.system"}, "not_offered"),  # denied keys never reach the file
+        ({"optimizer.lr": 1.0}, "not_offered"),  # the node's own field
         ({"dataloader.num_workers": 512}, "range"),  # shared-host DoS
         ({"dataloader.num_workers": True}, "type"),  # bool is not an int here
         ({"rng.ranked": 1}, "type"),
         ({"model.backend.attn": "flash3"}, "choice"),
         ({"model.backend.attn": "${oc.env:HF_TOKEN}"}, "resolver"),
-        ({f"k{i}": 1 for i in range(101)}, "at most"),
+        ({f"k{i}": 1 for i in range(101)}, "too_many"),
     ],
 )
-def test_bad_values_are_refused(values: dict[str, Any], needle: str) -> None:
-    with pytest.raises(ValueError, match=needle):
+def test_bad_values_are_refused(values: dict[str, Any], rule: str) -> None:
+    with pytest.raises(PydanticCustomError) as err:
         check_advanced(values)
-    with pytest.raises(ValidationError):
+    assert [p["rule"] for p in err.value.context["problems"]] == [rule]  # type: ignore[index]
+    with pytest.raises(ValidationError) as verr:
         LoraParams(advanced=values)
+    assert verr.value.errors()[0]["type"] == ERROR_TYPE
+
+
+def test_every_bad_key_is_listed_and_unknown_keys_are_echoed_only_when_key_shaped() -> None:
+    bad = {"dataloader.num_workers": 512, "model.backend.attn": "flash3", "nope.key": 1, "<img src=x>": 1, "a.b\n": 1}
+    with pytest.raises(PydanticCustomError) as err:
+        check_advanced(bad)
+    problems = err.value.context["problems"]  # type: ignore[index]
+    assert problems == [
+        {"key": "dataloader.num_workers", "rule": "range"},
+        {"key": "model.backend.attn", "rule": "choice"},
+        {"key": "nope.key", "rule": "not_offered"},
+        {"key": "", "rule": "not_offered"},  # never echo an arbitrary string from the file
+        {"key": "", "rule": "not_offered"},  # a trailing newline is not a key ($ alone would let it through)
+    ]
 
 
 def test_keys_follow_the_model_template() -> None:
