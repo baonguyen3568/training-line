@@ -163,6 +163,7 @@ function ParamField({
         >
           {visibleOptions(schema, mode, current).map((opt) => {
             const off = disabledReason(schema, opt);
+            const rec = schema["x-ui"]?.recommended;
             return (
               // a dimmed option is still announced: its text carries "· chưa hỗ trợ"
               <option
@@ -171,6 +172,9 @@ function ParamField({
                 disabled={off !== undefined && opt !== current}
               >
                 {optionLabel(schema, opt, availGb)}
+                {rec !== undefined && String(opt) === String(rec)
+                  ? ` · ${t("inspector.recommended")}`
+                  : ""}
                 {off !== undefined ? ` · ${t("param_unsupported.default")}` : ""}
               </option>
             );

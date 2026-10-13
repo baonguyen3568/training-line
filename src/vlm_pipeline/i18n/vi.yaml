@@ -813,6 +813,7 @@ template:
     desc: Dạy model trả lời câu hỏi về ảnh và video theo dữ liệu của bạn. Dùng Qwen3.5-2B, train nhẹ bằng LoRA, không cần tài khoản.
     needs_account: Cần tài khoản Hugging Face
 inspector:
+  recommended: khuyên dùng
   empty_hint: Chọn một bước trên canvas để xem và chỉnh thiết lập.
 license:
   badge:

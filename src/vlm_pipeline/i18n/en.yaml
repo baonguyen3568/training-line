@@ -813,6 +813,7 @@ template:
     desc: Teach a model to answer questions about images and videos from your data. Uses Qwen3.5-2B with lightweight LoRA training; no account needed.
     needs_account: Needs a Hugging Face account
 inspector:
+  recommended: recommended
   empty_hint: Select a step on the canvas to see and edit its settings.
 license:
   badge:
