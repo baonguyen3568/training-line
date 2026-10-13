@@ -1,0 +1,24 @@
+# Verdict of node eval.benchmarks for the user: PASS / WARN (Vietnamese UI: "cảnh báo") / FAIL.
+# Thresholds agreed by bao-research 2026-10-13 (P002 B3/A4, P001a 8aac26a). Read by vlm_pipeline.eval.gate; the UI
+# never hard-codes them. Deltas are on the 0-100 scale of the benchmark's primary metric, oriented so that
+# "positive = better" (higher_is_better from the benchmark registry).
+schema_version: 1
+
+# Benchmarks whose output is structured (JSON-like tokens): truncation / parse failure are meaningful there only.
+structured_output:
+  truncated_pct: {warn_above: 10, fail_above: 30}
+  parse_fail_pct: {warn_above: 5, fail_above: 20}
+
+# Fine-tune vs its base on the same images (paired bootstrap CI95 of the delta).
+finetune_vs_base:
+  # CI95 entirely above 0 -> pass; contains 0 -> warn; entirely below 0 -> fail.
+  min_samples_for_pass: 50  # fewer: at best WARN, labelled "quick measurement, indicative only"
+  general_forgetting_warn_min_benchmarks: 2  # general benchmarks dropping beyond their CI: warn, never fail
+
+# Quantized model vs its bf16 parent: mean delta over benchmarks, and the worst single benchmark.
+quant_vs_parent:
+  fp8: {pass_min_mean: -1.0, warn_min_mean: -2.0, fail_below_any: -5.0}
+  nvfp4: {pass_min_mean: -3.0, warn_min_mean: -5.0, fail_below_any: -5.0, ocr_docvqa_fail_below: -3.0}
+
+# No base to compare with: only the absolute structured_output thresholds apply. There is deliberately no absolute
+# F1 threshold: it depends on the task and the user's data, no single number is right.
