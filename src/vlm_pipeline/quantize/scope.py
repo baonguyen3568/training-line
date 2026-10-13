@@ -14,8 +14,6 @@ from vlm_pipeline.common.catalog import CatalogEntry
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.quantize.config import QuantizeParams
 
-PTQ_EXIT_PARITY_FAILED = 3  # vlm_pipeline.quantize.ptq: quantized, but the BF16-parity sanity check failed
-
 
 class QuantizeNotSupportedError(VlmPipelineError):
     """The model / data / options are outside what the quantize worker supports yet (refused before the GPU)."""

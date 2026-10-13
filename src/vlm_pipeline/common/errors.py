@@ -20,6 +20,7 @@ class ExitCode(IntEnum):
     NO_DISK = 3
     LOCK_BUSY = 4
     GPU_ENV = 5  # GPU/driver cannot run the image (D-4: GeForce without a native driver), never retried
+    QUANT_PARITY_FAIL = 10  # quantize.ptq exported, but parity says the quantization is broken (QNT-001)
     MEM_PREEMPT = 75  # worker stopped by the memory watchdog after checkpointing -> run status "interrupted"
 
 

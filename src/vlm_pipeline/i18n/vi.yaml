@@ -102,6 +102,16 @@ error:
     title: Bước này hỏng nhiều lần, app đã ngừng thử lại
     what: "Bước \"{node}\" đã chạy {attempt_count} lần mà lần nào cũng hỏng, nên app ngừng tự chạy lại bước này. Hãy xem lỗi của lần chạy gần nhất (đổi thiết lập của bước thì app sẽ chạy lại từ đầu); nếu chưa rõ nguyên nhân, hãy gửi báo cáo lỗi."
     why: Hỏng liên tiếp nhiều lần như vậy thường do thiết lập hoặc do máy, không phải lỗi ngẫu nhiên.
+  QNT-001:
+    title: Bản nén bị hỏng
+    what:
+      top1: 'Bản nén từ bước "{node}" chỉ khớp với bản gốc ở {top1_pct}% số từ trên {sample_count} ảnh kiểm tra (cần tối thiểu {limit_top1_pct}%). App không dùng bản nén này; hãy bỏ bước nén hoặc gửi báo cáo lỗi.'
+      kl: 'Bản nén từ bước "{node}" chọn từ lệch quá nhiều so với bản gốc trên {sample_count} ảnh kiểm tra. App không dùng bản nén này; hãy bỏ bước nén hoặc gửi báo cáo lỗi.'
+  QNT-002:
+    title: Bản nén khác bản gốc khá nhiều
+    what:
+      top1: 'Bản nén từ bước "{node}" khớp với bản gốc ở {top1_pct}% số từ trên {sample_count} ảnh kiểm tra, thấp hơn mức thường gặp ({limit_top1_pct}%). Bản nén vẫn dùng được; hãy đo điểm trước khi dùng thật.'
+      kl: 'Bản nén từ bước "{node}" chọn từ lệch nhiều hơn mức thường gặp so với bản gốc trên {sample_count} ảnh kiểm tra. Bản nén vẫn dùng được; hãy đo điểm trước khi dùng thật.'
   SYS-003:
     title: Bước này dừng đột ngột
     what: Bước này dừng giữa chừng mà không báo lý do (có thể do máy khởi động lại hoặc tiến trình bị tắt). Tiến độ đến {checkpoint_step} đã được lưu nếu có.
@@ -1065,6 +1075,7 @@ error_group:
   MEM: Bộ nhớ
   MODEL: Tải và dùng model
   NET: Kết nối mạng
+  QNT: Nén model
   STD: Khuyến nghị về thiết lập và dữ liệu
   SEC: An toàn và giấy phép
   SYS: Hệ thống và tiến trình chạy

@@ -615,6 +615,50 @@ CACHE-001:
     - {kind: executor, value: "cache hit but artifact path missing or manifest hash mismatch -> treated as miss"}
   actions: []
 
+QNT-001:
+  slug: QUANT_PARITY_FAIL
+  severity: error
+  prevent_in_preflight: false
+  # quantize.ptq parity verdict "fail" (exit 10 + report.json; thresholds come from report["parity"]["thresholds"]).
+  # top1_pct / limit_top1_pct = mean top-1 agreement with the BF16 model on held-out images, in percent (one decimal).
+  # The quantized model is NOT handed over. Research: .team/proposals/001-stack-model-catalog.md (B-4 A/B).
+  params:
+    - {name: node, ref: node}
+    - top1_pct
+    - limit_top1_pct
+    - kl
+    - limit_kl
+    - sample_count
+    - {name: reason, type: enum, values: [top1, kl]}  # which limit tripped; top1 when both did
+  variants:
+    - {when: {reason: top1}, key: top1}
+    - {when: {reason: kl}, key: kl}
+  match:
+    - {kind: exit, value: "10 (ExitCode.QUANT_PARITY_FAIL) and report.json parity verdict fail"}
+  actions:
+    - {id: remove_step, kind: patch, confirm: true}
+    - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+QNT-002:
+  slug: QUANT_PARITY_LOW
+  severity: warn
+  prevent_in_preflight: false
+  # quantize.ptq parity verdict "warn": below the typical FP8 level but not broken; the model IS handed over.
+  # Same params as QNT-001 with the warn thresholds. Export adds a NOTICE line when no benchmark follows (PM).
+  params:
+    - {name: node, ref: node}
+    - top1_pct
+    - limit_top1_pct
+    - kl
+    - limit_kl
+    - sample_count
+    - {name: reason, type: enum, values: [top1, kl]}  # which limit tripped; top1 when both did
+  variants:
+    - {when: {reason: top1}, key: top1}
+    - {when: {reason: kl}, key: kl}
+  match:
+    - {kind: executor, value: "quantize report.json parity verdict warn"}
+
 SYS-003:
   slug: WORKER_CRASHED
   severity: error

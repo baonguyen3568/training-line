@@ -42,7 +42,6 @@ MAX_KL = 0.05
 FAIL_TOP1_AGREEMENT = 0.80
 FAIL_KL = 0.20
 ParityVerdict = Literal["pass", "warn", "fail", "none"]  # contract with app/quantize_worker (QNT-001 / QNT-002)
-EXIT_PARITY_FAIL = 3  # quantized and exported, but parity says the quantization is broken
 
 
 def load_images(data_dir: Path, split: str, n: int) -> list[Any]:
@@ -202,7 +201,10 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     report = run(a.model, a.data, a.out, fmt=a.format, calib_size=a.calib_size)
     print(json.dumps(report, indent=2))
-    return EXIT_PARITY_FAIL if report["parity"]["verdict"] == "fail" else 0  # warn: the worker reads report.json
+    from vlm_pipeline.common.errors import ExitCode
+
+    # warn: exit 0, the worker reads report.json (QNT-002); fail: QNT-001
+    return ExitCode.QUANT_PARITY_FAIL if report["parity"]["verdict"] == "fail" else ExitCode.OK
 
 
 if __name__ == "__main__":

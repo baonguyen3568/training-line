@@ -102,6 +102,16 @@ error:
     title: This step keeps failing; retries stopped
     what: "Step \"{node}\" failed all {attempt_count} times it ran, so the app stopped retrying it. Check the error from the last run (changing the step's settings lets it run again); if the cause is unclear, send a bug report."
     why: Failing this many times in a row usually points to a setup or machine problem, not a one-off glitch.
+  QNT-001:
+    title: The quantized model is broken
+    what:
+      top1: 'The model from step "{node}" matches the original on only {top1_pct}% of words across {sample_count} test images (minimum {limit_top1_pct}%). The app will not use it; remove the quantize step or send a bug report.'
+      kl: 'The model from step "{node}" picks its words very differently from the original across {sample_count} test images. The app will not use it; remove the quantize step or send a bug report.'
+  QNT-002:
+    title: The quantized model differs noticeably
+    what:
+      top1: 'The model from step "{node}" matches the original on {top1_pct}% of words across {sample_count} test images, below the usual level ({limit_top1_pct}%). It is still usable; score it before real use.'
+      kl: 'The model from step "{node}" picks its words more differently from the original than usual across {sample_count} test images. It is still usable; score it before real use.'
   SYS-003:
     title: This step stopped unexpectedly
     what: This step stopped midway without reporting why (the machine may have restarted or the process was killed). Progress up to {checkpoint_step} was saved if available.
@@ -1065,6 +1075,7 @@ error_group:
   MEM: Memory
   MODEL: Downloading and using models
   NET: Network
+  QNT: Model quantization
   STD: Recommended settings and data
   SEC: Safety and licenses
   SYS: System and running processes
