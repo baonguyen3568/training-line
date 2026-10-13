@@ -919,6 +919,7 @@ lr_preset:
   fast: Nhanh
 epoch_count:
   '1': 1 lượt
+  '2': 2 lượt
   '3': 3 lượt
   '5': 5 lượt
 eval_suite:
@@ -1056,6 +1057,7 @@ standards:
     no_validation: "Chưa có dữ liệu kiểm tra, nên app không chọn được bản lưu tốt nhất và không phát hiện được học thuộc. Hãy nối vào cổng \"Dữ liệu kiểm tra\" hoặc dùng bước Chia dữ liệu."
     test_split_in_training: "Dữ liệu học đang lấy từ bộ chấm điểm. Bộ này chỉ dùng để chấm điểm cuối; học trên nó làm điểm số không còn ý nghĩa."
     too_few_samples: "Chỉ có dưới {below} mẫu dữ liệu học. Model dễ học thuộc thay vì học cách làm."
+    one_epoch: "1 lượt đủ để xem cả pipeline chạy, nhưng model thường chưa học đủ. Khi chạy thật, nên chọn 3 lượt."
   quant:
     calib_size: "Số mẫu hiệu chỉnh {value} nằm ngoài khoảng khuyến nghị ({min}–{max}). Ít quá thì bản nén kém chính xác, nhiều quá thì chạy lâu mà không tốt hơn."
     calib_from_heldout: "Dữ liệu hiệu chỉnh đang lấy từ bộ chấm điểm. Hãy dùng dữ liệu học để điểm sau khi nén còn đáng tin."

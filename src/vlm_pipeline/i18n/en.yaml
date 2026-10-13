@@ -919,6 +919,7 @@ lr_preset:
   fast: Fast
 epoch_count:
   '1': 1 pass
+  '2': 2 passes
   '3': 3 passes
   '5': 5 passes
 eval_suite:
@@ -1056,6 +1057,7 @@ standards:
     no_validation: "No validation data, so the app cannot pick the best saved version or detect memorising. Connect the \"Validation data\" port or use Split data."
     test_split_in_training: "Training data comes from the benchmark set. That set is only for the final score; training on it makes the score meaningless."
     too_few_samples: "Fewer than {below} training samples. The model may memorise instead of learning the task."
+    one_epoch: "One pass is enough to see the whole pipeline run, but the model usually has not learned enough yet. For a real run, choose 3 passes."
   quant:
     calib_size: "Calibration size {value} is outside the recommended range ({min}–{max}). Too few makes the quantized model less accurate; too many takes longer without helping."
     calib_from_heldout: "Calibration data comes from the benchmark set. Use training data so the post-quantization score stays trustworthy."
