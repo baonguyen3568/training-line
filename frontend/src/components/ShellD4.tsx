@@ -169,3 +169,28 @@ export function StatusBar() {
     </footer>
   );
 }
+
+/** D4 home (gallery) top bar: mark + product, then runs / storage; the editor toolbar replaces it once open. */
+export function HomeBarD4() {
+  const go = (to: string) => window.dispatchEvent(new CustomEvent("vlm:navigate", { detail: to }));
+  return (
+    <header className="tb" role="toolbar" aria-label={t("app.name")}>
+      <span className="tb-brand" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 32 32">
+          <rect width="32" height="32" rx="8" fill="var(--color-accent-brand)" />
+          <path
+            d="M10.25 22.5V9.5l11.5 13V9.5"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="3.2"
+            strokeLinecap="square"
+          />
+        </svg>
+      </span>
+      <span className="tb-name">{t("app.name")}</span>
+      <span className="tb-grow" />
+      <IconButton icon="scroll-text" label={t("app.nav_runs")} onClick={() => go("runs")} />
+      <IconButton icon="hard-drive" label={t("app.nav_storage")} onClick={() => go("storage")} />
+    </header>
+  );
+}

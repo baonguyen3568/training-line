@@ -2,6 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Editor } from "./components/Editor";
 import { Gallery } from "./components/Gallery";
 import { Header, type Nav } from "./components/Header";
+import { PipelineGallery } from "./components/PipelineGallery";
+import { HomeBarD4 } from "./components/ShellD4";
 import { t } from "./i18n";
 import { clearDraft, type Draft, loadDraft, saveDraft } from "./lib/draft";
 import { formatDateTime } from "./lib/format";
@@ -70,6 +72,7 @@ export function App() {
 
   // M2-6: the D4 editor owns the whole screen (its toolbar replaces the header); other views keep the header.
   const d4Editor = skin === "d4" && view.kind === "home" && !!workflow;
+  const d4Home = skin === "d4" && view.kind === "home" && !workflow;
 
   const navigate = (to: Nav) => {
     if (to === "home") closeWorkflow();
@@ -77,8 +80,8 @@ export function App() {
   };
 
   return (
-    <div className={d4Editor ? "app d4" : "app"}>
-      {!d4Editor && (
+    <div className={d4Editor || d4Home ? "app d4" : "app"}>
+      {!d4Editor && !d4Home && (
         <Header
           onNavigate={navigate}
           active={view.kind === "home" ? "home" : view.kind === "storage" ? "storage" : "runs"}
@@ -133,6 +136,11 @@ export function App() {
       {view.kind === "home" &&
         (workflow ? (
           <Editor />
+        ) : d4Home ? (
+          <div className="editor d4 d4-home">
+            <HomeBarD4 />
+            <PipelineGallery />
+          </div>
         ) : (
           <Gallery onOpen={(id) => void openTemplate(id)} onBlank={newWorkflow} />
         ))}

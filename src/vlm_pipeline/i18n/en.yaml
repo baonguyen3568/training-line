@@ -1100,3 +1100,33 @@ docs_placeholder:
   since: start time
 docs_error:
   actions_lead: "Depending on the situation, the app suggests one of these:"
+pipelines:
+  more_steps: "+{step_count} steps"
+  title: Reference pipelines
+  search: Search pipelines…
+  filter:
+    all: All
+    app_template: App templates
+    external: External sources
+    candidate: Candidates
+  kind:
+    app_template: App template
+    candidate: Candidate, not released
+  license: License
+  license_parts: "Source code {code} · model {model} · data {data}"
+  see_source: see source
+  difficulty: Difficulty
+  level:
+    basic: Basic
+    advanced: Advanced
+  not_assessed: not assessed
+  time: Time
+  hf_terms: Accept the model's terms on Hugging Face before downloading
+  hf_terms_detail: This model requires a Hugging Face login and your own acceptance of the author's terms, including the NVIDIA Open Model License guardrail terms. The app never accepts them for you.
+  license_detail: License details
+  open: Open
+  view_source: View source
+  status:
+    available: Available
+    planned: In preparation
+    reference_only: Reference only

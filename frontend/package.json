@@ -17,8 +17,8 @@
     "test": "vitest run",
     "check": "npm run tokens && npm run schemas:check && biome ci . && tsc --noEmit && vitest run",
     "licenses": "node scripts/list-licenses.mjs",
-    "schemas": "node scripts/gen-schema-types.mjs",
-    "schemas:check": "npm run schemas && git ls-files --error-unmatch src/generated/schemas.ts src/generated/node-types.json src/generated/templates.json >/dev/null && test -z \"$(git status --porcelain -- src/generated/schemas.ts src/generated/node-types.json src/generated/templates.json)\" || (echo 'schemas.ts drift: regenerate and commit src/generated/schemas.ts, node-types.json, templates.json' && exit 1)"
+    "schemas": "node scripts/gen-schema-types.mjs && uv run --quiet python scripts/reference_pipelines.py",
+    "schemas:check": "npm run schemas && git ls-files --error-unmatch src/generated/schemas.ts src/generated/node-types.json src/generated/templates.json src/generated/reference-pipelines.json >/dev/null && test -z \"$(git status --porcelain -- src/generated/schemas.ts src/generated/node-types.json src/generated/templates.json src/generated/reference-pipelines.json)\" || (echo 'schemas.ts drift: regenerate and commit src/generated/schemas.ts, node-types.json, templates.json' && exit 1)"
   },
   "dependencies": {
     "@dagrejs/dagre": "3.1.1",

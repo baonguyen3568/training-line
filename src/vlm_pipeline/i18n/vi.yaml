@@ -1100,3 +1100,33 @@ docs_placeholder:
   since: thời điểm bắt đầu
 docs_error:
   actions_lead: "Tuỳ trường hợp, app sẽ đề xuất một trong các cách sau:"
+pipelines:
+  more_steps: "+{step_count} bước"
+  title: Pipeline tham khảo
+  search: Tìm pipeline…
+  filter:
+    all: Tất cả
+    app_template: Mẫu của app
+    external: Từ nguồn ngoài
+    candidate: Ứng viên
+  kind:
+    app_template: Mẫu của app
+    candidate: Ứng viên, chưa phát hành
+  license: Giấy phép
+  license_parts: "Mã nguồn {code} · model {model} · dữ liệu {data}"
+  see_source: xem nguồn
+  difficulty: Độ khó
+  level:
+    basic: Cơ bản
+    advanced: Nâng cao
+  not_assessed: chưa đánh giá
+  time: Thời gian
+  hf_terms: Cần tự đồng ý điều khoản của model trên Hugging Face trước khi tải
+  hf_terms_detail: Model này yêu cầu đăng nhập Hugging Face và tự đồng ý điều khoản của tác giả, gồm cả điều khoản guardrail của NVIDIA Open Model License. App không đồng ý thay bạn.
+  license_detail: Chi tiết giấy phép
+  open: Mở
+  view_source: Xem nguồn
+  status:
+    available: Có sẵn
+    planned: Đang chuẩn bị
+    reference_only: Chỉ để tham khảo
