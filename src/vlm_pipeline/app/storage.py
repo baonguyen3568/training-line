@@ -31,6 +31,7 @@ from fastapi import Body, FastAPI, Query
 from fastapi.responses import JSONResponse
 
 from vlm_pipeline import i18n
+from vlm_pipeline.app.uploads import clean_label
 from vlm_pipeline.artifacts import cache_retention, retention
 from vlm_pipeline.artifacts.index import ArtifactIndex
 from vlm_pipeline.artifacts.storage import du_bytes
@@ -216,10 +217,11 @@ def _step_title(root: Path, item: retention.PlanItem, locale: str) -> str:
     """Node title of the run (app runs are named ``"<node type> <entry>"``), else the run's name, else its id."""
     run_json = root / item.runs_rel / item.run_id / "run.json"
     name = ""
-    try:  # a job can rewrite its own run.json: a regular file only, read at most RUN_JSON_MAX bytes
+    try:  # a job can rewrite its own run.json: a regular file only, at most RUN_JSON_MAX bytes,
+        # shown as a clean label (no bidi/control characters, short)
         st = run_json.lstat()
         if stat.S_ISREG(st.st_mode) and st.st_size <= RUN_JSON_MAX:
-            name = str(json.loads(run_json.read_text(encoding="utf-8")).get("name") or "")[:200]
+            name = clean_label(str(json.loads(run_json.read_text(encoding="utf-8")).get("name") or ""))
     except (OSError, ValueError, AttributeError):
         name = ""
     key = f"node.{name.split(' ', 1)[0]}.title" if name else ""

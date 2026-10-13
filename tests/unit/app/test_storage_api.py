@@ -376,6 +376,16 @@ def test_interrupted_run_is_kept_until_a_date_and_warned_a_day_before(
     assert script["node"] == "smoke p3b"
 
 
+def test_run_name_in_a_notice_is_a_clean_label(env: tuple[TestClient, ArtifactIndex, Path, Clock]) -> None:
+    """A job can write its own run.json: its name reaches the panel without bidi/control characters, shortened."""
+    client, _, root, _ = env
+    _interrupted(root, "r-x", 6.5, name="\u202eevil\x07" + "a" * 5000)
+    (notice,) = client.get("/api/storage/plan", params={"locale": "en"}).json()["attention"]
+    assert notice["node"].startswith("evila")
+    assert len(notice["node"]) <= 120
+    assert "\u202e" not in notice["message"]
+
+
 def test_expired_interrupted_run_latest_needs_a_person(env: tuple[TestClient, ArtifactIndex, Path, Clock]) -> None:
     client, _, root, _ = env
     _interrupted(root, "r-old", 8)
