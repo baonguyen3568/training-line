@@ -1153,7 +1153,7 @@ settings:
     deployment.profile: Install profile
     storage.schedule: Cleanup schedule
     storage.approval_policy: Approval for large deletions
-    storage.approval_threshold_gb: Approval threshold (GB)
+    storage.approval_threshold_gb: Approval threshold
     plugins.allowlist: Allowed third-party nodes
   title: Settings
   section_connect: Connections

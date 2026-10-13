@@ -1153,7 +1153,7 @@ settings:
     deployment.profile: Kiểu cài đặt
     storage.schedule: Lịch dọn dẹp
     storage.approval_policy: Duyệt khi xoá nhiều
-    storage.approval_threshold_gb: Ngưỡng cần duyệt (GB)
+    storage.approval_threshold_gb: Ngưỡng cần duyệt
     plugins.allowlist: Node bên thứ 3 được phép
   title: Cài đặt
   section_connect: Kết nối
