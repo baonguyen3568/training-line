@@ -233,3 +233,11 @@ Tầm nhìn mới: app no-code node-graph cho user không biết code. Nội dun
 
 ### R.3 Giai đoạn hiện tại
 Không chạy job GPU. Việc tester làm: spec test (xfail strict) cho scoring/stats (đã có), cho validator/executor (khi P009 có interface), và error catalog (cùng bao-design + bao-fixcode).
+
+### A6. Độ chính xác thống kê của gate nén (research + tester, 2026-10-13)
+- Paired 0/1: SE(Δ) ≈ √(d/n), với d = tỉ lệ câu đổi kết quả giữa 2 run. Ví dụ d ≈ 6%: CI95 ≈ ±2.1 điểm ở n = 500 (regression), ±1.5 điểm ở n = 1000 (full). ⇒ Kể cả full set cũng **không tách chắc được** Δ = −1 với Δ = 0.
+- Quy tắc cho quant_gate (configs/eval/gates.yaml):
+  - PASS/WARN theo point estimate như B3;
+  - report **luôn kèm CI95 paired**;
+  - nếu CI chạm ngưỡng FAIL (−2 với FP8) thì gắn nhãn "chưa chắc, nên chạy full" thay vì kết luận.
+- d thật sẽ được đo ở lần chạy FP8 đầu tiên (Qwen3.5, OCRBench regression_500), rồi chốt lại số này.
