@@ -23,7 +23,7 @@ Strict load of `checkpoints/LATEST/model/consolidated` against NVIDIA's checkpoi
 byte-for-byte into `model-vlm-restored-from-base.safetensors`, update the index, skip tied aliases (`lm_head.weight`
 when tie_word_embeddings), never overwrite trained tensors, idempotent; then gate export ⊇ base.
 Tests: `tests/unit/train/test_ckpt_complete.py` (9).
-Real checkpoint (copy at outputs/fixcode/bug002/consolidated): 3 keys restored, torch.equal to base, index 668 keys.
+Real checkpoint (scratch copy at outputs/fixcode/bug002/consolidated, deleted 2026-10-13 by bao-cleanup after closure): 3 keys restored, torch.equal to base, index 668 keys.
 
 ## Verification pending
 - Wire after training in app/workers.py (bao-backend) so every downstream node gets the complete export.
