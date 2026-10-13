@@ -106,11 +106,11 @@ const missing = copy.error["CFG-003"].title;
           >
             {n.id === "n4" ? (
               <span class="swap">
-                <span class="s-before"><span class="si bad">✕</span> {notReady}</span>
-                <span class="s-after"><span class="si ok">✓</span> {ready}</span>
+                <span class="s-before"><span class="si bad"><Icon name="x" size={12} /></span> {notReady}</span>
+                <span class="s-after"><span class="si ok"><Icon name="check" size={12} /></span> {ready}</span>
               </span>
             ) : (
-              <span><span class="si ok">✓</span> {ready}</span>
+              <span><span class="si ok"><Icon name="check" size={12} /></span> {ready}</span>
             )}
           </NodeCard>
         );
@@ -121,8 +121,8 @@ const missing = copy.error["CFG-003"].title;
   <div class="ep-check" aria-hidden="true">
     <b>{copy.preflight.title}:</b>
     <span class="swap">
-      <span class="s-before"><span class="si bad">✕</span> {missing}</span>
-      <span class="s-after"><span class="si ok">✓</span> {copy.preflight.summary_ok}</span>
+      <span class="s-before"><span class="si bad"><Icon name="x" size={12} /></span> {missing}</span>
+      <span class="s-after"><span class="si ok"><Icon name="check" size={12} /></span> {copy.preflight.summary_ok}</span>
     </span>
   </div>
   <div id="pop-editor" popover>

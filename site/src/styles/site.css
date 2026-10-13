@@ -282,7 +282,11 @@ button {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 2px; /* the links' own padding makes up the old 8px */
+}
+.site-foot ul a {
+  display: inline-block;
+  padding-block: 3px; /* ≥ 24px target (design E audit r1) */
 }
 .site-foot a:hover {
   color: var(--tx);

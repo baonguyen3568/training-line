@@ -209,7 +209,11 @@
     border-color: var(--line2);
   }
 }
-/* Ink-Not-Label: only the state glyph carries status ink; the label stays in text tokens. */
+/* Ink-Not-Label: only the state glyph (a Lucide icon) carries status ink; the label stays in text tokens. */
+.si {
+  display: inline-flex;
+  vertical-align: -1px;
+}
 .si.ok {
   color: var(--color-status-ink-good);
 }
