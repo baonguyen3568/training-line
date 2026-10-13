@@ -46,8 +46,18 @@ def build_recipe(
     run_dir: str,
     class_token_start_idx: int | None = None,
     train_limit: int | None = None,
+    train_split: str | None = None,
+    val_dataset_dir: str | None = None,
+    val_split: str | None = None,
+    drop_validation: bool = False,
 ) -> dict[str, Any]:
-    """Return a new recipe dict (the template is not modified)."""
+    """Return a new recipe dict (the template is not modified).
+
+    ``train_split`` / ``val_dataset_dir`` + ``val_split`` come from the Dataset artifacts wired into the node (a
+    ``data.split`` node); without them the template's own splits of ``dataset_dir`` are used.
+    ``drop_validation``: no val data wired and the dataset has no validation split -> no validation at all (a
+    template split that does not exist would crash the job).
+    """
     import copy
 
     r: dict[str, Any] = copy.deepcopy(dict(template))
@@ -58,6 +68,18 @@ def build_recipe(
         if isinstance(r.get(key), dict):
             r[key]["path_or_dataset"] = dataset_dir
 
+    if train_split:
+        _section(r, "dataset")["split"] = train_split
+    if drop_validation:
+        r.pop("validation_dataset", None)
+        r.pop("validation_dataloader", None)
+    sched = _section(r, "step_scheduler")
+    if "validation_dataset" in r and "ckpt_every_steps" in sched:
+        sched["val_every_steps"] = sched["ckpt_every_steps"]  # nodes count epochs, not steps: validate per checkpoint
+    if val_dataset_dir is not None and isinstance(r.get("validation_dataset"), dict):
+        r["validation_dataset"]["path_or_dataset"] = val_dataset_dir
+        if val_split:
+            r["validation_dataset"]["split"] = val_split
     if train_limit:
         _section(r, "dataset")["limit_dataset_samples"] = train_limit  # "quick run" sizes of the data node
     sched = _section(r, "step_scheduler")

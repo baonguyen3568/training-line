@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import functools
 import hashlib
-import json
 import logging
 import time
 from collections.abc import Callable
@@ -17,6 +16,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
+from vlm_pipeline.common.dataset_ref import DatasetRef, read_dataset_ref, write_dataset_ref
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
 from vlm_pipeline.common.jobrun import (
@@ -121,6 +121,7 @@ class RealWorker:
         return {
             "model.hf_pick": self._model_pick,
             "data.hf_load": self._hub_dataset,
+            "data.split": self._split,
             "train.lora_vlm": self._train,
             "train.sft_vlm": self._train,
         }
@@ -159,23 +160,40 @@ class RealWorker:
         revision = entry.revision
         path = _hub_snapshot(self.root, repo, revision, "dataset")
         limit = int(getattr(job.params, "max_samples", 0) or 0)
-        # The artifact is a small descriptor (snapshot + sample limit), so "quick run" sizes cost no copy.
-        job.run_dir.mkdir(parents=True, exist_ok=True)
-        descriptor = job.run_dir / "dataset.json"
-        descriptor.write_text(
-            json.dumps({"repo": repo, "revision": revision, "path": self._container_path(path), "limit": limit}),
-            encoding="utf-8",
-        )
-        digest = f"{repo}@{revision}" + (f"#limit={limit}" if limit else "")
-        ref = ArtifactRef(type="Dataset", path=str(descriptor.resolve()), hash=digest)
-        return NodeResult(outputs={"dataset": ref})
+        # The artifact is a small descriptor (snapshot + split + sample limit), so "quick run" sizes cost no copy.
+        ref = DatasetRef(repo=repo, revision=revision, path=self._container_path(path), limit=limit)
+        return NodeResult(outputs={"dataset": self._dataset_artifact(job.run_dir / "dataset.json", ref)})
 
-    def _dataset_input(self, ref: ArtifactRef) -> tuple[str, int]:
-        """(container dataset dir, sample limit) from a dataset artifact (descriptor json or plain dir)."""
+    def _dataset_artifact(self, path: Path, ref: DatasetRef) -> ArtifactRef:
+        write_dataset_ref(path, ref)
+        return ArtifactRef(type="Dataset", path=str(path.resolve()), hash=ref.hash)
+
+    def _dataset_input(self, ref: ArtifactRef) -> DatasetRef:
+        """The descriptor behind a Dataset artifact (a plain folder reads as all of it, train split)."""
         if ref.path.endswith(".json"):
-            desc = json.loads(self._host_path(ref.path).read_text(encoding="utf-8"))
-            return str(desc["path"]), int(desc.get("limit", 0))
-        return self._container_path(self._host_path(ref.path)), 0
+            return read_dataset_ref(self._host_path(ref.path))
+        return DatasetRef(path=self._container_path(self._host_path(ref.path)))
+
+    def _split(self, job: NodeJob) -> NodeResult:
+        """Train / val of a dataset; held-out test splits never appear.
+
+        Hub datasets with an official validation split use it (results stay comparable with published numbers);
+        ``val_fraction`` applies to data without one.
+        """
+        src = self._dataset_input(job.inputs["dataset"])
+        entry = next((d for d in load_dataset_catalog().datasets if src.repo and d.repo == src.repo), None)
+        if entry is None or "validation" not in entry.splits or "validation" in entry.heldout_splits:
+            raise NodeNotRunnableError(  # local folders: fraction split comes with data.local_folder (B-3)
+                "split by fraction not implemented yet", params={"node": job.node_id, "node_type": job.spec.type_id}
+            )
+        train = src.model_copy(update={"split": "train"})
+        val = src.model_copy(update={"split": "validation", "limit": 0})  # quick-run size limits training only
+        return NodeResult(
+            outputs={
+                "train": self._dataset_artifact(job.run_dir / "train.json", train),
+                "val": self._dataset_artifact(job.run_dir / "val.json", val),
+            }
+        )
 
     def _train(self, job: NodeJob) -> NodeResult:
         params = job.params
@@ -201,13 +219,23 @@ class RealWorker:
         (run_dir / "logs").mkdir(parents=True, exist_ok=True)
         if entry.id in RESUME_UNSUPPORTED:
             (run_dir / NOT_RESUMABLE_MARKER).touch()  # executor: no "resume" offer, warn on the next run
-        dataset_dir, limit = self._dataset_input(data)
+        train = self._dataset_input(data)
+        val = self._dataset_input(job.inputs["val_data"]) if "val_data" in job.inputs else None
+        template = load_template(template_path(self.root, entry))
+        if val is not None and "validation_dataset" not in template:
+            logger.warning("%s: template has no validation_dataset; the wired val_data is not used", entry.id)
+        source = next((d for d in load_dataset_catalog().datasets if train.repo and d.repo == train.repo), None)
+        no_val_split = source is None or "validation" not in source.splits or "validation" in source.heldout_splits
         recipe = build_recipe(
-            load_template(template_path(self.root, entry)),
+            template,
             params,
             model_dir=self._container_path(self._host_path(base.path)),
-            dataset_dir=dataset_dir,
-            train_limit=limit or None,
+            dataset_dir=train.path,
+            train_limit=train.limit or None,
+            train_split=train.split,
+            val_dataset_dir=val.path if val else None,
+            val_split=val.split if val else None,
+            drop_validation=val is None and no_val_split,
             run_dir=self._container_path(run_dir),
             class_token_start_idx=class_token,
         )

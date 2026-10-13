@@ -72,3 +72,25 @@ def test_decode_overrides_never_reach_automodel() -> None:
                      class_token_start_idx=50000)  # fmt: skip
     assert "decode_overrides" not in r
     assert template["decode_overrides"] == {"repetition_penalty": 1.0}  # input untouched
+
+
+def test_validation_follows_the_wired_data_and_the_checkpoint_cadence() -> None:
+    tpl = _tpl("nemotron-parse-v1.1")
+    r = build_recipe(tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r",
+                     val_dataset_dir="/w/v", val_split="validation", class_token_start_idx=50000)  # fmt: skip
+    assert (r["validation_dataset"]["path_or_dataset"], r["validation_dataset"]["split"]) == ("/w/v", "validation")
+    assert r["step_scheduler"]["val_every_steps"] == r["step_scheduler"]["ckpt_every_steps"]
+    dropped = build_recipe(tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r",
+                           drop_validation=True, class_token_start_idx=50000)  # fmt: skip
+    assert "validation_dataset" not in dropped
+    assert "validation_dataloader" not in dropped
+
+
+def test_val_cadence_is_left_alone_without_validation() -> None:
+    tpl = {**_tpl("nemotron-parse-v1.1")}
+    tpl.pop("validation_dataset")
+    tpl["step_scheduler"] = {**tpl["step_scheduler"], "val_every_steps": 100000}
+    r = build_recipe(
+        tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r", class_token_start_idx=50000
+    )
+    assert r["step_scheduler"]["val_every_steps"] == 100000

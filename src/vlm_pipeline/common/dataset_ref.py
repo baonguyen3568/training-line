@@ -1,0 +1,52 @@
+"""The ``Dataset`` artifact between graph nodes: a small JSON descriptor, not a copy of the data (M1b).
+
+Written by the data workers (``data.hf_load``, ``data.split``, later ``data.local_folder``) and read by every consumer
+(train, eval, quantize calibration). A "quick run" size or a split costs no copy: it is a field here. Paths are the
+container paths the jobs see (``/workspace/...``).
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class DatasetRef(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: Literal[1] = 1
+    repo: str | None = None  # hub repo id; None for local data
+    revision: str | None = None  # pinned hub revision
+    path: str  # container path of the dataset snapshot / folder
+    split: str = "train"  # split of that dataset this artifact stands for
+    limit: int = Field(0, ge=0)  # first N samples (0 = all)
+
+    @property
+    def hash(self) -> str:
+        """Content identity for the cache key: same snapshot + split + limit = same data.
+
+        ``repo@rev[#split=x][#limit=n]``: the train split keeps the pre-split format (existing cache keys stay valid),
+        and everything after the revision follows ``#`` (RunManifest reads the revision as ``@<40 hex>(#|$)``).
+        """
+        origin = f"{self.repo}@{self.revision}" if self.repo else self.path
+        return (
+            origin
+            + (f"#split={self.split}" if self.split != "train" else "")
+            + (f"#limit={self.limit}" if self.limit else "")
+        )
+
+
+def read_dataset_ref(path: Path) -> DatasetRef:
+    """Descriptors written before ``split``/``schema_version`` existed read as the train split."""
+    return DatasetRef.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def write_dataset_ref(path: Path, ref: DatasetRef) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(ref.model_dump(mode="json"), sort_keys=True) + "\n", encoding="utf-8")
+
+
+__all__ = ["DatasetRef", "read_dataset_ref", "write_dataset_ref"]

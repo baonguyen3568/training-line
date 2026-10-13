@@ -67,7 +67,50 @@ def test_hub_dataset_pinned(tmp_path: Path) -> None:
     limited = w.run(_job("data.hf_load", {"repo": "naver-clova-ix/cord-v2", "max_samples": 100}, root / "r2"))
     ref = limited.outputs["dataset"]
     assert ref.hash.endswith("#limit=100")
-    assert w._dataset_input(ref) == (f"/workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/{rev}", 100)
+    snapshot = f"/workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/{rev}"
+    got = w._dataset_input(ref)
+    assert (got.path, got.split, got.limit) == (snapshot, "train", 100)
+
+
+def test_split_uses_the_official_validation_split_and_keeps_cache_keys(tmp_path: Path) -> None:
+    from vlm_pipeline.common.catalog import load_dataset_catalog
+
+    root = _root(tmp_path)
+    rev = next(d.revision for d in load_dataset_catalog().datasets if d.repo == "naver-clova-ix/cord-v2")
+    _snap(root, "datasets", "naver-clova-ix/cord-v2", rev)
+    w = RealWorker(root)
+    src = w.run(_job("data.hf_load", {"repo": "naver-clova-ix/cord-v2", "max_samples": 100}, root / "a"))
+    out = w.run(_job("data.split", {}, root / "b", {"dataset": src.outputs["dataset"]})).outputs
+    train, val = w._dataset_input(out["train"]), w._dataset_input(out["val"])
+    assert (train.split, train.limit, val.split, val.limit) == ("train", 100, "validation", 0)
+    assert out["train"].hash == src.outputs["dataset"].hash  # train split = the loaded data: same cache key
+    assert out["val"].hash == f"naver-clova-ix/cord-v2@{rev}#split=validation"
+
+
+def test_train_reads_the_split_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.common.dataset_ref import DatasetRef, write_dataset_ref
+
+    root = _root(tmp_path)
+    w = RealWorker(root)
+    monkeypatch.setattr(
+        workers, "run_job", lambda job, m, d, **kw: m.model_copy(update={"status": RunStatus.COMPLETED, "exit_code": 0})
+    )
+    refs = {}
+    for name, split, limit in (("train_data", "train", 100), ("val_data", "validation", 0)):
+        path = root / "d" / f"{name}.json"
+        write_dataset_ref(
+            path, DatasetRef(repo="r/x", revision="0" * 40, path="/workspace/ds", split=split, limit=limit)
+        )
+        refs[name] = ArtifactRef("Dataset", str(path), name)
+    monkeypatch.setattr("vlm_pipeline.train.recipe_checks.resolve_parse_class_token_start_idx", lambda _path: 50000)
+    parse = w.catalog.get("nemotron-parse-v1.1")
+    assert parse is not None
+    base = ArtifactRef("Model", str(root / "m"), f"{parse.repo}@{parse.revision}")
+    run_dir = root / "outputs" / "graph" / "g" / "n"
+    w.run(_job("train.sft_vlm", {}, run_dir, {"base_model": base, **refs}))
+    cfg = (run_dir / "config.yaml").read_text()
+    assert "limit_dataset_samples: 100" in cfg
+    assert "split: validation" in cfg
 
 
 def _train_inputs(w: RealWorker) -> dict[str, ArtifactRef]:
