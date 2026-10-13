@@ -1,6 +1,6 @@
 # BUG-003 — Resume của Nemotron-Parse fail: "Missing key ... input_conditioner.norm_mean"
 
-- **Trạng thái:** FIX PROPOSED (patch 0005, chờ security + cleancode + backend review → rebuild image → resume smoke)
+- **Trạng thái:** CLOSED 2026-10-13 — patch 0005 (feaa1d6) trong `vlm-automodel:26.08-6` (`sha256:dc9da48f…`), kiểm chứng end-to-end bởi bao-backend
 - **Owner:** bao-fixcode · **Báo bởi:** bao-backend (FusedAdam resume smoke, 2026-10-13)
 - **Ảnh hưởng:** mọi lần resume Parse v1.1 (nút "Chạy tiếp", hoặc chạy lại vào run dir còn checkpoint). Tạm thời
   backend đưa Parse vào `RESUME_UNSUPPORTED` (cất ckpt sang `*.not-resumable-*`, marker `.not-resumable`, train lại từ 0).
@@ -30,4 +30,13 @@ Gọi `_externalize_radio_input_conditioner()` ngay trong `RadioWithNeck.__init_
 - `tests/integration/automodel/test_nemotron_parse_resume.py`: 26.08-5 → 1 FAIL (đúng bug), patched → 2 PASS
   (kèm test chiều ngược: `image_processor_normalizes=false` thì conditioner phải được giữ).
 - Key của model patched == key của shard thật (665 == 665).
-- **Còn thiếu:** resume smoke trên GPU với image mới (backend), sau đó bỏ Parse khỏi `RESUME_UNSUPPORTED`.
+- **End-to-end trên 26.08-6 (bao-backend):**
+  - (a) train mới từ base: `20261013-0924-resume6-a-6da1` completed; log không có dòng "unexpected"/"Missing key"
+    (base có 2 key conditioner thừa, DCP bỏ qua mà không cảnh báo).
+  - (b) resume từ ckpt của 26.08-5 (`20261013-0849-resume-b1-0335/checkpoints/epoch_0_step_1`, 665 key):
+    `20261013-0928-resume6-b2-6b5b` completed, không warning khi load optimizer (FusedAdam).
+  - weight_drift A' (liền mạch) vs B2' (resume): decoder.layers lệch 1.41%, ngang nhiễu nền giữa 2 run liền mạch
+    (1.37%), rất nhỏ so với thay đổi của 2 step train (17.6%). Loss của B2' lệch A' 2–3e-3, cỡ nhiễu giữa 2 run
+    liền mạch (1.7e-3).
+- **Việc tiếp theo (backend):** bỏ Parse khỏi `RESUME_UNSUPPORTED`, `DEFAULT_TRAIN_IMAGE = 26.08-6`. Marker
+  `.not-resumable` cũ vẫn khoá các run dir đã có marker (an toàn, có chủ đích).

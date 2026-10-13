@@ -115,3 +115,6 @@ NVIDIA's remote class expects the conditioner buffers. Tests: `test_nemotron_par
 before bumping the default image (review bao-cleancode/bao-backend): (a) a fresh run from the base (the base load
 now meets 2 extra file keys; any "unexpected keys" warning is expected and must be recorded here), (b) the
 FusedAdam resume smoke from the 26.08-5 checkpoint. Run ids go into `.team/bugs/BUG-003-*.md`.
+Result on 26.08-6 (`sha256:dc9da48f…`, bao-backend 2026-10-13): (a) `20261013-0924-resume6-a-6da1` and (b)
+`20261013-0928-resume6-b2-6b5b` both completed with no "unexpected"/"missing key" log line; resumed weights and loss
+within run-to-run noise (details in BUG-003).
