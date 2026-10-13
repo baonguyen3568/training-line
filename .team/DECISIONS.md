@@ -53,3 +53,4 @@
 - 2026-10-13 USER chọn thiết kế: landing/site = D4 "Chuẩn doanh nghiệp"; dashboard = khung D4, ép thêm icon-first (panel trái thành dải icon, nhãn vào tooltip/popover). Tên: NTC Training (chờ xác nhận chính tả).
 - 2026-10-13 Template 2 Cosmos-Reason2 → hạ xuống "ứng viên" (repo ghi không còn phát triển tích cực; DGX Spark chỉ hỗ trợ inference cho Cosmos). Research khảo sát Cosmos 3.
 - 2026-10-13 Quy tắc git: commit bằng pathspec (git commit -- <paths>), không git reset (sự cố index chung aaa2b2e/1cf1aba, không mất dữ liệu).
+- 2026-10-13 USER: tên sản phẩm chính thức = "NTC-Training" (hiển thị "NTC Training" được; slug ntc-training). HF token giữ nguyên quyền hiện tại (user chấp nhận rủi ro) — team phải đảm bảo token không bao giờ lộ: chỉ node download first-party, không vào job khác/log/UI.
