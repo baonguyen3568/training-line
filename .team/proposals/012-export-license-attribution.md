@@ -3,7 +3,8 @@
 - **Author:** bao-backend · **Requested by:** PM (2026-10-13, after bao-research found Export attaches nothing)
 - **Reviewers:** bao-security (licence content, fail-closed rule), bao-research (licence obligations per model/dataset),
   bao-fixcode (lineage), bao-frontend (what the Export node shows)
-- **Status:** DRAFT. No code until the open questions (§6) are answered.
+- **Status:** IN REVIEW (2026-10-13). §6 answered (§7 research + security). Core module `export/notices.py` written
+  and reviewed by security/cleancode (fixes applied); waiting PM sign-off before commit, then the export worker.
 
 ## 1. Problem
 `export.hf_dir` promises "the licence notice attached (ADR-003)" (`nodes/model_ops.py` ExportParams docstring), but
@@ -70,6 +71,17 @@ before any copy. A model the catalog marks `commercial: "no"` gets the restricti
 - `RealWorker._export`: copy the weights (hard copy, not symlink, so the folder is shareable), run
   `complete_from_base` for Parse, then `write_notices`. It is a host node, so no GPU lock.
 - Graph preflight: the EXP-001 check uses the same lineage code on the planned graph (catalog-level only).
+
+### 2.6 Export worker must make remote code portable (security B3, mandatory before Export ships)
+A Parse export's `config.json` has `encoder.auto_map` pointing at a container path
+(`/workspace/.cache/prepared/.../c-radiov2-h_0d8f4c18--hf_model.RADIOConfig`): unloadable elsewhere, and "fixing" it to
+`nvidia/C-RADIOv2-H--...` would fetch code from `main`. The worker therefore:
+- copies the hashed `.py` files of C-RADIOv2-H@0d8f4c18 into the export folder;
+- rewrites `encoder.auto_map` to same-folder modules (`hf_model.RADIOConfig`, no `--`) and every `_name_or_path`
+  to a neutral `repo@sha` (never a path);
+- checks afterwards that no `config*.json` contains `/workspace`, `/home/` or `--`; if one does, the export fails;
+- lists C-RADIOv2-H (code + encoder weights, NVIDIA Open Model License) as a `model_part`.
+Until this is done, the model card says only "Loading runs model code from this folder (trust_remote_code)".
 
 ## 4. Tests
 - Every catalog licence id has a vendored text whose sha256 matches LICENSES.lock.
