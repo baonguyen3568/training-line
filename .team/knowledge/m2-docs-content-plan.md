@@ -45,4 +45,4 @@ Nguyên tắc (PM, BOARD M2):
 - [ ] Kết luận repetition_penalty trên validation: cập nhật FAQ.
 - [ ] Template còn lại chuyển sang FusedAdam: cập nhật `phan-cung-va-bo-nho`.
 - [ ] OML §3.2: trang docs/site nói về template Cosmos phải có câu "Built on NVIDIA Cosmos" (chờ security chốt cách hiển thị, M2-8).
-- [ ] Khi B-1 merge_lora commit (backend): `gioi-han-da-biet` thêm mục "Qwen3.5 sau khi gộp LoRA: lớp MTP (dự đoán nhiều token) giữ nguyên như model gốc, nên LoRA không áp lên MTP; vLLM speculative decoding vẫn đúng nhưng có thể nhận ít token hơn". Source = file code/BUG mà backend ghi chuyện này.
+- [x] (done) Khi B-1 merge_lora commit (backend): `gioi-han-da-biet` thêm mục "Qwen3.5 sau khi gộp LoRA: lớp MTP (dự đoán nhiều token) giữ nguyên như model gốc, nên LoRA không áp lên MTP; vLLM speculative decoding vẫn đúng nhưng có thể nhận ít token hơn". Source = file code/BUG mà backend ghi chuyện này.
