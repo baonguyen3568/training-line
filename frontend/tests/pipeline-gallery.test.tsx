@@ -10,27 +10,41 @@ describe("PipelineGallery", () => {
     await useWorkflow.getState().loadCatalog();
     const { PipelineGallery } = await import("../src/components/PipelineGallery");
     render(<PipelineGallery />);
-    const cards = screen.getAllByRole("listitem").filter((li) => li.classList.contains("rp-card"));
-    expect(cards.length).toBe(10);
-    const openable = cards.filter((c) => within(c).queryByRole("button", { name: "Mở" }));
-    expect(openable.length).toBe(2); // invoice + image/video; quantize_bench is still "planned"
-    // numbers only where research measured a real run (data file), never invented elsewhere
+    // counts follow research's data file (pipelines are added over time), never a fixed number
     const data = (await import("../src/generated/reference-pipelines.json")).default as {
-      pipelines: { title: { vi: string }; measured?: { train_minutes?: number } | null }[];
+      pipelines: {
+        id: string;
+        kind: string;
+        status: string;
+        template_id: string | null;
+        title: { vi: string };
+        measured?: { train_minutes?: number } | null;
+      }[];
     };
+    const cards = screen.getAllByRole("listitem").filter((li) => li.classList.contains("rp-card"));
+    expect(cards.length).toBe(data.pipelines.length);
+    const openable = cards.filter((c) => within(c).queryByRole("button", { name: "Mở" }));
+    // only available app templates open (e.g. quantize_bench stays "planned")
+    expect(openable.length).toBe(
+      data.pipelines.filter((p) => p.status === "available" && p.template_id).length,
+    );
+    // numbers only where research measured a real run (data file), never invented elsewhere
     for (const p of data.pipelines) {
       const card = cards.find((c) => c.querySelector("h2")?.textContent === p.title.vi);
       if (p.measured?.train_minutes) expect(card?.textContent).toMatch(/Thời gian~\d/);
       else expect(card?.textContent).toContain("chưa có số đo");
     }
-    const invoice = cards.find((c) => c.textContent?.includes("Đọc hoá đơn"));
+    const parseTitle = data.pipelines.find((p) => p.id === "invoice-to-json")?.title.vi;
+    const invoice = cards.find((c) => c.querySelector("h2")?.textContent === parseTitle);
     expect(invoice?.textContent).toContain("~1 giờ 56 phút · RAM đỉnh 23.7 GB");
     const external = within(cards[cards.length - 1] as HTMLElement).getByRole("link", {
       name: /Xem nguồn/,
     });
     expect(external.getAttribute("rel")).toBe("noopener noreferrer");
     fireEvent.click(screen.getByRole("tab", { name: /Ứng viên/ }));
-    expect(document.querySelectorAll(".rp-card").length).toBe(3);
+    expect(document.querySelectorAll(".rp-card").length).toBe(
+      data.pipelines.filter((p) => p.kind === "candidate").length,
+    );
     expect(document.body.textContent).toContain("Built on NVIDIA Cosmos");
   });
 
