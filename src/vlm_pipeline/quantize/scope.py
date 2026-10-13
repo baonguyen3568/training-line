@@ -7,6 +7,7 @@ Layer rule (ADR-004 A3): imports ``common`` only.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import ClassVar
 
 from vlm_pipeline.common.catalog import CatalogEntry
@@ -60,3 +61,25 @@ def ptq_argv(*, model: str, data: str, out: str, fmt: str, calib_size: int) -> t
         "python", "-m", "vlm_pipeline.quantize.ptq", "--model", model, "--data", data, "--out", out,
         "--format", fmt, "--calib-size", str(calib_size),
     )  # fmt: skip
+
+
+def check_support(node_id: str, params: QuantizeParams, model: CatalogEntry | None, inputs: Mapping[str, str]) -> None:
+    """Validate-time twin of what the worker refuses (one source of truth): raise ``QuantizeNotSupportedError``.
+
+    ``model`` is the catalog model upstream (None when the graph cannot tell yet: nothing to check here);
+    ``inputs`` maps wired ports to their kind, e.g. ``{"calib_data": "dataset:hub"}`` (unwired ports are absent).
+    """
+    if model is not None:
+        check_supported(model, params, node_id)
+    calib = inputs.get("calib_data")
+    if calib is None:
+        _refuse(node_id, "calib_data_missing")
+    elif calib != "dataset:hub":
+        _refuse(node_id, "local_calib")
+
+
+def _refuse(node_id: str, reason: str) -> None:
+    raise QuantizeNotSupportedError(
+        f"quantize not supported: {reason}",
+        params={"node": node_id, "node_type": "quantize.modelopt_ptq", "reason": reason},
+    )

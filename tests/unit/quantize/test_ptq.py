@@ -55,3 +55,18 @@ def test_container_argv() -> None:
     assert argv[:3] == ("python", "-m", "vlm_pipeline.quantize.ptq")
     assert argv[argv.index("--calib-size") + 1] == "128"
     assert argv[argv.index("--format") + 1] == "fp8"
+
+
+def test_check_support_covers_the_calibration_wire() -> None:
+    from vlm_pipeline.quantize.scope import check_support
+
+    qwen = _entry("qwen3.5-2b")
+    check_support("n3", QuantizeParams(), qwen, {"calib_data": "dataset:hub"})
+    check_support("n3", QuantizeParams(), None, {"calib_data": "dataset:hub"})  # model unknown yet: wire still checked
+    for inputs, reason in (({}, "calib_data_missing"), ({"calib_data": "dataset:local"}, "local_calib")):
+        with pytest.raises(QuantizeNotSupportedError) as err:
+            check_support("n3", QuantizeParams(), qwen, inputs)
+        assert err.value.params["reason"] == reason
+    with pytest.raises(QuantizeNotSupportedError) as err:
+        check_support("n3", QuantizeParams(), _entry("nemotron-parse-v1.1"), {"calib_data": "dataset:hub"})
+    assert err.value.params["reason"] == "remote_code_model"
