@@ -318,7 +318,12 @@ class Executor:
             warning = UserError("CACHE-001", {"node": nid, "saved_at": saved_at, "est_minutes": None})
             run.warnings.setdefault(nid, []).append(warning)
             self._emit(run.graph_run_id, {"type": "warning", "node_id": nid, "error": _error_dict(warning)})
-        job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, read_checkpoint_step(run_dir))
+
+        def waiting(info: dict[str, float], nid: str = nid) -> None:  # queued for memory before the GPU lock
+            extra: dict[str, Any] = {k: info[k] for k in ("need_gb", "avail_gb", "since") if k in info}
+            self._emit(run.graph_run_id, {"type": "node_state", "node_id": nid, "state": "waiting_memory", **extra})
+
+        job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, read_checkpoint_step(run_dir), waiting)
         self._set(run, nid, "running", cache_key=key, resume_from_step=job.resume_from_step)
         started = time.time()
         try:

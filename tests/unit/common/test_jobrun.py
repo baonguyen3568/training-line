@@ -203,3 +203,77 @@ def test_run_job_refuses_unapproved_images_by_default(
     manifest = RunManifest(run_id="r1", name="r1", stage="eval", task="eval")
     with pytest.raises(ImageMismatchError):
         jobrun.run_job(job, manifest, tmp_path / "run", project_root=root, who="t", est_peak_gb=1)
+
+
+def _approved_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, ContainerJob, object]:
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.runinfo import RunManifest
+
+    root = _probe_root(tmp_path, "bao-security APPROVED 2026-10-13")
+    monkeypatch.setattr(jobrun, "image_digest", lambda _image: f"sha256:{'a' * 64}")
+    monkeypatch.setattr("vlm_pipeline.common.preflight.preflight", lambda *a, **k: pytest.fail("no preflight/lock"))
+    return (
+        root,
+        ContainerJob(name="r1", image="vlm-x:1", argv=("true",)),
+        RunManifest(run_id="r1", name="r1", stage="eval", task="eval"),
+    )
+
+
+def test_cancel_while_waiting_for_memory_starts_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.runinfo import read_manifest
+
+    root, job, manifest = _approved_run(tmp_path, monkeypatch)
+    seen: list[dict[str, float]] = []
+
+    def fake_wait(est: float, *, on_wait: object, cancel: object, **kw: object) -> bool:
+        on_wait({"need_gb": 30.0, "avail_gb": 12.0, "waited_s": 0.0})  # type: ignore[operator]
+        return False  # cancelled
+
+    def broken_ui(info: dict[str, float]) -> None:
+        seen.append(info)
+        raise RuntimeError("websocket closed")  # must not stop the wait
+
+    monkeypatch.setattr("vlm_pipeline.common.preflight.wait_for_memory", fake_wait)
+    final = jobrun.run_job(job, manifest, tmp_path / "run", project_root=root, who="t", est_peak_gb=30,  # type: ignore[arg-type]
+                           on_wait=broken_ui)  # fmt: skip
+    assert final.status == RunStatus.CANCELLED
+    assert read_manifest(tmp_path / "run").status == RunStatus.CANCELLED
+    assert (seen[0]["need_gb"], seen[0]["avail_gb"]) == (30.0, 12.0)
+    assert "since" in seen[0]
+
+
+def test_memory_wait_timeout_is_sys002_and_recorded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.preflight import MemoryWaitTimeoutError
+    from vlm_pipeline.common.runinfo import read_manifest
+
+    root, job, manifest = _approved_run(tmp_path, monkeypatch)
+
+    def timeout(*a: object, **k: object) -> bool:
+        raise MemoryWaitTimeoutError("no memory", params={"minutes": 30})
+
+    monkeypatch.setattr("vlm_pipeline.common.preflight.wait_for_memory", timeout)
+    with pytest.raises(MemoryWaitTimeoutError) as ei:
+        jobrun.run_job(job, manifest, tmp_path / "run", project_root=root, who="t", est_peak_gb=30)  # type: ignore[arg-type]
+    assert ei.value.code == "SYS-002"
+    recorded = read_manifest(tmp_path / "run")
+    assert (recorded.status, recorded.error_code) == (RunStatus.FAILED, "SYS-002")
+
+
+def test_wait_and_preflight_use_the_same_tightened_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A tightened budget must keep the job WAITING, not let it through the wait and fail in preflight."""
+    from vlm_pipeline.common import jobrun
+
+    root, job, manifest = _approved_run(tmp_path, monkeypatch)
+    tight = jobrun.tightened_thresholds(abort_gb=20.0)
+    seen: dict[str, object] = {}
+
+    def fake_wait(est: float, *, thresholds: object, **kw: object) -> bool:
+        seen["wait"] = thresholds
+        return False
+
+    monkeypatch.setattr("vlm_pipeline.common.preflight.wait_for_memory", fake_wait)
+    jobrun.run_job(job, manifest, tmp_path / "run", project_root=root, who="t", est_peak_gb=10,  # type: ignore[arg-type]
+                   mem_thresholds=tight)  # fmt: skip
+    assert seen["wait"] is tight

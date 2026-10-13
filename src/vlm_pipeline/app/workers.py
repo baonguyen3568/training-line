@@ -276,6 +276,7 @@ class RealWorker:
                 est_peak_gb=entry.ram_gb_train,
                 ckpt_gb=entry.disk_gb,
                 cancel=job.cancel,
+                on_wait=job.on_wait,
                 require_approved_image=True,  # user jobs never run on a PROBE image
             )
         except MemoryPreemptedBeforeStartError as exc:
@@ -338,8 +339,10 @@ class RealWorker:
             rw_dirs=(run_dir,),
         )
         try:
-            final = run_job(container, manifest, run_dir, project_root=self.root, who=self.who,
-                            est_peak_gb=_merge_peak_gb(entry), ckpt_gb=entry.disk_gb, cancel=job.cancel)  # fmt: skip
+            final = run_job(
+                container, manifest, run_dir, project_root=self.root, who=self.who, est_peak_gb=_merge_peak_gb(entry),
+                ckpt_gb=entry.disk_gb, cancel=job.cancel, on_wait=job.on_wait,
+            )  # fmt: skip
         except MemoryPreemptedBeforeStartError as exc:
             raise InsufficientMemoryError(str(exc), params={"need_gb": _merge_peak_gb(entry)}) from exc
         if final.status != RunStatus.COMPLETED:

@@ -331,3 +331,20 @@ def test_container_path_outputs_are_rejected(tmp_path: Path) -> None:
     assert run.errors["d"].code == "SYS-000"
     assert "non-host" in run.errors["d"].details or "host path" in run.errors["d"].details
     assert index_db.exists()
+
+
+def test_memory_wait_is_reported_as_node_state(tmp_path: Path) -> None:
+    events: list[dict[str, Any]] = []
+
+    class Waits(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            if job.node_id == "t":
+                assert job.on_wait is not None
+                job.on_wait({"need_gb": 22.0, "avail_gb": 9.5, "waited_s": 30.0, "since": 1.0})
+            return super().run(job)
+
+    Executor(make_test_registry(), Waits(), tmp_path, on_event=events.append).run(_wf())
+    [state] = [e for e in events if e["type"] == "node_state"]
+    assert {k: state[k] for k in ("node_id", "state", "need_gb", "avail_gb", "since")} == {
+        "node_id": "t", "state": "waiting_memory", "need_gb": 22.0, "avail_gb": 9.5, "since": 1.0,
+    }  # fmt: skip

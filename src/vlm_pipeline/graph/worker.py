@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -43,6 +43,8 @@ class NodeJob:
     run_dir: Path  # created by the executor, empty unless resuming
     cancel: threading.Event = field(default_factory=threading.Event)  # set => stop ASAP (SIGTERM, save ckpt)
     resume_from_step: int | None = None  # set when resuming an interrupted node from its checkpoint
+    # Called while a job waits for free memory (``jobrun.run_job(on_wait=...)``): {need_gb, avail_gb, waited_s, since}.
+    on_wait: Callable[[dict[str, float]], None] | None = None
 
 
 @dataclass(frozen=True)

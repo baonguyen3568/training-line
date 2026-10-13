@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import math
 import os
 import re
@@ -59,6 +60,8 @@ class ContainerJob:
 
 
 # Env every first-party job gets (P003 D2, ADR-005 D1 caches); never secrets.
+logger = logging.getLogger(__name__)
+
 BASE_ENV: Mapping[str, str] = {
     "HOME": "/tmp",  # noqa: S108 - HOME inside the container (non-root uid has no passwd home)
     "HF_HOME": f"{CONTAINER_ROOT}/.cache/hf",
@@ -375,6 +378,57 @@ def _docker_rm(name: str) -> None:
     subprocess.run(["docker", "rm", name], capture_output=True, check=False)  # noqa: S603,S607
 
 
+def _check_gate(job: ContainerJob, manifest: RunManifest, project_root: Path) -> None:
+    from vlm_pipeline.common.runinfo import reproducibility_gaps
+
+    commit, dirty = git_state(job.code_root or project_root)
+    probe = manifest.model_copy(
+        update={
+            "git_commit": manifest.git_commit or commit,
+            "git_dirty": dirty,
+            "container_digest": manifest.container_digest or image_digest(job.image),
+        }
+    )
+    gaps = reproducibility_gaps(probe)
+    if gaps:
+        raise RuntimeError(f"gate run refused, not reproducible: missing/invalid {gaps}")
+
+
+def _wait_for_memory(
+    manifest: RunManifest,
+    run_dir: Path,
+    est_peak_gb: float,
+    *,
+    cancel: threading.Event | None,
+    on_wait: Callable[[dict[str, float]], None] | None,
+    timeout_s: float,
+    thresholds: MemThresholds,
+) -> RunManifest | None:
+    """Queue until the job fits the memory budget; the CANCELLED manifest if cancelled meanwhile, else None."""
+    from vlm_pipeline.common.preflight import MemoryWaitTimeoutError, wait_for_memory
+
+    since = time.time()
+
+    def _report(info: dict[str, float]) -> None:
+        if on_wait is not None:
+            try:
+                on_wait({**info, "since": since})
+            except Exception:  # a broken UI callback must never stop the wait
+                logger.exception("on_wait callback failed")
+
+    try:
+        fits = wait_for_memory(est_peak_gb, thresholds=thresholds, timeout_s=timeout_s, on_wait=_report, cancel=cancel)
+    except MemoryWaitTimeoutError:
+        failed = {"status": RunStatus.FAILED, "error_code": "SYS-002", "ended_at": time.time()}
+        write_manifest(run_dir, manifest.model_copy(update=failed))
+        raise
+    if fits:
+        return None
+    final = manifest.model_copy(update={"status": RunStatus.CANCELLED, "ended_at": time.time()})
+    write_manifest(run_dir, final)
+    return final
+
+
 def run_job(
     job: ContainerJob,
     manifest: RunManifest,
@@ -389,32 +443,37 @@ def run_job(
     cancel: threading.Event | None = None,
     mem_thresholds: MemThresholds = DEFAULT_THRESHOLDS,
     require_approved_image: bool = True,
+    on_wait: Callable[[dict[str, float]], None] | None = None,
+    memory_wait_s: float = 1800.0,
 ) -> RunManifest:
     """Run ``job`` end to end under the GPU lock; always writes a final run.json and releases the lock.
 
     ``require_approved_image`` is fail-closed: only a team probe passes False explicitly (``jobrun_cli
     --allow-unapproved-image``); every other job needs a ``bao-security APPROVED`` row in docker/IMAGES.lock.
+
+    Not enough free memory (ADR-005 A1 budget) -> the job WAITS before taking the GPU lock (``wait_for_memory``),
+    reporting ``on_wait({need_gb, avail_gb, waited_s, since})`` on every poll; cancel while waiting -> CANCELLED
+    without starting a container; still no memory after ``memory_wait_s`` -> FAILED with SYS-002 (raised).
     """
     from vlm_pipeline.common.preflight import preflight
 
     if gate:  # gate/published runs must be reproducible before they take the GPU (ADR-002 A1)
-        from vlm_pipeline.common.runinfo import reproducibility_gaps
-
-        commit, dirty = git_state(job.code_root or project_root)
-        probe = manifest.model_copy(
-            update={
-                "git_commit": manifest.git_commit or commit,
-                "git_dirty": dirty,
-                "container_digest": manifest.container_digest or image_digest(job.image),
-            }
-        )
-        gaps = reproducibility_gaps(probe)
-        if gaps:
-            raise RuntimeError(f"gate run refused, not reproducible: missing/invalid {gaps}")
+        _check_gate(job, manifest, project_root)
     check_pinned_image(  # before preflight/lock: cheap, no side effects
         project_root, job.image, image_digest(job.image), require_approved=require_approved_image
     )
-    verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb)
+    waited = _wait_for_memory(
+        manifest,
+        run_dir,
+        est_peak_gb,
+        cancel=cancel,
+        on_wait=on_wait,
+        timeout_s=memory_wait_s,
+        thresholds=mem_thresholds,
+    )
+    if waited is not None:  # cancelled while waiting: nothing started, nothing to clean up
+        return waited
+    verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb, thresholds=mem_thresholds)  # same budget as the wait
     if not verdict.ok:
         raise RuntimeError(f"preflight refused: {verdict.to_json()}")
     path = lock_path or gpu_lock.default_lock_path()
