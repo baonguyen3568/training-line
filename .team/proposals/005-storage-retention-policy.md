@@ -222,3 +222,12 @@ Nguồn: P001 §3 (bao-research), `docker/IMAGES.lock`. Ước lượng footprin
 - **Cập nhật 2026-10-12 (Phase 2 mở)**: probe 26.08 PASS → `nemo-automodel:26.08` là **image mặc định**, không còn là ứng viên xoá; không pull 26.02 → footprint image giảm ~25–30 GB so với ước lượng ở bảng trên.
 - Không full-FT 9B: checkpoint có optim ~90 GB/bản (fp32 Adam), và cũng vượt budget RAM.
 - **Cập nhật 2026-10-13 (research, 001a §10.9)**: template full-SFT Parse v1.1 chuyển sang FusedAdam master fp32 → `optim/` ~1.1 → ~2.7 GB/ckpt (+1.6 GB). Đo thực P-3b-A `epoch_0_step_99`: `model/` 5.4 GB + `optim/` 2.7 GB ≈ 8.1 GB/ckpt. Với `max_recent_checkpoints` 2–3 → ~16–25 GB/run full-SFT Parse; `optim/` bị strip theo D3 (best ngay khi xong, LATEST sau 7 ngày). Không đổi kết luận quota (< warn 500 GB); preflight nên khai `--ckpt-gb 8–9` cho các run này.
+
+## 8. Đề xuất bổ sung D3: run `interrupted` có checkpoint (bao-cleanup, 2026-10-13) — chờ PM chốt
+- Bối cảnh: `stale_runs.reconcile` (backend) chuyển run kẹt `running`/`queued` sang `interrupted` (SYS-003) ở mỗi lượt scheduler. Theo D3, `interrupted` là "giữ để resume, retention không bao giờ đụng".
+- Vấn đề: run `interrupted` **không có** ckpt thì không tốn gì, vì retention không xoá run dir. Nhưng run `interrupted` **có** ckpt (memguard exit 75, crash) sẽ bị giữ mãi nếu không ai resume: mỗi run full-SFT Parse tốn ~16–25 GB.
+- Đề xuất: `interrupted` mà không có hoạt động trong **7 ngày** kể từ `ended_at` thì xử lý như `failed` sau grace:
+  - checkpoint không phải LATEST → xoá (auto);
+  - LATEST → PERMANENT_LOSS, **chỉ xoá tay** trong panel (gõ tên run).
+  - Resume trong 7 ngày (status lại thành `running`) thì không bị ảnh hưởng.
+- Không đổi D7 / quota. Code: `retention._blocked_reason` thôi chặn `interrupted` quá 7 ngày, và `_plan_checkpoint` dùng nhánh `failed`; kèm test. Làm sau khi PM chốt.
