@@ -24,3 +24,26 @@ datasets:
     loader: make_cord_v2_dataset
     gated: false
     disk_gb: 0.24
+
+  - id: ocrbench
+    repo: echo840/OCRBench
+    revision: 92a54bd1384387c178d5a07140a2d85e0a3d12e1
+    display_name: "OCRBench"
+    # bao-security 2026-10-13 APPROVED-WITH-CONDITIONS (eval_only). MIT applies to the MultimodalOCR CODE only; the
+    # images come from IIIT5K, SVT, IC13/15, Total-Text, CTW, WordArt, HME100k, ESTVQA, SROIE, FUNSD, POIE, ST-VQA,
+    # TextVQA, DocVQA, ChartQA, InfoVQA... each under its own terms. Never train, never bundle/mirror (users download),
+    # publish aggregate scores only, no sample images/questions on site or docs. Download verifies files_sha256.
+    license: mixed-unverified
+    commercial: "conditional"
+    attribution: "OCRBench: Liu et al., 'OCRBench: On the Hidden Mystery of OCR in Large Multimodal Models', https://github.com/Yuliang-Liu/MultimodalOCR"
+    security: approved_with_conditions
+    use: eval_only
+    splits: [test]
+    heldout_splits: [test]
+    num_train: 0
+    format: parquet
+    loader: ocrbench
+    gated: false
+    disk_gb: 0.07
+    files_sha256:
+      data/test-00000-of-00001.parquet: d9cc9f488e5310143d8d89956c19d0bdfd71e7089025da5202643f73720df7f5
