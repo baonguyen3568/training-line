@@ -220,8 +220,20 @@ class DownloadService:
                 f.write(body)
             return
 
+    def _release(self, run_id: str) -> None:
+        """Remove the one-at-a-time lock only if it is still ours: the next download may already hold a new one."""
+        active = self.root / ACTIVE_REL
+        try:
+            held = read_small_json(active, max_bytes=4096)
+        except (OSError, ValueError):
+            return
+        if isinstance(held, dict) and held.get("download_id") == run_id:
+            active.unlink(missing_ok=True)
+
     # ------------------------------------------------------------------------------------------ the job
     def _set(self, d: Download, status: str, **extra: Any) -> None:
+        if status in ("completed", "failed"):  # free the slot first: the UI starts the next one on this event
+            self._release(d.run_id)
         d.status = status
         self._emit(d.download_id, {"type": "status", "status": status, **extra})
 
@@ -253,7 +265,7 @@ class DownloadService:
             logger.exception("download %s failed", d.download_id)
             self._fail(d, {"code": "SYS-000", "params": {}})
         finally:
-            (self.root / ACTIVE_REL).unlink(missing_ok=True)
+            self._release(d.run_id)  # idempotent; never the next download's lock (security)
 
     def _fetch(self, d: Download, part: Asset, run_id: str, planned: int, plan_only: bool) -> bool:
         """One repo: the job into its own run dir, then the host verifies and installs (or checks) it."""

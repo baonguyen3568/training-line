@@ -186,3 +186,44 @@ def test_a_bridged_model_fetches_its_bridge_then_is_prepared(svc: Any, monkeypat
     assert fetched == ["nvidia/NVIDIA-Nemotron-Parse-v1.1", "nvidia/C-RADIOv2-H"]
     assert prepared == ["nemotron-parse-v1.1"]
     assert "installing" in [e["status"] for _i, e in events if e.get("type") == "status"]
+
+
+def test_the_slot_is_free_when_the_ui_sees_the_end(svc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """frontend chains "download all missing": the next POST goes out on the completed event.
+
+    security: the first download's cleanup must then never remove the second one's lock.
+    """
+    service, _events = svc
+    _fake_job(monkeypatch, {})
+    fake = downloads.run_job
+    hold = threading.Event()
+    calls: list[str] = []
+
+    def run_job(job: Any, manifest: Any, run_dir: Path, **kw: Any) -> Any:
+        calls.append(run_dir.name)
+        if len(calls) == 2:
+            hold.wait(5)  # the second download is still running while the first one finishes
+        return fake(job, manifest, run_dir, **kw)
+
+    monkeypatch.setattr(downloads, "run_job", run_job)
+    active = service.root / downloads.ACTIVE_REL
+    second: list[str] = []
+
+    def emit(_i: str, e: dict[str, Any]) -> None:
+        if e.get("status") == "completed" and not second:
+            second.append(service.start("model", "m2")["download_id"])  # would be SYS-002 if the slot were held
+
+    service._emit = emit
+    monkeypatch.setattr(downloads, "resolve", lambda kind, cid: SMALL if cid == "m" else
+                        Asset("model", "m2", "org/m2", REV, "M2", 1.0, "apache-2.0", gated=False))  # fmt: skip
+    first = service.start("model", "m")
+    assert _wait(service, first["download_id"]) == "completed"
+    for _ in range(100):  # the first download's thread ends (its finally ran)
+        if not any(t.name == f"download-{first['download_id']}" for t in threading.enumerate()):
+            break
+        threading.Event().wait(0.02)
+    assert second
+    assert json.loads(active.read_text())["download_id"] == second[0]  # still the second one's lock
+    hold.set()
+    assert _wait(service, second[0]) == "completed"
+    assert not active.exists()
