@@ -35,8 +35,9 @@ def _guide_anchors() -> set[str]:
 
 
 def _patch_possible(action: Any, specs: list[dict[str, Any]]) -> bool:
-    """A patch action is listed only if some registered node has every param it sets and accepts the value (the app
-    filters the same way per node), so e.g. "use QLoRA" stays hidden until a node offers QLoRA (bao-design).
+    """Whether some registered node has every param the patch sets and accepts the value.
+
+    The app filters the same way per node, so e.g. "use QLoRA" stays hidden until a node offers QLoRA (bao-design).
     """
     if action.kind != "patch" or not action.patch:
         return True  # navigate / resume / generic patches (remove_step, preview) are always available
