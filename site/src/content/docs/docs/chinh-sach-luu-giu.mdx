@@ -7,13 +7,14 @@ sources:
   - docs/adr/ADR-005-storage-retention.md
   - src/vlm_pipeline/artifacts/retention.py
   - .team/proposals/005-storage-retention-policy.md
+  - src/vlm_pipeline/app/storage_scheduler.py
 ---
 import Hint from '~/components/Hint.astro';
 
 Chính sách này áp dụng cho dữ liệu app tạo ra **trên máy của bạn**. App không gửi dữ liệu đi đâu; mọi thứ nằm trong thư mục dự án.
 
 :::note[Hiện trạng]
-Các luật dưới đây được áp dụng khi chạy công cụ dọn dẹp `scripts/cleanup/retention.py` (xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/)). App **chưa tự chạy** công cụ này theo lịch.
+App áp dụng các luật dưới đây theo lịch, mỗi 6 giờ, trừ các mục sẽ mất vĩnh viễn: những mục đó chỉ bị xoá khi bạn tự chọn và xác nhận. Trên máy dùng chung, quản trị viên quyết định có bật xoá thật hay chỉ chạy thử. Xem [Quản lý dung lượng](/docs/quan-ly-dung-luong/).
 :::
 
 ## Nguyên tắc

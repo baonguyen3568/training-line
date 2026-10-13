@@ -1,20 +1,30 @@
 ---
 title: Quản lý dung lượng
-description: App dùng ổ đĩa vào đâu, phần nào được bảo vệ, và cách dọn dẹp an toàn. Panel Dung lượng trong app đang được làm.
+description: App dùng ổ đĩa vào đâu, tự dọn những gì, phần nào được bảo vệ, và cách tự chọn mục cần xoá trong panel Dung lượng.
 sidebar:
   order: 5
 sources:
   - src/vlm_pipeline/app/storage.py
   - src/vlm_pipeline/artifacts/cache_retention.py
   - src/vlm_pipeline/i18n/vi.yaml
+  - src/vlm_pipeline/app/storage_scheduler.py
 ---
 import Hint from '~/components/Hint.astro';
 
 Train model tạo ra nhiều dữ liệu lớn: model tải về, checkpoint, model đã nén, kết quả từng node. Trang này nói dữ liệu nằm ở đâu, phần nào được bảo vệ, và cách dọn dẹp mà không mất thứ cần giữ.
 
-:::note[Hiện trạng]
-Việc dọn dẹp hiện làm bằng **dòng lệnh** (xem bên dưới), và app **chưa tự dọn** khi đầy. Panel Dung lượng trong app đang được làm: phần xử lý phía máy chủ đã có, giao diện thì chưa.
-:::
+## App tự dọn những gì
+
+Khi app đang chạy, cứ **6 giờ** app dọn một lượt (lượt đầu sau khi khởi động vài phút). Mỗi lượt chỉ làm những việc **không làm mất thứ không lấy lại được**:
+
+- xoá kết quả tạm lâu không dùng khi bộ nhớ đệm vượt giới hạn;
+- áp dụng [chính sách lưu giữ](/docs/chinh-sach-luu-giu/) cho checkpoint, trừ các mục sẽ mất vĩnh viễn.
+
+Lượt dọn **bỏ qua** khi máy đang có tác vụ GPU (hoặc còn khoá GPU chưa được giải phóng), và chạy lại ở lượt sau. Mục được bảo vệ hoặc sẽ mất vĩnh viễn không bao giờ bị dọn tự động; chúng nằm trong mục **Cần bạn chọn** của panel Dung lượng.
+
+<Hint title="Trên máy dùng chung">
+Mặc định app chỉ **chạy thử**: liệt kê những gì sẽ dọn mà không xoá. Quản trị viên bật xoá thật trong file cấu hình của máy. Mỗi lượt cũng tuân theo giới hạn 20 GB mỗi 24 giờ; phần vượt để lượt sau.
+</Hint>
 
 ## Bốn nhóm dữ liệu
 
@@ -44,6 +54,16 @@ Không bao giờ bị dọn tự động:
 - mục có thông tin lần chạy bị hỏng.
 
 Nếu đã xoá hết những gì được phép mà vẫn vượt giới hạn, công cụ dọn dẹp **dừng lại** và báo **DISK-003** "Bộ nhớ đệm đầy, cần bạn chọn mục xoá", chứ không xoá thêm.
+
+## Panel Dung lượng
+
+Mở bằng nút **Dung lượng** trên thanh trên cùng. Panel chia ba nhóm:
+
+- **Cần bạn chọn**: mục được bảo vệ hoặc sẽ mất vĩnh viễn, kèm lý do.
+- **App sẽ tự dọn khi cần**: bạn cũng có thể xoá ngay.
+- **Được giữ lại**: chỉ để xem, kèm lý do (ví dụ đang chạy, có file `KEEP`).
+
+Mỗi mục ghi dung lượng và **hậu quả nếu xoá**. Chọn mục rồi bấm xoá; nếu đang có lượt dọn khác chạy, app báo thử lại sau ít phút.
 
 ## Xoá một mục được bảo vệ
 
