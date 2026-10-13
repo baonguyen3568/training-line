@@ -1,0 +1,50 @@
+{
+  "purpose": "O-1b pipeline sanity: Parse v1.1 overfit on 20 CORD train images, 50 steps; train F1 must clearly exceed test F1",
+  "train_run": "20261012-1836-o1b-parse-overfit20-6b22",
+  "image": "vlm-automodel:26.08-4",
+  "eval_path": "hf_remote (trust_remote_code), parity vs native: run 20261012-1930-o1b-parity-ae1a",
+  "decoder_prefix_ids": [
+    2,
+    0,
+    50004,
+    50008,
+    50001
+  ],
+  "decoding": {
+    "do_sample": false,
+    "num_beams": 1,
+    "repetition_penalty": null,
+    "max_new_tokens": 1536,
+    "note": "checkpoint generation_config lacks base repetition_penalty 1.1 (reported to fixcode); this is the no-penalty baseline"
+  },
+  "eval_runs": {
+    "train": "20261012-1932-o1b-eval-train-80ee",
+    "test": "20261012-1935-o1b-eval-test-c738"
+  },
+  "dataset": "naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98, train[0:20], test[0:20]",
+  "results": {
+    "train": {
+      "field_f1": 71.65,
+      "nted_accuracy": 64.82,
+      "json_exact": 5.0,
+      "parse_fail_rate": 0.0,
+      "truncated_rate": 0.05,
+      "n": 20
+    },
+    "test": {
+      "field_f1": 33.13,
+      "nted_accuracy": 38.38,
+      "json_exact": 0.0,
+      "parse_fail_rate": 0.0,
+      "truncated_rate": 0.05,
+      "n": 20
+    }
+  },
+  "verdict": "PASS for pipeline purposes: train >> test (+38.5 F1). Error analysis: repetition loop (train #5), malformed tags (#10), right values in swapped total/subtotal/change fields; no systematic pipeline error found.",
+  "caveats": [
+    "n=20 per split, no CI",
+    "50 steps only: absolute numbers are not model quality",
+    "eval worker on train split predates batching/decoding-record changes (outputs identical path: batch_size 1, greedy)"
+  ],
+  "retention": "train run weights deleted 2026-10-13 by bao-cleanup (D-6, PM default for concluded experiments); run.json, metrics and eval pred.jsonl kept"
+}
