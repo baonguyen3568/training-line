@@ -11,6 +11,8 @@ import functools
 import hashlib
 import json
 import logging
+import os
+import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -84,6 +86,12 @@ def _hub_snapshot(root: Path, repo: str, revision: str, kind: str) -> Path:
     return path
 
 
+def caller_id() -> str:
+    """``script:<program>/<pid>`` for a worker built outside the app, so the lock tells a script run from an app run."""
+    program = Path(sys.argv[0]).name if sys.argv and sys.argv[0] else "python"
+    return f"script:{program[:40]}/{os.getpid()}"
+
+
 class RealWorker:
     def __init__(
         self,
@@ -91,12 +99,12 @@ class RealWorker:
         *,
         catalog: Catalog | None = None,
         image: str = DEFAULT_TRAIN_IMAGE,
-        who: str = "vlm-app",
+        who: str | None = None,
     ) -> None:
         self.root = root.resolve()
         self.catalog = catalog or load_catalog()
         self.image = image
-        self.who = who
+        self.who = who or caller_id()  # GPU_LOCK "who": the app passes "vlm-app"; scripts say who they are
 
     def identity(self, spec: NodeSpec) -> str:
         """Part of the executor cache key: container nodes are keyed by the exact image (content id)."""

@@ -136,7 +136,7 @@ class DefaultServices:
         else:
             from vlm_pipeline.app.workers import RealWorker
 
-            worker = RealWorker(self.root)
+            worker = RealWorker(self.root, who="vlm-app")
         return graph_executor.Executor(self.registry, worker, self._state_dir, index=self.index, workspace=self.root)
 
     def validate(self, workflow: Mapping[str, Any]) -> list[dict[str, Any]]:

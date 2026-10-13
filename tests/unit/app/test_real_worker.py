@@ -493,3 +493,13 @@ def test_local_folder_split_and_train_use_meta_datasets(tmp_path: Path, monkeypa
     assert first["messages"][1]["content"].startswith("<s_total>")  # Parse: json2token target
     meta = json.loads((run_dir / "data" / "train.meta.json").read_text())
     assert meta["train"]["media_dir"] == "/workspace/data/mine"
+
+
+def test_the_lock_owner_says_who_runs(tmp_path: Path) -> None:
+    """PM: a script driving RealWorker must not look like the app in GPU_LOCK."""
+    import os
+
+    assert RealWorker(_root(tmp_path), who="vlm-app").who == "vlm-app"
+    script = RealWorker(_root(tmp_path / "b")).who
+    assert script.startswith("script:")
+    assert script.endswith(f"/{os.getpid()}")
