@@ -1,0 +1,110 @@
+{
+ "purpose": "R3 quant gate for Qwen3.5-0.8B: two FP8 exports (per-tensor and per-channel, calib 128, ModelOpt) vs the bf16 parent, paired on OCRBench regression_500, same vLLM engine settings",
+ "models": {
+  "reference_bf16": "Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17",
+  "fp8_per_tensor": "outputs/graph/runs/n3-f03d17784e408456/ptq/quantized",
+  "fp8_per_channel": "outputs/runs/20261013-1631-research-quant-perchannel-calib128/ptq/quantized"
+ },
+ "benchmark": {
+  "name": "OCRBench",
+  "dataset": "echo840/OCRBench@92a54bd1384387c178d5a07140a2d85e0a3d12e1 (eval_only)",
+  "subset": "regression_500",
+  "data_copy_manifest_sha256": "e6e6f4460c621bb515ef81744f85dd854a33d75599041b3c6028f04039f29a47",
+  "prompt": "question verbatim, enable_thinking=False",
+  "citation": "Liu et al., OCRBench: On the Hidden Mystery of OCR in Large Multimodal Models, Science China Information Sciences 2024 (arXiv:2305.07895)",
+  "comparability": "measured in this app on a 500-question subset: not comparable with model-card OCRBench numbers; only the paired deltas are gate numbers"
+ },
+ "engine": {
+  "vllm": "0.31.0",
+  "container_digest": "sha256:bbe7045055707d1027079ed01cca40812578a235c56032d85c16108ad473384c",
+  "kv_cache_gb": 8.0,
+  "chunk": 64,
+  "enforce_eager": true,
+  "sampling": "greedy, max_tokens 256",
+  "pixels": {
+   "min_pixels": 200704,
+   "max_pixels": 1003520
+  },
+  "num_preemptions": {
+   "q08-bf16-a": 0,
+   "q08-bf16-b": 0,
+   "q08-fp8": 0,
+   "q08-fp8-perch": 0
+  }
+ },
+ "runs": {
+  "q08-bf16-a": "20261013-2116-ocrbench-q08-bf16-a-3eee",
+  "q08-bf16-b": "20261013-2124-ocrbench-q08-bf16-b-8c54",
+  "q08-fp8": "20261013-2133-ocrbench-q08-fp8-5bb8",
+  "q08-fp8-perch": "20261013-2144-ocrbench-q08-fp8-perch-67ec"
+ },
+ "results": {
+  "accuracy_pct": {
+   "q08-bf16-a": 78.2,
+   "q08-bf16-b": 78.6,
+   "q08-fp8": 77.8,
+   "q08-fp8-perch": 78.0
+  },
+  "truncated_pct": {
+   "q08-bf16-a": 1.6,
+   "q08-bf16-b": 1.4,
+   "q08-fp8": 2.6,
+   "q08-fp8-perch": 1.2
+  },
+  "gen_tokens_mean": {
+   "q08-bf16-a": 41.8,
+   "q08-bf16-b": 41.3,
+   "q08-fp8": 45.2,
+   "q08-fp8-perch": 40.1
+  },
+  "engine_noise_bf16_b_minus_a": {
+   "delta": 0.4,
+   "ci95": [
+    -0.4,
+    1.2
+   ],
+   "changed_answers": 4
+  },
+  "fp8_per_tensor_minus_bf16": {
+   "delta": -0.4,
+   "ci95": [
+    -2.2,
+    1.6
+   ],
+   "n": 500,
+   "gate": {
+    "status": "WARN",
+    "reasons": [
+     {
+      "code": "uncertain_run_full",
+      "level": "WARN",
+      "metric": "ocrbench",
+      "value": [
+       -2.2,
+       1.6
+      ],
+      "threshold": -2.0
+     }
+    ]
+   }
+  },
+  "fp8_per_channel_minus_bf16": {
+   "delta": -0.2,
+   "ci95": [
+    -1.8,
+    1.4
+   ],
+   "n": 500,
+   "gate": {
+    "status": "PASS",
+    "reasons": []
+   }
+  }
+ },
+ "reading": "both FP8 exports are within noise of bf16 on the point estimate (-0.4 and -0.2); per-tensor gets WARN uncertain_run_full because its CI reaches -2.2 (500 questions cannot exclude a -2 drop); per-channel PASS. Engine noise for 0.8B is larger than for 2B (+0.4 points, 4 answers).",
+ "caveats": [
+  "vLLM batched greedy is not bit-reproducible run to run (4/500 answers changed between two bf16 runs)",
+  "one benchmark only; P002 forgetting check on general benchmarks not part of this gate",
+  "the block-scaled FP8 export does not load on vLLM 0.31 (in_proj_a/b < 128 channels); research re-exports"
+ ]
+}
