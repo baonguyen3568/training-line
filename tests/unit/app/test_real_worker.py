@@ -605,3 +605,30 @@ def test_failure_log_tail_never_follows_a_job_made_link_or_fifo(
     with pytest.raises(ContainerExit) as ei:
         w.run(_job("train.lora_vlm", {}, run_dir, _train_inputs(w)))
     assert ei.value.log_tail == ("step 1\nboom" if kind == "file" else "")
+
+
+def test_train_refuses_a_record_image_that_resolves_outside_its_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """bao-security R1: an image swapped for a link out of the folder after the scan fails early, with its line."""
+    pil = pytest.importorskip("PIL.Image")
+    root = _root(tmp_path)
+    data = root / "data" / "mine"
+    data.mkdir(parents=True)
+    pil.new("RGB", (32, 24)).save(data / "a.png")
+    (data / "labels.jsonl").write_text(json.dumps({"image": "a.png", "target": "x"}) + "\n")
+    w = RealWorker(root)
+    src = w.run(_job("data.local_folder", {"path": "data/mine"}, root / "outputs" / "graph" / "runs" / "lf"))
+    outside = tmp_path / "secret.png"
+    pil.new("RGB", (32, 24)).save(outside)
+    (data / "a.png").unlink()
+    (data / "a.png").symlink_to(outside)
+    monkeypatch.setattr(workers, "run_job", lambda *a, **k: pytest.fail("no job may start"))
+    qwen = w.catalog.get("qwen3.5-0.8b")
+    assert qwen is not None
+    base = ArtifactRef("Model", str(root / "m"), f"{qwen.repo}@{qwen.revision}")
+    job = _job("train.lora_vlm", {}, root / "outputs" / "graph" / "runs" / "t",
+               {"base_model": base, "train_data": src.outputs["dataset"]})  # fmt: skip
+    with pytest.raises(workers.LocalDatasetInvalidError) as err:
+        w.run(job)
+    assert (err.value.params["first_reason"], err.value.params["node"]) == ("bad_image_name", job.node_id)
