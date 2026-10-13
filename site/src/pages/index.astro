@@ -339,7 +339,14 @@ const invoiceMeasured = pipes.find((p) => p.id === "invoice-to-json")?.measured;
         <code>configs/reference_pipelines.yaml</code>.
       </div>
     </details>
-    {/* Q6 (export + "Chạy thử") waits for tester's check before publishing (design landing-copy §5) */}
+    {/* Q6 checked by tester 2026-10-13: trial run + export (base and merged) loaded offline from the folder alone */}
+    <details>
+      <summary><Icon name="chevron-right" size={16} class="chev" />Dạy xong thì dùng model ở đâu?</summary>
+      <p>
+        Bạn chạy thử ngay trong app, hoặc xuất model ra một thư mục theo định dạng Hugging Face, kèm văn bản giấy phép
+        cần thiết, để dùng ở máy khác.
+      </p>
+    </details>
     <details>
       <summary><Icon name="chevron-right" size={16} class="chev" />Dùng được những model nào?</summary>
       <p>
