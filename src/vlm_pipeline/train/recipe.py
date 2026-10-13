@@ -83,6 +83,9 @@ def _apply_data(
         _section(r, "dataset")["limit_dataset_samples"] = train_limit  # "quick run" sizes of the data node
 
 
+NO_STEP_CADENCE = 1_000_000_000  # ckpt_every_steps that never fires (step % N == N - 1): epoch ends only
+
+
 def build_recipe(
     template: Mapping[str, Any],
     params: LoraParams | FullFinetuneParams,
@@ -124,10 +127,11 @@ def build_recipe(
     sched["local_batch_size"] = params.local_batch_size
     sched["num_epochs"] = params.epochs
     sched.pop("max_steps", None)  # the node trains whole epochs; smoke step caps belong to smoke configs
-    # Save + validate at epoch boundaries only (research 2026-10-13): with no step cadence the engine saves every
-    # epoch_len steps (= each epoch end, the last step included) and validates exactly when it saves. A step cadence
-    # from the template (smoke runs) would add a ~4 min validation every 25 steps (+48 min on the default template).
-    sched.pop("ckpt_every_steps", None)
+    # Save + validate at epoch boundaries only (research 2026-10-13): save_checkpoint_every_epoch saves at each epoch
+    # end (the last step included) and the engine validates exactly when it saves. The step cadence is switched off
+    # explicitly: leaving ckpt_every_steps out is NOT "per epoch" in AutoModel 26.08, whose StepSchedulerConfig
+    # defaults it to 100 (R2 saved + validated at steps 99 and 199 on top of the epoch ends, research 2026-10-13).
+    sched["ckpt_every_steps"] = NO_STEP_CADENCE
     sched.pop("val_every_steps", None)
     sched["save_checkpoint_every_epoch"] = True
 

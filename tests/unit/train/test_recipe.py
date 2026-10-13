@@ -7,7 +7,14 @@ import pytest
 from vlm_pipeline.common.catalog import load_catalog
 from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
-from vlm_pipeline.train.recipe import RecipeError, build_recipe, load_template, render_recipe, template_path
+from vlm_pipeline.train.recipe import (
+    NO_STEP_CADENCE,
+    RecipeError,
+    build_recipe,
+    load_template,
+    render_recipe,
+    template_path,
+)
 
 ROOT = project_root()
 
@@ -80,7 +87,7 @@ def test_validation_follows_the_wired_data_at_epoch_boundaries() -> None:
                      val_dataset_dir="/w/v", val_split="validation", class_token_start_idx=50000)  # fmt: skip
     assert (r["validation_dataset"]["path_or_dataset"], r["validation_dataset"]["split"]) == ("/w/v", "validation")
     sched = r["step_scheduler"]
-    assert "ckpt_every_steps" not in sched  # engine default: every epoch_len steps
+    assert sched["ckpt_every_steps"] == NO_STEP_CADENCE  # 26.08's typed config defaults it to 100, not epoch_len
     assert "val_every_steps" not in sched  # validate exactly when saving
     assert sched["save_checkpoint_every_epoch"] is True
     dropped = build_recipe(tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r",
@@ -96,4 +103,5 @@ def test_a_template_step_cadence_never_reaches_a_node_recipe() -> None:
     r = build_recipe(
         tpl, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r", class_token_start_idx=50000
     )
-    assert {"val_every_steps", "ckpt_every_steps"} & set(r["step_scheduler"]) == set()
+    assert "val_every_steps" not in r["step_scheduler"]
+    assert r["step_scheduler"]["ckpt_every_steps"] == NO_STEP_CADENCE
