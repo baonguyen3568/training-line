@@ -126,6 +126,8 @@ def compile_cache_env(job: ContainerJob, project_root: Path, image_id: str | Non
     """
     if not image_id:  # no image identity: never persist a .so another image could load (bao-fixcode)
         scratch = {"TORCH_EXTENSIONS_DIR": "torch_extensions", "TORCHINDUCTOR_CACHE_DIR": "inductor"}
+        if job.read_only_project:
+            scratch["TRITON_CACHE_DIR"] = "triton"
         return {**{k: f"{_SCRATCH}/{v}" for k, v in scratch.items()}, "MAX_JOBS": "2"}
     key = image_id.removeprefix("sha256:")[:16]
     base = f"{CONTAINER_ROOT}/.cache"
@@ -136,11 +138,14 @@ def compile_cache_env(job: ContainerJob, project_root: Path, image_id: str | Non
         base = f"{CONTAINER_ROOT}/{rel}/.cache"
     elif job.read_only_project:
         base = _SCRATCH  # nothing writable in the project: rebuilt per job, as before
-    return {
+    env = {
         "TORCH_EXTENSIONS_DIR": f"{base}/torch_extensions/{key}",
         "TORCHINDUCTOR_CACHE_DIR": f"{base}/inductor/{key}",
         "MAX_JOBS": "2",
     }
+    if job.read_only_project:  # BASE_ENV's Triton cache is in the (read-only) project: Triton autotune fails there
+        env["TRITON_CACHE_DIR"] = f"{base}/triton/{key}"
+    return env
 
 
 def docker_args(

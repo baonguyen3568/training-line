@@ -298,3 +298,18 @@ def test_compile_caches_are_kept_per_image_and_follow_the_writable_dir(tmp_path:
     args = docker_args(_job(env={"MAX_JOBS": "4"}), tmp_path, image_id="sha256:" + "cd" * 32)
     assert "MAX_JOBS=4" in args  # a job's own env wins
     assert "TORCHINDUCTOR_CACHE_DIR=/workspace/.cache/inductor/cdcdcdcdcdcdcdcd" in args
+
+
+def test_a_read_only_job_never_gets_a_triton_cache_in_the_read_only_project(tmp_path: Path) -> None:
+    # 2026-10-13 quantize GPU run: Qwen3.5 Triton autotune hit BASE_ENV's /workspace/.cache/triton (mounted :ro).
+    from vlm_pipeline.common.jobrun import BASE_ENV, compile_cache_env
+
+    run = tmp_path / "outputs" / "graph" / "runs" / "n1"
+    for job, image in (
+        (_job(read_only_project=True, rw_dirs=(run,)), "sha256:" + "ef" * 32),
+        (_job(read_only_project=True), "sha256:" + "ef" * 32),
+        (_job(read_only_project=True), None),
+    ):
+        triton = {**BASE_ENV, **compile_cache_env(job, tmp_path, image)}["TRITON_CACHE_DIR"]
+        assert triton.startswith(("/workspace/outputs/", "/tmp/")), triton  # noqa: S108
+    assert "TRITON_CACHE_DIR" not in compile_cache_env(_job(), tmp_path, "sha256:" + "ab" * 32)  # writable: unchanged

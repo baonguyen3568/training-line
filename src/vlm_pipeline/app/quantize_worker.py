@@ -57,9 +57,8 @@ def run_quantize(worker: RealWorker, job: NodeJob) -> NodeResult:
             fmt=params.format,
             calib_size=params.calib_size,
         ),
-        read_only_project=True,  # writes only its run dir; the FP8 extension is compiled into the container's /tmp
+        read_only_project=True,  # writes only its run dir; JIT caches go there too (jobrun.compile_cache_env)
         rw_dirs=(run_dir,),
-        env={"TORCH_EXTENSIONS_DIR": "/tmp/torch_extensions", "MAX_JOBS": "2"},  # noqa: S108
     )
     need = est_peak_gb(entry)
     try:
