@@ -180,6 +180,10 @@ EOF
   - dirty/writeback: job trước là eval, không ghi checkpoint.
   - container trước dùng /dev/shm lớn (7 GiB, --shm-size 8g), hoặc bị SIGKILL: Shmem và MemFree hồi trong ≤ 2 s, B 16/16 OK
     (20:48–20:51).
+  - B start chỉ +0.7–1.0 s sau khi A thoát (A dùng expandable_segments, giữ 20 GiB), B sleep 30 s rồi mới cấp phát: 4/4 OK
+    (22:02–22:06). Dù vậy 6/6 lần OOM thật đều là job start ≤ 2 s sau một job GPU của ta, và process của B không bao
+    giờ hiện trong nvidia-smi dù MemFree > 30 GB (lần 21:53). Khác biệt duy nhất còn lại là đường chạy run_job/jobrun_cli
+    (memguard, --user, mount, BASE_ENV, inspect/rm).
 - Đang có: 2 VLLM::EngineCore ngoài dự án (khoảng 58 GB) và stack vss-* chạy song song (đã báo PM để hỏi user).
 - Biện pháp hiện tại:
   - log CUDA OOM → MEM-003 (d83e0db);
