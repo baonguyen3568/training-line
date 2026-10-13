@@ -42,4 +42,30 @@ describe("run warnings", () => {
     expect(btn.textContent).not.toMatch(/null|undefined|model\.hf_pick-/);
     vi.restoreAllMocks();
   });
+
+  it("a result reused from the cache keeps its warning (768716a: warning comes before status cached)", async () => {
+    const { api } = await import("../src/api");
+    const { useWorkflow } = await import("../src/store/workflow");
+    const { Editor } = await import("../src/components/Editor");
+    await useWorkflow.getState().loadCatalog();
+    useWorkflow.getState().newWorkflow();
+    const s = () => useWorkflow.getState();
+    const id = s().addNode("model.hf_pick", { x: 0, y: 0 }) as string;
+    let emit: (ev: RunEvent) => void = () => {};
+    vi.spyOn(api, "startRun").mockResolvedValue({ run_id: "r2" });
+    vi.spyOn(api, "watchRun").mockImplementation((_id, onEvent) => {
+      emit = onEvent;
+      return () => {};
+    });
+    await s().startRun();
+    const { container } = render(<Editor />);
+    emit({ type: "warning", node_id: id, error: { code: "QNT-002", params: {} } } as RunEvent);
+    emit({ type: "node_status", node_id: id, status: "cached" } as RunEvent);
+    expect(s().run?.nodes[id]?.status).toBe("cached");
+    expect(s().run?.nodes[id]?.warnings?.map((w) => w.code)).toEqual(["QNT-002"]);
+    await waitFor(() =>
+      expect(container.querySelector(`[data-id="${id}"] .run-warning`)).not.toBeNull(),
+    );
+    vi.restoreAllMocks();
+  });
 });
