@@ -220,6 +220,11 @@ export interface Api {
   listUserModels(): Promise<{ models: UserModel[] }>;
   /** The user-added datasets of this machine (licence words for the download dialog, backend H5). */
   listUserDatasets(): Promise<{ datasets: UserDataset[] }>;
+  /** H5: add an inspected split with its column mapping; 400 {detail} DATA-010 for a missing role. */
+  addUserDataset(body: { inspect_id: string; columns: Record<string, string> }): Promise<{
+    dataset: UserDataset;
+  }>;
+  confirmUserDatasetLicense(id: string): Promise<{ dataset: UserDataset }>;
   inspectDataset(body: {
     repo: string;
     revision?: string;
@@ -340,6 +345,11 @@ export const httpApi: Api = {
     }),
   listUserModels: () => request("GET", "/api/user-assets/models"),
   listUserDatasets: () => request("GET", "/api/user-assets/datasets"),
+  addUserDataset: (body) => request("POST", "/api/user-assets/datasets", body),
+  confirmUserDatasetLicense: (id) =>
+    request("POST", `/api/user-assets/datasets/${encodeURIComponent(id)}/confirm-license`, {
+      accept: true,
+    }),
   userAssetLimits: () => request("GET", "/api/user-assets/limits"),
   setUserAssetLimits: (body) => request("PUT", "/api/user-assets/limits", body),
   inspectDataset: (body) => request("POST", "/api/user-assets/datasets/inspect", body),

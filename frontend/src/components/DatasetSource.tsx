@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { appPrefix } from "../api/client";
-import type { DatasetInspection, EventError, HubJob } from "../api/types";
+import type { DatasetInspection, EventError, HubJob, UserDataset } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { hubError, isRepoId, pollHubJob, recentRepos, rememberRepo } from "../lib/hubJob";
 import { runErrorText } from "../lib/runWarning";
 import { untrustedText } from "../lib/safeText";
+import { useUserModels } from "../store/userModels";
 import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
 import { FieldError } from "./FieldError";
@@ -17,6 +18,21 @@ function sampleErrorText(code: string): string {
 }
 
 type Mapping = { image?: string; question?: string; answer?: string; messages?: string };
+
+/** The three params a user-added dataset sets together (backend H5); the server refuses them when they disagree. */
+export const USER_DATASET_PARAMS = ["user_dataset", "user_repo", "user_revision"];
+
+/** Pick a user-added dataset for the step (id, repo, pinned revision), or `null` back to the catalog one: one undo step. */
+export function setUserDataset(
+  nodeId: string,
+  ds: Pick<UserDataset, "id" | "repo" | "revision"> | null,
+) {
+  useWorkflow.getState().setParams(nodeId, {
+    user_dataset: ds?.id ?? "",
+    user_repo: ds?.repo ?? "",
+    user_revision: ds?.revision ?? "",
+  });
+}
 
 /**
  * "Ghép cột dữ liệu" (spec H §4): which column is the image, the question, the answer (or the conversation), the
@@ -31,13 +47,15 @@ function ColumnMapDialog({
 }: {
   inspection: DatasetInspection;
   inspectId: string;
-  onApply: (m: Mapping, fixedQuestion: string) => void;
+  /** Adds the dataset on the server; resolves to its refusal (DATA-010…) or null once added. */
+  onApply: (m: Mapping) => Promise<EventError | null>;
   onClose: () => void;
 }) {
   const s = inspection.suggested;
   const [mode, setMode] = useState<"qa" | "messages">(s.messages && !s.answer ? "messages" : "qa");
   const [map, setMap] = useState<Mapping>(s);
-  const [fixed, setFixed] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [refused, setRefused] = useState<EventError | null>(null);
   const kindOf = (name?: string) => inspection.columns.find((c) => c.name === name)?.kind;
   const roles =
     mode === "qa" ? (["image", "question", "answer"] as const) : (["messages", "image"] as const);
@@ -51,9 +69,21 @@ function ColumnMapDialog({
     const col = map[role as keyof Mapping];
     return !!col && kindOf(col) !== want[role];
   };
-  const missing =
-    mode === "qa" ? !map.image || !map.answer || (!map.question && !fixed.trim()) : !map.messages;
-  const ok = !missing && !roles.some(wrong);
+  // the server's rule (ColumnMap): an image, and an answer (question optional) or a conversation
+  const missing = !map.image || (mode === "qa" ? !map.answer : !map.messages);
+  const ok = !missing && !roles.some(wrong) && !busy;
+  const apply = async () => {
+    setBusy(true);
+    setRefused(null);
+    const err = await onApply(
+      mode === "qa"
+        ? { image: map.image, question: map.question, answer: map.answer }
+        : { messages: map.messages, image: map.image },
+    );
+    setBusy(false);
+    if (err) setRefused(err);
+  };
+  const refusedText = refused ? runErrorText(refused, (x) => x) : undefined;
 
   return (
     <div className="modal-scrim">
@@ -112,12 +142,6 @@ function ColumnMapDialog({
             )}
           </div>
         ))}
-        {mode === "qa" && !map.question && (
-          <label className="byo-map-row">
-            {t("byo.map.fixed_question")}
-            <input type="text" value={fixed} onChange={(e) => setFixed(e.target.value)} />
-          </label>
-        )}
         <p className="small muted">{t("byo.map.preview")}</p>
         {inspection.sample_error && (
           <p className="small" role="status">
@@ -149,7 +173,7 @@ function ColumnMapDialog({
                   <span className="small">{sampleErrorText(smp.error)}</span>
                 ) : (
                   <>
-                    <span className="clamp2">{untrustedText(smp.question ?? fixed, 300)}</span>
+                    <span className="clamp2">{untrustedText(smp.question ?? "", 300)}</span>
                     <span className="clamp2 muted mono">
                       {untrustedText(smp.answer ?? "", 300)}
                     </span>
@@ -159,6 +183,13 @@ function ColumnMapDialog({
             </li>
           ))}
         </ul>
+        {refused && (
+          <div className="error-card" role="alert" data-code={refused.code}>
+            <ErrorIcon tone="critical" />
+            <strong>{refusedText?.title}</strong>
+            {refusedText?.what && <p>{refusedText.what}</p>}
+          </div>
+        )}
         <p className="modal-actions">
           <button type="button" className="hairline" onClick={onClose}>
             {t("storage.dialog.cancel")}
@@ -169,14 +200,7 @@ function ColumnMapDialog({
             disabled={!ok}
             aria-disabled={!ok}
             data-inspect={inspectId}
-            onClick={() =>
-              onApply(
-                mode === "qa"
-                  ? { image: map.image, question: map.question, answer: map.answer }
-                  : { messages: map.messages, image: map.image },
-                fixed,
-              )
-            }
+            onClick={() => void apply()}
           >
             {t("byo.map.apply")}
           </button>
@@ -208,6 +232,23 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
     };
   }, []);
   const recent = recentRepos("dataset");
+  const [revision, setRevision] = useState("");
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  // the dataset this step uses now (this machine's record), said above the paste box
+  const usedId = useWorkflow(
+    (st) => st.workflow?.nodes.find((n) => n.id === nodeId)?.params.user_dataset ?? "",
+  );
+  const inUse = useUserModels((st) => st.datasets.find((d) => d.id === usedId));
+  // DATA-013 "Thêm dataset này": the workflow's repo + pinned revision typed in, never checked for the user
+  useEffect(() => {
+    const p = useUserModels.getState().takePrefill(nodeId);
+    if (p) {
+      setRepo(p.repo);
+      setRevision(p.revision);
+      setRevisionOpen(!!p.revision);
+    }
+    void useUserModels.getState().load();
+  }, [nodeId]);
 
   const check = async (value = repo) => {
     const r = value.trim();
@@ -218,6 +259,7 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
     try {
       const { inspect_id } = await api.inspectDataset({
         repo: r,
+        ...(revision.trim() ? { revision: revision.trim() } : {}),
         ...(config ? { config } : {}),
         ...(split ? { split } : {}),
       });
@@ -240,21 +282,20 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
     }
   };
 
-  const apply = (m: Mapping, fixedQuestion: string) => {
-    if (!found) return;
-    const r = found.result;
-    // one edit, one undo step
-    useWorkflow.getState().setParams(nodeId, {
-      repo: r.repo,
-      revision: r.revision,
-      ...(r.config ? { config: r.config } : {}),
-      split: r.split,
-      columns: {
-        ...Object.fromEntries(Object.entries(m).filter(([, v]) => v)),
-        ...(fixedQuestion.trim() ? { fixed_question: fixedQuestion.trim() } : {}),
-      },
-    });
-    setMapping(false);
+  const apply = async (m: Mapping): Promise<EventError | null> => {
+    if (!found) return null;
+    try {
+      const columns = Object.fromEntries(
+        Object.entries(m).filter((e): e is [string, string] => !!e[1]),
+      );
+      const { dataset } = await api.addUserDataset({ inspect_id: found.id, columns });
+      setUserDataset(nodeId, dataset);
+      void useUserModels.getState().load();
+      if (alive.current) setMapping(false);
+      return null;
+    } catch (e) {
+      return hubError(e);
+    }
   };
 
   const errText = error ? runErrorText(error, (id) => id) : undefined;
@@ -284,6 +325,29 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
           {t("byo.check")}
         </button>
       </div>
+      <details
+        className="byo-revision"
+        open={revisionOpen}
+        onToggle={(e) => setRevisionOpen(e.currentTarget.open)}
+      >
+        <summary>{t("byo.revision")}</summary>
+        <input
+          type="text"
+          className="mono"
+          spellCheck={false}
+          aria-label={t("byo.revision")}
+          value={revision}
+          onChange={(e) => setRevision(e.target.value)}
+        />
+      </details>
+      {inUse && !mapping && (
+        <p className="small byo-in-use">
+          <code>{untrustedText(inUse.name, 120)}</code>{" "}
+          <span className="chip unverified">
+            <Icon name="badge-question-mark" size={12} /> {t("byo.unverified")}
+          </span>
+        </p>
+      )}
       {choices && choices.configs.length > 1 && (
         <label className="byo-map-row">
           {t("byo.data.config")}

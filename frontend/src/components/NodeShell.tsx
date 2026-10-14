@@ -220,7 +220,17 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
   // the one "?" chip the face has, "Chưa kiểm chứng" (spec H §2)
   const userModel =
     typeof params.user_model === "string" && params.user_model ? params.user_model : "";
-  const userModelName = userModel.split("--")[2] ?? userModel;
+  // a user-added dataset (H5): the step's repo param is still the catalog default, so the face says user_repo
+  const userDatasetRepo =
+    typeof params.user_dataset === "string" &&
+    params.user_dataset &&
+    typeof params.user_repo === "string"
+      ? params.user_repo
+      : "";
+  const userModelName = userModel
+    ? (userModel.split("--")[2] ?? userModel)
+    : (userDatasetRepo.split("/").pop() ?? userDatasetRepo);
+  const userAsset = userModel || userDatasetRepo;
   // Key choices on the node face (x-ui.summary), e.g. the chosen model/dataset; repo ids shortened to the name.
   const summaryAll = Object.entries(spec?.params_schema.properties ?? {})
     .filter(([, s]) => s["x-ui"]?.summary)
@@ -234,7 +244,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
     .map((v) =>
       spec?.origin.kind === "third_party" ? untrustedText(v, 40) : (v.split("/").pop() ?? v),
     );
-  const summary = userModel ? [untrustedText(userModelName, 40)] : summaryAll;
+  const summary = userAsset ? [untrustedText(userModelName, 40)] : summaryAll;
   // "not on this machine yet" is not the user's mistake (design G-5 #1): it shows as not_downloaded + the button
   // only, never in the error count, the red edge or a failed run badge.
   const isDownload = (i: { code: string; params?: Record<string, unknown> }) =>
@@ -321,7 +331,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
       </div>
       {thirdParty && <ThirdPartyBadge spec={spec} />}
       {summary.length > 0 && <div className="node-summary">{summary.join(" · ")}</div>}
-      {userModel && (
+      {userAsset && (
         <span className="chip unverified nodrag">
           <Icon name="badge-question-mark" size={12} /> {t("byo.unverified")}
           <button

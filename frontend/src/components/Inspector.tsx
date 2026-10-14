@@ -30,7 +30,7 @@ import { useUi } from "../store/ui";
 import { useUserModels } from "../store/userModels";
 import { useWorkflow } from "../store/workflow";
 import { AdvancedOptions } from "./AdvancedOptions";
-import { DatasetHubPanel } from "./DatasetSource";
+import { DatasetHubPanel, setUserDataset, USER_DATASET_PARAMS } from "./DatasetSource";
 import { ErrorIcon } from "./ErrorIcon";
 import { FieldError } from "./FieldError";
 import { Icon } from "./Icon";
@@ -673,9 +673,7 @@ export function Inspector() {
   const modelTab: "catalog" | "hub" =
     hubTab || node.params.user_model || prefillFor === node.id ? "hub" : "catalog";
   const dataTab: "catalog" | "hub" =
-    hubTab || (typeof node.params.repo === "string" && node.params.repo !== props.repo?.default)
-      ? "hub"
-      : "catalog";
+    hubTab || node.params.user_dataset || prefillFor === node.id ? "hub" : "catalog";
   const params = Object.entries(props)
     // the catalog choice lives in the "Đã kiểm chứng" tab only; `user_model` is set by the hub panel, never typed
     // `x-ui.widget: "hidden"` (backend H3): never a row, the value stays and its errors still show in the check bar
@@ -684,9 +682,8 @@ export function Inspector() {
       node.type === "model.hf_pick"
         ? !USER_MODEL_PARAMS.includes(name) && !(modelTab === "hub" && name === "model")
         : node.type === "data.hf_load"
-          ? // the hub panel sets these; the catalog tab keeps its own repo row
-            !["revision", "config", "split", "columns"].includes(name) &&
-            !(dataTab === "hub" && name === "repo")
+          ? // the hub panel sets user_dataset (+ hidden repo/revision); the catalog tab keeps its repo row
+            !USER_DATASET_PARAMS.includes(name) && !(dataTab === "hub" && name === "repo")
           : true,
     )
     // P016 `advanced` (object) has no widget yet: no row at all, not even its "?" help
@@ -747,7 +744,14 @@ export function Inspector() {
       {node.type === "data.hf_load" && (
         // ADR-021 / spec H §4: the catalog dataset, or any Hugging Face dataset with its columns mapped
         <>
-          <SourceTabs value={dataTab} onChange={(v) => setHubTab(v === "hub")} />
+          <SourceTabs
+            value={dataTab}
+            onChange={(v) => {
+              setHubTab(v === "hub");
+              // back to the catalog dataset: all three user params cleared together (one undo step)
+              if (v === "catalog" && node.params.user_dataset) setUserDataset(node.id, null);
+            }}
+          />
           {dataTab === "hub" && <DatasetHubPanel nodeId={node.id} />}
         </>
       )}

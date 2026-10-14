@@ -28,6 +28,7 @@ import type {
   TrialResult,
   UploadInfo,
   UserAssetLimits,
+  UserDataset,
   UserModel,
   ValidationIssue,
   ValidationResult,
@@ -80,6 +81,7 @@ const mockJobs = new Map<
 >();
 let mockJobSeq = 0;
 const mockUserModels = new Map<string, UserModel>();
+const mockUserDatasets = new Map<string, UserDataset>();
 const mockLimits: UserAssetLimits = {
   max_model_gb: 40,
   max_model_gb_range: [1, 1000],
@@ -744,7 +746,47 @@ export const mockApi: Api = {
     return delay({ model: confirmed });
   },
   listUserModels: () => delay({ models: [...mockUserModels.values()] }),
-  listUserDatasets: () => delay({ datasets: [] }),
+  listUserDatasets: () => delay({ datasets: [...mockUserDatasets.values()] }),
+  addUserDataset: ({ inspect_id, columns }) => {
+    const job = mockJobs.get(inspect_id);
+    if (!job) return Promise.reject(new ApiError(404, { detail: { code: "CFG-004", params: {} } }));
+    if (!columns.image || (!columns.answer && !columns.messages))
+      return Promise.reject(
+        new ApiError(400, {
+          detail: {
+            code: "DATA-010",
+            params: { repo: job.repo, missing: columns.image ? "answer" : "image", available: "" },
+          },
+        }),
+      );
+    const [org = "", name = ""] = job.repo.toLowerCase().split("/");
+    const split = job.split ?? "train";
+    const config = job.config ?? "default";
+    const dataset: UserDataset = {
+      id: `user--ds--${org}--${name}--7f0115a4--${config}--${split}`,
+      name: `${name} (${config}/${split})`,
+      repo: job.repo,
+      revision: "7f0115a4b758a71d6473b8d085751692da2fef98",
+      config,
+      split,
+      size_gb: 0.05,
+      license: "cc-by-4.0",
+      license_card: null,
+      license_class: "commercial_ok",
+      obligations: [],
+      license_confirmed: false,
+      verified: false,
+    };
+    mockUserDatasets.set(dataset.id, dataset);
+    return delay({ dataset });
+  },
+  confirmUserDatasetLicense: (id) => {
+    const ds = mockUserDatasets.get(id);
+    if (!ds) return Promise.reject(new ApiError(404, { detail: { code: "CFG-004", params: {} } }));
+    const confirmed = { ...ds, license_confirmed: true };
+    mockUserDatasets.set(id, confirmed);
+    return delay({ dataset: confirmed });
+  },
   userAssetLimits: () => delay({ ...mockLimits }),
   setUserAssetLimits: ({ max_model_gb }) => {
     const [lo, hi] = mockLimits.max_model_gb_range;
@@ -955,54 +997,8 @@ function mockNodeTitle(nodeId: string): string {
   return type ? tp(["node", type, "title"]) : nodeId;
 }
 /** Real registry (REGISTRY.to_api() snapshot from schemas/); the hand-written mockNodeTypes are for tests only. */
-const registry = withUserModelParam(registrySnapshot as unknown as NodeTypesResponse);
+const registry = registrySnapshot as unknown as NodeTypesResponse;
 
-/**
- * model.hf_pick 1.1.0 (P021 §2) gains `user_model` (a user-added model's id, "" = the catalog choice). Until the
- * backend snapshot has it, the mock adds it so the "Từ Hugging Face" tab works end to end.
- */
-/** data.hf_load 1.1.0 (P021 §3): any HF repo, pinned revision, config/split and the column mapping. Mock only. */
-function withHubDatasetParams(n: NodeSpec): NodeSpec {
-  const { repo, ...rest } = n.params_schema.properties;
-  return {
-    ...n,
-    params_schema: {
-      ...n.params_schema,
-      properties: {
-        ...rest,
-        repo: { ...(repo ?? { type: "string" }), const: undefined } as ParamSchema,
-        revision: { type: "string", default: "" },
-        config: { type: "string", default: "" },
-        split: { type: "string", default: "train" },
-        columns: { type: "object", default: {} },
-      },
-    },
-  };
-}
-
-function withUserModelParam(res: NodeTypesResponse): NodeTypesResponse {
-  return {
-    ...res,
-    node_types: res.node_types.map((n) =>
-      n.type_id === "data.hf_load" && !("columns" in n.params_schema.properties)
-        ? withHubDatasetParams(n)
-        : n.type_id !== "model.hf_pick" || "user_model" in n.params_schema.properties
-          ? n
-          : {
-              ...n,
-              params_schema: {
-                ...n.params_schema,
-                properties: {
-                  ...n.params_schema.properties,
-                  user_model: { type: "string", default: "", "x-ui": { widget: "user_model" } },
-                  user_repo: { type: "string", default: "", "x-ui": { widget: "hidden" } },
-                  user_revision: { type: "string", default: "", "x-ui": { widget: "hidden" } },
-                },
-              },
-            },
-    ),
-  };
-}
 const fakeCancel = new Map<string, () => void>();
 /** Duration of one fake progress step; tests shorten it via setFakeStepMs. */
 let FAKE_STEP_MS = 400;

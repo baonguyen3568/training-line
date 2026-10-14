@@ -103,6 +103,8 @@ export const useDownloads = create<DownloadsState>((set, get) => {
         // "I agree" tick is that confirmation
         if (kind === "model" && catalogId.startsWith("user--"))
           await api.confirmUserModelLicense(catalogId);
+        else if (kind === "dataset" && catalogId.startsWith("user--ds--"))
+          await api.confirmUserDatasetLicense(catalogId);
         const body = { kind, catalog_id: catalogId, ...opts };
         const res = await api.startDownload(body).catch(async (e: unknown) => {
           if (!busyCode(e)) throw e;

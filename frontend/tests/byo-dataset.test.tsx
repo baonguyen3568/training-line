@@ -1,9 +1,10 @@
 // ADR-021 / spec H §4: a dataset from Hugging Face is inspected, its columns mapped in a dialog with the server's
 // suggestions and a preview, a wrong column kind is said under its select, and the mapping lands in the step.
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("VITE_MOCK_API", "1");
+afterEach(() => vi.restoreAllMocks());
 
 async function setup() {
   const { useWorkflow } = await import("../src/store/workflow");
@@ -49,21 +50,33 @@ describe("dataset from Hugging Face", () => {
     const apply = within(dialog).getByRole("button", { name: "Dùng cách ghép này" });
     expect(apply).toHaveProperty("disabled", true);
     fireEvent.change(image, { target: { value: "image" } });
+    const { api } = await import("../src/api");
+    const add = vi.spyOn(api, "addUserDataset");
     fireEvent.click(apply);
+    // the mapping goes to the server (H5), which answers with the added dataset; the step names it by its three
+    // params, set together
+    await waitFor(() =>
+      expect(add).toHaveBeenCalledWith({
+        inspect_id: expect.any(String),
+        columns: { image: "image", question: "query", answer: "ground_truth" },
+      }),
+    );
     await waitFor(() => {
       const p = useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.params;
       expect(p).toMatchObject({
-        repo: "acme/invoices-vi",
-        revision: "7f0115a4b758a71d6473b8d085751692da2fef98",
-        split: "train",
-        columns: { image: "image", question: "query", answer: "ground_truth" },
+        user_dataset: "user--ds--acme--invoices-vi--7f0115a4--default--train",
+        user_repo: "acme/invoices-vi",
+        user_revision: "7f0115a4b758a71d6473b8d085751692da2fef98",
       });
     });
-    // the whole mapping is one undo step: one Ctrl+Z puts the step back as it was
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // one undo step: all three back together
     act(() => useWorkflow.getState().undo());
-    expect(useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.params.repo).not.toBe(
-      "acme/invoices-vi",
-    );
+    expect(useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.params).toMatchObject({
+      user_dataset: "",
+      user_repo: "",
+      user_revision: "",
+    });
   });
 
   it("a repo that only has a loading script is refused with the catalog's words", async () => {
@@ -74,5 +87,73 @@ describe("dataset from Hugging Face", () => {
     const err = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(err.getAttribute("data-code")).toBe("DATA-009");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("a refused mapping is said in the dialog, which stays open", async () => {
+    await setup();
+    const { api } = await import("../src/api");
+    const { ApiError } = await import("../src/api/client");
+    vi.spyOn(api, "addUserDataset").mockRejectedValue(
+      new ApiError(400, {
+        detail: {
+          code: "DATA-010",
+          params: { repo: "acme/x", missing: "image", available: "a, b" },
+        },
+      }),
+    );
+    const input = screen.getByPlaceholderText(/naver-clova-ix\/cord-v2/);
+    fireEvent.change(input, { target: { value: "acme/invoices-vi" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 4000 });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Dùng cách ghép này" }));
+    const card = await within(dialog).findByRole("alert");
+    expect(card.getAttribute("data-code")).toBe("DATA-010");
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("DATA-013 'Thêm dataset này' opens the hub tab with the repo and revision typed in", async () => {
+    const { useWorkflow } = await import("../src/store/workflow");
+    await useWorkflow.getState().loadCatalog();
+    useWorkflow.getState().newWorkflow();
+    const id = useWorkflow.getState().addNode("data.hf_load", { x: 0, y: 0 }) as string;
+    const { Inspector } = await import("../src/components/Inspector");
+    const { QuickFixes } = await import("../src/components/QuickFixes");
+    const { tpOptional, t } = await import("../src/i18n");
+    const label = tpOptional(["action", "add_user_dataset"]);
+    if (!label) return; // fixcode's label not in this bundle yet: no button, never a key
+    const rev = "7f0115a4b758a71d6473b8d085751692da2fef98";
+    render(
+      <>
+        <QuickFixes
+          nodeId={id}
+          issue={{
+            node_id: id,
+            code: "DATA-013",
+            severity: "error",
+            params: { node: "Dataset", repo: "acme/invoices-vi", revision: rev },
+            title: "…",
+            what: "…",
+            action_ids: ["add_user_dataset"],
+            actions: [
+              {
+                id: "add_user_dataset",
+                kind: "navigate",
+                confirm: false,
+                node_id: id,
+                target: "add_dataset_dialog",
+              },
+            ],
+          }}
+        />
+        <Inspector />
+      </>,
+    );
+    act(() => fireEvent.click(screen.getByRole("button", { name: label })));
+    const tab = await screen.findByRole("tab", { name: /Từ Hugging Face/ });
+    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect((screen.getByPlaceholderText(/naver-clova-ix\/cord-v2/) as HTMLInputElement).value).toBe(
+      "acme/invoices-vi",
+    );
+    expect((screen.getByLabelText(t("byo.revision")) as HTMLInputElement).value).toBe(rev);
   });
 });

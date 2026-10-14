@@ -700,6 +700,12 @@ export interface UserDataset {
   license_class?: "commercial_ok" | "conditional" | "non_commercial" | "unknown";
   obligations?: LicenseObligation[];
   license_confirmed: boolean;
+  gated?: boolean;
+  format?: string;
+  /** The column mapping it was added with (role → column). */
+  columns?: Record<string, string>;
+  /** Rows once downloaded and converted, else null. */
+  rows?: number | null;
   verified: false;
 }
 
