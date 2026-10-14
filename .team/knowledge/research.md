@@ -109,6 +109,7 @@ Loại: Mistral Small 4 (119B, quá lớn), InternVL3.5 (lạc hậu so với Qw
 - Pin `transformers` theo `config.json` của model (Qwen3.5 cần transformers 5.x).
 - Docs "latest" của NVIDIA thường trễ so với "nightly"/GitHub → đối chiếu cả hai.
 - (✅ 2026-10-14) **NeMo-RL GRPO 1 GPU trên GB10** (recipe VLM chính chủ cần ≥ 2 GPU): `cluster.gpus_per_node=1` + vLLM colocated (sleep mode); NVML không trả bộ nhớ trên UMA → patch `third_party/patches/nemo-rl/0001` (image vlm-nemo-rl:0.7.0-3); buffer refit tính theo cudaMemGetInfo (~0.5 GB "free") → đặt `++policy.refit_buffer_size_gb=4`; profiling KV của vLLM nhiễu bởi bộ nhớ hệ thống dùng chung → `++policy.generation.vllm_kwargs.kv_cache_memory_bytes` cố định; CuMemAllocator từ chối `expandable_segments` → bỏ `PYTORCH_CUDA_ALLOC_CONF`. Probe: `outputs/research/grpo_probe/probe.sh`.
+- (✅ 2026-10-14, probe 10 PASS) **GRPO 1 GPU chỉ qua khi KL = 0**: NeMo-RL nạp policy fp32 và giữ reference là state_dict fp32 PINNED trên CPU, lượt logprob reference còn thêm 1 bản pinned của policy → trên UMA là 3–4 bản model cùng RAM, memguard dừng ở "Computing logprobs". `loss_fn.reference_policy_kl_penalty=0` (DAPO / Dr.GRPO) → 0.8B: container ~20.6 GiB, 3 step 17'. Worker phải truyền lora_exclude (mặc định NeMo-RL gắn LoRA cả vision + lm_head tied). Bản có KL: vá reference = LoRA tắt (như dpo_vlm.py), sau 1.0.
 - (✅) Preflight chặn khi SwapFree < 2 GB dù RAM trống còn ~39 GB — máy dùng chung, chờ chứ không ép.
 
 ## 6. Checklist áp dụng cho dự án
