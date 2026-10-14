@@ -26,15 +26,22 @@ import sys
 import time
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from vlm_pipeline.common.catalog import CatalogEntry
+from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.quantize.config import QatParams
 from vlm_pipeline.quantize.scope import QuantizeNotSupportedError
 
 NODE_TYPE = "quantize.qat"
 # False until the Q2 GPU smoke passes (ADR-022 #10): every QAT node is refused with ``worker_pending`` meanwhile.
 WORKER_READY = False
+
+
+class QatInputUnsupportedError(VlmPipelineError):
+    """The QAT step is fed through an input it does not take yet: the user fixes the wiring (CFG-013)."""
+
+    code: ClassVar[str] = "CFG-013"
 
 
 def _refuse(node_id: str, reason: str, model: CatalogEntry | None = None) -> None:
@@ -53,10 +60,14 @@ def check_support(node_id: str, params: QatParams, model: CatalogEntry | None, i
             _refuse(node_id, "remote_code_model", model)
         if model.quant_fp8 != "official":
             _refuse(node_id, "fp8_not_official", model)
-    if inputs.get("train_data", "dataset:local") != "dataset:local":  # v1: local datasets (unwired = CFG-003's job)
-        _refuse(node_id, "hub_train_data", model)
-    if "calib_data" in inputs:  # v1 calibrates on the first training images
-        _refuse(node_id, "separate_calib_data", model)
+    for reason, wrong in (
+        ("hub_train_data", inputs.get("train_data", "dataset:local") != "dataset:local"),  # v1: local folders only
+        ("separate_calib_data", "calib_data" in inputs),  # v1 calibrates on the first training images
+    ):
+        if wrong:
+            raise QatInputUnsupportedError(
+                f"qat input not supported: {reason}", params={"node": node_id, "node_type": NODE_TYPE, "reason": reason}
+            )
     if not WORKER_READY:
         _refuse(node_id, "worker_pending", model)
 
@@ -308,7 +319,15 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-__all__ = ["NODE_TYPE", "WORKER_READY", "check_support", "lr_at", "optimizer_steps", "read_samples"]
+__all__ = [
+    "NODE_TYPE",
+    "WORKER_READY",
+    "QatInputUnsupportedError",
+    "check_support",
+    "lr_at",
+    "optimizer_steps",
+    "read_samples",
+]
 
 
 if __name__ == "__main__":

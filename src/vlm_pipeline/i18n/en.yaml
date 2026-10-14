@@ -150,6 +150,11 @@ error:
       engine_single_gpu: '"{node}" can''t run yet: the current engine version cannot run this step on a machine with a single GPU. Remove the step to run the rest.'
       engine_no_vlm_dpo: '"{node}" can''t run yet: the current engine version cannot learn from answer pairs with images. Remove the step to run the rest.'
       generic: '"{node}" isn''t supported for real runs in this version yet. Remove the step to run the rest, or wait for an update.'
+  CFG-013:
+    title: "This step doesn't take this data wiring yet"
+    what:
+      hub_train_data: 'Step "{node}" can only retrain from an image folder on this machine for now, not from a Hugging Face dataset. Connect one of your image folders to its "Retraining data" input.'
+      separate_calib_data: 'Step "{node}" calibrates on its own training images for now and does not take a separate calibration dataset. Remove the wire on its "Calibration data" input.'
   CFG-012:
     title: This step group has a problem
     what:

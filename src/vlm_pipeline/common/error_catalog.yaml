@@ -807,6 +807,24 @@ CFG-011:
   actions:
     - {id: remove_step, kind: patch, confirm: true}
 
+CFG-013:
+  slug: UNSUPPORTED_INPUT
+  severity: error
+  prevent_in_preflight: true
+  # A step that works, fed in a way it does not take yet; the user fixes the wiring (design: never "remove the step").
+  # quantize.qat v1 (ADR-022 #10): hub_train_data = training data from a hub dataset (local folders only);
+  # separate_calib_data = a wired calibration dataset (it calibrates on its training images).
+  params:
+    - {name: node, ref: node}
+    - node_type
+    - {name: reason, type: enum, values: [hub_train_data, separate_calib_data]}
+  variant_by: reason
+  match:
+    - {kind: validate, value: "a step fed through an input it does not take yet (quantize.qat v1)"}
+  actions:
+    - {id: pick_other_asset, kind: navigate, target: "node:asset", confirm: false, when: {reason: hub_train_data}}
+    - {id: open_node, kind: navigate, target: "node:self", confirm: false, when: {reason: separate_calib_data}}
+
 CFG-012:
   slug: GROUP_INVALID
   severity: error

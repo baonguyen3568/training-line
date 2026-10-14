@@ -150,6 +150,11 @@ error:
       engine_single_gpu: 'Bước "{node}" chưa chạy được: bản engine hiện tại chưa chạy được bước này trên máy chỉ có một GPU. Bạn có thể xoá bước này để chạy phần còn lại.'
       engine_no_vlm_dpo: 'Bước "{node}" chưa chạy được: bản engine hiện tại chưa học được từ cặp câu trả lời có kèm ảnh. Bạn có thể xoá bước này để chạy phần còn lại.'
       generic: 'Bước "{node}" chưa được hỗ trợ chạy thật trong phiên bản này. Bạn có thể xoá bước này để chạy phần còn lại, hoặc chờ bản cập nhật.'
+  CFG-013:
+    title: 'Bước này chưa nhận cách nối dữ liệu này'
+    what:
+      hub_train_data: 'Bước "{node}" hiện chỉ học lại từ thư mục ảnh trên máy, chưa dùng bộ dữ liệu tải từ Hugging Face. Hãy nối một bước thư mục ảnh của bạn vào cổng "Dữ liệu học lại".'
+      separate_calib_data: 'Bước "{node}" hiện tự hiệu chỉnh bằng chính ảnh dùng để học lại, chưa nhận bộ dữ liệu hiệu chỉnh riêng. Hãy gỡ dây ở cổng "Dữ liệu hiệu chỉnh".'
   CFG-012:
     title: Nhóm bước bị lỗi nên chưa chạy được
     what:

@@ -123,8 +123,9 @@ def test_hub_training_data_and_separate_calibration_are_refused() -> None:
         ({"train_data": "dataset:hub"}, "hub_train_data"),
         ({"train_data": "dataset:local", "calib_data": "dataset:local"}, "separate_calib_data"),
     ):
-        with pytest.raises(QuantizeNotSupportedError) as err:
+        with pytest.raises(qat.QatInputUnsupportedError) as err:
             qat.check_support("q", params, None, inputs)  # type: ignore[arg-type]
+        assert err.value.code == "CFG-013"
         assert err.value.params["reason"] == reason
     qat.check_support("q", params, None, {"train_data": "dataset:local"})  # type: ignore[arg-type]
 
