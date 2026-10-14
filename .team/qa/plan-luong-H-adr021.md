@@ -100,3 +100,14 @@ security: ca config.json bất thường + review · frontend: UI dán repo / gh
   (MODEL-004 remote code, CFG-0xx), preflight/lock/runner/budget, SEC-005 license. MODEL-005 là info. trial_run_id chỉ ghi
   khi train completed/cached; id model = user_model_id(repo, sha40), đổi sha thì MODEL-005 quay lại. Cache key trial có
   "+trial5" (test_trial_executor). Ca âm phải kiểm: remote code + chạy thử ⇒ 422 / MODEL-004.
+
+### E2E H lượt 1 (image hiện tại, họ Qwen; KHÔNG tính cho tiêu chí "≥ 3 họ ngoài Qwen", PM 14/10). Repo do backend gợi ý
+1. unsloth/Qwen3.5-0.8B @23c69c53358a (apache-2.0, Qwen3_5, 1.75 GB): trial 5 bước + LoRA ngắn; model của tổ chức khác.
+2. Qwen/Qwen3.5-0.8B-Base (apache-2.0, ~1.7 GB): bản Base, khác bản Instruct trong catalog.
+3. Qwen/Qwen3-VL-2B-Thinking (apache-2.0, qwen3_vl, 4.26 GB).
+4. Ca âm license: Qwen/Qwen2.5-VL-3B-Instruct (license trên card = null, 7.5 GB). Kỳ vọng: thêm được kèm cảnh báo license
+   không rõ, train/trial được, export bị chặn SEC-006, license_class "unknown". Cần đối chiếu: repo này có file LICENSE
+   riêng (theo trí nhớ của tester là Qwen Research License, không thương mại; CHƯA kiểm). Nếu đúng vậy thì cảnh báo nên
+   nói rõ hơn "không rõ".
+5. Ca âm remote code: một repo có *.py ⇒ MODEL-004 ngay ở resolve, 0 byte tải.
+Tổng tải < 20 GB.
