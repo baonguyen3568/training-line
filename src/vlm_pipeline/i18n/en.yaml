@@ -1609,6 +1609,11 @@ param_unsupported:
   default: not supported yet
   worker_v1: This option is still being built and the app cannot run it yet. Choose another value.
 settings:
+  section_byo: Models you add
+  row_max_model_gb: Maximum size per model
+  max_model_gb_help: The app won't download a model you add from Hugging Face if it is larger than this. The machine's overall storage limits still apply.
+  max_model_gb_range: From {min} to {max} GB
+  max_model_gb_saved: 'Saved: at most {gb} GB per model'
   section_app: App
   row_language: Language
   row_version: Version

@@ -1609,6 +1609,11 @@ param_unsupported:
   default: chưa hỗ trợ
   worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.
 settings:
+  section_byo: Model tự thêm
+  row_max_model_gb: Dung lượng tối đa mỗi model
+  max_model_gb_help: Model bạn tự thêm từ Hugging Face mà lớn hơn mức này thì app không tải. Giới hạn dung lượng chung của máy vẫn áp dụng.
+  max_model_gb_range: Từ {min} đến {max} GB
+  max_model_gb_saved: 'Đã lưu: tối đa {gb} GB mỗi model'
   section_app: Ứng dụng
   row_language: Ngôn ngữ
   row_version: Phiên bản
