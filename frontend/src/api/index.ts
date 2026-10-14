@@ -15,6 +15,8 @@ function lazyMock(): Api {
     bugReport: (runId, q, locale) => load().then((m) => m.bugReport(runId, q, locale)),
     nodeResetPlan: (node, locale) => load().then((m) => m.nodeResetPlan(node, locale)),
     advancedOptions: (typeId, model) => load().then((m) => m.advancedOptions(typeId, model)),
+    health: () => load().then((m) => m.health()),
+    lan: () => load().then((m) => m.lan()),
     session: () => load().then((m) => m.session()),
     signOut: () => load().then((m) => m.signOut()),
     revokeAllSessions: () => load().then((m) => m.revokeAllSessions()),

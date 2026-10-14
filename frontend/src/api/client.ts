@@ -9,6 +9,8 @@ import type {
   DownloadEvent,
   DownloadRequest,
   DownloadStart,
+  HealthInfo,
+  LanInfo,
   MetricsPage,
   MetricsQuery,
   NodeResetPlan,
@@ -188,6 +190,10 @@ export interface Api {
     locale: string,
   ): Promise<BugReport>;
   /** G-5: start (or check) a catalog download. 409/404 {detail: {code, params}}: NET-004, DISK-001, SYS-002, CFG-004. */
+  /** The code this app runs (version, commit, dirty): Settings › Về app. */
+  health(): Promise<HealthInfo>;
+  /** A5: how other devices reach this app on the LAN, and its CA; local session only. */
+  lan(): Promise<LanInfo>;
   /** D-8: who this browser is (local / LAN) and, on the local machine, the LAN sign-in lock. */
   session(): Promise<SessionInfo>;
   /** DELETE /api/session: this browser only. */
@@ -280,6 +286,8 @@ export const httpApi: Api = {
       "GET",
       `/api/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/result`,
     ),
+  health: () => request("GET", "/api/health"),
+  lan: () => request("GET", "/api/lan"),
   session: async () => {
     const { csrf_token, ...info } = await request<SessionInfo & { csrf_token?: string }>(
       "GET",

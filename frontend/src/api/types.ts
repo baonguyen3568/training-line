@@ -608,3 +608,22 @@ export interface SessionInfo {
   /** Local session only: the LAN sign-in lock (too many wrong tokens); epoch seconds or null. */
   lan_login?: { locked_until: number | null; recent_failures: number };
 }
+
+/** GET /api/health (session required, D13): the code this app process runs. */
+export interface HealthInfo {
+  ok: boolean;
+  version: string;
+  /** Full commit hash, or null outside a git tree / image without a baked commit. */
+  commit: string | null;
+  /** Built from a tree with uncommitted changes. */
+  dirty: boolean;
+  app_version: string;
+}
+
+/** A5: GET /api/lan (local session only; LAN gets 403 local_only). */
+export interface LanInfo {
+  enabled: boolean;
+  urls: string[];
+  /** The LAN CA (public, name-constrained): fingerprint "AB:CD:…" upper-case pairs, as browsers show it. */
+  ca: { fingerprint_sha256: string; download: string } | null;
+}

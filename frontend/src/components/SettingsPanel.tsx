@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { SecretField, SessionInfo, SettingsView } from "../api/types";
-import { getLocale, t, tpOptional } from "../i18n";
+import { appPrefix } from "../api/client";
+import type { HealthInfo, LanInfo, SecretField, SessionInfo, SettingsView } from "../api/types";
+import { getLocale, type Locale, t, tpOptional } from "../i18n";
+import { switchLocale } from "../lib/localePref";
 import { reloadForSignIn } from "../lib/session";
+import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
+import { toast } from "./QuickFixes";
 import { errorText, SecretRow } from "./SecretRow";
 
 const FIELDS: SecretField[] = ["HF_TOKEN", "NGC_API_KEY", "WANDB_API_KEY"];
@@ -165,6 +169,224 @@ function SessionSection() {
   );
 }
 
+/** Each language named in itself (design A5): the picker reads the same whichever language is on. */
+const LANGUAGE_NAME: Record<Locale, string> = { vi: "Tiếng Việt", en: "English" };
+
+/** Copy text; false when the browser gives no clipboard (http, permissions). */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * "Ngôn ngữ": choosing reloads the page in that language; an open workflow is kept as the draft the app offers to
+ * restore, and if that cannot be saved the language stays and the user is told to save first.
+ */
+function LanguageRow() {
+  const workflow = useWorkflow((st) => st.workflow);
+  const [blocked, setBlocked] = useState(false);
+  const current = getLocale();
+  return (
+    <div className="set-row">
+      <span className="set-label" id="set-language-label">
+        {t("settings.row_language")}
+      </span>
+      <div className="set-control">
+        <div className="seg" role="radiogroup" aria-labelledby="set-language-label">
+          {(Object.keys(LANGUAGE_NAME) as Locale[]).map((l) => (
+            <button
+              key={l}
+              type="button"
+              role="radio"
+              lang={l}
+              aria-checked={l === current}
+              className={l === current ? "on" : ""}
+              onClick={() => setBlocked(!switchLocale(l, workflow))}
+            >
+              {LANGUAGE_NAME[l]}
+            </button>
+          ))}
+        </div>
+        {blocked && (
+          <p className="set-warning" role="alert">
+            <span className="si si-warn" aria-hidden="true">
+              <Icon name="triangle-alert" size={14} />
+            </span>{" "}
+            {t("settings.language_reload_confirm")}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "Phiên bản": the version and commit this app runs (/api/health), and one button that copies exactly the bug
+ * report's version + GPU fields, nothing else (design).
+ */
+function VersionRow() {
+  const [health, setHealth] = useState<HealthInfo | null>(null);
+  const [gpu, setGpu] = useState<string | undefined>(undefined);
+  const [manual, setManual] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.health().then(
+      (h) => live && setHealth(h),
+      () => undefined,
+    );
+    api.bugReport(null, {}, getLocale()).then(
+      (b) => live && setGpu(b.gpu),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!health) return null;
+  const commit = health.commit
+    ? `${health.commit.slice(0, 12)}${health.dirty ? "-dirty" : ""}`
+    : "—";
+  const text = [
+    `${t("bug_report.field.app_version")}: ${health.app_version}`,
+    ...(gpu ? [`${t("bug_report.field.gpu")}: ${gpu}`] : []),
+  ].join("\n");
+  const copy = async () => {
+    if (await copyText(text)) {
+      setManual(null);
+      toast(t("settings.about.copied"));
+    } else setManual(text); // shown to copy by hand
+  };
+  const [before, after = ""] = t("settings.about.version", {
+    version: health.version,
+    commit: "\u0000",
+  }).split("\u0000");
+  return (
+    <div className="set-row">
+      <span className="set-label">{t("settings.row_version")}</span>
+      <div className="set-control">
+        <p className="set-state">
+          {before}
+          <code>{commit}</code>
+          {after}
+        </p>
+        <button type="button" className="hairline" onClick={() => void copy()}>
+          <Icon name="copy" size={14} /> {t("settings.about.copy")}
+        </button>
+        {manual && <pre className="set-copy-manual">{manual}</pre>}
+      </div>
+    </div>
+  );
+}
+
+/** "Ứng dụng" (design A5 r2): language and version together. */
+function AppSection() {
+  return (
+    <section aria-labelledby="set-app">
+      <h2 id="set-app">
+        <Icon name="settings" size={16} /> {t("settings.section_app")}
+      </h2>
+      <LanguageRow />
+      <VersionRow />
+    </section>
+  );
+}
+
+/** A small icon button that copies one value, with the copy itself as its name. */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  return (
+    <button
+      type="button"
+      className="help-btn inline"
+      aria-label={label}
+      title={label}
+      onClick={() => void copyText(value).then((ok) => ok && toast(t("app.copied")))}
+    >
+      <Icon name="copy" size={14} />
+    </button>
+  );
+}
+
+/**
+ * A5 "Truy cập từ máy khác": how other devices reach this app on the LAN and the CA they install, with its SHA-256
+ * fingerprint to compare on that device (security). Only the app's own machine sees it (403 local_only elsewhere).
+ */
+function LanSection() {
+  const [lan, setLan] = useState<LanInfo | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.lan().then(
+      (l) => live && setLan(l),
+      () => undefined, // 403 local_only (a LAN browser) or no endpoint: no section
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!lan) return null;
+  return (
+    <section aria-labelledby="set-lan">
+      <h2 id="set-lan">
+        <Icon name="globe" size={16} /> {t("settings.lan.section")}
+      </h2>
+      {!lan.enabled ? (
+        <p className="muted">{t("settings.lan.off")}</p>
+      ) : (
+        <>
+          <div className="set-row">
+            <span className="set-label">{t("settings.lan.row_address")}</span>
+            <div className="set-control">
+              {lan.urls.map((u) => (
+                <p key={u} className="set-state">
+                  <code>{u}</code> <CopyButton value={u} label={t("settings.lan.copy_address")} />
+                </p>
+              ))}
+            </div>
+          </div>
+          <div className="set-row" data-testid="lan-cert">
+            <span className="set-label">{t("settings.lan.row_cert")}</span>
+            <div className="set-control">
+              {lan.ca ? (
+                <>
+                  <p>
+                    <a className="btn ghost sm" href={`${appPrefix()}${lan.ca.download}`} download>
+                      <Icon name="download" size={14} /> {t("settings.lan.ca_download")}
+                    </a>
+                  </p>
+                  <p className="small muted">{t("settings.lan.fingerprint")}</p>
+                  <p className="set-fingerprint">
+                    <code>
+                      {lan.ca.fingerprint_sha256.split(":").map((pair, i, all) => (
+                        // a line may break only after a pair's colon, so a line never starts with ":"
+                        // biome-ignore lint/suspicious/noArrayIndexKey: a fixed sequence of byte pairs
+                        <span key={i}>
+                          {pair}
+                          {i < all.length - 1 && ":"}
+                          <wbr />
+                        </span>
+                      ))}
+                    </code>{" "}
+                    <CopyButton
+                      value={lan.ca.fingerprint_sha256}
+                      label={t("settings.lan.copy_fingerprint")}
+                    />
+                  </p>
+                  <p className="small muted">{t("settings.lan.howto")}</p>
+                </>
+              ) : (
+                <p className="muted">{t("settings.lan.ca_missing")}</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 /** Settings (D4, D-7): secrets the user may set; deployment policy shown read-only with who/why behind "?". */
 export function SettingsPanel() {
   const [view, setView] = useState<SettingsView | null>(null);
@@ -201,6 +423,8 @@ export function SettingsPanel() {
         ))}
       </section>
       <SessionSection />
+      <LanSection />
+      <AppSection />
       <section aria-labelledby="set-admin">
         <h2 id="set-admin">
           <Icon name="lock" size={16} /> {t("settings.section_admin")}

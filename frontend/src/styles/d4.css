@@ -1193,3 +1193,21 @@ button.hairline.sm {
   gap: var(--space-4);
   border-bottom: 0;
 }
+
+/* A5 "Về app": the version text to copy by hand when the browser gives no clipboard */
+.set-copy-manual {
+  margin: var(--space-8) 0 0;
+  padding: var(--space-8);
+  border: 1px solid var(--color-grid);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  user-select: all;
+}
+
+/* A5 LAN fingerprint: 32 mono byte pairs that may wrap only between pairs */
+.set-fingerprint code {
+  overflow-wrap: normal;
+  word-break: normal;
+}

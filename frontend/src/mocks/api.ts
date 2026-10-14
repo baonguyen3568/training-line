@@ -6,6 +6,8 @@ import type {
   AdvancedOption,
   BugReport,
   DownloadStart,
+  HealthInfo,
+  LanInfo,
   NodeResetPlan,
   NodeResetResult,
   NodeSpec,
@@ -549,6 +551,26 @@ export const mockApi: Api = {
       ...(runId ? { ref_code: "a1b2c3d4e5f6" } : {}), // the server derives it; the mock only pretends
     }),
   // D-8: the local machine, LAN sign-in locked for a few minutes after wrong tokens
+  health: () =>
+    delay<HealthInfo>({
+      ok: true,
+      version: "1.0.0.dev0",
+      commit: "4b04214c0ffee0123456789abcdef0123456789a",
+      dirty: false,
+      app_version: "1.0.0.dev0+4b04214c0ffe",
+    }),
+  // A5: LAN on, one address, a made-up CA fingerprint (32 pairs, as browsers print it)
+  lan: () =>
+    delay<LanInfo>({
+      enabled: true,
+      urls: ["https://192.168.2.178:4000/"],
+      ca: {
+        fingerprint_sha256: Array.from({ length: 32 }, (_, i) =>
+          ((i * 37 + 11) % 256).toString(16).toUpperCase().padStart(2, "0"),
+        ).join(":"),
+        download: "/api/lan/ca.crt",
+      },
+    }),
   session: () => delay<SessionInfo>({ ...mockSession }),
   signOut: () => delay(undefined),
   revokeAllSessions: () => delay(undefined),
