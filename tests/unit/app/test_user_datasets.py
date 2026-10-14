@@ -122,7 +122,7 @@ def test_a_failed_inspect_job_is_never_a_traceback(service: Any, monkeypatch: py
     client = _client(service)
     done = _done(client, client.post("/api/user-assets/datasets/inspect", json={"repo": "org/d"}).json()["inspect_id"])
     assert done["status"] == "failed"
-    assert done["error"]["code"] == "DATA-010"
+    assert done["error"] == {"code": "DATA-012", "params": {"repo": "org/d", "reason": "unreadable_sample"}}
 
 
 @pytest.mark.parametrize("tamper", [
