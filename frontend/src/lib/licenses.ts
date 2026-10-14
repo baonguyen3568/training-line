@@ -11,8 +11,10 @@ const LICENSE_NAME: Record<string, string> = {
   "nvidia-open-model-license": "NVIDIA Open Model License",
   "openmdw-1.1": "OpenMDW-1.1",
 };
-export const licenseName = (id: string) =>
-  tpOptional(["license", "name", id]) ?? LICENSE_NAME[id] ?? id;
+export const licenseName = (id: string): string =>
+  tpOptional(["license", "name", id]) ??
+  // own keys only: an id like "constructor" must not read Object.prototype
+  (Object.hasOwn(LICENSE_NAME, id) ? (LICENSE_NAME[id] as string) : id);
 
 /** "Tác giả ghi: “…”": a user-added asset's licence in its author's words (untrusted: plain text, clamped), or
  * undefined while the copy is missing (the line hides, never a key). */
