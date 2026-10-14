@@ -67,6 +67,8 @@ class BatchRequest:
     enable_thinking: bool = False
     logprobs: int = 0  # >0: per generated token, the top-N (token id, logprob) for near-tie analysis (tester parity)
     enforce_eager: bool = True  # no torch.compile / CUDA graphs: faster start, no compile cache to persist
+    # JSON schema every answer must follow (vLLM structured output, xgrammar/llguidance in the image): caption task=qa.
+    json_schema: dict[str, Any] | None = None
     extra: dict[str, Any] = field(default_factory=dict)  # recorded as is (e.g. who asked, gate id)
 
     @classmethod
@@ -195,6 +197,10 @@ def run(request_path: Path) -> dict[str, Any]:
         if "top_k" in decoding:
             decoding["top_k"] = int(decoding["top_k"])  # vLLM wants an int
         logprobs = req.logprobs or None
+        if req.json_schema is not None:
+            from vllm.sampling_params import StructuredOutputsParams
+
+            decoding["structured_outputs"] = StructuredOutputsParams(json=req.json_schema)
         params = SamplingParams(n=1, max_tokens=max_tokens, seed=SEED, logprobs=logprobs, **decoding)
         for start in range(0, len(group), CHUNK):
             chunk = group[start : start + CHUNK]
@@ -233,6 +239,7 @@ def run(request_path: Path) -> dict[str, Any]:
             "per_request": sorted({k for i in req.items for k in i.sampling}),
         },
         "chat_template_kwargs": {"enable_thinking": req.enable_thinking},
+        "json_schema_sha": _sha(json.dumps(req.json_schema, sort_keys=True)) if req.json_schema else None,
         "mm_processor_kwargs": mm_kwargs,
         "image_decoder": "common.image_rules.open_image",
         "requests": len(req.items),

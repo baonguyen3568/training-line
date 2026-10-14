@@ -136,6 +136,7 @@ def test_job_is_narrowed_read_only_on_the_approved_vllm_image(tmp_path: Path, mo
     assert seen["kw"]["est_peak_gb"] == pytest.approx(weights * 1.1 + 3.0 + 8.0 + 8.0 + 2.5 * weights, abs=0.1)
     req = BatchRequest.from_json((res.run_dir / "batch.json").read_text())
     assert (req.min_pixels, req.max_pixels, req.enable_thinking) == (200704, 1003520, False)
+    assert req.json_schema is None  # greedy free text unless a caller asks for structured output
     assert req.model_dir == "/workspace/.cache/hf/hub/models--Q--M/snapshots/abc"
     assert res.ok
     assert res.rows() == [{"id": "b", "text": "ok"}]
@@ -246,3 +247,17 @@ def test_estimate_covers_the_measured_peaks(weights: float, peak: float) -> None
     """The preflight / memory-queue estimate is never below what these runs really took."""
     kv = 36.5 - (weights * 1.1 + 3.0)  # those runs had a 36.5 GB engine (KV sized to mem_frac 0.3 then)
     assert engine_budget(weights, total_gb=121.7, available_gb=110.0, kv_cache_gb=kv).est_peak_gb >= peak
+
+
+def test_json_schema_reaches_the_batch_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _project(tmp_path)
+    model = root / ".cache" / "hf" / "hub" / "models--Q--M" / "snapshots" / "abc"
+
+    def fake_run_job(job: Any, manifest: RunManifest, run_dir: Path, **kw: Any) -> RunManifest:
+        return manifest.model_copy(update={"status": RunStatus.COMPLETED})
+
+    monkeypatch.setattr(vllm_runner, "run_job", fake_run_job)
+    schema = {"type": "object", "properties": {"q": {"type": "string"}}, "required": ["q"]}
+    res = run_vllm_batch(root, model, [{"id": "b", "image": "data/imgs/a.png", "prompt": "p"}], who="t",
+                         json_schema=schema, memory=(121.7, 110.0))  # fmt: skip
+    assert BatchRequest.from_json((res.run_dir / "batch.json").read_text()).json_schema == schema

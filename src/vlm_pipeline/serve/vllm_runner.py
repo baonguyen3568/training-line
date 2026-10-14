@@ -274,6 +274,7 @@ def run_vllm_batch(
     max_pixels: int = 0,
     enable_thinking: bool = False,
     logprobs: int = 0,
+    json_schema: Mapping[str, Any] | None = None,
     kv_cache_gb: float | None = None,
     extra: Mapping[str, Any] | None = None,
     cancel: threading.Event | None = None,
@@ -325,6 +326,7 @@ def run_vllm_batch(
         max_pixels=max_pixels,
         enable_thinking=enable_thinking,
         logprobs=logprobs,
+        json_schema=dict(json_schema) if json_schema is not None else None,
         extra={**(extra or {}), "engine_gb": budget.engine_gb, "est_peak_gb": budget.est_peak_gb},
     )
     request_path = run_dir / "batch.json"

@@ -172,3 +172,58 @@ def test_captions_carry_their_model(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     entry = w.catalog.get(MODEL)
     assert entry is not None
     assert [r.generated_by for r in recs] == [f"{MODEL}@{entry.revision}", None]
+
+
+@pytest.mark.usefixtures("parity")
+def test_qa_task_writes_question_as_prompt_and_drops_unparsed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.serve import vllm_runner
+
+    w = RealWorker(_root(tmp_path))
+    model, data = _model(w), _dataset(w, [None, None, None, None])
+    seen: dict[str, Any] = {}
+    answers = {
+        "0": {"text": json.dumps({"question": " How many cats? ", "answer": " Two. "})},
+        "1": {"text": "not json"},
+        "2": {"text": json.dumps({"question": "", "answer": "x"})},
+        "3": {"text": json.dumps({"question": "q", "answer": "a", "extra": 1})},
+    }
+    monkeypatch.setattr(vllm_runner, "run_vllm_batch", _fake_batch(answers, seen))
+    run_caption(w, _job(w, {"task": "qa", "qa_focus": "counting"}, data, model))
+    assert all(i["prompt"] == caption_worker.QA_PROMPTS["counting"] for i in seen["items"])
+    assert seen["kw"]["json_schema"] == caption_worker.QA_SCHEMA
+    run = w.root / "outputs" / "graph" / "runs" / "cap"
+    records = list(read_records(run / "records.jsonl"))
+    assert [(r.image, r.prompt, r.target) for r in records] == [("0.png", "How many cats?", "Two.")]
+    assert records[0].generated_by is not None
+    report = json.loads((run / "caption_report.json").read_text())
+    assert (report["task"], report["captioned"], report["dropped_unparsed"]) == ("qa", 1, 3)
+
+
+@pytest.mark.usefixtures("parity")
+def test_caption_task_sends_no_schema(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.serve import vllm_runner
+
+    w = RealWorker(_root(tmp_path))
+    model, data = _model(w), _dataset(w, [None])
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(vllm_runner, "run_vllm_batch", _fake_batch({"0": {"text": '{"question": "q"}'}}, seen))
+    run_caption(w, _job(w, {"prompt": "Describe."}, data, model))
+    assert seen["kw"]["json_schema"] is None
+    records = list(read_records(w.root / "outputs" / "graph" / "runs" / "cap" / "records.jsonl"))
+    assert records[0].target == '{"question": "q"}'  # a caption is kept verbatim, never parsed
+
+
+@pytest.mark.parametrize("focus", ["general", "text_reading", "counting", "charts"])
+def test_every_qa_focus_has_a_template_asking_for_the_schema(focus: str) -> None:
+    from vlm_pipeline.data.config import CaptionParams
+
+    assert focus in CaptionParams.model_fields["qa_focus"].annotation.__args__  # type: ignore[union-attr]
+    assert '"question"' in caption_worker.QA_PROMPTS[focus]
+    assert '"answer"' in caption_worker.QA_PROMPTS[focus]
+
+
+def test_question_and_answer_lose_control_characters() -> None:
+    pair = caption_worker.parse_qa(json.dumps({"question": "\x00Wh\x1b[31mat?\x7f ", "answer": " a\tb\nc\x00 "}))
+    assert pair == ("Wh[31mat?", "a\tb\nc")
+    assert caption_worker.parse_qa(json.dumps({"question": "\x00\x1b", "answer": "x"})) is None  # empty once cleaned
+    assert caption_worker.clean_caption("\x00cap\x08") == "cap"

@@ -5,6 +5,11 @@ One offline vLLM job for the whole dataset (``serve.vllm_runner.run_vllm_batch``
 answers passed the vLLM<->HF parity gate (``trial_worker.VLLM_PARITY_MODELS``); others are refused at validate time
 (CFG-011) rather than answered by a second, slower engine.
 
+task=qa (ADR-022 #6 distillation, P023 §4): ONE prompt per image (a fixed template per ``qa_focus``) asks the teacher
+for a question and its answer as JSON, enforced by vLLM structured output (``QA_SCHEMA``); the record gets
+``prompt = question``, ``target = answer``. A reply that does not parse, or has an empty part, drops the record
+(``dropped_unparsed``); both strings are untrusted text like a caption.
+
 Input: a local dataset (``records.jsonl``, common.local_records). Output: the same images with new records:
 - a record is captioned when it has no target, or always with ``overwrite_existing``; the others pass through;
 - a caption is UNTRUSTED text (bao-security §B3): stripped, cut at ``MAX_CAPTION_CHARS``, written by the JSON
@@ -34,6 +39,27 @@ if TYPE_CHECKING:
     from vlm_pipeline.app.workers import RealWorker
 
 MAX_CAPTION_CHARS = 8000
+MAX_QUESTION_CHARS = 500
+QA_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "question": {"type": "string", "minLength": 1, "maxLength": MAX_QUESTION_CHARS},
+        "answer": {"type": "string", "minLength": 1, "maxLength": MAX_CAPTION_CHARS},
+    },
+    "required": ["question", "answer"],
+    "additionalProperties": False,
+}
+_QA_ASK = (
+    " Then answer it from the image alone, accurately and concisely."
+    ' Reply with JSON only: {"question": "...", "answer": "..."}.'
+)
+# One template per qa_focus (no free prompt for qa: the JSON contract depends on it). Same language as the image text.
+QA_PROMPTS: dict[str, str] = {
+    "general": "Look at this image and write one question about it that needs the image to answer." + _QA_ASK,
+    "text_reading": "Look at this image and write one question about text that is written in it." + _QA_ASK,
+    "counting": "Look at this image and write one question asking how many of something are in it." + _QA_ASK,
+    "charts": "Look at this chart or table and write one question about a value or a trend it shows." + _QA_ASK,
+}
 REPORT_NAME = "caption_report.json"
 
 
@@ -43,8 +69,7 @@ def check_support(node_id: str, params: object, model: CatalogEntry | None, inpu
     from vlm_pipeline.app.workers import NodeNotRunnableError
 
     refuse = {"node": node_id, "node_type": "data.caption_vlm"}
-    if getattr(params, "task", "caption") == "qa":  # ADR-022 #6: the qa worker path is not built yet
-        raise NodeNotRunnableError("caption task qa is not runnable yet", params={**refuse, "reason": "qa_pending"})
+    del params  # task caption | qa: both run in the same vLLM job
     if model is not None and (model.auto_class != "AutoModelForImageTextToText" or model.id not in VLLM_PARITY_MODELS):
         raise NodeNotRunnableError("caption needs a native model that passed the vLLM parity gate", params=refuse)
     if inputs.get("dataset", "dataset:local") != "dataset:local":  # allowlist; unwired is CFG-003's job
@@ -55,9 +80,30 @@ def _needs_caption(record: Record, overwrite: bool) -> bool:
     return overwrite or record.target is None or (isinstance(record.target, str) and not record.target.strip())
 
 
-def clean_caption(text: str) -> str:
-    """Untrusted model text as stored: stripped and bounded (never rendered as markup, see CaptionParams)."""
-    return text.strip()[:MAX_CAPTION_CHARS]
+_CONTROL = dict.fromkeys((*range(0x00, 0x09), 0x0B, 0x0C, *range(0x0E, 0x20), 0x7F))  # keeps \t \n \r
+
+
+def clean_caption(text: str, limit: int = MAX_CAPTION_CHARS) -> str:
+    """Untrusted model text as stored: control characters (NUL, ESC...) removed, stripped, bounded.
+
+    Never rendered as markup (see CaptionParams); tabs and line breaks are kept.
+    """
+    return text.translate(_CONTROL).strip()[:limit]
+
+
+def parse_qa(text: str) -> tuple[str, str] | None:
+    """(question, answer) from a teacher reply, cleaned and bounded; None if it is not the QA_SCHEMA object."""
+    try:
+        raw = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(raw, dict) or set(raw) != {"question", "answer"}:
+        return None
+    question, answer = raw["question"], raw["answer"]
+    if not isinstance(question, str) or not isinstance(answer, str):
+        return None
+    question, answer = clean_caption(question, MAX_QUESTION_CHARS), clean_caption(answer)
+    return (question, answer) if question and answer else None
 
 
 def _caption_batch(
@@ -70,8 +116,8 @@ def _caption_batch(
     try:
         res = run_vllm_batch(
             worker.root, batch["model_dir"], requests, who=worker.who, min_pixels=batch["min_pixels"],
-            max_pixels=batch["max_pixels"], cancel=job.cancel, on_wait=job.on_wait, run_dir=run_dir,
-            manifest=batch["manifest"],
+            max_pixels=batch["max_pixels"], json_schema=batch.get("json_schema"), cancel=job.cancel,
+            on_wait=job.on_wait, run_dir=run_dir, manifest=batch["manifest"],
         )  # fmt: skip
     except MemoryPreemptedBeforeStartError as exc:
         raise InsufficientMemoryError(str(exc)) from exc
@@ -88,7 +134,7 @@ def _caption_batch(
             cancelled_by_executor=res.status == RunStatus.CANCELLED,
             log_tail=log_tail(run_dir),
         )
-    captions = {int(r["id"]): clean_caption(str(r["text"])) for r in rows if "text" in r}
+    captions = {int(r["id"]): str(r["text"]) for r in rows if "text" in r}  # raw: cleaned by the task's parser
     failed = {int(r["id"]) for r in rows if "text" not in r}
     return captions, failed, engine
 
@@ -119,27 +165,43 @@ def run_caption(worker: RealWorker, job: NodeJob) -> NodeResult:
     run_dir = job.run_dir.resolve()
     manifest = RunManifest(run_id=run_dir.name[:120], name=f"{job.spec.type_id} {entry.display_name}", stage="data",
                            task="caption", base_model=entry.repo, base_model_revision=entry.revision)  # fmt: skip
-    requests = [{"id": str(n), "image": str(images[n]), "prompt": params.prompt,
+    qa = params.task == "qa"
+    prompt = QA_PROMPTS[params.qa_focus] if qa else params.prompt
+    requests = [{"id": str(n), "image": str(images[n]), "prompt": prompt,
                  "max_tokens": params.max_new_tokens} for n in todo]  # fmt: skip
-    batch = {"model_dir": worker.model_dir(ref), "min_pixels": min_px, "max_pixels": max_px, "manifest": manifest}
-    captions, failed, engine = _caption_batch(worker, job, requests, batch) if todo else ({}, set(), {})
+    batch = {"model_dir": worker.model_dir(ref), "min_pixels": min_px, "max_pixels": max_px, "manifest": manifest,
+             "json_schema": QA_SCHEMA if qa else None}  # fmt: skip
+    replies, failed, engine = _caption_batch(worker, job, requests, batch) if todo else ({}, set(), {})
     made_by = f"{entry.id}@{entry.revision}"
-    out = [r.model_copy(update={"target": captions[n], "generated_by": made_by}) if n in captions else r
-           for n, r in enumerate(records) if n not in failed]  # fmt: skip
+    updates: dict[int, dict[str, Any]] = {}
+    unparsed: set[int] = set()
+    for n, text in replies.items():
+        if not qa:
+            updates[n] = {"target": clean_caption(text), "generated_by": made_by}
+        elif (pair := parse_qa(text)) is None:
+            unparsed.add(n)
+        else:
+            updates[n] = {"prompt": pair[0], "target": pair[1], "generated_by": made_by}
+    out = [r.model_copy(update=updates[n]) if n in updates else r
+           for n, r in enumerate(records) if n not in failed and n not in unparsed]  # fmt: skip
     if not out:
-        empty = {"node": job.node_id, "problem_count": len(failed), "first_line": 0, "first_reason": "no_samples"}
+        empty = {"node": job.node_id, "problem_count": len(failed) + len(unparsed), "first_line": 0,
+                 "first_reason": "no_samples"}  # fmt: skip
         raise LocalDatasetInvalidError("no sample left after captioning", params=empty)
     sha = write_records(run_dir / "records.jsonl", out)
     report = {
-        "captioned": len(captions),
+        "task": params.task,
+        "qa_focus": params.qa_focus if qa else None,
+        "captioned": len(updates),
         "failed_images": len(failed),
+        "dropped_unparsed": len(unparsed),
         "kept_existing": len(records) - len(todo),
         "model": entry.repo,
         "revision": entry.revision,
         "license": entry.license,
-        "prompt_sha256": hashlib.sha256(params.prompt.encode()).hexdigest(),
+        "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "max_new_tokens": params.max_new_tokens,
-        "engine": {k: engine.get(k) for k in ("vllm", "quantization", "dtype", "container_digest")},
+        "engine": {k: engine.get(k) for k in ("vllm", "quantization", "dtype", "container_digest", "json_schema_sha")},
     }
     (run_dir / REPORT_NAME).write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     dataset = DatasetRef(path=src.path, split="all", records=worker.container_path(run_dir / "records.jsonl"),
@@ -147,4 +209,13 @@ def run_caption(worker: RealWorker, job: NodeJob) -> NodeResult:
     return NodeResult(outputs={"dataset": worker.dataset_artifact(run_dir / "dataset.json", dataset)})
 
 
-__all__ = ["MAX_CAPTION_CHARS", "REPORT_NAME", "check_support", "clean_caption", "run_caption"]
+__all__ = [
+    "MAX_CAPTION_CHARS",
+    "QA_PROMPTS",
+    "QA_SCHEMA",
+    "REPORT_NAME",
+    "check_support",
+    "clean_caption",
+    "parse_qa",
+    "run_caption",
+]
