@@ -420,6 +420,38 @@ DATA-011:
   actions:
     - {id: open_column_mapping, kind: navigate, target: column_mapping, confirm: false}
 
+DATA-012:
+  slug: DATASET_UNREADABLE
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 §4: the hub dataset could not be inspected. no_data_files: no data file in a hub layout (and no loading
+  # script, that is DATA-009); unreadable_sample: the sampled file is corrupt or does not parse; sample_too_large:
+  # every file of the split is over the sampling cap (limit_mb).
+  params:
+    - repo
+    - {name: reason, type: enum, values: [no_data_files, unreadable_sample, sample_too_large]}
+    - limit_mb  # sample_too_large: the sampling cap (download.dataset_layout.SAMPLE_MAX), sent by the resolver
+  variant_by: reason
+  match:
+    - {kind: executor, value: "hub dataset inspect: no readable sample (ADR-021 §4)"}
+  actions:
+    - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
+
+DATA-013:
+  slug: USER_DATASET_NOT_ADDED
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 H5: the workflow names a user-added dataset (repo + pinned revision) this machine has no record of. The
+  # dialog is prefilled; the licence is still reviewed and confirmed (as MODEL-006).
+  params:
+    - {name: node, ref: node}
+    - repo
+    - revision
+  match:
+    - {kind: validate, value: "workflow names a user dataset this machine has not added (ADR-021 H5)"}
+  actions:
+    - {id: add_user_dataset, kind: navigate, target: add_dataset_dialog, confirm: false}
+
 MODEL-001:
   slug: CKPT_LOAD_KEY_MISMATCH
   severity: error

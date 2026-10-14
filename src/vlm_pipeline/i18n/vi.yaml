@@ -303,6 +303,15 @@ error:
   DATA-011:
     title: 'Cột dữ liệu không đúng loại'
     what: 'Cột "{column}" của "{repo}" chứa {found}, không dùng làm {role} được (cần {expected}). Hãy chọn cột khác.'
+  DATA-012:
+    title: 'Không đọc được bộ dữ liệu'
+    what:
+      no_data_files: 'Bộ dữ liệu "{repo}" không có tệp dữ liệu nào app đọc được (parquet, json, csv hoặc thư mục ảnh). Hãy chọn bộ dữ liệu khác.'
+      unreadable_sample: 'Tệp dữ liệu mẫu của "{repo}" bị hỏng hoặc sai định dạng nên app không đọc được. Hãy chọn bộ dữ liệu khác.'
+      sample_too_large: 'Mọi tệp dữ liệu của "{repo}" đều quá lớn (trên {limit_mb} MB mỗi tệp) nên app không xem trước được. Hãy chọn bộ dữ liệu khác có tệp nhỏ hơn.'
+  DATA-013:
+    title: 'Workflow dùng bộ dữ liệu chưa có trên máy này'
+    what: 'Workflow này dùng bộ dữ liệu "{repo}" do tác giả tự thêm, còn máy này chưa có. Bấm "Thêm bộ dữ liệu này" để thêm đúng bản tác giả đã dùng; bạn vẫn xem và xác nhận giấy phép trước khi tải.'
   CFG-001:
     title: Hai bước này không nối được với nhau
     what: Đầu ra của "{a}" là {type_a} nhưng "{b}" cần {type_b}.
@@ -370,6 +379,7 @@ action:
   use_parquet_export: 'Dùng bản chuyển đổi'
   run_smoke: 'Chạy thử nhanh'
   add_user_model: 'Thêm model này'
+  add_user_dataset: 'Thêm bộ dữ liệu này'
   open_inner_step: 'Mở bước bị lỗi'
   check_files: Kiểm tra tệp
   migrate_node: Xem thay đổi và cập nhật

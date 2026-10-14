@@ -303,6 +303,15 @@ error:
   DATA-011:
     title: 'A data column has the wrong type'
     what: 'Column "{column}" of "{repo}" holds {found}, so it cannot be the {role} (it needs {expected}). Pick another column.'
+  DATA-012:
+    title: 'The dataset cannot be read'
+    what:
+      no_data_files: 'Dataset "{repo}" has no data file the app can read (parquet, json, csv or an image folder). Pick another dataset.'
+      unreadable_sample: 'A sample data file of "{repo}" is corrupt or in the wrong format, so the app cannot read it. Pick another dataset.'
+      sample_too_large: 'Every data file of "{repo}" is too large (over {limit_mb} MB each) for the app to preview. Pick another dataset with smaller files.'
+  DATA-013:
+    title: 'This workflow uses a dataset not added here'
+    what: 'This workflow uses dataset "{repo}", which its author added themselves and this machine does not have yet. Click "Add this dataset" to add the exact version the author used; you still review and confirm the license before downloading.'
   CFG-001:
     title: These two steps can't connect
     what: '"{a}" outputs {type_a} but "{b}" needs {type_b}.'
@@ -370,6 +379,7 @@ action:
   use_parquet_export: 'Use the converted copy'
   run_smoke: 'Quick test run'
   add_user_model: 'Add this model'
+  add_user_dataset: 'Add this dataset'
   open_inner_step: 'Open the failing step'
   check_files: Check files
   migrate_node: Review changes and update
