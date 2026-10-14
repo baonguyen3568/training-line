@@ -230,10 +230,14 @@ class UserDatasetRecord(BaseModel):
         return sum(f.size for f in self.files)
 
     def to_api(self) -> dict[str, object]:
-        return {"id": self.id, "name": f"{self.repo.split('/', 1)[1]} ({self.config}/{self.split})",
+        from vlm_pipeline.common.obligations import licence_meta
+
+        licence = normalize_license(self.license)
+        return {**licence_meta(licence, "dataset"),
+                "id": self.id, "name": f"{self.repo.split('/', 1)[1]} ({self.config}/{self.split})",
                 "repo": self.repo, "revision": self.revision, "config": self.config, "split": self.split,
                 "format": self.format, "size_gb": round(self.size_bytes / (1 << 30), 2),
-                "license": normalize_license(self.license), "license_card": self.license_card,
+                "license": licence, "license_card": self.license_card,
                 "license_confirmed": self.license_confirmed, "gated": self.gated, "columns": self.columns.roles(),
                 "rows": self.rows, "verified": False}  # fmt: skip
 

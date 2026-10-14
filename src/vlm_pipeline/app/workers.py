@@ -66,6 +66,7 @@ from vlm_pipeline.graph.worker import (
 )
 from vlm_pipeline.nodes.source import picked_model_id
 from vlm_pipeline.nodes.spec import NodeSpec, is_compatible, model_kind
+from vlm_pipeline.nodes.train import TRIAL_CAPABLE
 from vlm_pipeline.train.advanced import AdvancedNotForModelError, keys_not_for
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import Blocks, build_recipe, qlora_models, render_recipe, templates_digest
@@ -219,6 +220,10 @@ class RealWorker:
                 f"no worker for {job.spec.type_id}", params={"node": job.node_id, "node_type": job.spec.type_id}
             )
         self.check_support(self.support_query(job))  # the SAME check graph validate ran on the canvas
+        if job.trial_max_steps and job.spec.type_id not in TRIAL_CAPABLE:  # never a full run in a trial's place
+            raise NodeNotRunnableError(
+                f"no quick trial for {job.spec.type_id}", params={"node": job.node_id, "node_type": job.spec.type_id}
+            )
         return handler(job)
 
     # ------------------------------------------------------------------------------------------ support
@@ -508,6 +513,7 @@ class RealWorker:
             class_token_start_idx=class_token,
             model_id=entry.id,
             blocks=_model_blocks(entry),  # P023 §1: train_blocks / vision_lr_scale act on these modules
+            trial_steps=job.trial_max_steps,  # a quick trial run (MODEL-005): a run option, never a param
         )
         if job.resume_from is not None and entry.id not in RESUME_UNSUPPORTED:
             # P017: the earlier attempt's checkpoint (chosen and checked by the executor, C1-C3) is read through the
@@ -534,6 +540,7 @@ class RealWorker:
             config_hash=config_hash,
             seed=params.seed,
             container_image=self.image,
+            tags=["trial"] if job.trial_max_steps else [],  # the Runs page: "Chạy thử", never a real training
         )
         container = ContainerJob(
             name=run_id,

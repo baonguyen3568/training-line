@@ -352,6 +352,7 @@ class Executor:
         self.workspace = workspace
         self._cancels: dict[str, threading.Event] = {}
         self._sinks: dict[str, Callable[[Event], None]] = {}  # per-run event sink (one shared Executor per app)
+        self._trials: dict[str, dict[str, int]] = {}  # per-run quick-trial steps by node id (MODEL-005)
         # One computation per cache key at a time: concurrent graph runs sharing a node would otherwise run it twice
         # in the same run dir (and the same container name); the second one waits and then gets a cache hit.
         self._key_locks: dict[str, threading.Lock] = {}
@@ -374,19 +375,25 @@ class Executor:
         *,
         graph_run_id: str | None = None,
         on_event: Callable[[Event], None] | None = None,
+        trial_max_steps: Mapping[str, int] | None = None,
     ) -> GraphRun:
-        """Run a workflow (blocking; call it from a worker thread). ``on_event`` overrides the executor-wide sink."""
+        """Run a workflow (blocking; call it from a worker thread). ``on_event`` overrides the executor-wide sink.
+
+        ``trial_max_steps``: node id -> steps of a quick trial (MODEL-005); those nodes get their own cache key.
+        """
         gid = graph_run_id or f"g-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
         with self._lock:
             if gid in self._cancels or gid in self._sinks:
                 raise ValueError(f"graph run {gid!r} is already running")
             if on_event is not None:
                 self._sinks[gid] = on_event
+            self._trials[gid] = dict(trial_max_steps or {})
         try:
             return self._run(workflow, gid)
         finally:
             with self._lock:
                 self._sinks.pop(gid, None)
+                self._trials.pop(gid, None)
 
     def _run(self, workflow: Mapping[str, Any], gid: str) -> GraphRun:
         can_run = functools.partial(worker_supports, self.worker)
@@ -454,12 +461,13 @@ class Executor:
             self._set(run, nid, "skipped")
             return
         inputs = gather_inputs(node.spec, [(src, out, inp, run.outputs[src][out]) for src, out, inp in upstream])
+        trial = self._trials.get(run.graph_run_id, {}).get(nid)
         key = compute_cache_key(
             node.spec,
             node.params,
             {p: r.hash for p, r in inputs.items()},
             node.spec.image_digest,
-            worker=worker_identity(self.worker, node.spec),
+            worker=worker_identity(self.worker, node.spec) + (f"+trial{trial}" if trial else ""),
         )
         keys[nid] = key
         with self._lock:
@@ -562,7 +570,8 @@ class Executor:
             self._emit(run.graph_run_id, {"type": "node_state", "node_id": nid, "state": state, **extra})
 
         step = resume_step if resume_from is not None else read_checkpoint_step(run_dir)
-        job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, step, waiting, resume_from=resume_from)
+        job = NodeJob(nid, node.spec, node.params, inputs, run_dir, cancel, step, waiting, resume_from=resume_from,
+                      trial_max_steps=self._trials.get(run.graph_run_id, {}).get(nid))  # fmt: skip
         self._set(run, nid, "running", cache_key=key, resume_from_step=job.resume_from_step)
         started = time.time()
         try:

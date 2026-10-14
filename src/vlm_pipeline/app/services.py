@@ -39,7 +39,13 @@ class Services(Protocol):
     registry: Registry
 
     def validate(self, workflow: Mapping[str, Any]) -> list[dict[str, Any]]: ...
-    def run_graph(self, workflow: Mapping[str, Any], graph_run_id: str, on_event: EventSink) -> None: ...
+    def run_graph(
+        self,
+        workflow: Mapping[str, Any],
+        graph_run_id: str,
+        on_event: EventSink,
+        trial_max_steps: Mapping[str, int] | None = None,
+    ) -> None: ...
     def cancel(self, graph_run_id: str) -> bool: ...
     def list_runs(self) -> list[dict[str, Any]]: ...
     def get_run(self, run_id: str) -> dict[str, Any] | None: ...
@@ -150,10 +156,38 @@ class DefaultServices:
         can_run = functools.partial(worker_supports, worker)
         support = functools.partial(worker_support_problem, worker)
         issues = validate(dict(workflow), self.registry, workspace=self.root, can_run=can_run, support=support)
-        return [_issue_to_dict(i) for i in issues]
+        return [_issue_to_dict(i) for i in [*issues, *self._untried_user_models(workflow)]]
 
-    def run_graph(self, workflow: Mapping[str, Any], graph_run_id: str, on_event: EventSink) -> None:
-        self.executor.run(dict(workflow), graph_run_id=graph_run_id, on_event=on_event)
+    def _untried_user_models(self, workflow: Mapping[str, Any]) -> list[object]:
+        """MODEL-005 (info): a training step on a user-added model that has no completed quick trial yet.
+
+        A hint to save the user a wasted long run, never a gate: a passed trial (``trial_run_id``) is NOT a sign the
+        model is safe; every run is sandboxed the same way (bao-security, ADR-021 §2). Top-level steps only so far.
+        """
+        from vlm_pipeline.app import user_assets
+        from vlm_pipeline.nodes.spec import Issue
+        from vlm_pipeline.nodes.train import TRIAL_CAPABLE
+
+        hints: list[object] = []
+        for node in workflow.get("nodes", []):
+            if not isinstance(node, Mapping) or node.get("type") not in TRIAL_CAPABLE:
+                continue
+            for model_id in user_assets.picked_user_models(workflow, str(node.get("id"))):
+                record = user_assets.load(self.root, model_id)
+                if record is not None and record.trial_run_id is None:
+                    hints.append(Issue("MODEL-005", severity="info", node_id=str(node.get("id")),
+                                       params={"node": node.get("id"), "model": record.entry.repo}))  # fmt: skip
+        return hints
+
+    def run_graph(
+        self,
+        workflow: Mapping[str, Any],
+        graph_run_id: str,
+        on_event: EventSink,
+        trial_max_steps: Mapping[str, int] | None = None,
+    ) -> None:
+        self.executor.run(dict(workflow), graph_run_id=graph_run_id, on_event=on_event,
+                          trial_max_steps=trial_max_steps)  # fmt: skip
 
     def cancel(self, graph_run_id: str) -> bool:
         return bool(self.executor.cancel(graph_run_id))

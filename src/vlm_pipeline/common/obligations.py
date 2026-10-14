@@ -59,6 +59,18 @@ def load_obligations() -> ObligationsTable:
     return ObligationsTable.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
+def licence_meta(licence: str, part: str) -> dict[str, object]:
+    """``license_class`` + ``obligations`` of one licence id, shaped like a catalog model's option_meta.
+
+    For an asset the user added (ADR-021): an id not in the table gets the unknown terms (fail-closed, bao-security).
+    """
+    table = load_obligations()
+    terms = table.licences.get(licence, table.unknown_licence)
+    duties = [{**ob.model_dump(exclude_none=True), "licence": licence, "parts": [part]} for ob in terms.obligations
+              if ob.when != "cosmos"]  # fmt: skip
+    return {"license_class": terms.license_class, "obligations": duties}
+
+
 def model_obligations(entry: CatalogEntry, table: ObligationsTable) -> tuple[LicenseClass, list[dict[str, object]]]:
     """Strictest licence class and the obligations of the model AND its separately licensed parts.
 

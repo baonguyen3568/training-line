@@ -25,7 +25,9 @@ from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
 from vlm_pipeline.app.services import BadRequestError, NotAvailableError, Services
 from vlm_pipeline.common.error_catalog import Labels, display_params, variant_key, word_params
+from vlm_pipeline.graph.trial import TRIAL_STEPS, TrialNotPossibleError, trial_workflow
 from vlm_pipeline.nodes.standards import MESSAGE_PATTERN, STANDARD_CODE
+from vlm_pipeline.nodes.train import TRIAL_CAPABLE
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
 Workflow = Annotated[dict[str, Any], Body()]
@@ -135,16 +137,37 @@ def _first_party_groups(services: Services, locale: str) -> list[dict[str, Any]]
     return groups
 
 
-def _start_graph_run(services: Services, bus: EventBus, workflow: dict[str, Any]) -> str:
+def _record_trial(services: Services, workflow: Mapping[str, Any], node_id: str, graph_run_id: str) -> None:
+    """A completed quick trial of a user-added model clears its MODEL-005 hint (its record keeps the run id)."""
+    root = getattr(services, "root", None)
+    if root is None:
+        return
+    from vlm_pipeline.app import user_assets
+
+    for model_id in user_assets.picked_user_models(workflow, node_id):
+        record = user_assets.load(root, model_id)
+        if record is not None:
+            user_assets.save(root, record.model_copy(update={"trial_run_id": graph_run_id}))
+
+
+def _start_graph_run(services: Services, bus: EventBus, workflow: dict[str, Any], trial_node: str | None = None) -> str:
     graph_run_id = f"g-{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(3)}"
     bus.open(graph_run_id, context=workflow)  # error cards render step names from it (WS ?locale=)
 
     def emit(event: dict[str, Any]) -> None:
+        if trial_node is not None:  # MODEL-005 quick trial: every run_status says so; a finished trial is recorded
+            if event.get("type") == "run_status":
+                event = {**event, "trial": True}
+            done = event.get("status") in {"completed", "cached"}  # cached: the same trial already passed
+            if event.get("type") == "node_status" and event.get("node_id") == trial_node and done:
+                _record_trial(services, workflow, trial_node, graph_run_id)
         bus.publish(graph_run_id, {"graph_run_id": graph_run_id, "ts": time.time(), **event})
+
+    trial = {trial_node: TRIAL_STEPS} if trial_node is not None else None
 
     def worker() -> None:
         try:
-            services.run_graph(workflow, graph_run_id, emit)
+            services.run_graph(workflow, graph_run_id, emit, trial_max_steps=trial)
         except Exception as exc:  # noqa: BLE001 - surfaced to the UI as a run_status event
             _log.exception("graph run %s failed", graph_run_id)
             code = getattr(exc, "code", "SYS-000")
@@ -204,10 +227,18 @@ def _register_graph_routes(app: FastAPI, services: Services, bus: EventBus) -> N
 
     @app.post("/api/runs", status_code=202)
     def start_run(workflow: Workflow) -> dict[str, Any]:
+        # A quick trial (MODEL-005, P021 §4) wraps the workflow: {workflow, trial: {node}}; a normal run posts it bare.
+        trial_node = None
+        if set(workflow) == {"workflow", "trial"} and isinstance(workflow.get("workflow"), dict):
+            node = (workflow.get("trial") or {}).get("node") if isinstance(workflow.get("trial"), dict) else None
+            try:
+                workflow, trial_node = trial_workflow(workflow["workflow"], str(node), TRIAL_CAPABLE), str(node)
+            except TrialNotPossibleError:
+                raise BadRequestError(params={"param": "trial", "rule": "train_step"}) from None
         blocking = [i for i in services.validate(workflow) if i.get("severity", "error") == "error"]
         if blocking:
             raise HTTPException(status_code=422, detail={"errors": blocking})
-        return {"graph_run_id": _start_graph_run(services, bus, workflow)}
+        return {"graph_run_id": _start_graph_run(services, bus, workflow, trial_node)}
 
     @app.post("/api/runs/{graph_run_id}/cancel", status_code=202)
     def cancel(graph_run_id: str) -> dict[str, Any]:

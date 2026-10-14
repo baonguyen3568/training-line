@@ -202,3 +202,14 @@ def test_train_blocks_without_module_prefixes_is_refused_on_the_canvas() -> None
     with pytest.raises(TrainBlocksNotForModelError) as refused:
         _check_train(SupportQuery("t", spec, FullFinetuneParams(train_blocks="all"), unknown, {}))
     assert (refused.value.params["param"], refused.value.params["rule"]) == ("train_blocks", "not_for_model")
+
+
+def test_a_quick_trial_runs_a_few_steps_without_validation() -> None:
+    tpl = _tpl("nemotron-parse-v1.1")
+    r = build_recipe(tpl, FullFinetuneParams(epochs=3), model_dir="m", dataset_dir="d", run_dir="r",
+                     val_dataset_dir="/w/v", val_split="validation", class_token_start_idx=50000,
+                     trial_steps=5)  # fmt: skip
+    assert (r["step_scheduler"]["max_steps"], r["step_scheduler"]["num_epochs"]) == (5, 1)
+    assert r["step_scheduler"]["ckpt_every_steps"] == 5  # the adapter is saved although the epoch never ends
+    assert "validation_dataset" not in r
+    assert "validation_dataloader" not in r

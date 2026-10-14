@@ -33,7 +33,9 @@ class FakeServices:
                      "params": {"node": "n1", "port": "dataset"}}]  # fmt: skip
         return []
 
-    def run_graph(self, workflow: Mapping[str, Any], graph_run_id: str, on_event: Any) -> None:
+    def run_graph(self, workflow: Mapping[str, Any], graph_run_id: str, on_event: Any,
+                  trial_max_steps: Mapping[str, int] | None = None) -> None:  # fmt: skip
+        self.started = (dict(workflow), trial_max_steps)
         for node in ("n1", "n2"):
             on_event({"type": "node_status", "node_id": node, "status": "running"})
             on_event({"type": "node_status", "node_id": node, "status": "done"})

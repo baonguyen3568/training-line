@@ -57,3 +57,7 @@ TRAIN_DPO_VLM = NodeSpec(
     params_model=DpoParams,
     runner="container",
 )
+
+# MODEL-005 "Chạy thử nhanh": steps whose recipe takes a trial step cap (train.recipe ``trial_steps``). The RL / DPO
+# engines have no such cap yet; a trial asked of them is refused, never run in full (bao-security).
+TRIAL_CAPABLE = frozenset({TRAIN_LORA_VLM.type_id, TRAIN_SFT_VLM.type_id})

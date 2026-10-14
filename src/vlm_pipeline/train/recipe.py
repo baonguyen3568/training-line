@@ -179,6 +179,28 @@ def vision_pattern(blocks: Blocks) -> str:
 NO_STEP_CADENCE = 1_000_000_000  # ckpt_every_steps that never fires (step % N == N - 1): epoch ends only
 
 
+def _schedule(r: dict[str, Any], params: LoraParams | FullFinetuneParams, trial_steps: int | None) -> None:
+    """The step scheduler: whole epochs, saved + validated at epoch ends; a quick trial: a few steps, no validation."""
+    sched = _section(r, "step_scheduler")
+    sched["global_batch_size"] = params.global_batch_size
+    sched["local_batch_size"] = params.local_batch_size
+    sched["num_epochs"] = params.epochs
+    sched.pop("max_steps", None)  # the node trains whole epochs; smoke step caps belong to smoke configs
+    # Save + validate at epoch boundaries only (research 2026-10-13): save_checkpoint_every_epoch saves at each epoch
+    # end (the last step included) and the engine validates exactly when it saves. The step cadence is switched off
+    # explicitly: leaving ckpt_every_steps out is NOT "per epoch" in AutoModel 26.08, whose StepSchedulerConfig
+    # defaults it to 100 (R2 saved + validated at steps 99 and 199 on top of the epoch ends, research 2026-10-13).
+    sched["ckpt_every_steps"] = NO_STEP_CADENCE
+    sched.pop("val_every_steps", None)
+    sched["save_checkpoint_every_epoch"] = True
+    if trial_steps:  # "Chạy thử nhanh" (MODEL-005, a run option): a few steps to see it runs; no validation
+        sched["max_steps"] = trial_steps
+        sched["num_epochs"] = 1
+        sched["ckpt_every_steps"] = trial_steps  # saved at the last step even though the epoch never ends
+        r.pop("validation_dataset", None)
+        r.pop("validation_dataloader", None)
+
+
 def build_recipe(
     template: Mapping[str, Any],
     params: LoraParams | FullFinetuneParams,
@@ -196,6 +218,7 @@ def build_recipe(
     val_meta: str | None = None,
     model_id: str | None = None,
     blocks: Blocks = Blocks(),  # noqa: B008 - frozen dataclass, an immutable default
+    trial_steps: int | None = None,
 ) -> dict[str, Any]:
     """Return a new recipe dict (the template is not modified).
 
@@ -226,18 +249,7 @@ def build_recipe(
             set_dotted(r, key, value)
         except ValueError as exc:
             raise RecipeError(str(exc)) from exc
-    sched = _section(r, "step_scheduler")
-    sched["global_batch_size"] = params.global_batch_size
-    sched["local_batch_size"] = params.local_batch_size
-    sched["num_epochs"] = params.epochs
-    sched.pop("max_steps", None)  # the node trains whole epochs; smoke step caps belong to smoke configs
-    # Save + validate at epoch boundaries only (research 2026-10-13): save_checkpoint_every_epoch saves at each epoch
-    # end (the last step included) and the engine validates exactly when it saves. The step cadence is switched off
-    # explicitly: leaving ckpt_every_steps out is NOT "per epoch" in AutoModel 26.08, whose StepSchedulerConfig
-    # defaults it to 100 (R2 saved + validated at steps 99 and 199 on top of the epoch ends, research 2026-10-13).
-    sched["ckpt_every_steps"] = NO_STEP_CADENCE
-    sched.pop("val_every_steps", None)
-    sched["save_checkpoint_every_epoch"] = True
+    _schedule(r, params, trial_steps)
 
     opt = _section(r, "optimizer")
     opt["lr"] = params.learning_rate

@@ -15,8 +15,9 @@ import re
 import stat
 import tempfile
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import ClassVar, Literal, Self
+from typing import Any, ClassVar, Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -81,10 +82,15 @@ class UserModelRecord(BaseModel):
         return self
 
     def to_api(self) -> dict[str, object]:
+        from vlm_pipeline.common.obligations import load_obligations, model_obligations
+
         e = self.entry
-        return {"id": e.id, "name": e.display_name, "repo": e.repo, "revision": e.revision, "family": self.family,
+        licence = normalize_license(e.license)  # read the same way as a dataset's (security)
+        license_class, duties = model_obligations(e.model_copy(update={"license": licence}), load_obligations())
+        return {"license_class": license_class, "obligations": duties,
+                "id": e.id, "name": e.display_name, "repo": e.repo, "revision": e.revision, "family": self.family,
                 "architecture": self.architecture, "params_b": e.params_b, "size_gb": e.disk_gb,
-                "license": normalize_license(e.license), "license_card": self.license_card,
+                "license": licence, "license_card": self.license_card,
                 "license_confirmed": self.license_confirmed, "gated": e.gated,
                 "ram_gb_train": e.ram_gb_train, "ram_source": e.ram_source, "verified": False,
                 "trial_run_id": self.trial_run_id}  # fmt: skip
@@ -121,6 +127,23 @@ def load(root: Path, model_id: str) -> UserModelRecord | None:
     except (OSError, ValueError, ValidationError):
         logger.warning("user model record %s is not valid: ignored", model_id)
         return None
+
+
+def picked_user_models(workflow: Mapping[str, Any], node_id: str) -> list[str]:
+    """Ids of the user-added models a step reads straight from a model.hf_pick wired into it (MODEL-005)."""
+    nodes = {n.get("id"): n for n in workflow.get("nodes", []) if isinstance(n, Mapping)}
+    ids: list[str] = []
+    for edge in workflow.get("edges", []):
+        if not isinstance(edge, Mapping) or (edge.get("to") or [None])[0] != node_id:
+            continue
+        source = nodes.get((edge.get("from") or [None])[0]) or {}
+        params = source.get("params")
+        user = (
+            params.get("user_model") if isinstance(params, Mapping) and source.get("type") == "model.hf_pick" else None
+        )
+        if isinstance(user, str) and user and user not in ids:
+            ids.append(user)
+    return ids
 
 
 def list_all(root: Path) -> list[UserModelRecord]:

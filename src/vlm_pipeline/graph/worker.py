@@ -52,6 +52,9 @@ class NodeJob:
     # Host path of the checkpoint step dir of an EARLIER attempt to resume from (P017: a retry runs in a new attempt
     # dir; the old checkpoint is a read-only input). None: start fresh, or (fake/host workers) resume in ``run_dir``.
     resume_from: Path | None = None
+    # A quick trial run (MODEL-005, POST /api/runs {workflow, trial}): train only this many steps, no validation.
+    # A RUN option, never a param: the workflow file stays the user's; the cache key carries "+trial<N>" (cleancode).
+    trial_max_steps: int | None = None
 
 
 @dataclass(frozen=True)
