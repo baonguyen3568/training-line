@@ -260,8 +260,10 @@ error:
       mismatch: 'Một tệp của "{name}" không khớp chữ ký của bản đã kiểm tra, nên app đã bỏ tệp đó và không cài. Hãy tải lại; nếu vẫn lỗi, hãy gửi báo cáo.'
       cached_differs: 'Bản "{name}" đang có trong bộ nhớ đệm khác bản gốc ở cùng phiên bản, nên app không dùng và không ghi đè. Hãy xoá bản đó trong bảng Dung lượng rồi tải lại.'
   NET-004:
-    title: "Vượt hạn mức tải của máy"
-    what: 'Lần tải này cần {size_gb} GB, vượt hạn mức tải {quota_gb} GB do quản trị viên đặt. Hãy nhờ quản trị viên nới hạn mức, hoặc chọn model nhỏ hơn.'
+    title: "Model vượt dung lượng cho phép"
+    what:
+      quota: 'Lần tải này cần {size_gb} GB, vượt hạn mức tải {quota_gb} GB do quản trị viên đặt. Hãy nhờ quản trị viên nới hạn mức, hoặc chọn model nhỏ hơn.'
+      model_cap: 'Model này cần {size_gb} GB, vượt mức tối đa {quota_gb} GB cho mỗi model bạn tự thêm. Bạn có thể nâng mức này trong Cài đặt, hoặc chọn model nhỏ hơn.'
   NET-005:
     title: 'Không đọc được repo trên Hugging Face'
     what:
@@ -384,6 +386,7 @@ action:
   run_smoke: 'Chạy thử nhanh'
   add_user_model: 'Thêm model này'
   add_user_dataset: 'Thêm bộ dữ liệu này'
+  raise_model_limit: 'Nâng mức tối đa'
   open_inner_step: 'Mở bước bị lỗi'
   check_files: Kiểm tra tệp
   migrate_node: Xem thay đổi và cập nhật

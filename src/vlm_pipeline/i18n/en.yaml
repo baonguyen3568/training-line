@@ -260,8 +260,10 @@ error:
       mismatch: 'A file of "{name}" does not match the signature of the checked version, so the app discarded it and installed nothing. Download again; if it still fails, send a report.'
       cached_differs: 'The copy of "{name}" already in the cache differs from the original at the same version, so the app neither uses nor overwrites it. Remove it in Storage, then download again.'
   NET-004:
-    title: "Over this machine's download limit"
-    what: 'This download needs {size_gb} GB, over the {quota_gb} GB limit set by the admin. Ask the admin to raise it, or pick a smaller model.'
+    title: "The model is over the allowed size"
+    what:
+      quota: 'This download needs {size_gb} GB, over the {quota_gb} GB limit set by the admin. Ask the admin to raise it, or pick a smaller model.'
+      model_cap: 'This model needs {size_gb} GB, over the {quota_gb} GB maximum for each model you add yourself. You can raise this limit in Settings, or pick a smaller model.'
   NET-005:
     title: 'Could not read the Hugging Face repo'
     what:
@@ -384,6 +386,7 @@ action:
   run_smoke: 'Quick test run'
   add_user_model: 'Add this model'
   add_user_dataset: 'Add this dataset'
+  raise_model_limit: 'Raise the limit'
   open_inner_step: 'Open the failing step'
   check_files: Check files
   migrate_node: Review changes and update

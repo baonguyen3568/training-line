@@ -600,10 +600,19 @@ NET-004:
   prevent_in_preflight: true
   # The planned size is over the download limit (Settings quota, admin policy [download] max_gb). size_gb / quota_gb
   # in GB, one decimal. Checked before the job starts (catalog size) and on the job's plan (security download §5).
-  params: [size_gb, quota_gb]
+  # reason model_cap: over the per-model cap for user-added models (Settings, PUT /api/user-assets/limits, ADR-021
+  # A1), which the user can raise; anything else (or no reason, older emitters) is the machine's download quota.
+  params:
+    - size_gb
+    - quota_gb
+    - {name: reason, type: enum, values: [quota, model_cap]}
+  variants:
+    - {when: {reason: model_cap}, key: model_cap}
+    - {when: {}, key: quota}
   match:
     - {kind: executor, value: "download quota check before the job and on its plan"}
   actions:
+    - {id: raise_model_limit, kind: navigate, target: settings_limits, confirm: false, when: {reason: model_cap}}
     - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
 
 NET-005:
