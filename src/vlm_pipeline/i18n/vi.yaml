@@ -1400,6 +1400,7 @@ docs_error:
   actions_lead: "Tuỳ trường hợp, app sẽ đề xuất một trong các cách sau:"
 pipelines:
   more_steps: "+{step_count} bước"
+  swap_hint: Đổi model hoặc dữ liệu ở bước nguồn để dùng pipeline này với model, dữ liệu khác; số đo trên thẻ chỉ đúng với cấu hình đã đo.
   metric:
     field_f1: F1 theo trường
     accuracy_delta_fp8_minus_bf16: Điểm chênh so với bản gốc BF16
@@ -1620,3 +1621,36 @@ session:
   ended_title: Phiên đăng nhập đã kết thúc
   ended_body: Mở đường link đăng nhập mới nhất mà app in trong nhật ký (log) để đăng nhập lại. Nếu app chạy trên máy khác, hãy hỏi người quản trị đường link đó.
   ended_retry: Thử lại
+byo:
+  source:
+    catalog: Đã kiểm chứng
+    hub: Từ Hugging Face
+  check: Kiểm tra
+  checking: Đang đọc thông tin…
+  revision: Phiên bản (revision)
+  recent: Đã dán gần đây
+  gated: 'Nhà phát hành yêu cầu bạn đồng ý điều khoản trên Hugging Face trước khi tải.'
+  model:
+    placeholder: "vd: Qwen/Qwen3.5-2B"
+    facts: "{family} · ~{params} tham số · tải ~{size_gb} GB"
+    use: Dùng model này
+  unverified: Chưa kiểm chứng
+  unverified_help: Model này do bạn tự thêm, team chưa chạy thử trên máy như các model đã kiểm chứng. Thời gian và bộ nhớ chỉ là ước lượng theo số tham số. Nên bấm "Chạy thử nhanh" (vài bước) trước khi train thật.
+  smoke_hint: Model chưa kiểm chứng. Nên chạy thử nhanh vài bước trước khi train thật.
+  estimate_upper: Ước lượng theo số tham số của model, thường cao hơn thực tế.
+  data:
+    placeholder: "vd: naver-clova-ix/cord-v2"
+    config: Cấu hình (config)
+    split: Phần dữ liệu (split)
+  map:
+    title: Ghép cột dữ liệu
+    mode_qa: Ảnh + câu hỏi + câu trả lời
+    mode_messages: Hội thoại (messages)
+    image: Cột ảnh
+    question: Cột câu hỏi (tuỳ chọn)
+    answer: Cột câu trả lời
+    messages: Cột hội thoại
+    fixed_question: Câu hỏi dùng chung cho mọi ảnh
+    suggested: gợi ý
+    preview: Xem trước
+    apply: Dùng cách ghép này

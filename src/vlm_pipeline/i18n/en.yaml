@@ -1400,6 +1400,7 @@ docs_error:
   actions_lead: "Depending on the situation, the app suggests one of these:"
 pipelines:
   more_steps: "+{step_count} steps"
+  swap_hint: Change the model or data in the source steps to use this pipeline with others; the numbers on the card only hold for the measured setup.
   metric:
     field_f1: Field F1
     accuracy_delta_fp8_minus_bf16: Score change vs the BF16 original
@@ -1620,3 +1621,36 @@ session:
   ended_title: Your session has ended
   ended_body: Open the latest sign-in link the app printed in its log to sign in again. If the app runs on another machine, ask its admin for that link.
   ended_retry: Try again
+byo:
+  source:
+    catalog: Verified
+    hub: From Hugging Face
+  check: Check
+  checking: Reading details…
+  revision: Version (revision)
+  recent: Recently pasted
+  gated: The publisher asks you to accept their terms on Hugging Face before downloading.
+  model:
+    placeholder: "e.g. Qwen/Qwen3.5-2B"
+    facts: "{family} · ~{params} parameters · ~{size_gb} GB download"
+    use: Use this model
+  unverified: Not verified
+  unverified_help: You added this model yourself; the team has not test-run it like the verified models. Time and memory are estimates from its parameter count. Click "Quick test run" (a few steps) before a real training run.
+  smoke_hint: Unverified model. Do a quick test run of a few steps before a real training run.
+  estimate_upper: Estimated from the model's parameter count; usually higher than actual.
+  data:
+    placeholder: "e.g. naver-clova-ix/cord-v2"
+    config: Configuration (config)
+    split: Data split (split)
+  map:
+    title: Map data columns
+    mode_qa: Image + question + answer
+    mode_messages: Conversation (messages)
+    image: Image column
+    question: Question column (optional)
+    answer: Answer column
+    messages: Conversation column
+    fixed_question: One question for every image
+    suggested: suggested
+    preview: Preview
+    apply: Use this mapping
