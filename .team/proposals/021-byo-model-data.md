@@ -73,11 +73,13 @@ Params: `repo` (pattern = HF repo id), `revision?` (pinned at add time like mode
 `cord-v2` stays the default and keeps its loader.
 
 1. **Inspect** (`POST /api/user-assets/datasets/inspect {repo, revision?, config?}`): a plan-only hub job lists files
-   at the pinned sha. Only `*.parquet`, `*.arrow`, `*.json[l]`, and imagefolder layouts are accepted; a repo whose
-   data is only a loading script (`<name>.py`) → **DATA-009** (suggest `refs/convert/parquet` when the hub has it).
-   The job fetches the first parquet row group (or first 64 KB of json) of the chosen split; the host reads the
-   schema with `pyarrow` (no `datasets.load_dataset`, no script) and returns columns + types + 3 sample rows
-   (images as small thumbnails written by the host, text truncated).
+   at the pinned sha. Only `*.parquet`, `*.arrow`, `*.json[l]`, `*.csv`, imagefolder (and WebDataset tar/zip, A1) are
+   accepted; a repo with any `*.py` loading script → **DATA-009** (suggest `refs/convert/parquet` when the hub has it).
+   Then an **inspect job with `--network none`** (security 2026-10-14: pyarrow and image decoders are a large parse
+   surface, kept out of the app process) reads the fetched sample (first row group / first 64 KB) with pyarrow,
+   writes OUR JSON (columns, types, suggested mapping, ≤ 20 rows, text truncated) and thumbnails decoded by
+   `common.image_rules` and re-encoded to PNG (≤ 256 px side, metadata dropped). The host only reads that JSON
+   (`read_small_json` + schema validation) and those PNGs.
 2. **Column mapping**: auto-suggested by name/type (image feature → image; `messages` list → messages;
    question/prompt/query → question; answer/text/label/ground_truth → answer); the UI confirms. Missing → **DATA-010**,
    wrong type → **DATA-011**.
@@ -96,7 +98,10 @@ Params: `repo` (pattern = HF repo id), `revision?` (pinned at add time like mode
 ## 5. Security points to review (security)
 
 1. config.json parse: size/depth caps, read keys only, no code paths (`AutoConfig`, `trust_remote_code`) anywhere in
-   the user path; a test asserts `trust_remote_code` is never true for a user entry and that `auto_map` blocks.
+   the user path. Remote code is blocked on ANY of the five signs of the security checklist §4 (tests for each):
+   `auto_map` anywhere (recursive, every config/processor/tokenizer json), an `org/repo--module.Class` value, a `*.py`
+   in the file list, a class not native in the train image's transformers (looked up in a `--network none` job), a
+   `trust_remote_code` key. Every loader call for a user model passes `trust_remote_code=False` explicitly.
 2. Revision pinned to a sha at add time; the stored record is the only source afterwards.
 3. Downloads: same proxy, budget from the pinned file list, verify, install; dataset scripts never fetched (the plan
    filters `*.py` for datasets entirely).
