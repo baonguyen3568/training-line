@@ -229,15 +229,17 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
 
   const apply = (m: Mapping, fixedQuestion: string) => {
     if (!found) return;
-    const set = useWorkflow.getState().setParam;
     const r = found.result;
-    set(nodeId, "repo", r.repo);
-    set(nodeId, "revision", r.revision);
-    if (r.config) set(nodeId, "config", r.config);
-    set(nodeId, "split", r.split);
-    set(nodeId, "columns", {
-      ...Object.fromEntries(Object.entries(m).filter(([, v]) => v)),
-      ...(fixedQuestion.trim() ? { fixed_question: fixedQuestion.trim() } : {}),
+    // one edit, one undo step
+    useWorkflow.getState().setParams(nodeId, {
+      repo: r.repo,
+      revision: r.revision,
+      ...(r.config ? { config: r.config } : {}),
+      split: r.split,
+      columns: {
+        ...Object.fromEntries(Object.entries(m).filter(([, v]) => v)),
+        ...(fixedQuestion.trim() ? { fixed_question: fixedQuestion.trim() } : {}),
+      },
     });
     setMapping(false);
   };

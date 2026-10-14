@@ -19,10 +19,12 @@ export function setUserModel(
   nodeId: string,
   model: Pick<UserModel, "id" | "repo" | "revision"> | null,
 ) {
-  const { setParam } = useWorkflow.getState();
-  setParam(nodeId, "user_model", model?.id ?? "");
-  setParam(nodeId, "user_repo", model?.repo ?? "");
-  setParam(nodeId, "user_revision", model?.revision ?? "");
+  // one edit, one undo step: the three never disagree in between (validate, autosave, Ctrl+Z)
+  useWorkflow.getState().setParams(nodeId, {
+    user_model: model?.id ?? "",
+    user_repo: model?.repo ?? "",
+    user_revision: model?.revision ?? "",
+  });
 }
 
 /** The segmented "Đã kiểm chứng | Từ Hugging Face" (spec H §1, §4), shared by the model and the dataset step. */

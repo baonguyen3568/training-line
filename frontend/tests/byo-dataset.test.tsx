@@ -1,6 +1,6 @@
 // ADR-021 / spec H §4: a dataset from Hugging Face is inspected, its columns mapped in a dialog with the server's
 // suggestions and a preview, a wrong column kind is said under its select, and the mapping lands in the step.
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("VITE_MOCK_API", "1");
@@ -52,6 +52,11 @@ describe("dataset from Hugging Face", () => {
         columns: { image: "image", question: "query", answer: "ground_truth" },
       });
     });
+    // the whole mapping is one undo step: one Ctrl+Z puts the step back as it was
+    act(() => useWorkflow.getState().undo());
+    expect(useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.params.repo).not.toBe(
+      "acme/invoices-vi",
+    );
   });
 
   it("a repo that only has a loading script is refused with the catalog's words", async () => {

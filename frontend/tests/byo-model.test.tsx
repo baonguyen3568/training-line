@@ -44,6 +44,16 @@ describe("model from Hugging Face", () => {
         },
       ),
     );
+    // one undo step: all three back together, never a mismatched pair
+    const before = useWorkflow.getState().past.length;
+    act(() => useWorkflow.getState().undo());
+    expect(useWorkflow.getState().past.length).toBe(before - 1);
+    expect(useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.params).toMatchObject({
+      user_model: "",
+      user_repo: "",
+      user_revision: "",
+    });
+    act(() => useWorkflow.getState().redo());
     // back to "Đã kiểm chứng": all three cleared
     act(() => fireEvent.click(screen.getByRole("tab", { name: /Đã kiểm chứng/ })));
     expect(useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.params).toMatchObject({
