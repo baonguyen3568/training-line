@@ -212,6 +212,31 @@ fi
 run "${COMPOSE[@]}" up -d
 # A re-render replaces nginx.conf / the certificate files (new inodes): restart so nginx reads them.
 [[ -z "$LAN_BIND" ]] || run "${COMPOSE[@]}" restart nginx
+
+# Smoke (PM 2026-10-14): the app must really answer where the user will open it, else stop here with an ERROR.
+# No session yet, so the app's own reply is 401 {"code": "unauthenticated"}: that proves the request reached it
+# (a 403 forbidden_host or a 502 from nginx does not).
+answers() {  # answers <url> [curl args...]: the app replied 401 unauthenticated within 2 minutes
+  local url="$1" body="" i
+  shift
+  for i in $(seq 60); do
+    body="$(curl -s --max-time 5 "$@" -w '\n%{http_code}' "$url" 2>/dev/null || true)"
+    [[ "${body##*$'\n'}" == "401" && "$body" == *'"unauthenticated"'* ]] && return 0
+    sleep 2
+  done
+  say "last reply from $url: HTTP ${body##*$'\n'}"
+  return 1
+}
+if (( DRY_RUN )); then
+  say "[dry-run] smoke: GET http://127.0.0.1:$PORT/api/health${LAN_BIND:+ and https://$LAN_BIND:$LAN_PORT/api/health}"
+else
+  answers "http://127.0.0.1:$PORT/api/health" || fail "the app does not answer on http://127.0.0.1:$PORT/ (see: ${COMPOSE[*]} logs app)"
+  if [[ -n "$LAN_BIND" ]]; then
+    answers "https://$LAN_BIND:$LAN_PORT/api/health" --cacert "$TLS_DIR/ca.crt" \
+      || fail "the app does not answer on https://$LAN_BIND:$LAN_PORT/ (see: ${COMPOSE[*]} logs nginx app)"
+  fi
+  say "smoke: the app answers on http://127.0.0.1:$PORT/${LAN_BIND:+ and https://$LAN_BIND:$LAN_PORT/}"
+fi
 # The default template's model + dataset, through THE app's download path (vlm-runner, egress proxy, verify, install).
 if (( ! SKIP_DOWNLOAD )); then
   answer="y"
@@ -226,7 +251,7 @@ if (( ! SKIP_DOWNLOAD )); then
   fi
 fi
 say ""
-say "NTC-Training is starting on http://127.0.0.1:$PORT/"
+say "NTC-Training is running on http://127.0.0.1:$PORT/"
 say "Open the link printed by:  ${COMPOSE[*]} logs app | grep 'open http'"
 if [[ -n "$LAN_BIND" ]]; then
   say "On the LAN: https://$LAN_BIND:$LAN_PORT/ (each device must trust $TLS_DIR/ca.crt first)."
