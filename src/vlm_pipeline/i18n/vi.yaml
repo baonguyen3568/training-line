@@ -146,7 +146,9 @@ error:
       not_trainable: Bước "{node}" là bước train, nhưng {model} chỉ dùng để chạy thử và đánh giá, không train được. App chưa chạy gì; hãy chọn model khác.
   CFG-011:
     title: Bước này chưa chạy thật được
-    what: Bước "{node}" chưa được hỗ trợ chạy thật trong phiên bản này. Bạn có thể xoá bước này để chạy phần còn lại, hoặc chờ bản cập nhật.
+    what:
+      engine_single_gpu: 'Bước "{node}" chưa chạy được: bản engine hiện tại chưa chạy được bước này trên máy chỉ có một GPU. Bạn có thể xoá bước này để chạy phần còn lại.'
+      generic: 'Bước "{node}" chưa được hỗ trợ chạy thật trong phiên bản này. Bạn có thể xoá bước này để chạy phần còn lại, hoặc chờ bản cập nhật.'
   CFG-012:
     title: Nhóm bước bị lỗi nên chưa chạy được
     what:
@@ -866,6 +868,42 @@ node:
   train.grpo_vlm:
     title: Học từ phản hồi (GRPO)
     desc: Cải thiện model bằng cách chấm điểm các câu trả lời. Dành cho người dùng nâng cao.
+    param:
+      reward:
+        label: Cách chấm điểm
+        help: Cách engine chấm câu trả lời so với đáp án trong dữ liệu. "So giá trị" coi 0,5 và 1/2 là như nhau. Không cần viết code.
+      epochs:
+        label: Thời lượng huấn luyện
+        help: Số lượt model đọc hết dữ liệu.
+      lr_preset:
+        label: Tốc độ học
+        help: Tốc độ model thay đổi theo điểm thưởng. Nên để "Vừa".
+      num_generations:
+        label: Số câu trả lời mỗi câu hỏi
+        help: Model viết bấy nhiêu câu trả lời để so với nhau (2–8). Nhiều hơn thì học tốt hơn nhưng chậm và tốn bộ nhớ hơn.
+      max_new_tokens:
+        label: Độ dài câu trả lời tối đa (token)
+        help: Giới hạn độ dài mỗi câu trả lời model viết (32–1024).
+      kl_coef:
+        label: Mức giữ gần model gốc (KL)
+        help: Càng lớn thì model càng ít đi xa khỏi model gốc. Nên giữ mặc định.
+      lora_dim:
+        label: Kích thước LoRA (dim)
+        help: Lớn hơn thì học được nhiều hơn nhưng tốn RAM hơn (4–64). Nên giữ mặc định.
+      format_weight:
+        label: Điểm cho đúng định dạng
+        help: Điểm thưởng khi câu trả lời có đúng dạng mong đợi (một số, một JSON, hoặc khớp mẫu).
+      correctness_weight:
+        label: Điểm cho đúng đáp án
+        help: Điểm thưởng khi câu trả lời đúng so với đáp án.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
+    port:
+      base_model: Model gốc
+      train_data: Dữ liệu học
+      val_data: Dữ liệu kiểm tra (tuỳ chọn)
+      adapter: Phần học thêm (LoRA)
   serve.vllm:
     title: Bật model để chạy thử
     desc: Chạy model như một dịch vụ để chat thử hoặc đo tốc độ.
@@ -1148,6 +1186,10 @@ mix_strategy:
 quantize_base:
   none: Không nén
   nf4: 4-bit (QLoRA)
+grpo_reward:
+  exact_match: Khớp đáp án
+  numeric: So giá trị (số, biểu thức)
+  format: Chỉ chấm định dạng
 lr_preset:
   slow: Chậm – an toàn
   medium: Vừa

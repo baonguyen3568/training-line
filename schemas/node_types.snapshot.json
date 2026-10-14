@@ -1605,6 +1605,166 @@
     {
       "cacheable": true,
       "category": "train",
+      "icon": "train",
+      "inputs": {
+        "base_model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        },
+        "train_data": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "val_data": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "adapter": {
+          "many": false,
+          "optional": false,
+          "type": "Adapter"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "train.grpo_vlm (P020): a LoRA adapter trained with GRPO and one of the engine's BUILT-IN rewards (security \u00a7B2).\n\nThe reward compares each generated answer with the record's ``target``. Total reward = format_weight x shape\nbonus + correctness_weight x score; defaults follow the engine's geometry3k example (0.1 / 0.9), confirmed by\nresearch when the NeMo-RL probe runs.",
+        "properties": {
+          "correctness_weight": {
+            "default": 0.9,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Correctness Weight",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "epochs": {
+            "default": 1,
+            "enum": [
+              1,
+              2,
+              3,
+              5
+            ],
+            "title": "Epochs",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "epoch_count",
+              "order": 1,
+              "widget": "segmented"
+            }
+          },
+          "format_weight": {
+            "default": 0.1,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Format Weight",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "kl_coef": {
+            "default": 0.01,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Kl Coef",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "lora_dim": {
+            "default": 8,
+            "maximum": 64,
+            "minimum": 4,
+            "title": "Lora Dim",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "lr_preset": {
+            "default": "medium",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ],
+            "title": "Lr Preset",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "lr_preset",
+              "order": 2,
+              "preset": true,
+              "widget": "segmented"
+            }
+          },
+          "max_new_tokens": {
+            "default": 256,
+            "maximum": 1024,
+            "minimum": 32,
+            "title": "Max New Tokens",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "num_generations": {
+            "default": 4,
+            "maximum": 8,
+            "minimum": 2,
+            "title": "Num Generations",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "reward": {
+            "default": "exact_match",
+            "enum": [
+              "exact_match",
+              "numeric",
+              "format"
+            ],
+            "title": "Reward",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "grpo_reward",
+              "order": 0,
+              "summary": true
+            }
+          },
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "GrpoParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "train.grpo_vlm",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "train",
       "icon": "merge",
       "inputs": {
         "adapter": {

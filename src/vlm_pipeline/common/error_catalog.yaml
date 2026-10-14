@@ -616,8 +616,13 @@ CFG-011:
   prevent_in_preflight: true
   # The real (container) worker has no implementation for this node type yet (M1b B-0). Raised at validate only with
   # `--worker container` (the fake worker runs every node) and by the worker (NodeNotRunnableError) as a backstop.
-  # node = the node's id; node_type is for logs/tests, not shown.
-  params: [{name: node, ref: node}, node_type]
+  # node = the node's id; node_type is for logs/tests, not shown. reason (free, optional): why, when the app knows;
+  # only reasons with their own text are variants (engine_single_gpu: GRPO, NeMo-RL has no 1-GPU VLM recipe yet,
+  # PM 2026-10-14), every other reason (quantize/scope's format, remote_code_model...) reads the generic sentence.
+  params: [{name: node, ref: node}, node_type, reason]
+  variants:
+    - {when: {reason: engine_single_gpu}, key: engine_single_gpu}
+    - {when: {}, key: generic}
   match:
     - {kind: validate, value: "node type has no real worker yet (container worker)"}
     - {kind: executor, value: "app/workers.py NodeNotRunnableError"}

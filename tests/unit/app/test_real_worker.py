@@ -644,3 +644,18 @@ def test_the_merge_estimate_fits_measured_peaks_and_lets_9b_run() -> None:
     assert _merge_peak_gb(models["qwen3.5-4b"]) >= 8.5
     assert _merge_peak_gb(models["qwen3.5-9b"]) <= 33.1  # never more than the 9B training it follows
     assert _merge_peak_gb(models["qwen3.5-0.8b"]) == 10.0  # floor
+
+
+def test_grpo_is_coming_soon_with_its_real_reason() -> None:
+    """PM 2026-10-14: GRPO is refused (canvas and run share this check) with the engine's real limitation."""
+    from types import SimpleNamespace
+
+    from vlm_pipeline.app.workers import GRPO_BLOCKED_REASON, NodeNotRunnableError, _check_grpo, _support_checks
+
+    assert _support_checks()["train.grpo_vlm"] is _check_grpo
+    query = SimpleNamespace(node_id="g", spec=SimpleNamespace(type_id="train.grpo_vlm"), params=None, model=None,
+                            inputs={})  # fmt: skip
+    with pytest.raises(NodeNotRunnableError) as refused:
+        _check_grpo(query)  # type: ignore[arg-type]
+    assert refused.value.code == "CFG-011"
+    assert refused.value.params == {"node": "g", "node_type": "train.grpo_vlm", "reason": GRPO_BLOCKED_REASON}

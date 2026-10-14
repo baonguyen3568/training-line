@@ -10,7 +10,7 @@ from vlm_pipeline.nodes.rules import RULES
 from vlm_pipeline.nodes.source import DATA_HF_LOAD, DATA_LOCAL_FOLDER, MODEL_HF_PICK
 from vlm_pipeline.nodes.spec import Registry
 from vlm_pipeline.nodes.standards import load_standards, standards_rule
-from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM
+from vlm_pipeline.nodes.train import TRAIN_GRPO_VLM, TRAIN_LORA_VLM, TRAIN_SFT_VLM
 
 SPECS = (
     # Sources
@@ -26,6 +26,7 @@ SPECS = (
     # Train
     TRAIN_LORA_VLM,
     TRAIN_SFT_VLM,
+    TRAIN_GRPO_VLM,
     TRAIN_MERGE_LORA,
     # Test, quantize, evaluate, export
     SERVE_VLLM,

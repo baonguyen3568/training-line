@@ -82,3 +82,34 @@ class FullFinetuneParams(_FinetuneParams):
     @property
     def learning_rate(self) -> float:
         return FULL_LR[self.lr_preset]
+
+
+# The rewards NeMo-RL's VLMEnvironment ships (P020 v3: it loads no outside module, so no app code ever scores):
+# exact_match = format + exact_alnum, numeric = format + math_expr (sympy equivalence), format = format only.
+GrpoReward = Literal["exact_match", "numeric", "format"]
+
+
+class GrpoParams(Params):
+    """train.grpo_vlm (P020): a LoRA adapter trained with GRPO and one of the engine's BUILT-IN rewards (security §B2).
+
+    The reward compares each generated answer with the record's ``target``. Total reward = format_weight x shape
+    bonus + correctness_weight x score; defaults follow the engine's geometry3k example (0.1 / 0.9), confirmed by
+    research when the NeMo-RL probe runs.
+    """
+
+    reward: GrpoReward = Field("exact_match", json_schema_extra=ui(order=0, summary=True, option_keys="grpo_reward"))
+    epochs: Epochs = Field(1, json_schema_extra=ui(order=1, widget="segmented", option_keys="epoch_count"))
+    lr_preset: LrPreset = Field(
+        "medium", json_schema_extra=ui(order=2, widget="segmented", preset=True, option_keys="lr_preset")
+    )
+    num_generations: int = Field(4, ge=2, le=8, json_schema_extra=ui(advanced=True))  # answers per prompt
+    max_new_tokens: int = Field(256, ge=32, le=1024, json_schema_extra=ui(advanced=True))
+    kl_coef: float = Field(0.01, ge=0.0, le=1.0, json_schema_extra=ui(advanced=True))
+    lora_dim: int = Field(8, ge=4, le=64, json_schema_extra=ui(advanced=True))
+    format_weight: float = Field(0.1, ge=0.0, le=1.0, json_schema_extra=ui(advanced=True))
+    correctness_weight: float = Field(0.9, ge=0.0, le=1.0, json_schema_extra=ui(advanced=True))
+    seed: int = Field(DEFAULT_SEED, json_schema_extra=ui(advanced=True))
+
+    @property
+    def learning_rate(self) -> float:
+        return LORA_LR[self.lr_preset]

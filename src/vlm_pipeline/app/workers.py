@@ -672,6 +672,20 @@ def _check_merge(q: SupportQuery) -> None:
         )
 
 
+GRPO_BLOCKED_REASON = "engine_single_gpu"  # NeMo-RL v0.7.0 has no 1-GPU VLM GRPO recipe (research probe, 2026-10-14)
+
+
+def _check_grpo(q: SupportQuery) -> None:
+    """GRPO ships as "coming soon" in 1.0 (PM 2026-10-14): refused on the canvas and at run, with the real reason.
+
+    Lifted only when the NeMo-RL probe passes (a real 1-GPU GRPO run on GB10, reward going up, RAM within budget).
+    """
+    raise NodeNotRunnableError(
+        "GRPO has no single-GPU engine configuration for this machine yet",
+        params={"node": q.node_id, "node_type": q.spec.type_id, "reason": GRPO_BLOCKED_REASON},
+    )
+
+
 def _check_export(q: SupportQuery) -> None:
     from vlm_pipeline.app.export_worker import ExportUnsupportedError
 
@@ -700,6 +714,7 @@ def _support_checks() -> dict[str, Callable[[SupportQuery], None]]:
         "train.lora_vlm": _check_train,
         "train.sft_vlm": _check_train,
         "train.merge_lora": _check_merge,
+        "train.grpo_vlm": _check_grpo,  # "coming soon": no handler, refused with its reason (P020)
         "data.caption_vlm": _owner_check("vlm_pipeline.app.caption_worker"),
         "data.filter": _owner_check("vlm_pipeline.app.data_workers"),
         "data.dedupe": _owner_check("vlm_pipeline.app.data_workers"),

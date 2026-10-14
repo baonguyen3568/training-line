@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from vlm_pipeline.nodes.spec import NodeSpec, PortSpec
-from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
+from vlm_pipeline.train.config import FullFinetuneParams, GrpoParams, LoraParams
 
 _FINETUNE_INPUTS = {
     "base_model": PortSpec(type="Model"),
@@ -31,5 +31,17 @@ TRAIN_SFT_VLM = NodeSpec(
     inputs=_FINETUNE_INPUTS,
     outputs={"model": PortSpec(type="Checkpoint")},
     params_model=FullFinetuneParams,
+    runner="container",
+)
+
+# P020: "coming soon" in 1.0 (no handler; the support check refuses it with its reason, engine_single_gpu).
+TRAIN_GRPO_VLM = NodeSpec(
+    type_id="train.grpo_vlm",
+    version="1.0.0",
+    category="train",
+    icon="train",
+    inputs=_FINETUNE_INPUTS,
+    outputs={"adapter": PortSpec(type="Adapter")},  # a LoRA adapter: Merge / Eval / Export reuse it (P020 §6)
+    params_model=GrpoParams,
     runner="container",
 )

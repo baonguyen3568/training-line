@@ -146,7 +146,9 @@ error:
       not_trainable: '"{node}" is a training step, but {model} is for trying out and evaluation only and can''t be trained. Nothing has run yet; pick another model.'
   CFG-011:
     title: This step can't run for real yet
-    what: '"{node}" isn''t supported for real runs in this version yet. Remove the step to run the rest, or wait for an update.'
+    what:
+      engine_single_gpu: '"{node}" can''t run yet: the current engine version cannot run this step on a machine with a single GPU. Remove the step to run the rest.'
+      generic: '"{node}" isn''t supported for real runs in this version yet. Remove the step to run the rest, or wait for an update.'
   CFG-012:
     title: This step group has a problem
     what:
@@ -866,6 +868,42 @@ node:
   train.grpo_vlm:
     title: Learn from feedback (GRPO)
     desc: Improve the model by scoring its answers. For advanced users.
+    param:
+      reward:
+        label: How answers are scored
+        help: How the engine scores the answer against the one in your data. "Same value" counts 0.5 and 1/2 as equal. No code needed.
+      epochs:
+        label: Training length
+        help: How many times the model goes through the data.
+      lr_preset:
+        label: Learning speed
+        help: How fast the model changes with the rewards. Keep "Medium".
+      num_generations:
+        label: Answers per question
+        help: How many answers the model writes to compare (2–8). More learns better but is slower and needs more memory.
+      max_new_tokens:
+        label: Maximum answer length (tokens)
+        help: Caps each answer the model writes (32–1024).
+      kl_coef:
+        label: Stay close to the base model (KL)
+        help: Higher keeps the model closer to the base model. Keep the default.
+      lora_dim:
+        label: LoRA rank (dim)
+        help: Larger can learn more but uses more RAM (4–64). Keep the default.
+      format_weight:
+        label: Reward for the right format
+        help: Reward when the answer has the expected shape (a number, a JSON object, or the pattern).
+      correctness_weight:
+        label: Reward for the right answer
+        help: Reward when the answer matches the reference.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
+    port:
+      base_model: Base model
+      train_data: Training data
+      val_data: Validation data (optional)
+      adapter: Add-on (LoRA)
   serve.vllm:
     title: Start model for testing
     desc: Run the model as a service to chat with it or measure speed.
@@ -1148,6 +1186,10 @@ mix_strategy:
 quantize_base:
   none: No compression
   nf4: 4-bit (QLoRA)
+grpo_reward:
+  exact_match: Exact answer
+  numeric: Same value (number, expression)
+  format: Format only
 lr_preset:
   slow: Slow – safe
   medium: Medium
