@@ -53,7 +53,59 @@
       "suspect": "logprob over the 248k vocab not chunked (policy.logprob_chunk_size None) + a parallel 8 GB gates container",
       "next": "probe 9: policy.logprob_chunk_size=256, max_total_sequence_length 1024, max_new_tokens 384, no parallel heavy container",
       "safety_note": "the memory guard stopped the job before the host ran out (designed behaviour)"
+    },
+    {
+      "n": 9,
+      "run": "20261014-1228-grpo-probe9-q08-1b07",
+      "image": "-3",
+      "change": "policy.logprob_chunk_size=256, max_total_sequence_length 1024, max_new_tokens 384, no parallel container",
+      "reached": "Step 1 rollouts (3'18) + rewards",
+      "peak_gb": 36.8,
+      "stopped_by": "memguard MEM-002 fast-fall at 'Computing logprobs' again (host available 13.9 GB)",
+      "finding": "chunking was not it: memory jumps when the policy phase starts"
+    },
+    {
+      "n": 10,
+      "run": "20261014-1446-grpo-probe10-q08-b949",
+      "image": "-3",
+      "change": "loss_fn.reference_policy_kl_penalty=0 (no reference model; DAPO arXiv 2503.14476, Dr.GRPO arXiv 2503.20783), TORCHINDUCTOR_COMPILE_THREADS=1, LoRA use_triton false, logprob_batch_size 1, dynamic_batching mb tokens 1024",
+      "root_cause": "NeMo-RL loads the policy in fp32 (automodel/setup.py:330) and keeps the reference as a PINNED fp32 CPU state_dict (setup.py:432); the reference logprob pass adds a second pinned copy of the training weights (dtensor_policy_worker_v2 use_reference_model). On unified memory pinned CPU = the same RAM.",
+      "result": "PASS: 3 GRPO steps, exit 0, 17.1 min, checkpoint step_3 (130 MB, PEFT adapter; merge_lora OK on CPU)",
+      "setup_s": 341.5,
+      "step_s": [
+        417.37,
+        62.7,
+        93.63
+      ],
+      "loss": [
+        0.1108,
+        0.0,
+        0.0
+      ],
+      "avg_reward": [
+        0.0047,
+        0.0,
+        0.0
+      ],
+      "mean_generation_length": [
+        361.8,
+        363.5,
+        379.6
+      ],
+      "memory": {
+        "container_max_gib_sampler": 20.59,
+        "run_json_peak_gb": 34.9,
+        "host_min_available_gb": 15.7,
+        "policy_worker_gpu_max_mib": 7050,
+        "other_services_vllm_gib": 58.7,
+        "sampler": "outputs/runs/20261014-1446-grpo-probe10-q08-b949/memsample.tsv (2 s, not committed)"
+      },
+      "caveats": [
+        "reward 0 in steps 2-3: the 0.8B base solves no geometry3k problem, all-zero advantage, no learning signal",
+        "generations hit the 384-token cap (mean 362-380): a real run needs a larger max_new_tokens",
+        "LoRA targeted vision + merger + tied lm_head (NeMo-RL default match_all_linear, no exclude): the worker must pass the family's lora_exclude"
+      ]
     }
   ],
-  "status": "not passed yet (no completed GRPO step)"
+  "status": "PASS (infrastructure: 1-GPU GRPO without KL completes and checkpoints); ADR-022 DoD still needs a real run with a rising held-out reward"
 }
