@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "purpose": "QLoRA (NF4) vs LoRA (BF16) on Qwen3.5-2B, decides train.lora_vlm quantize_base: nf4",
+  "hardware": "1x NVIDIA GB10, UMA, driver 580.142",
+  "image": "vlm-automodel:26.08-7 (AutoModel patch 0006: bnb skip modules + tied lm_head)",
+  "config": "configs/train/smoke/qwen35_2b_{lora_bf16,qlora_nf4}_ab.yaml: identical except the quantization block (nf4, double quant, bf16 compute, llm_int8_skip_modules [model.visual]); CORD v2 train, GBS 4, 40 steps, LoRA dim 8 alpha 32, pixel cap",
+  "speed_note": "s/step from the progress bar: LoRA 8.01, QLoRA 6.88 (single run each)",
+  "lora_bf16": {
+    "run_id": "20261014-0946-q35-2b-lora-bf16-ab7-3f52",
+    "peak_mem_gb_host": 28.1,
+    "torch_mem_gib_max": 12.04,
+    "container_minutes": 7.7,
+    "loss_first": 0.6661,
+    "loss_last": 0.0948,
+    "val_loss_step39": 0.0507,
+    "git_commit": "91e25dd4522dd64b4e63144d44dacbdc9eaee154",
+    "git_dirty": false
+  },
+  "qlora_nf4": {
+    "run_id": "20261014-0953-q35-2b-qlora-nf4-ab7-37b1",
+    "peak_mem_gb_host": 24.7,
+    "torch_mem_gib_max": 8.29,
+    "container_minutes": 6.8,
+    "loss_first": 0.5911,
+    "loss_last": 0.0824,
+    "val_loss_step39": 0.0516,
+    "git_commit": "621326b1777503653a91592f45dbb5daea01ea4b",
+    "git_dirty": false
+  },
+  "earlier_failure": "26.08-6 without patch 0006: QLoRA failed at step 0 (tied lm_head quantized), run 20261014-0842-q35-2b-qlora-nf4-ab-cd64; upstream draft .team/upstream/automodel-vlm-qlora-tied-lm-head.md",
+  "caveat": "one 40-step run per side; val_loss on the template's 100 CORD validation images, no task score"
+}
