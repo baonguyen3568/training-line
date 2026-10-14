@@ -24,7 +24,10 @@
 #   Qwen2-VL / Qwen2.5-VL / Qwen3-VL share one recipe: the catalog Qwen3-VL template (qwen2_5_collate_fn, the collate
 #   AutoModel's own Qwen2.5-VL and Qwen3-VL examples use). Pixel caps: 200704/1003520 = 256..1280 tokens at 28 px
 #   (Qwen2/2.5-VL, patch 14) and 196..980 at 32 px (Qwen3-VL, patch 16); both are Qwen's documented processor range.
-#   Non-Qwen families (gemma3, llava_onevision, idefics3/smolvlm, mistral3) wait for image_policy processor_default.
+#   Other families use image_policy processor_default (the repo's processor decides tiles/tokens) and a family recipe:
+#   family-default.yaml (default_collate_fn) or family-llava-onevision.yaml. Families whose labels need AutoModel
+#   patch 0008 (markers from the processor's chat template) set min_image vlm-automodel:26.08-8. Families not listed
+#   here and why: .team/knowledge/vlm-families-26.08-7.md.
 schema_version: 1
 families:
   - id: qwen3_5
@@ -98,4 +101,155 @@ families:
     max_pixels: 1003520
     vision_prefixes: [model.visual]
     projector_prefixes: [model.visual.merger]
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: gemma4
+    model_types: [gemma4]
+    architectures: [Gemma4ForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: B  # AutoModel examples/vlm_finetune/gemma4; the catalog Gemma 4 template
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/gemma-4-e2b-it.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*embed_vision*", "*audio*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_tower, model.embed_vision, model.audio_tower]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_tower]
+    projector_prefixes: [model.embed_vision]
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: gemma3
+    model_types: [gemma3]
+    architectures: [Gemma3ForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: eager
+    verified: B  # AutoModel examples/vlm_finetune/gemma3; eager attention as HF advises for Gemma 3 training
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-default.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*multi_modal_projector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_tower, model.multi_modal_projector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_tower]
+    projector_prefixes: [model.multi_modal_projector]
+    min_image: vlm-automodel:26.08-8
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: internvl
+    model_types: [internvl]
+    architectures: [InternVLForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: B  # native OpenGVLab/*-hf repos; the original InternVL repos need remote code (refused)
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-default.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*multi_modal_projector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_tower, model.multi_modal_projector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_tower]
+    projector_prefixes: [model.multi_modal_projector]
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: llava_onevision
+    model_types: [llava_onevision]
+    architectures: [LlavaOnevisionForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: B  # AutoModel examples/vlm_finetune/llava_onevision; labels need patch 0008
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-llava-onevision.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*multi_modal_projector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_tower, model.multi_modal_projector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_tower]
+    projector_prefixes: [model.multi_modal_projector]
+    min_image: vlm-automodel:26.08-8
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: mistral3
+    model_types: [mistral3]
+    architectures: [Mistral3ForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: B  # AutoModel examples/vlm_finetune/mistral3p5; smallest public model is 24B (+20% RAM past valid_up_to_params_b)
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-default.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*multi_modal_projector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_tower, model.multi_modal_projector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_tower]
+    projector_prefixes: [model.multi_modal_projector]
+    min_image: vlm-automodel:26.08-8
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: idefics3
+    model_types: [idefics3]
+    architectures: [Idefics3ForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: C  # SmolVLM v1 / Idefics3; labels need patch 0008
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-default.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_model*", "*connector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_model, model.connector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_model]
+    projector_prefixes: [model.connector]
+    min_image: vlm-automodel:26.08-8
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: smolvlm
+    model_types: [smolvlm]
+    architectures: [SmolVLMForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: C  # SmolVLM2; same layout as idefics3; labels need patch 0008
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-default.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_model*", "*connector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_model, model.connector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_model]
+    projector_prefixes: [model.connector]
+    min_image: vlm-automodel:26.08-8
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: llava
+    model_types: [llava]
+    architectures: [LlavaForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: C  # llava-hf/* (LLaVA-1.5 and derivatives)
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-default.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*multi_modal_projector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_tower, model.multi_modal_projector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_tower]
+    projector_prefixes: [model.multi_modal_projector]
+    min_image: vlm-automodel:26.08-8
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: llava_next
+    model_types: [llava_next]
+    architectures: [LlavaNextForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: C  # llava-hf/llava-v1.6-*; anyres tiling gives many image tokens
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/family-default.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*multi_modal_projector*", "*lm_head*"]
+    qlora_skip_modules: [model.vision_tower, model.multi_modal_projector]
+    loss: masked_ce
+    image_policy: processor_default
+    vision_prefixes: [model.vision_tower]
+    projector_prefixes: [model.multi_modal_projector]
+    min_image: vlm-automodel:26.08-8
     ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
