@@ -1,0 +1,15 @@
+--- a/nemo_rl/utils/nvml.py	2026-07-26 16:59:56.000000000 +0700
++++ b/nemo_rl/utils/nvml.py	2026-10-14 10:58:42.365728843 +0700
+@@ -88,6 +88,12 @@
+         try:
+             handle = pynvml.nvmlDeviceGetHandleByIndex(global_device_idx)
+             return pynvml.nvmlDeviceGetMemoryInfo(handle).free
++        except pynvml.NVMLError_NotSupported:
++            # PATCH(vlm): unified-memory GPUs (DGX Spark GB10) report no framebuffer memory through NVML; CUDA's own
++            # cudaMemGetInfo answers for the logical device (what the refit buffer sizing needs).
++            import torch
++
++            return torch.cuda.mem_get_info(device_idx)[0]
+         except pynvml.NVMLError as e:
+             raise RuntimeError(
+                 f"Failed to get free memory for device {device_idx} (global index: {global_device_idx}): {e}"
