@@ -193,17 +193,33 @@ describe("dataset from Hugging Face", () => {
     expect(inspect.mock.calls[1]?.[0]).toMatchObject({ split: "validation" });
   }, 15000);
 
-  it("without a question column the preview shows the question every sample gets", async () => {
+  it("without a question column: the shared question, the server's default typed in, editable, sent when changed", async () => {
     await setup();
+    const { api } = await import("../src/api");
+    const { t } = await import("../src/i18n");
+    const add = vi.spyOn(api, "addUserDataset");
     const input = screen.getByPlaceholderText(/naver-clova-ix\/cord-v2/);
     fireEvent.change(input, { target: { value: "acme/invoices-vi" } });
     fireEvent.keyDown(input, { key: "Enter" });
     const dialog = await screen.findByRole("dialog", {}, { timeout: 4000 });
-    expect(dialog.querySelector(".byo-default-q")).toBeNull(); // a question column is mapped
-    const q = within(dialog).getByLabelText(/Cột câu hỏi/) as HTMLSelectElement;
-    fireEvent.change(q, { target: { value: "" } });
-    const shown = dialog.querySelectorAll(".byo-default-q");
-    expect(shown.length).toBeGreaterThan(0);
-    expect(shown[0]?.textContent).toBe("Describe this image."); // the server's, never typed in the UI
+    expect(within(dialog).queryByLabelText(t("byo.map.prompt"))).toBeNull(); // a question column is mapped
+    fireEvent.change(within(dialog).getByLabelText(/Cột câu hỏi/), { target: { value: "" } });
+    const prompt = within(dialog).getByLabelText(t("byo.map.prompt")) as HTMLInputElement;
+    expect(prompt.value).toBe("Describe this image."); // the server's default_question, never typed in the UI
+    expect(dialog.textContent).toContain(t("byo.map.prompt_default_note"));
+    expect(dialog.querySelector(".byo-default-q")?.textContent).toBe("Describe this image.");
+    // the user's own question: no note, the preview says it plainly, and it is sent
+    fireEvent.change(prompt, { target: { value: "Tổng tiền là bao nhiêu?" } });
+    expect(dialog.textContent).not.toContain(t("byo.map.prompt_default_note"));
+    expect(dialog.querySelector(".byo-default-q")).toBeNull();
+    expect(dialog.querySelector(".byo-preview")?.textContent).toContain("Tổng tiền là bao nhiêu?");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Dùng cách ghép này" }));
+    await waitFor(() =>
+      expect(add.mock.calls[0]?.[0].columns).toEqual({
+        image: "image",
+        answer: "ground_truth",
+        prompt: "Tổng tiền là bao nhiêu?",
+      }),
+    );
   });
 });

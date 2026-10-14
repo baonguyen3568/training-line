@@ -704,6 +704,8 @@ export interface UserDataset {
   format?: string;
   /** The column mapping it was added with (role → column). */
   columns?: Record<string, string>;
+  /** The shared question samples without one get; null = the server's default prompt. */
+  prompt?: string | null;
   /** Rows once downloaded and converted, else null. */
   rows?: number | null;
   verified: false;

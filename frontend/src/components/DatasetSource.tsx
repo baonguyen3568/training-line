@@ -24,7 +24,16 @@ function sampleErrorText(code: string): string {
   return tpOptional(["byo", "sample_error", code]) ?? t("byo.sample_error.image_unreadable");
 }
 
-type Mapping = { image?: string; question?: string; answer?: string; messages?: string };
+type Mapping = {
+  image?: string;
+  question?: string;
+  answer?: string;
+  messages?: string;
+  /** The question every sample without one gets (text, not a column; backend ColumnMap.prompt, ≤ 2000). */
+  prompt?: string;
+};
+/** backend ColumnMap.prompt limit (above it: 400 CFG-005 range) */
+const PROMPT_MAX = 2000;
 
 /** The three params a user-added dataset sets together (backend H5); the server refuses them when they disagree. */
 export const USER_DATASET_PARAMS = ["user_dataset", "user_repo", "user_revision"];
@@ -63,6 +72,11 @@ function ColumnMapDialog({
   const [map, setMap] = useState<Mapping>(s);
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<EventError | null>(null);
+  // the shared question (design r3): the server's default typed in, editable; sent only when it differs
+  const defaultQ = inspection.default_question ?? "";
+  const [prompt, setPrompt] = useState(defaultQ);
+  const askPrompt = mode === "qa" && !map.question;
+  const promptIsDefault = prompt.trim() === defaultQ.trim();
   const kindOf = (name?: string) => inspection.columns.find((c) => c.name === name)?.kind;
   const roles =
     mode === "qa" ? (["image", "question", "answer"] as const) : (["messages", "image"] as const);
@@ -84,7 +98,12 @@ function ColumnMapDialog({
     setRefused(null);
     const err = await onApply(
       mode === "qa"
-        ? { image: map.image, question: map.question, answer: map.answer }
+        ? {
+            image: map.image,
+            question: map.question,
+            answer: map.answer,
+            ...(askPrompt && prompt.trim() && !promptIsDefault ? { prompt: prompt.trim() } : {}),
+          }
         : { messages: map.messages, image: map.image },
     );
     setBusy(false);
@@ -149,6 +168,38 @@ function ColumnMapDialog({
             )}
           </div>
         ))}
+        {askPrompt && (
+          <div className="byo-map-row">
+            <p className="byo-map-head">
+              <label htmlFor="byo-prompt">{t("byo.map.prompt")}</label>
+              <button
+                type="button"
+                className="help-btn inline"
+                popoverTarget="byo-prompt-help"
+                aria-label={t("d4.explain")}
+              >
+                <Icon name="circle-question-mark" size={14} />
+              </button>
+            </p>
+            <div id="byo-prompt-help" popover="auto" className="pop">
+              <strong>{t("byo.map.prompt")}</strong>
+              <p>{t("byo.map.prompt_help")}</p>
+            </div>
+            <input
+              id="byo-prompt"
+              type="text"
+              maxLength={PROMPT_MAX}
+              value={prompt}
+              aria-describedby={promptIsDefault ? "byo-prompt-note" : undefined}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            {promptIsDefault && (
+              <p id="byo-prompt-note" className="small muted">
+                {t("byo.map.prompt_default_note")}
+              </p>
+            )}
+          </div>
+        )}
         <p className="small muted">{t("byo.map.preview")}</p>
         {inspection.sample_error && (
           <p className="small" role="status">
@@ -180,11 +231,14 @@ function ColumnMapDialog({
                   <span className="small">{sampleErrorText(smp.error)}</span>
                 ) : (
                   <>
-                    {map.question || !inspection.default_question ? (
+                    {!askPrompt ? (
                       <span className="clamp2">{untrustedText(smp.question ?? "", 300)}</span>
                     ) : (
-                      // no question column: the one every sample gets, said so (design: not "no question at all")
-                      <span className="clamp2 byo-default-q">{inspection.default_question}</span>
+                      // no question column: the one every sample gets (the default reads muted/italic, the user's own
+                      // question plain)
+                      <span className={`clamp2${promptIsDefault ? " byo-default-q" : ""}`}>
+                        {untrustedText(prompt.trim() || defaultQ, 300)}
+                      </span>
                     )}
                     <span className="clamp2 muted mono">
                       {untrustedText(smp.answer ?? "", 300)}

@@ -775,8 +775,15 @@ export const mockApi: Api = {
       license_class: "commercial_ok",
       obligations: [],
       license_confirmed: false,
+      prompt: columns.prompt?.trim() || null,
       verified: false,
     };
+    if ((columns.prompt ?? "").length > 2000)
+      return Promise.reject(
+        new ApiError(400, {
+          detail: { code: "CFG-005", params: { param: "prompt", rule: "range" } },
+        }),
+      );
     mockUserDatasets.set(dataset.id, dataset);
     return delay({ dataset });
   },
