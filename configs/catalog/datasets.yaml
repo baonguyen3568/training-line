@@ -49,3 +49,27 @@ datasets:
       data/test-00000-of-00001.parquet: d9cc9f488e5310143d8d89956c19d0bdfd71e7089025da5202643f73720df7f5
     # MANIFEST.sha256 of the extracted files (eval.ocrbench_extract, bao-tester 2026-10-13, `sha256sum -c` OK).
     extracted_manifest_sha256: e6e6f4460c621bb515ef81744f85dd854a33d75599041b3c6028f04039f29a47
+
+  - id: geometry3k
+    repo: hiyouga/geometry3k
+    revision: fd21e533e1e50d0662a2bf7b223e60511bd5f8b7
+    display_name: "Geometry3K"
+    # bao-security 2026-10-13 APPROVED-WITH-CONDITIONS: re-upload of lupantech/InterGPS (MIT). Cite InterGPS; never
+    # redistribute the data (exports, site, images); the test split is for evaluation only. Used by the GRPO probe /
+    # reference pipeline R4 (NeMo-RL geometry3k environment, reward format + math_expr).
+    license: mit
+    commercial: "yes"
+    attribution: "Geometry3K from Inter-GPS (Lu et al., ACL 2021), https://github.com/lupantech/InterGPS, MIT; re-upload hiyouga/geometry3k"
+    security: approved_with_conditions
+    use: train
+    splits: [train, validation, test]
+    heldout_splits: [test]
+    num_train: 2101
+    format: parquet
+    loader: geometry3k
+    gated: false
+    disk_gb: 0.06
+    files_sha256:
+      data/train-00000-of-00001.parquet: 83f540e29dea49f6a7ef4e6e09cb79b79d3c0f975dfd742c669f863038045de9
+      data/validation-00000-of-00001.parquet: 5fc4781a84c089e4cdbb3f020f30f4819d11bc314e92642c18501ad58e47689e
+      data/test-00000-of-00001.parquet: 86d76af5feffd642dac209acb9ea31ecbd6b0fdcd87004f501c272a39eabdb5c
