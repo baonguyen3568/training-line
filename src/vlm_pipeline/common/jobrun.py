@@ -856,6 +856,17 @@ def _wait_for_memory(
     return final
 
 
+def _measured_peak(baseline_gb: float, guard: MemGuard) -> float | None:
+    """Host MemAvailable drop while the job ran; None when the guard never polled after the launch.
+
+    The first poll is taken before the container starts, so a job shorter than one poll interval has no reading of
+    its own: "unknown", never a measured 0.0 (research 2026-10-14; the alloc retry already treats None as unknown).
+    """
+    if guard.samples < 2:
+        return None
+    return round(max(0.0, baseline_gb - guard.min_available_gb), 1)
+
+
 def _relative(run_dir: Path, project_root: Path) -> str | None:
     """``run_dir`` relative to the project (for the GPU lock), None when it lives elsewhere."""
     root, path = project_root.resolve(), run_dir.resolve()
@@ -1055,8 +1066,8 @@ def run_job(
                 "oom_killed": info.oom_killed,
                 "ended_at": time.time(),
                 # Host-level estimate (includes CUDA on UMA, which the container cgroup misses) + shared-host noise.
-                "peak_mem_gb": round(max(0.0, baseline_gb - guard.min_available_gb), 1),
-                "host_min_available_gb": round(guard.min_available_gb, 1),
+                "peak_mem_gb": _measured_peak(baseline_gb, guard),
+                "host_min_available_gb": round(guard.min_available_gb, 1) if guard.samples else None,
                 "trainable_pct": _trainable_pct(run_dir / "logs" / "stdout.log"),
                 "engine_warnings": _engine_warnings(run_dir / "logs" / "stdout.log"),
                 "memguard_fast_fall": bool(guard.fast_fall_killed),

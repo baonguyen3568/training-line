@@ -185,6 +185,7 @@ class MemGuard:
         self.should_stop: threading.Event = threading.Event()
         self.state: GuardState = "ok"
         self.min_available_gb: float = math.inf
+        self.samples = 0  # polls so far; the first one (start()) is before the job is launched
         self._meminfo_path = meminfo_path
         self._cgroup_root = cgroup_root
         self._clock = clock
@@ -208,6 +209,7 @@ class MemGuard:
         cgroup_gb = read_cgroup_available_gb(self._cgroup_root) if self._cgroup_root is not None else None
         available = effective_available_gb(snapshot, cgroup_gb)
         self.min_available_gb = min(self.min_available_gb, available)
+        self.samples += 1
         now = self._clock()
         self._history.append((now, available))
         if not self.hard_exited and self._falling_too_fast(now, available):

@@ -182,3 +182,14 @@ def test_resolved_levels_are_published_before_the_job_starts(tmp_path: Path) -> 
     )
     assert rc == 0
     assert seen == [(8.0, False)]  # resolved level, and the process had not started yet
+
+
+def test_a_job_shorter_than_one_poll_has_no_measured_peak() -> None:
+    """research 2026-10-14: only the pre-launch poll (start()) means "unknown", never a measured 0.0 GB."""
+    from types import SimpleNamespace
+
+    from vlm_pipeline.common.jobrun import _measured_peak
+
+    assert _measured_peak(40.0, SimpleNamespace(samples=1, min_available_gb=40.0)) is None  # type: ignore[arg-type]
+    assert _measured_peak(40.0, SimpleNamespace(samples=3, min_available_gb=31.04)) == 9.0  # type: ignore[arg-type]
+    assert _measured_peak(40.0, SimpleNamespace(samples=3, min_available_gb=41.0)) == 0.0  # type: ignore[arg-type]

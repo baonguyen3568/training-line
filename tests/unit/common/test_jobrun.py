@@ -337,7 +337,7 @@ def test_a_run_id_gets_its_job_once(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(jobrun, "_wait_for_memory", lambda *a, **k: None)
     monkeypatch.setattr(jobrun, "git_state", lambda _root: ("c0ffee", False))
     monkeypatch.setattr(jobrun, "read_meminfo", lambda: SimpleNamespace(mem_available_gb=40.0))
-    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=30.0, fast_fall_killed=False,
+    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=30.0, samples=3, fast_fall_killed=False,
                             thresholds=SimpleNamespace(abort_gb=8.0))  # fmt: skip
     started: list[str] = []
     monkeypatch.setattr(jobrun, "run_guarded", lambda launch, *a, **k: (launch(), guard))
@@ -841,7 +841,7 @@ def test_an_app_capped_at_4gb_still_runs_a_2gb_job_when_the_host_has_40gb(
     monkeypatch.setattr(jobrun, "image_digest", lambda _image: f"sha256:{'a' * 64}")
     monkeypatch.setattr(jobrun, "git_state", lambda _root: ("c0ffee", False))
     monkeypatch.setattr(jobrun, "read_meminfo", lambda: host)
-    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=35.0, fast_fall_killed=False,
+    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=35.0, samples=3, fast_fall_killed=False,
                             thresholds=SimpleNamespace(abort_gb=8.0))  # fmt: skip
     monkeypatch.setattr(jobrun, "run_guarded", lambda launch, *a, **k: (launch(), guard))
 
@@ -903,7 +903,7 @@ def _race_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replies: list[dic
     monkeypatch.setattr(jobrun, "_wait_for_memory", lambda *a, **k: None)
     monkeypatch.setattr(jobrun, "git_state", lambda _root: ("c0ffee", False))
     monkeypatch.setattr(jobrun, "read_meminfo", lambda: SimpleNamespace(mem_available_gb=40.0))
-    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=35.0, fast_fall_killed=False,
+    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=35.0, samples=3, fast_fall_killed=False,
                             thresholds=SimpleNamespace(abort_gb=8.0))  # fmt: skip
     monkeypatch.setattr(jobrun, "run_guarded", lambda launch, *a, **k: (launch(), guard))
     monkeypatch.setattr(RunnerLauncher, "POLL_S", 0.0)

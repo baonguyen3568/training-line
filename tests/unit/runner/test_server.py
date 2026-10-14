@@ -216,7 +216,7 @@ def test_run_job_through_the_runner_end_to_end(tmp_path: Path, monkeypatch: pyte
     monkeypatch.setattr(jobrun, "_wait_for_memory", lambda *a, **k: None)
     monkeypatch.setattr(jobrun, "git_state", lambda _r: ("c0ffee", False))
     monkeypatch.setattr(jobrun, "run_guarded", lambda launch, *a, **k: (launch(), SimpleNamespace(
-        should_stop=threading.Event(), min_available_gb=30.0, fast_fall_killed=False,
+        should_stop=threading.Event(), min_available_gb=30.0, samples=3, fast_fall_killed=False,
         thresholds=SimpleNamespace(abort_gb=8.0))))  # fmt: skip
     monkeypatch.setattr(RunnerLauncher, "POLL_S", 0.01)
     run_dir = cfg.data_root / "outputs" / "graph" / "runs" / RUN
