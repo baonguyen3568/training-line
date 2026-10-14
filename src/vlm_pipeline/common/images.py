@@ -20,7 +20,7 @@ DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-7"
 # locally. vlm-nemo-rl:0.7.0-1 (docker/IMAGES.lock, PROBE ONLY) keeps /opt/nemo-rl 660/770 root:root, so its
 # non-root user needs group 0. Never offered to any other image (a job in group 0 can read root-group files).
 GROUP_ADD_ALLOWED: dict[str, frozenset[int]] = {
-    "sha256:4c740d252ef90651621224005623546b4931582fa2eeb9ce816ba9d7576a4add": frozenset({0}),  # vlm-nemo-rl:0.7.0-1
+    "sha256:99f0fd748c0e428a13506a932c3d3b879ce74d61586096e924545db40138abbe": frozenset({0}),  # vlm-nemo-rl:0.7.0-2
 }
 
 
