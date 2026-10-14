@@ -1502,7 +1502,7 @@ engine_warning:
     title: The model may have learned less than expected
     what: Weights were trained in bf16 without an fp32 copy, so very small updates were rounded away. The model may have learned much less than the number of steps suggests. Compare its score with the base model before using it.
 trial:
-  prefilled_prompt: Prefilled with the question the model was trained on. Asking it this way gives the closest results.
+  prefilled_prompt: Leave it empty and the app asks the exact question the model was trained on (the grey text in the box). Asking it this way gives the closest results.
   image_too_large: The image is larger than 20 MB. Use a smaller one.
   upload_failed: Could not upload the image. Try again.
   uploading: Uploading the image…
