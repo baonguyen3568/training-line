@@ -29,7 +29,7 @@ Inspector của `model.hf_pick` có một segmented control ngay dưới tiêu �
 ## 3. Model cần chạy mã riêng (trust_remote_code): bị chặn
 Đây là một mã lỗi trong catalog (§6, fixcode). Câu chữ giải thích lý do bằng lời thường và cho 2 lối ra:
 - chọn model khác, chuyển sang tab "Đã kiểm chứng";
-- đề nghị thêm vào danh mục: action `suggest_catalog` mở `https://github.com/baonguyen3568/training-line/issues/new` trong tab mới, không có query (cùng điều kiện security như bug report).
+- đề nghị thêm vào danh mục: action `request_catalog` mở `https://github.com/baonguyen3568/training-line/issues/new` trong tab mới, không có query (cùng điều kiện security như bug report).
 Icon `ban`, màu `status_ink.serious`. Không nhắc tới "trust_remote_code" trong câu chính; tên kỹ thuật chỉ nằm trong "Chi tiết kỹ thuật".
 
 ## 4. Dataset từ Hugging Face: ghép cột + xem trước
