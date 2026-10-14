@@ -28,6 +28,8 @@ KEYS = (
     "reference_pipeline",
     "pipelines",
     "estimate",
+    "method",
+    "arch",
 )
 ERRORS = ("MEM-001", "CFG-003")
 

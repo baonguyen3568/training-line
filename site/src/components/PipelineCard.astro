@@ -1,92 +1,128 @@
 ---
-// One reference pipeline (the app's data): step chips, title, licence and level, the measured line with its
-// source/CI/config and the score comparison behind "?". Used by the landing (available ones) and /template (all).
+// One method card (design spec I §1, same layout as the app's gallery card): method + difficulty, when to use, the
+// training architecture (shared layout with the app), source · licence · "Đo với", the measured line with its "?"
+// (metric help → comparison → single run → config → source → swap hint), status + "Xem nguồn". Used by the landing
+// (available ones) and /template (all). Every word comes from the app's copy, every number from research's data.
+import ArchDiagram from "~/components/ArchDiagram.astro";
 import Icon from "~/components/Icon.astro";
-import { compareOf, compareParts, fill, formatCi, formatScore, licenseOf, METRIC, measuredLine, metricHelp, type Pipe, pl } from "~/lib/pipelines";
+import {
+  compareOf,
+  compareParts,
+  copyText,
+  formatCi,
+  formatScore,
+  licenseParts,
+  METRIC,
+  measuredParts,
+  metricHelp,
+  type Pipe,
+  pl,
+} from "~/lib/pipelines";
 
 interface Props {
   p: Pipe;
-  /** URL of another pipeline's card (the score comparison links its title). */
+  /** URL of another pipeline's card (the score comparison links its method). */
   compareHref: (id: string) => string;
   /** Give the card id={p.id} so /template/#<id> lands on it. */
   anchor?: boolean;
 }
 const { p, compareHref, anchor = false } = Astro.props;
 const other = compareOf(p);
+const title = copyText(`method.${p.method}.title`);
+const when = copyText(p.when_to_use_key);
+const withModel = p.measured_with ? fill(pl.measured_with ?? "", { model: p.measured_with.model }) : "";
+const measured = p.measured ? [pl.measured as string, ...measuredParts(p.measured)] : [];
+function fill(tpl: string, v: Record<string, string>) {
+  return tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "");
+}
 ---
 
 <li class="tpl-card" id={anchor ? p.id : undefined}>
-  <ol class="mini" aria-hidden="true">
-    {(p.steps.length > 5 ? p.steps.slice(0, 4) : p.steps).map((st) => (
-      <li class={st.node ? undefined : "no-node"}>{st.label.vi}</li>
-    ))}
-    {p.steps.length > 5 && <li class="more">{fill(pl.more_steps, { step_count: p.steps.length - 4 })}</li>}
-  </ol>
-  <h3>{p.title.vi}</h3>
-  {p.status !== "available" && <p class="tpl-status">{pl.status?.[p.status] ?? p.status}</p>}
+  <header class="tpl-head">
+    <h3>{title}</h3>
+    {p.difficulty && <span class="badge">{pl.level[p.difficulty]}</span>}
+  </header>
+  {when !== p.when_to_use_key && <p class="tpl-when">{when}</p>}
+  <div class="tpl-arch">
+    <ArchDiagram arch={p.train_arch} id={p.id} />
+    <button class="help" popovertarget={`pop-a-${p.id}`} aria-label={copyText("arch.legend_title")}>
+      <Icon name="circle-question-mark" size={14} />
+    </button>
+    <div id={`pop-a-${p.id}`} popover>
+      <strong>{copyText("arch.legend_title")}</strong>
+      <ArchDiagram arch={p.train_arch} id={`${p.id}-legend`} legend />
+    </div>
+  </div>
   <p class="tpl-meta">
-    <span class="badge">{licenseOf(p)}</span>
-    <span>{p.difficulty ? pl.level[p.difficulty] : pl.not_assessed}</span>
+    <a href={p.source.url} rel="noopener noreferrer">{p.source.publisher} <Icon name="external-link" size={12} /></a>
+    <span class="badge">
+      {licenseParts(p).map((x, i) => (
+        <>
+          {i > 0 && <span class="wrap"> · </span>}
+          <span class="nowrap">{x}</span>
+        </>
+      ))}
+    </span>
+    {withModel && <span class="tpl-with">{withModel}</span>}
   </p>
-  {p.measured ? (
+  {p.measured && (
     <p class="tpl-measured">
-      <span class="tpl-label">{pl.measured}</span> · {measuredLine(p.measured)}
-      <button class="help" popovertarget={`pop-m-${p.id}`} aria-label="Về số đo này">
-        <Icon name="circle-question-mark" size={14} />
-      </button>
+      <span class="nowrap-line">
+        {measured.map((x, i) => (
+          <>
+            {i > 0 && <span class="wrap"> · </span>}
+            <span class="nowrap">{x}</span>
+          </>
+        ))}
+        <button class="help" popovertarget={`pop-m-${p.id}`} aria-label={pl.measured}>
+          <Icon name="circle-question-mark" size={14} />
+        </button>
+      </span>
     </p>
-  ) : (
-    <p class="tpl-measured muted"><span class="tpl-label">{pl.measured}</span> · chưa có số đo</p>
   )}
   {p.measured && (
     <div id={`pop-m-${p.id}`} popover>
-      {p.measured.score && metricHelp(p.measured.score) && <>{metricHelp(p.measured.score)} </>}
+      {p.measured.score && metricHelp(p.measured.score) && <p>{metricHelp(p.measured.score)}</p>}
       {p.measured.score && (
-        <>
-          {" "}
+        <p>
           {METRIC[p.measured.score.metric] ?? p.measured.score.metric}{" "}
           {formatScore(p.measured.score.metric, p.measured.score.value)} trên {p.measured.score.n} mẫu{" "}
           {p.measured.score.benchmark}
-          {p.measured.score.ci95 && (
-            <>
-              , khoảng tin cậy 95%: {formatCi(p.measured.score.metric, p.measured.score.ci95)}
-            </>
-          )}
-          .
-        </>
+          {p.measured.score.ci95 && <>, khoảng tin cậy 95%: {formatCi(p.measured.score.metric, p.measured.score.ci95)}</>}.
+        </p>
       )}
       {other?.measured?.score && (
-        <>
-          {" "}
+        <p>
           {compareParts(other)[0]}
-          <a class="link" href={compareHref(other.id)}>{other.title.vi}</a>
+          <a class="link" href={compareHref(other.id)}>{copyText(`method.${other.method}.title`)}</a>
           {compareParts(other)[1]}
-        </>
+        </p>
       )}
-      {p.measured.score && (
-        <>
-          {" "}
-          {pl.score_single_run}
-        </>
-      )}
-      {p.measured.config && (
-        <>
-          {" "}
-          Cấu hình: <span lang="en">{p.measured.config}</span>.
-        </>
-      )}
-      {p.measured.sources && (
-        <>
-          {" "}
-          Nguồn: {p.measured.sources.map((src, i) => (
-            <>
-              {i ? ", " : ""}
-              <code>{src}</code>
-            </>
-          ))}
-          .
-        </>
-      )}
+      {p.measured.score && <p>{pl.score_single_run}</p>}
+      {p.measured.config && <p>Cấu hình: <span lang="en">{p.measured.config}</span>.</p>}
+      <p>
+        <a href={p.source.url} rel="noopener noreferrer">{p.source.publisher}</a>
+        {p.source.paper_url && <> · <a href={p.source.paper_url} rel="noopener noreferrer">{pl.paper}</a></>}
+        {p.measured.sources && (
+          <>
+            {" · "}
+            {p.measured.sources.map((src, i) => (
+              <>
+                {i ? ", " : ""}
+                <code>{src}</code>
+              </>
+            ))}
+          </>
+        )}
+      </p>
+      <p>{pl.swap_hint}</p>
     </div>
   )}
+  <p class="tpl-foot">
+    {p.status !== "available" && <span class="tpl-status">{pl.status?.[p.status] ?? p.status}</span>}
+    <a class="tpl-src" href={p.source.url} rel="noopener noreferrer">
+      <Icon name="external-link" size={14} />
+      {pl.view_source}
+    </a>
+  </p>
 </li>

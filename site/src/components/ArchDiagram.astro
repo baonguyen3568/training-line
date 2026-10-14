@@ -1,0 +1,76 @@
+---
+// The training-architecture diagram of a method (design spec I §2), drawn at build time from the app's own layout
+// (frontend/src/lib/archLayout.ts) so the site and the app never drift; copy from the app's i18n (app-copy.json).
+import Icon from "~/components/Icon.astro";
+import { archLayout, LEGEND_STATES, legendSample, type TrainArch } from "../../../frontend/src/lib/archLayout";
+import { copyText } from "~/lib/pipelines";
+
+interface Props {
+  arch: TrainArch;
+  /** Unique per page: the arrow marker's id. */
+  id: string;
+  /** The small legend list instead of a diagram (the "?" popover). */
+  legend?: boolean;
+}
+const { arch, id, legend = false } = Astro.props;
+const layout = archLayout(arch, copyText);
+const marker = `arch-m-${id}`;
+---
+
+{legend ? (
+  <ul class="arch-legend">
+    {LEGEND_STATES.map((state) => {
+      const g = legendSample(state);
+      return (
+        <li>
+          <svg class="arch-diagram" width="58" height="22" viewBox="-1 -9 58 30" aria-hidden="true">
+            <g class={g.cls}>
+              {g.shapes.map((s) =>
+                s.kind === "rect" ? (
+                  <rect class={s.cls} x={s.x} y={s.y} width={s.w} height={s.h} rx={s.rx} />
+                ) : s.kind === "icon" ? (
+                  <g class={s.cls} transform={`translate(${s.x} ${s.y})`}><Icon name={s.name} size={s.size} /></g>
+                ) : s.kind === "text" ? (
+                  <text class={s.cls} x={s.x} y={s.y} text-anchor={s.anchor}>{s.lines.join(" ")}</text>
+                ) : null,
+              )}
+            </g>
+          </svg>
+          <span>{copyText(`arch.state.${state}`)}</span>
+        </li>
+      );
+    })}
+  </ul>
+) : (
+  <svg
+    class="arch-diagram"
+    role="img"
+    aria-label={layout.label}
+    viewBox={`0 0 ${layout.width} ${layout.height}`}
+    width="100%"
+    style={`max-width:${layout.width}px`}
+  >
+    <defs>
+      <marker id={marker} viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0 0 6 3 0 6z" class="arch-arrowhead" />
+      </marker>
+    </defs>
+    {layout.groups.map((g) => (
+      <g class={g.cls}>
+        {g.shapes.map((s) =>
+          s.kind === "rect" ? (
+            <rect class={s.cls} x={s.x} y={s.y} width={s.w} height={s.h} rx={s.rx} />
+          ) : s.kind === "icon" ? (
+            <g class={s.cls} transform={`translate(${s.x} ${s.y})`}><Icon name={s.name} size={s.size} /></g>
+          ) : s.kind === "wire" ? (
+            <line class="arch-wire" x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} marker-end={`url(#${marker})`} />
+          ) : (
+            <text class={s.cls} x={s.x} y={s.y} text-anchor={s.anchor}>
+              {s.lines.map((l, i) => <tspan x={s.x} dy={i === 0 ? 0 : s.dy}>{l}</tspan>)}
+            </text>
+          ),
+        )}
+      </g>
+    ))}
+  </svg>
+)}

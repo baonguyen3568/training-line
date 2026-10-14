@@ -1,15 +1,21 @@
 // Reference pipelines as the app's gallery reads them (bao-research configs/reference_pipelines.yaml, exported by
 // scripts/app_copy.py), and the copy that formats their measurements. Never a number that is not in the data.
 import copy from "~/generated/app-copy.json";
+import type { TrainArch } from "../../../frontend/src/lib/archLayout";
 
 export type Pipe = {
   id: string;
   kind: string;
   status: string;
   difficulty: "basic" | "advanced" | null;
+  method: string;
   title: { vi: string };
   summary_key?: string;
-  source_url: string;
+  /** method.<method>.when: the method's one "when to use" sentence. */
+  when_to_use_key: string;
+  train_arch: TrainArch;
+  source: { url: string; publisher: string; paper_url?: string | null };
+  measured_with?: { model: string; data: string } | null;
   license: { code: string | null; model: string | null; data: string | null };
   steps: { node: string | null; label: { vi: string } }[];
   measured?: {
@@ -34,6 +40,12 @@ const est = copy.estimate as Record<string, string>;
 
 export const fill = (tpl: string, v: Record<string, string | number>) =>
   tpl.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? `{${k}}`));
+
+/** A dotted key of the app's copy ("arch.block.vision", "method.lora.title"), filled; the key itself if missing. */
+export const copyText = (key: string, params?: Record<string, string | number>): string => {
+  const v = key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], copy);
+  return typeof v === "string" ? (params ? fill(v, params) : v) : key;
+};
 
 export const minutes = (m: number) => {
   const total = Math.round(m);
@@ -73,14 +85,20 @@ export const formatCi = (metric: string, [lo, hi]: [number, number]) => {
 };
 export const licenseOf = (p: Pipe) =>
   [...new Set([p.license.code, p.license.model].filter(Boolean).map((x) => LICENSE[x as string] ?? x))].join(" · ");
-export const measuredLine = (m: NonNullable<Pipe["measured"]>) =>
+/** The measured line's parts (the card wraps only between them): time · peak RAM · score. */
+export const measuredParts = (m: NonNullable<Pipe["measured"]>) =>
   [
-    m.train_minutes ? `Dạy model: ~${minutes(m.train_minutes)}` : null,
+    m.train_minutes ? `~${minutes(m.train_minutes)}` : null,
     m.peak_ram_gb ? fill(pl.ram_peak, { gb: m.peak_ram_gb }) : null,
     m.score ? `${METRIC[m.score.metric] ?? m.score.metric} ${formatScore(m.score.metric, m.score.value)}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  ].filter((x): x is string => !!x);
+export const measuredLine = (m: NonNullable<Pipe["measured"]>) => measuredParts(m).join(" · ");
+/** The licences, each once (code, model, data), for the badge; the line wraps only between them. */
+export const licenseParts = (p: Pipe) => [
+  ...new Set(
+    [p.license.code, p.license.model, p.license.data].map((x) => (x ? (LICENSE[x] ?? x) : pl.see_source)),
+  ),
+];
 /** The pipeline this one's score is compared with (generator-checked: same benchmark and metric). */
 export const compareOf = (p: Pipe) => allPipes.find((x) => x.id === p.measured?.score?.compare_with);
 /** score_compare around its {other} placeholder, so {other} can be a link: [before, after]. */

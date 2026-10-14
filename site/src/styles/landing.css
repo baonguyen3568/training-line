@@ -221,68 +221,40 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 0 0 18px;
+  padding: 18px 0;
   border: 1px solid var(--line2);
   border-radius: var(--r);
   background: var(--bg2);
   overflow: hidden;
 }
-.tpl-card > :not(.mini) {
+.tpl-card > * {
   margin-left: 18px;
   margin-right: 18px;
 }
 .tpl-card h3 {
-  margin-top: 4px;
+  margin-top: 0;
   margin-bottom: 0;
   font-size: 17px;
   line-height: 1.3;
 }
-.tpl-card .mini {
-  list-style: none;
-  margin: 0;
-  padding: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-content: center;
-  min-height: 92px;
-  background-color: var(--bg1);
-  border-bottom: 1px solid var(--line);
-}
-.tpl-card .mini li {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--color-canvas-node-border);
-  border-radius: var(--radius-sm);
-  background: var(--bg2);
-  font-size: 12px;
-  color: var(--tx2);
-}
-.tpl-card .mini li.no-node,
-.tpl-card .mini li.more {
-  border-style: dashed;
-  color: var(--tx3);
-}
-.tpl-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 0;
-  margin-bottom: 0;
+.tpl-card .tpl-meta {
+  margin-block: 0;
+  line-height: 1.7;
   color: var(--tx2);
   font-size: 13px;
+}
+.tpl-card .tpl-meta > * {
+  margin-right: 8px; /* trailing gap: a wrapped line starts flush left */
 }
 .tpl-meta .badge {
   padding: 0 8px;
   border: 1px solid var(--line2);
   border-radius: var(--radius-sm);
 }
-.tpl-measured {
-  margin-top: auto;
-  margin-bottom: 0;
+.tpl-card .tpl-measured {
+  margin-block: 0;
   font-size: 13px;
+  line-height: 1.7;
   color: var(--tx);
 }
 .tpl-measured.muted {
@@ -396,4 +368,154 @@
   .prose .tpl-library .tpl-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Method card (design spec I §1, same as the app's gallery card) */
+.tpl-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tpl-head .badge {
+  flex: none;
+  padding: 0 8px;
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.tpl-card .tpl-when {
+  margin-block: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tx2);
+}
+.tpl-arch {
+  position: relative;
+  padding: 8px 0;
+}
+.tpl-arch > .help {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+.tpl-meta a {
+  color: var(--tx2);
+}
+.tpl-card .tpl-meta .badge {
+  display: inline;
+  box-decoration-break: clone;
+}
+.tpl-card .nowrap,
+.tpl-card .nowrap-line {
+  white-space: nowrap;
+}
+.tpl-card .wrap {
+  white-space: normal;
+}
+.tpl-with {
+  display: inline-block;
+  max-width: 100%;
+}
+.tpl-card .tpl-foot {
+  margin-block: auto 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.tpl-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+/* the training architecture diagram (shared layout with the app, frontend/src/lib/archLayout.ts) */
+.arch-diagram {
+  display: block;
+  height: auto;
+  overflow: visible;
+}
+.arch-diagram text {
+  font-size: 11px;
+  fill: var(--tx);
+}
+.arch-block rect {
+  fill: none;
+  stroke: var(--color-axis);
+  stroke-dasharray: 3 2;
+}
+.arch-block.train rect {
+  fill: color-mix(in srgb, var(--color-accent-brand) 16%, transparent);
+  stroke: var(--color-accent-brand);
+  stroke-dasharray: none;
+}
+.arch-block.train-low rect {
+  fill: color-mix(in srgb, var(--color-accent-brand) 8%, transparent);
+  stroke: var(--color-accent-brand);
+  stroke-dasharray: none;
+}
+.arch-block.na {
+  opacity: 0.5;
+}
+.arch-lock {
+  color: var(--tx3);
+}
+.arch-diagram .arch-mark,
+.arch-diagram .arch-pill-lora-text,
+.arch-diagram .arch-pill-quant-text {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+}
+.arch-diagram .arch-block rect.arch-pill-lora {
+  fill: var(--color-accent-brand);
+  stroke: none;
+}
+.arch-diagram .arch-pill-lora-text {
+  fill: #fff;
+}
+.arch-diagram .arch-block rect.arch-pill-quant {
+  fill: var(--bg2);
+  stroke: var(--color-axis);
+  stroke-dasharray: none;
+}
+.arch-side rect {
+  fill: var(--bg2);
+  stroke: var(--color-axis);
+}
+.arch-side {
+  color: var(--tx2);
+}
+.arch-side.ghost {
+  opacity: 0.6;
+}
+.arch-diagram .arch-side text {
+  font-size: 10px;
+  fill: var(--tx2);
+}
+.arch-diagram .arch-stage {
+  fill: var(--tx2);
+  font-size: 10px;
+}
+.arch-wire {
+  stroke: var(--tx3);
+}
+.arch-arrowhead {
+  fill: var(--tx3);
+}
+.arch-legend {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.arch-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.arch-legend .arch-diagram {
+  flex: none;
 }
