@@ -1,0 +1,39 @@
+# VLM architecture families the app can train WITHOUT the model being in the catalog (ADR-021, "bring your own model").
+# Owner: bao-research. Consumer: the resolver (proposal 021): config.json `architectures[0]` -> family -> a CatalogEntry
+# (tier unverified, ram_source estimated) + a training template rendered from `recipe`. Remote code (auto_map) outside
+# the catalog is refused (ADR-021 §3), so every family here is a transformers-native class in vlm-automodel:26.08-7
+# (transformers 5.12.1). Module names come from building each class in that image on the meta device
+# (.team/knowledge/vlm-families-26.08-7.md). Per-repo facts (tie_word_embeddings, vision_config present) are read from
+# the repo's config.json, never assumed from the family.
+#
+#   verified        A = trained on GB10 by the team | B = AutoModel ships a recipe/implementation | C = native only
+#   train_node      the only training node offered (LoRA for every family: full fine-tune is catalog-only)
+#   recipe          template rendered per model: model/processor paths replaced, pixels/freeze/LoRA as below
+#   lora_exclude    PEFT exclude_modules (vision + projector + lm_head stay frozen)
+#   qlora_skip_modules  modules kept BF16 under 4-bit NF4 (vision + projector; the tied lm_head is skipped by patch 0006)
+#   image_policy    qwen_pixels -> processor min_pixels/max_pixels set below | processor_default -> the repo's own
+#   ram_gb_train    upper bound for LoRA BF16, batch 1, GBS <= 8, at the pixel cap: a * params_b + b (GB, run.json peak).
+#                   Fitted to the GB10 envelope (worst measured run per size, cold JIT caches): 0.8B 18.3, 2B 28.1,
+#                   4B 24.4, 9B 33.1 GB -> a 1.8, b 25 covers all four (2B: 28.6; 9B: 41.2). QLoRA uses the same bound
+#                   (2B measured 24.7 vs 28.1 for LoRA; the saving grows with size but is not measured above 2B).
+#                   Sources: benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json,
+#                   benchmarks/perf/r7-filter-dedupe-lora-20261014.json, benchmarks/perf/qwen3.5-4b-9b-lora-mem-20261013.json,
+#                   benchmarks/perf/qlora-vs-lora-qwen3.5-2b-26.08-7-20261014.json
+schema_version: 1
+families:
+  - id: qwen3_5
+    model_types: [qwen3_5]
+    architectures: [Qwen3_5ForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: A
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/qwen3.5-2b.yaml  # the catalog Qwen3.5 templates differ only in model/processor paths
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*vision*", "*visual*", "*image_encoder*", "*lm_head*", "*audio*"]
+    qlora_skip_modules: [model.visual]
+    loss: masked_ce
+    image_policy: qwen_pixels
+    min_pixels: 200704
+    max_pixels: 1003520
+    ram_gb_train: {a: 1.8, b: 25.0, valid_up_to_params_b: 10.0}
