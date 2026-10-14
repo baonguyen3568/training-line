@@ -4,6 +4,7 @@ import { t, tpOptional } from "../i18n";
 import { formatDuration } from "../lib/format";
 import { cardFull, cardSays } from "../lib/licenses";
 import { type DownloadKind, downloadKey, downloadPercent, useDownloads } from "../store/downloads";
+import { useUserModels } from "../store/userModels";
 import { ErrorIcon } from "./ErrorIcon";
 import { GatedSteps } from "./GatedSteps";
 import { Icon } from "./Icon";
@@ -45,6 +46,14 @@ export function DownloadDialog({
   target: DownloadTarget;
   onClose: () => void;
 }) {
+  // an unknown licence of a user-added asset: its author's words, from the issue or this machine's added lists
+  const added = useUserModels((st) => (target.kind === "model" ? st.models : st.datasets));
+  const needCard = target.license === "unknown" && !target.licenseCard;
+  useEffect(() => {
+    if (needCard) void useUserModels.getState().load();
+  }, [needCard]);
+  const licenseCard =
+    target.licenseCard ?? added.find((a) => a.id === target.catalogId)?.license_card ?? undefined;
   const key = downloadKey(target.kind, target.catalogId);
   const entry = useDownloads((s) => s.entries[key]);
   const start = useDownloads((s) => s.start);
@@ -124,9 +133,9 @@ export function DownloadDialog({
             {t("download.license_unknown")}
           </p>
         )}
-        {target.license === "unknown" && target.licenseCard && cardSays(target.licenseCard) && (
-          <p className="small license-card" title={cardFull(target.licenseCard)}>
-            {cardSays(target.licenseCard)}
+        {target.license === "unknown" && licenseCard && cardSays(licenseCard) && (
+          <p className="small license-card" title={cardFull(licenseCard)}>
+            {cardSays(licenseCard)}
           </p>
         )}
         {!busy && entry?.status !== "completed" && entry?.status !== "unverified" && (

@@ -34,6 +34,7 @@ import type {
   TrialResult,
   UploadInfo,
   UserAssetLimits,
+  UserDataset,
   UserModel,
   ValidationResult,
   Workflow,
@@ -217,6 +218,8 @@ export interface Api {
   setUserAssetLimits(body: { max_model_gb: number }): Promise<UserAssetLimits>;
   /** The user-added models this machine has a record of (the `user_model` widget's choices, backend H3). */
   listUserModels(): Promise<{ models: UserModel[] }>;
+  /** The user-added datasets of this machine (licence words for the download dialog, backend H5). */
+  listUserDatasets(): Promise<{ datasets: UserDataset[] }>;
   inspectDataset(body: {
     repo: string;
     revision?: string;
@@ -336,6 +339,7 @@ export const httpApi: Api = {
       accept: true,
     }),
   listUserModels: () => request("GET", "/api/user-assets/models"),
+  listUserDatasets: () => request("GET", "/api/user-assets/datasets"),
   userAssetLimits: () => request("GET", "/api/user-assets/limits"),
   setUserAssetLimits: (body) => request("PUT", "/api/user-assets/limits", body),
   inspectDataset: (body) => request("POST", "/api/user-assets/datasets/inspect", body),

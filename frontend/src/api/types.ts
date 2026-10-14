@@ -678,6 +678,23 @@ export interface UserModel {
   trial_run_id?: string | null;
 }
 
+/** A user-added Hugging Face dataset (GET /api/user-assets/datasets, backend H5): the fields the UI reads. */
+export interface UserDataset {
+  id: string;
+  /** "repo (config/split)" */
+  name: string;
+  repo: string;
+  revision: string;
+  config?: string | null;
+  split: string;
+  size_gb?: number | null;
+  license: string;
+  /** The licence as the author wrote it (untrusted: plain text only), or null. */
+  license_card?: string | null;
+  license_confirmed: boolean;
+  verified: false;
+}
+
 /** GET/PUT /api/user-assets/limits (ADR-021 A1): the cap of one user-added model; the machine quota still applies. */
 export interface UserAssetLimits {
   max_model_gb: number;

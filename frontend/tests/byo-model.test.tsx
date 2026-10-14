@@ -279,4 +279,39 @@ describe("unknown licence", () => {
     expect(dialog.textContent).not.toContain("license.card_says");
     expect(line.querySelector("b")).toBeNull();
   });
+
+  it("a user dataset's licence words come from the added list when the issue has none", async () => {
+    const { api } = await import("../src/api");
+    vi.spyOn(api, "listUserDatasets").mockResolvedValue({
+      datasets: [
+        {
+          id: "userds--acme--invoices--7f0115a4",
+          name: "acme/invoices (default/train)",
+          repo: "acme/invoices",
+          revision: "7f0115a4b758a71d6473b8d085751692da2fef98",
+          split: "train",
+          license: "unknown",
+          license_card: "other (acme)",
+          license_confirmed: false,
+          verified: false,
+        },
+      ],
+    });
+    const { DownloadDialog } = await import("../src/components/DownloadDialog");
+    const { cardSays } = await import("../src/lib/licenses");
+    render(
+      <DownloadDialog
+        target={{
+          kind: "dataset",
+          catalogId: "userds--acme--invoices--7f0115a4",
+          name: "acme/invoices",
+          license: "unknown",
+        }}
+        onClose={() => {}}
+      />,
+    );
+    await waitFor(() =>
+      expect(document.querySelector(".license-card")?.textContent).toBe(cardSays("other (acme)")),
+    );
+  });
 });

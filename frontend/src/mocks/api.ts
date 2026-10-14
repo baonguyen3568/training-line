@@ -729,6 +729,7 @@ export const mockApi: Api = {
     return delay({ model: confirmed });
   },
   listUserModels: () => delay({ models: [...mockUserModels.values()] }),
+  listUserDatasets: () => delay({ datasets: [] }),
   userAssetLimits: () => delay({ ...mockLimits }),
   setUserAssetLimits: ({ max_model_gb }) => {
     const [lo, hi] = mockLimits.max_model_gb_range;

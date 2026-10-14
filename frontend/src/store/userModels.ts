@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api } from "../api";
-import type { UserModel } from "../api/types";
+import type { UserDataset, UserModel } from "../api/types";
 
 /** A repo + pinned revision to put in a step's "Từ Hugging Face" panel (MODEL-006 "Thêm model này"), not checked yet. */
 export interface HubPrefill {
@@ -12,6 +12,9 @@ export interface HubPrefill {
 interface UserModelsState {
   /** GET /api/user-assets/models: the models this machine has a record of. */
   models: UserModel[];
+  /** GET /api/user-assets/datasets: the datasets this machine has a record of. */
+  datasets: UserDataset[];
+  /** Both lists; each one is a shortcut, a failure leaves it as it was. */
   load(): Promise<void>;
   prefill: HubPrefill | null;
   /** Open the step's hub tab with this repo and revision typed in; the user still presses "Kiểm tra". */
@@ -22,13 +25,19 @@ interface UserModelsState {
 
 export const useUserModels = create<UserModelsState>((set, get) => ({
   models: [],
+  datasets: [],
   async load() {
-    try {
-      const { models } = await api.listUserModels();
-      set({ models });
-    } catch {
-      /* the list is a shortcut; pasting the repo again still works */
-    }
+    // the lists are shortcuts; pasting the repo again still works
+    await Promise.all([
+      api.listUserModels().then(
+        ({ models }) => set({ models }),
+        () => undefined,
+      ),
+      api.listUserDatasets().then(
+        ({ datasets }) => set({ datasets }),
+        () => undefined,
+      ),
+    ]);
   },
   prefill: null,
   openAdd(prefill) {
