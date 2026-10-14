@@ -44,7 +44,10 @@ docker container prune --filter label=project=vlm-training --filter until=72h
 docker image prune --filter label=project=vlm-training --filter until=168h   # dangling only
 docker images --filter label=project=vlm-training                 # tagged: docker rmi one by one
 docker ps -a --filter ancestor=<image>                            # make sure no non-project container uses it
-docker buildx prune --builder vlm-builder --filter until=168h
+docker buildx prune --builder vlm-builder --keep-storage 35gb -f   # PM 2026-10-14: 35gb keeps the ~29 GB NGC base
+# vlm-builder (docker-container driver) cannot see daemon images: the NGC base lives ONLY in its cache. keep 15gb
+# evicted it and the next build re-pulled ~20 GB (26.08-8). Only go below 35gb when disk is urgent, and ask backend
+# first whether a rebuild is coming. `--filter until=168h` may free nothing (all layers recent).
 ```
 Project tools (built, reviewed):
 ```bash

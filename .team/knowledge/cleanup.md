@@ -55,7 +55,7 @@ Nguồn: https://docs.docker.com/reference/cli/docker/system/prune/ (filter `lab
   - `docker ps -a --filter name=^vlm- --filter status=exited`
   - `docker container prune --filter label=project=vlm-training --filter until=72h`
   - `docker image prune --filter label=project=vlm-training --filter until=168h` (chỉ dangling); image có tag thì liệt kê `docker images --filter label=project=vlm-training` rồi `docker rmi` từng cái.
-  - Build cache: dùng builder riêng `docker buildx create --name vlm-builder` → `docker buildx prune --builder vlm-builder --filter until=168h` chỉ ảnh hưởng builder của ta. **Không** prune default builder.
+  - Build cache: dùng builder riêng `docker buildx create --name vlm-builder` → `docker buildx prune --builder vlm-builder --keep-storage 35gb -f` chỉ ảnh hưởng builder của ta. **Không** prune default builder. Bài học 2026-10-14: builder docker-container KHÔNG thấy image của daemon, nên base NGC (~29 GB) chỉ nằm trong cache builder. keep 15gb đã đẩy base đi, build 26.08-8 phải kéo lại ~20 GB. Mặc định giữ **35gb**, chỉ thấp hơn khi disk gấp và đã hỏi backend có sắp build không.
   - Volume: `docker volume ls --filter label=project=vlm-training`.
 - Image NGC base (nvcr.io/nvidia/pytorch, nemo…) 20–30GB: giữ đúng 1 tag đang được pin trong ADR; tag cũ xoá khi ADR đổi — nhưng **kiểm tra image không bị container khác (ngoài dự án) dùng** (`docker ps -a --filter ancestor=<img>`).
 - Container NGC nên chạy `--rm` cho job một lần; log lấy ra file trong `outputs/logs/`.
