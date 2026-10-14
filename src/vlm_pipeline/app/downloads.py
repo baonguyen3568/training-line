@@ -24,7 +24,7 @@ import re
 import secrets
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar, Literal
@@ -356,7 +356,9 @@ class DownloadService:
                        memory_wait_s=self.memory_wait_s)  # fmt: skip
 
     # ------------------------------------------------------------------------------------------ resolve (ADR-021)
-    def start_resolve(self, kind: Kind, repo: str, ref: str, finish: Callable[[Path], Any]) -> Download:
+    def start_resolve(
+        self, kind: Kind, repo: str, ref: str, finish: Callable[[Path], Any], extra: Mapping[str, str] | None = None
+    ) -> Download:
         """Resolve a user-added repo (P021 H2): the plan-only hub job in the download slot, then the host's finish.
 
         ``finish(run_dir)`` returns the result kept on the Download, or raises the catalog error to show.
@@ -367,12 +369,12 @@ class DownloadService:
         download = Download(download_id=run_id, asset=asset, run_id=run_id)
         with self._lock:
             self.downloads[run_id] = download
-        threading.Thread(target=self._resolve_run, args=(download, finish), name=f"resolve-{run_id}",
-                         daemon=True).start()  # fmt: skip
+        threading.Thread(target=self._resolve_run, args=(download, finish, dict(extra or {})),
+                         name=f"resolve-{run_id}", daemon=True).start()  # fmt: skip
         threading.Thread(target=self._heartbeat, args=(download,), name=f"resolve-lock-{run_id}", daemon=True).start()
         return download
 
-    def _resolve_run(self, d: Download, finish: Callable[[Path], Any]) -> None:
+    def _resolve_run(self, d: Download, finish: Callable[[Path], Any], extra: dict[str, str]) -> None:
         from vlm_pipeline.app.user_assets import UserModelTooLargeError
         from vlm_pipeline.download.hub import EXIT_HUB
         from vlm_pipeline.download.resolver import RepoFilesInvalidError
@@ -380,8 +382,12 @@ class DownloadService:
         part = d.asset
         run_dir = self.root / "outputs" / "runs" / d.run_id
         planned = planned_bytes(0.05)
+        if part.kind == "dataset":  # one bounded sample file of the split comes too (dataset_layout.SAMPLE_MAX)
+            from vlm_pipeline.download.dataset_layout import SAMPLE_MAX
+
+            planned += SAMPLE_MAX
         spec = {"kind": part.kind, "repo": part.repo, "revision": part.revision, "resolve": True,
-                "remote_code_files": [], "max_bytes": planned, "plan_only": True}  # fmt: skip
+                "remote_code_files": [], "max_bytes": planned, "plan_only": True, **extra}  # fmt: skip
         try:
             final = self._job(d, part, run_dir, spec, planned)
             if final.status != RunStatus.COMPLETED:
@@ -394,9 +400,12 @@ class DownloadService:
             self._set(d, "completed")
         except UserModelTooLargeError as exc:
             self._fail(d, {"code": "NET-004", "params": exc.params})
-        except RepoFilesInvalidError:  # a config the app cannot read safely: never used (security H2)
-            unreadable = {"repo": part.repo, "revision": "", "reason": "unreadable_config", "file": "unknown"}
-            self._fail(d, {"code": "MODEL-004", "params": unreadable})
+        except RepoFilesInvalidError:  # a file the app cannot read safely: never used (security H2)
+            if part.kind == "dataset":
+                self._fail(d, {"code": "DATA-010", "params": {"repo": part.repo, "missing": "image", "available": ""}})
+            else:
+                unreadable = {"repo": part.repo, "revision": "", "reason": "unreadable_config", "file": "unknown"}
+                self._fail(d, {"code": "MODEL-004", "params": unreadable})
         except VlmPipelineError as exc:
             self._fail(d, {"code": exc.code, "params": exc.params})
         except Exception:  # never a traceback to the UI
@@ -404,6 +413,18 @@ class DownloadService:
             self._fail(d, {"code": "SYS-000", "params": {}})
         finally:
             self._release(d.run_id)
+
+    def run_data_job(self, d: Download, name: str, argv: tuple[str, ...], ro_inputs: tuple[Path, ...]) -> Any:
+        """A ``data`` job (no network, CPU) of ``d`` in its own run dir ``outputs/runs/<name>``; its final manifest."""
+        run_dir = self.root / "outputs" / "runs" / name
+        run_dir.mkdir(parents=True)
+        job = ContainerJob(name=name, image=DEFAULT_TRAIN_IMAGE, gpu=False, memory_gb=4, narrow=True,
+                           rw_dirs=(run_dir,), ro_inputs=ro_inputs, argv=argv)  # fmt: skip
+        manifest = RunManifest(run_id=name, name=f"inspect {d.asset.name}", stage="data", task="inspect",
+                               dataset=f"{d.asset.repo}@{d.asset.revision}")  # fmt: skip
+        return run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
+                       take_gpu_lock=False, launcher=self._launcher, on_wait=self._waiting(d),
+                       memory_wait_s=self.memory_wait_s)  # fmt: skip
 
     def _extract(self, d: Download) -> bool:
         """Eval data as plain files: a no-network job extracts the checked source, the host checks and installs it."""

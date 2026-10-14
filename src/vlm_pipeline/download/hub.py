@@ -62,6 +62,7 @@ def meta_caps() -> dict[str, int]:
 
 
 MAX_REPO_FILES = 2000  # security checklist §3
+_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 def read_spec(run_dir: Path) -> dict[str, Any]:
@@ -75,6 +76,10 @@ def read_spec(run_dir: Path) -> dict[str, Any]:
             raise ValueError("bad ref")
         if ref.startswith("refs/pr/"):  # anyone can open a hub PR: never pin unmerged code under the repo's name
             raise ValueError("an unmerged pull request ref is not a revision of the repo")
+        for key in ("config", "split"):  # a dataset's choice (H4): a plain name, or absent
+            value = spec.get(key)
+            if value is not None and not (isinstance(value, str) and _NAME.fullmatch(value)):
+                raise ValueError(f"bad {key}")
     else:
         check_repo(str(spec.get("repo")), str(spec.get("revision")))
     budget = spec.get("max_bytes")
@@ -141,6 +146,32 @@ def _card_license(info: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _dataset_choice(
+    spec: dict[str, Any], api: Any, files: list[dict[str, Any]], names: list[str]
+) -> tuple[dict[str, Any], list[str]]:
+    """A dataset's configs / splits / chosen pair / format and the sample to fetch (download.dataset_layout)."""
+    from vlm_pipeline.download.dataset_layout import choose, has_script, layout, sample_files
+
+    sizes = {f["name"]: f["size"] for f in files}
+    tree = layout(sizes)  # planned files only: a *.py is never planned (its presence is has_script)
+    try:  # the hub's own parquet conversion (refs/convert/parquet): DATA-009 can offer it instead of a script
+        refs = api.list_repo_refs(spec["repo"], repo_type="dataset")
+        export = any(getattr(r, "ref", "") == "refs/convert/parquet" for r in getattr(refs, "converts", None) or ())
+    except Exception:  # noqa: BLE001 - optional: absent means "not offered"
+        export = False
+    block: dict[str, Any] = {
+        "configs": sorted(tree), "has_script": has_script(names), "has_parquet_export": export,
+        "config": None, "split": None, "splits": [], "format": "unknown", "sample": [],
+    }  # fmt: skip
+    if not tree:
+        return block, []
+    config, split = choose(tree, spec.get("config"), spec.get("split"))
+    fmt, sample = sample_files(tree[config][split], sizes, sizes)
+    block.update(config=config, split=split, splits=sorted(tree[config]), format=fmt, sample=sample,
+                 split_bytes=sum(sizes.get(f.name, 0) for f in tree[config][split]))  # fmt: skip
+    return block, sample
+
+
 def resolve(run_dir: Path, spec: dict[str, Any], *, api: Any, fetch: Callable[..., str], token: str | None) -> int:
     """Resolve mode (module docstring): pin the ref, list every file, fetch only the small JSON files."""
     kind: Kind = spec["kind"]
@@ -171,7 +202,14 @@ def resolve(run_dir: Path, spec: dict[str, Any], *, api: Any, fetch: Callable[..
     unreadable = sorted(n for n, cap in caps.items() if n in names and (n not in sizes or sizes[n] > cap))
     meta = {"sha": sha, "gated": bool(gated), "license": _card_license(info), "all_files": names,
             "files": files, "total_bytes": sum(f["size"] for f in files), "unreadable": unreadable}  # fmt: skip
+    sample: list[str] = []
+    if kind == "dataset":
+        meta["dataset"], sample = _dataset_choice(spec, api, files, names)
     (stage / "resolve.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    for name in sample:  # one bounded file of the chosen split (imagefolder: its metadata + a few images)
+        fetch(repo_id=spec["repo"], filename=name, revision=sha, repo_type=kind, local_dir=str(stage / "sample"),
+              cache_dir=str(stage / "cache"), token=token)  # fmt: skip
+    shutil.rmtree(stage / "sample" / ".cache" / "huggingface", ignore_errors=True)
     for name in caps:
         if name not in sizes or name in unreadable:
             continue

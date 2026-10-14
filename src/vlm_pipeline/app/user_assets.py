@@ -239,6 +239,7 @@ class ResolveMeta(BaseModel):
     files: list[_PlannedFile] = Field(max_length=2000)
     total_bytes: int = Field(ge=0)
     unreadable: list[str]
+    dataset: dict[str, object] | None = None  # a dataset resolve: validated by app.user_datasets.DatasetBlock
 
     @model_validator(mode="after")
     def _names(self) -> Self:
