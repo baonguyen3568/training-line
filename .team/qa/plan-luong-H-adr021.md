@@ -113,3 +113,14 @@ security: ca config.json bất thường + review · frontend: UI dán repo / gh
    vendor qwen-research thành non_commercial (backlog a5ba012).
 5. Ca âm remote code: một repo có *.py ⇒ MODEL-004 ngay ở resolve, 0 byte tải.
 Tổng tải < 20 GB.
+
+### E2E H lượt 2 (TÍNH cho tiêu chí ≥ 3 họ ngoài Qwen; cần default image -8, sau hồi quy 3b; PM đã duyệt, research 14/10)
+1. HuggingFaceTB/SmolVLM2-2.2B-Instruct @482adb537c02 (smolvlm, apache-2.0, 9.0 GB; patch 0008)
+2. llava-hf/llava-interleave-qwen-0.5b-hf @1090956dd1c7 (llava, license "other": kiểm luồng xác nhận license trên UI, 1.7 GB)
+3. llava-hf/llava-v1.6-mistral-7b-hf @2424fdd47412 (llava_next, apache-2.0, 15.1 GB, RAM ước ≈ 47 GB): chạy nếu preflight
+   đủ ngân sách; nếu bị chặn vì RAM thì đây là ca âm "chặn vì RAM, câu dễ hiểu" và KHÔNG tính là họ đã chạy.
+   Khi đó họ thứ 3 lấy từ dự phòng.
+4. Dự phòng: HuggingFaceTB/SmolVLM-500M-Instruct @a7da5b986cb5 (idefics3, 1.0 GB); idefics3 khác smolvlm.
+Tổng tải khoảng 26 GB (> 20 GB): PM đã biết. Lượt 2 thay danh sách H1 nhỏ đã ghi trước đó (SmolVLM-256M / InternVL3-1B /
+llava-onevision), những repo đó thành dự phòng nếu cần.
+Đạt H1 khi ≥ 3 model_type ngoài Qwen KHÁC NHAU có trial 5 bước + adapter thật qua đường của app.
