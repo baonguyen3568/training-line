@@ -1242,10 +1242,10 @@ license:
     eval_only: Chỉ dùng để chấm điểm; không dùng để train hay làm dữ liệu hiệu chỉnh khi nén.
     no_redistribution: Không chia sẻ lại bộ dữ liệu này.
     per_source_terms: Mỗi ảnh giữ điều khoản riêng của nguồn gốc; xem trang mô tả của bộ dữ liệu.
-    eu_multimodal_restriction: Giấy phép không cấp quyền dùng bản đọc ảnh của model này cho cá nhân cư trú, hoặc công ty có trụ sở chính, tại Liên minh châu Âu.
+    eu_multimodal_restriction: Giấy phép không cấp quyền dùng bản đọc ảnh của model này cho cá nhân cư trú, hoặc công ty có trụ sở chính, tại Liên minh châu Âu. Hạn chế này không áp dụng cho người dùng cuối của sản phẩm hoặc dịch vụ có tích hợp model.
     mau_threshold: 'Nếu sản phẩm hoặc dịch vụ của bạn vượt {text} người dùng hoạt động mỗi tháng, bạn phải xin giấy phép riêng từ nhà phát hành.'
-    built_with_notice: 'Khi chia sẻ model hoặc sản phẩm tạo ra từ nó, hiển thị rõ dòng "{text}" trên website, giao diện hoặc tài liệu liên quan.'
-    derivative_name_prefix: 'Model bạn tạo ra từ nó (train hoặc fine-tune), nếu chia sẻ, phải có tên bắt đầu bằng "{text}".'
+    built_with_notice: 'Khi chia sẻ model hoặc sản phẩm tạo ra từ nó hay từ kết quả (output) của nó, hiển thị rõ dòng "{text}" trên website, giao diện hoặc tài liệu liên quan.'
+    derivative_name_prefix: 'Model bạn train hoặc fine-tune từ nó, hay từ kết quả (output) của nó, nếu chia sẻ, phải có tên bắt đầu bằng "{text}".'
     pass_on_use_restrictions: Khi chia sẻ, đưa các hạn chế sử dụng của nhà phát hành vào điều khoản của bạn và báo cho người nhận rằng model chịu các hạn chế đó.
     revenue_threshold: 'Chỉ được dùng thương mại khi doanh thu năm dưới {text}; vượt mức này thì không được cấp phép. Tổ chức phi lợi nhuận dùng cho nghiên cứu được miễn.'
   policy_link: Xem chính sách

@@ -1242,10 +1242,10 @@ license:
     eval_only: Use it for scoring only; not for training or as calibration data for quantization.
     no_redistribution: Don't share this dataset onward.
     per_source_terms: Each image keeps its own source's terms; see the dataset card.
-    eu_multimodal_restriction: The license grants no rights to use this model's image-capable version to individuals living in, or companies with their main office in, the European Union.
+    eu_multimodal_restriction: The license grants no rights to use this model's image-capable version to individuals living in, or companies with their main office in, the European Union. This does not apply to end users of a product or service that includes the model.
     mau_threshold: 'If your product or service has more than {text} monthly active users, you must get a separate license from the publisher.'
-    built_with_notice: 'When you share the model or a product made from it, show the line "{text}" clearly on a related website, interface or documentation.'
-    derivative_name_prefix: 'A model you make from it (training or fine-tuning) must have a name starting with "{text}" if you share it.'
+    built_with_notice: 'When you share the model or a product made from it or from its outputs, show the line "{text}" clearly on a related website, interface or documentation.'
+    derivative_name_prefix: 'A model you train or fine-tune from it, or from its outputs, must have a name starting with "{text}" if you share it.'
     pass_on_use_restrictions: When you share, include the publisher's use restrictions in your own terms and tell recipients the model is subject to them.
     revenue_threshold: 'Commercial use is allowed only while yearly revenue is below {text}; above that, no license is granted. Non-profits using it for research are exempt.'
   policy_link: View policy
