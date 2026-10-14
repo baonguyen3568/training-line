@@ -1780,6 +1780,8 @@ byo:
     placeholder: "e.g. Qwen/Qwen3.5-2B"
     facts: "{family} · ~{params} parameters · ~{size_gb} GB download"
     use: Use this model
+    added: Models you added
+    in_use: In use
   unverified: Not verified
   unverified_help: You added this model yourself; the team has not test-run it like the verified models. Time and memory are estimates from its parameter count. Click "Quick test run" (a few steps) before a real training run.
   estimate_upper: Estimated from the model's parameter count; usually higher than actual.

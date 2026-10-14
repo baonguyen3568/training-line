@@ -1780,6 +1780,8 @@ byo:
     placeholder: "vd: Qwen/Qwen3.5-2B"
     facts: "{family} · ~{params} tham số · tải ~{size_gb} GB"
     use: Dùng model này
+    added: Model bạn đã thêm
+    in_use: Đang dùng
   unverified: Chưa kiểm chứng
   unverified_help: Model này do bạn tự thêm, team chưa chạy thử trên máy như các model đã kiểm chứng. Thời gian và bộ nhớ chỉ là ước lượng theo số tham số. Nên bấm "Chạy thử nhanh" (vài bước) trước khi train thật.
   estimate_upper: Ước lượng theo số tham số của model, thường cao hơn thực tế.
