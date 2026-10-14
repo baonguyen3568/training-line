@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LicenseObligation } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { formatDuration } from "../lib/format";
-import { cardSays } from "../lib/licenses";
+import { cardFull, cardSays } from "../lib/licenses";
 import { type DownloadKind, downloadKey, downloadPercent, useDownloads } from "../store/downloads";
 import { ErrorIcon } from "./ErrorIcon";
 import { GatedSteps } from "./GatedSteps";
@@ -125,7 +125,9 @@ export function DownloadDialog({
           </p>
         )}
         {target.license === "unknown" && target.licenseCard && cardSays(target.licenseCard) && (
-          <p className="small license-card">{cardSays(target.licenseCard)}</p>
+          <p className="small license-card" title={cardFull(target.licenseCard)}>
+            {cardSays(target.licenseCard)}
+          </p>
         )}
         {!busy && entry?.status !== "completed" && entry?.status !== "unverified" && (
           <label className="field check">

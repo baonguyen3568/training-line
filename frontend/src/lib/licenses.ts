@@ -15,3 +15,5 @@ export const licenseName = (id: string) => LICENSE_NAME[id] ?? id;
  * undefined while the copy is missing (the line hides, never a key). */
 export const cardSays = (text: string): string | undefined =>
   tpOptional(["license", "card_says"], { text: untrustedText(text, 200) });
+/** The whole of it, for the line's title (still visible-escaped; bounded so a huge card cannot flood it). */
+export const cardFull = (text: string): string => untrustedText(text, 2000);

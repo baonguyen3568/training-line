@@ -259,7 +259,7 @@ describe("unknown licence", () => {
           catalogId: "user--a--b--0f3a9c1e",
           name: "b",
           license: "unknown",
-          licenseCard: "<b>research only</b>",
+          licenseCard: `<b>research only</b> ${"x".repeat(300)}`,
         }}
         onClose={() => {}}
       />,
@@ -270,9 +270,13 @@ describe("unknown licence", () => {
     expect(dialog.textContent).not.toMatch(/\bunknown\b/);
     // the author's own words, as plain text (untrusted): the tag stays text, never markup; no copy → no line, no key
     const { cardSays } = await import("../src/lib/licenses");
-    const said = cardSays("<b>research only</b>");
-    if (said) expect(dialog.textContent).toContain(said);
+    const card = `<b>research only</b> ${"x".repeat(300)}`;
+    const line = dialog.querySelector(".license-card") as HTMLElement;
+    expect(line.textContent).toBe(cardSays(card)); // cut at 200 with "…"
+    expect(line.textContent).toContain("<b>research only</b>");
+    expect(line.textContent?.endsWith("…”")).toBe(true);
+    expect(line.title).toBe(card); // the whole of it on hover
     expect(dialog.textContent).not.toContain("license.card_says");
-    expect(dialog.querySelector(".license-card b")).toBeNull();
+    expect(line.querySelector("b")).toBeNull();
   });
 });
