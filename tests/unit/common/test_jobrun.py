@@ -779,3 +779,89 @@ def test_graph_classifies_a_cuda_oom_log_tail_as_mem003() -> None:
     other = classify(ContainerExit(1, log_tail="KeyError: 'x'"), cancelled=False, checkpoint_step=None)
     assert other.error is not None
     assert other.error.code == "SYS-003"
+
+
+def test_a_job_is_never_budgeted_by_the_launchers_own_cgroup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PM 2026-10-14: the compose app (4 GB cgroup) saw "3.9 GB available" and every job it launched waited
+    forever. A run_job job runs in its OWN container: only host memory is its budget."""
+    from vlm_pipeline.common import jobrun
+
+    root, job, manifest = _approved_run(tmp_path, monkeypatch)
+    seen: dict[str, object] = {}
+
+    def fake_wait(est: float, **kw: object) -> bool:
+        seen["read_cgroup"] = kw.get("read_cgroup")
+        return False  # cancelled: stop right after the memory wait
+
+    monkeypatch.setattr("vlm_pipeline.common.preflight.wait_for_memory", fake_wait)
+    jobrun.run_job(job, manifest, tmp_path / "run", project_root=root, who="t", est_peak_gb=2)  # type: ignore[arg-type]
+    reader = seen["read_cgroup"]
+    assert callable(reader)
+    assert reader() is None
+
+
+def test_preflight_can_leave_the_callers_cgroup_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.common import preflight as pf
+    from vlm_pipeline.common.memguard import MemSnapshot
+
+    host = MemSnapshot(mem_total_gb=121.0, mem_available_gb=42.0, cached_gb=30.0, swap_free_gb=6.0)
+    monkeypatch.setattr(pf, "read_meminfo", lambda: host)
+    monkeypatch.setattr(pf, "read_cgroup_available_gb", lambda: 3.9)  # the app container's own 4 GB cap
+    mem = [f.code for f in pf.preflight(2.0, lock_holder=lambda: None, gpus=[]).findings if f.code == "MEM-001"]
+    assert mem == ["MEM-001"]  # the process itself would not fit in its own cgroup
+    free = pf.preflight(2.0, lock_holder=lambda: None, gpus=[], own_cgroup=False).findings
+    assert "MEM-001" not in [f.code for f in free]  # but a job in another container does
+
+
+def test_an_app_capped_at_4gb_still_runs_a_2gb_job_when_the_host_has_40gb(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PM 2026-10-14 regression: the REAL memory queue and preflight, only the readings faked. The app's own cgroup
+    (4 GB cap, 3.9 GB headroom) must not hold back a job that runs in its own container."""
+    import threading
+    from types import SimpleNamespace
+
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common import preflight as pf
+    from vlm_pipeline.common.jobrun import ExitInfo
+    from vlm_pipeline.common.memguard import MemSnapshot
+    from vlm_pipeline.common.runinfo import RunManifest, RunStatus
+
+    host = MemSnapshot(mem_total_gb=121.0, mem_available_gb=40.0, cached_gb=30.0, swap_free_gb=6.0)
+    monkeypatch.setattr(pf, "read_meminfo", lambda: host)
+    monkeypatch.setattr(pf, "read_cgroup_available_gb", lambda *_a: 3.9)  # the compose app's own cap
+    real_wait = pf.wait_for_memory
+
+    def wait(est: float, **kw: object) -> bool:  # the real queue, reading the faked host, never sleeping long
+        return real_wait(est, read=lambda: host, gpus=lambda: [], poll_s=0.01, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pf, "wait_for_memory", wait)
+    root = _probe_root(tmp_path, "bao-security APPROVED 2026-10-13")
+    monkeypatch.setattr(jobrun, "image_digest", lambda _image: f"sha256:{'a' * 64}")
+    monkeypatch.setattr(jobrun, "git_state", lambda _root: ("c0ffee", False))
+    monkeypatch.setattr(jobrun, "read_meminfo", lambda: host)
+    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=35.0, fast_fall_killed=False,
+                            thresholds=SimpleNamespace(abort_gb=8.0))  # fmt: skip
+    monkeypatch.setattr(jobrun, "run_guarded", lambda launch, *a, **k: (launch(), guard))
+
+    class Launcher:
+        def run(self, *a: object, **k: object) -> int:
+            return 0
+
+        def state(self, name: str) -> ExitInfo:
+            return ExitInfo(exit_code=0, oom_killed=False)
+
+        def stop(self, *a: object) -> None: ...
+
+        def kill(self, *a: object) -> None: ...
+
+        def remove(self, *a: object) -> None: ...
+
+    run_dir = root / "outputs" / "runs" / "20261014-0132-dl-x"
+    final = jobrun.run_job(
+        ContainerJob(name="20261014-0132-dl-x", image="vlm-x:1", argv=("true",), gpu=False),
+        RunManifest(run_id="20261014-0132-dl-x", name="t", stage="data", task="download"),
+        run_dir, project_root=root, who="t", est_peak_gb=2.0, lock_path=tmp_path / "GPU_LOCK",
+        launcher=Launcher(), memory_wait_s=0.5,  # type: ignore[arg-type]
+    )  # fmt: skip
+    assert final.status == RunStatus.COMPLETED  # before the fix: SYS-002 after the memory wait

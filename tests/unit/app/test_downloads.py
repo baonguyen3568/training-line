@@ -337,3 +337,21 @@ def test_a_running_download_refreshes_its_lock(svc: Any, monkeypatch: pytest.Mon
     release.set()
     assert _wait(service, started["download_id"]) == "completed"
     service._stop.set()
+
+
+def test_a_download_waiting_for_memory_says_so(svc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PM 2026-10-14: the prefetch waited 17 min with no word; now every memory poll is an event (need vs avail)."""
+    service, events = svc
+    _fake_job(monkeypatch, {})
+    fake = downloads.run_job
+
+    def waits(job: Any, manifest: Any, run_dir: Path, **kw: Any) -> Any:
+        kw["on_wait"]({"need_gb": 10.0, "avail_gb": 3.9, "waited_s": 30.0, "since": 1.0})
+        assert kw["memory_wait_s"] == service.memory_wait_s
+        return fake(job, manifest, run_dir, **kw)
+
+    monkeypatch.setattr(downloads, "run_job", waits)
+    started = service.start("model", "m")
+    assert _wait(service, started["download_id"]) == "completed"
+    [waiting] = [e for _i, e in events if e.get("type") == "waiting"]
+    assert waiting == {"type": "waiting", "waiting_for": "memory", "need_gb": 10.0, "avail_gb": 3.9, "waited_s": 30.0}

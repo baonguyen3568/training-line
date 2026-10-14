@@ -143,6 +143,7 @@ class DownloadService:
         self._launcher = launcher
         self._lock = threading.Lock()
         self._stop = threading.Event()  # tests: end the heartbeat threads
+        self.memory_wait_s = 1800.0  # run_job's memory queue; install.sh asks for less (it should never wait long)
         self.downloads: dict[str, Download] = {}
 
     # ------------------------------------------------------------------------------------------ checks
@@ -232,6 +233,15 @@ class DownloadService:
                 f.write(body)
             return
 
+    def _waiting(self, d: Download) -> Callable[[dict[str, float]], None]:
+        """The memory queue's report as an event: a job that waits says why (need vs available GB), never silently."""
+
+        def report(info: dict[str, float]) -> None:
+            fields: dict[str, float] = {k: info[k] for k in ("need_gb", "avail_gb", "waited_s") if k in info}
+            self._emit(d.download_id, {"type": "waiting", "waiting_for": "memory", **fields})
+
+        return report
+
     def _heartbeat(self, d: Download) -> None:
         """Keep the lock's mtime fresh while ``d`` runs (and only while the lock is still ``d``'s)."""
         active = self.root / ACTIVE_REL
@@ -317,7 +327,8 @@ class DownloadService:
         self._set(d, "downloading", part=part.repo)
         threading.Thread(target=self._watch_progress, args=(d, run_dir), daemon=True).start()
         final = run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
-                        take_gpu_lock=False, launcher=self._launcher)  # fmt: skip
+                        take_gpu_lock=False, launcher=self._launcher, on_wait=self._waiting(d),
+                        memory_wait_s=self.memory_wait_s)  # fmt: skip
         if final.status != RunStatus.COMPLETED:
             self._fail(d, {"code": "NET-001", "params": {"reason": "network"}})
             return False
@@ -347,7 +358,8 @@ class DownloadService:
         manifest = RunManifest(run_id=run_id, name=f"extract {d.asset.name}", stage="data", task="extract",
                                dataset=f"{d.asset.repo}@{d.asset.revision}")  # fmt: skip
         final = run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
-                        take_gpu_lock=False, launcher=self._launcher)  # fmt: skip
+                        take_gpu_lock=False, launcher=self._launcher, on_wait=self._waiting(d),
+                        memory_wait_s=self.memory_wait_s)  # fmt: skip
         if final.status != RunStatus.COMPLETED:
             self._fail(d, {"code": "NET-003", "params": {"name": d.asset.name, "reason": "mismatch"}})
             return False
@@ -419,12 +431,14 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - install.sh
     parser = argparse.ArgumentParser(prog="python -m vlm_pipeline.app.downloads")
     parser.add_argument("--template", required=True)
     parser.add_argument("--yes-large", action="store_true", help="the user confirmed downloads over the threshold")
+    parser.add_argument("--memory-wait-min", type=float, default=30.0, help="give up waiting for free memory after")
     args = parser.parse_args(argv)
     root = project_root()
     template = json.loads((root / "configs" / "templates" / f"{Path(args.template).name}.json").read_text("utf-8"))
     store = SecretStore(root, create_key=False)
     service = DownloadService(root, emit=lambda _i, e: print(json.dumps(e), flush=True),
                               token=lambda: store.reveal("HF_TOKEN"))  # fmt: skip
+    service.memory_wait_s = max(1.0, args.memory_wait_min) * 60
     failed = 0
     for kind, catalog_id in template_assets(template):
         reply = service.start(kind, catalog_id, confirm=args.yes_large)  # never confirmed for the user (P1)

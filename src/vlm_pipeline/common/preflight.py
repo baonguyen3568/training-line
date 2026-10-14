@@ -216,8 +216,13 @@ def preflight(
     thresholds: MemThresholds = DEFAULT_THRESHOLDS,
     gpus: list[GpuInfo] | None = None,
     est_vram_gb: float | None = None,
+    own_cgroup: bool = True,
 ) -> Verdict:
     """Run every pre-run check; defaults read the live host so no caller can skip disk or lock by accident.
+
+    ``own_cgroup=False``: the job runs in ANOTHER container (run_job), so the caller's own cgroup limit (e.g. the
+    app container's 4 GB) is not the job's budget; only host memory counts (PM 2026-10-14: every job from the
+    compose app waited forever on "3.9 GB available").
 
     Discrete GPU (D-4): VRAM is a second budget, ``est_vram_gb`` (default ``est_peak_gb``) <= max_free_frac x free
     VRAM, and a GeForce card needs a native driver for the image's CUDA. UMA (GB10) and CPU-only hosts: host memory
@@ -226,7 +231,7 @@ def preflight(
     base = root if root is not None else project_root()
     mem = snapshot if snapshot is not None else read_meminfo()
     # The container's own cgroup limit only matters when the caller reads live memory in that container.
-    cgroup_gb = read_cgroup_available_gb() if snapshot is None else None
+    cgroup_gb = read_cgroup_available_gb() if snapshot is None and own_cgroup else None
     dsk = disk if disk is not None else read_disk(base)
     if lock_holder is not None:
         lock = lock_holder()

@@ -708,7 +708,9 @@ def _wait_for_gpu(
     since = time.time()
     short_since: float | None = None  # start of the current memory shortage
     while True:
-        verdict = preflight(est_peak_gb, ckpt_gb=ckpt_gb, thresholds=thresholds, lock_holder=lambda: check_lock(path))
+        verdict = preflight(
+            est_peak_gb, ckpt_gb=ckpt_gb, thresholds=thresholds, lock_holder=lambda: check_lock(path), own_cgroup=False
+        )  # the job is another container: never the caller's own cgroup limit
         busy = [f for f in verdict.findings if f.code == "SYS-001" and f.params.get("state") == "busy"]
         short = [f for f in verdict.findings if f.code == "MEM-001"]  # transient on a shared host: wait
         refused = next((f for f in verdict.findings if f not in busy and f not in short), None)
@@ -739,6 +741,15 @@ def _wait_for_gpu(
             time.sleep(GPU_POLL_S)
 
 
+def _no_cgroup() -> float | None:
+    """No cgroup headroom: a run_job job runs in its OWN container with its own limit.
+
+    The launching process's cgroup (the compose app is capped at 4 GB) says nothing about the job: only host memory
+    is its budget (PM 2026-10-14).
+    """
+    return None
+
+
 def _wait_for_memory(
     manifest: RunManifest,
     run_dir: Path,
@@ -762,7 +773,14 @@ def _wait_for_memory(
                 logger.exception("on_wait callback failed")
 
     try:
-        fits = wait_for_memory(est_peak_gb, thresholds=thresholds, timeout_s=timeout_s, on_wait=_report, cancel=cancel)
+        fits = wait_for_memory(
+            est_peak_gb,
+            thresholds=thresholds,
+            timeout_s=timeout_s,
+            on_wait=_report,
+            cancel=cancel,
+            read_cgroup=_no_cgroup,
+        )  # the job is another container (see _no_cgroup)
     except MemoryWaitTimeoutError:
         failed = {"status": RunStatus.FAILED, "error_code": "SYS-002", "ended_at": time.time()}
         write_manifest(run_dir, manifest.model_copy(update=failed))
