@@ -142,3 +142,46 @@ Qwen3.5-0.8B config). Verified 2026-10-14: **2 FAIL** on vlm-automodel:26.08-6 (
 `Linear4bit` despite the recipe skip), **2 PASS** with the patched files bind-mounted. `patch -p1 --forward --dry-run`
 clean on the 26.08-6 tree. Still to do: research's QLoRA vs LoRA A/B on the patched image (GPU).
 Remove when AutoModel's streaming loader adds HF's default skips upstream.
+
+## 0007-freeze-config-block-prefixes.patch
+Files: `nemo_automodel/components/utils/model_utils.py`, `nemo_automodel/_transformers/infrastructure.py`
+
+Per-block training for ADR-022 #4 (two-stage LLaVA-style: stage 1 projector only, stage 2 projector + LoRA) and #5
+(vision tower unfrozen at its own LR) (bao-research 2026-10-14). The existing `freeze_config` keys freeze by name
+pattern only (Qwen keeps its projector `merger` inside `visual`; LLaVA-style `lm_head` sits outside `language_model`).
+1. `freeze_config.freeze_prefixes` / `train_prefixes`: module paths matched as whole module-name runs anywhere in the
+   parameter name (`param_matches_prefix`: wrappers such as `_orig_mod.` still match, `merger2` never matches
+   `merger`; a short name matches every module of that name, so recipes give full paths). `train_prefixes` applies
+   last and wins. Parameters are walked with `remove_duplicate=False` (a tied `lm_head` matches under its own name).
+   A prefix that matches no parameter raises (`RuntimeError`): a typo never trains the wrong blocks silently.
+2. The PEFT pass that freezes everything not `lora_` is `freeze_non_lora_params(model, freeze_config)`; it keeps the
+   `train_prefixes` parameters by `id(param)` collected with `remove_duplicate=False` (a tied lm_head is kept too).
+   Without it stage 2 "projector + LoRA" was impossible.
+Proven: a full-trained block next to LoRA is saved in the adapter file (`_get_peft_state_dict` takes every
+`requires_grad` parameter) and `train/merge_lora.py` (peft `PeftModel.from_pretrained` + `merge_and_unload`) keeps
+its trained values in the merged model.
+Regression tests: `tests/integration/automodel/test_automodel_block_freeze.py` (6, CPU/meta: Qwen3.5 stage 1 = merger
+only, LLaVA-OV stage 1 = projector only, wrong prefix refused, `merger2` boundary, tied lm_head through the PEFT
+pass, merge keeps the trained projector). All fail on 26.08-7 (keys unknown), pass with the patch.
+Review: bao-fixcode (2 rounds). Remove when AutoModel offers block-level freezing upstream.
+
+## 0008-vlm-labels-from-processor-chat-template.patch
+Files: `nemo_automodel/components/datasets/vlm/collate_fns.py`
+
+Families outside Qwen trained on nothing (bao-research 2026-10-14, measured with the real collate on CORD): SmolVLM
+(idefics3) and LLaVA-OneVision got 0 label tokens, so loss 0 / nan and a run that "completes" without learning.
+1. **Root cause: assistant-turn markers were derived from the TOKENIZER's chat template**, while the collate renders
+   with the PROCESSOR's. LLaVA-OV's processor renders `<|im_start|>assistant \n` (a space), its tokenizer `assistant\n`;
+   SmolVLM's tokenizer template renders nothing for plain-string content. Fix: `_derive_turn_markers_from_processor`
+   renders a sentinel reply through the processor's template and takes the marker tokens by character offsets (a BPE
+   merge with the space before the sentinel cannot hide it); tried first, then the tokenizer path, then the old
+   pattern fallback. Qwen3.5 / Gemma-4 / InternVL results unchanged.
+2. **A batch with no label token is no longer silent**: `build_labels_from_template` calls `_require_labels` exactly
+   once per batch: the first batch must have labels (a broken template stops the run there); later empty batches
+   (an answer truncated away) are counted and warned about, and the run stops once more than 5 % of at least 20
+   batches were empty (counted per process).
+Regression tests: `tests/integration/automodel/test_automodel_vlm_labels.py` (labels == the answer for smolvlm,
+llava_onevision, internvl, gemma4, qwen3_5; empty-batch behaviour incl. all three paths empty -> first batch raises).
+On 26.08-7: smolvlm, llava_onevision and the empty-batch tests fail; with the patch all pass (13 with 0007's).
+Review: bao-fixcode (2 rounds; round 1 found the double count that let a broken template pass its first batch).
+Draft upstream: `.team/upstream/` (research). Remove when AutoModel derives markers from the processor upstream.

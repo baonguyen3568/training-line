@@ -4,3 +4,5 @@ d4456d5f3286720ff9a7012152e2ff35693687e7d9205fb753717770ee01d80c  0003-nemotron-
 ad2315e2c0520c898025e355c610bd53a5b20eff768cd038681e15c7763c979b  0004-nemotron-parse-nvidia-decoder-prefix-and-positional-labels.patch
 4074e25fd961bca7a4720e79ba4403c7f154bab668592f784c257df1cd21960b  0005-nemotron-parse-externalize-radio-conditioner-at-build.patch
 f30be0a19637c89b6b2671c641713d8d1c9035d1edd542f0b36e653cae7981b8  0006-qlora-keep-tied-lm-head-and-recipe-skips-unquantized.patch
+f7fd245e15153d2b882676931a959782c657bc5c5b19de6a24922fb92ee24480  0007-freeze-config-block-prefixes.patch
+db4f0c6246884eaf86c4b194b69a33e13bcb2d4f2791443e76ebf73678cdb4e6  0008-vlm-labels-from-processor-chat-template.patch

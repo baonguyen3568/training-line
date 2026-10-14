@@ -1,0 +1,122 @@
+diff --git a/nemo_automodel/components/datasets/vlm/collate_fns.py b/nemo_automodel/components/datasets/vlm/collate_fns.py
+--- a/nemo_automodel/components/datasets/vlm/collate_fns.py
++++ b/nemo_automodel/components/datasets/vlm/collate_fns.py
+@@ -333,6 +333,37 @@
+     raise ValueError(f"Sentinel '{sentinel}' (ids={sentinel_ids}) not found in template output {all_ids}.")
+ 
+ 
++def _derive_turn_markers_from_processor(processor) -> Tuple[List[int], int]:
++    """Derive the assistant-turn marker from the PROCESSOR's chat template (the one the collate renders with).
++
++    PATCH(vlm): the tokenizer's template can differ from the processor's: LLaVA-OneVision's processor renders
++    ``<|im_start|>assistant \n`` (a space) while its tokenizer renders ``assistant\n``, and SmolVLM's tokenizer
++    template renders nothing for plain-string content. Either way no marker matched and every label was -100.
++    The sentinel is located by character offsets in the rendered text, so a BPE merge with the space before it
++    cannot hide it; the marker is the tokens between the user turn and the reply, tokenized in context.
++    """
++    tokenizer = getattr(processor, "tokenizer", processor)
++    sentinel = "XSENTINELMARKERX"
++
++    def _render(messages) -> str:
++        return processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
++
++    user = [{"role": "user", "content": [{"type": "text", "text": "u"}]}]
++    full_text = _render(user + [{"role": "assistant", "content": [{"type": "text", "text": sentinel}]}])
++    user_text = _render(user)
++    start = full_text.find(sentinel)
++    if start < 0 or not full_text.startswith(user_text) or start < len(user_text):
++        raise ValueError(f"sentinel not found after the user turn in {full_text!r}")
++    end = start + len(sentinel)
++    enc = tokenizer(full_text, add_special_tokens=False, return_offsets_mapping=True)
++    ids, offsets = list(enc["input_ids"]), list(enc["offset_mapping"])
++    marker = [i for i, (a, b) in zip(ids, offsets) if a >= len(user_text) and b <= start]
++    after = [i for i, (a, _) in zip(ids, offsets) if a >= end]
++    if not marker or not after:
++        raise ValueError(f"empty assistant marker or no end-of-turn token in {full_text!r}")
++    return marker, after[0]
++
++
+ def _build_labels_from_markers(
+     input_ids_batch: torch.Tensor,
+     assistant_marker: List[int],
+@@ -394,6 +425,16 @@
+     conversations: Sequence[Sequence[Dict[str, Any]]],
+     processor,
+ ) -> torch.Tensor:
++    """PATCH(vlm): the labels of :func:`_build_labels_from_template_impl`, checked ONCE per collate call."""
++    labels = _build_labels_from_template_impl(input_ids_batch, conversations, processor)
++    return _require_labels(labels, type(processor).__name__)
++
++
++def _build_labels_from_template_impl(
++    input_ids_batch: torch.Tensor,
++    conversations: Sequence[Sequence[Dict[str, Any]]],
++    processor,
++) -> torch.Tensor:
+     """Build training labels by scanning ``input_ids`` for chat-template role markers.
+ 
+     Instead of re-tokenizing assistant text and searching for it (fragile due
+@@ -449,13 +490,29 @@
+         )
+ 
+     # ------------------------------------------------------------------
++    # PATCH(vlm): markers from the processor's own chat template first (what the collate rendered with).
++    # ------------------------------------------------------------------
++    if processor is not tokenizer and getattr(processor, "chat_template", None):
++        try:
++            assistant_marker, stop_id = _derive_turn_markers_from_processor(processor)
++            labels = _build_labels_from_markers(input_ids_batch, assistant_marker, stop_id)
++            if bool((labels != -100).any()):
++                return labels
++            raise ValueError("the processor's assistant marker matched no assistant turn")
++        except ValueError as exc:
++            logger.warning("Processor %s: no turn markers from its chat template (%s).", processor_type, exc)
++
++    # ------------------------------------------------------------------
+     # General path: derive markers from the chat template via sentinel.
+     # Handles Gemma4 and any future model automatically.
+     # ------------------------------------------------------------------
+     if hasattr(tokenizer, "apply_chat_template"):
+         try:
+             assistant_marker, stop_id = _derive_turn_markers(tokenizer)
+-            return _build_labels_from_markers(input_ids_batch, assistant_marker, stop_id)
++            labels = _build_labels_from_markers(input_ids_batch, assistant_marker, stop_id)
++            if bool((labels != -100).any()):  # PATCH(vlm): a marker that never matches is not a success
++                return labels
++            raise ValueError("the tokenizer's assistant marker matched no assistant turn")
+         except Exception as exc:
+             logger.warning(
+                 "Processor %s: could not derive turn markers from chat template (%s). "
+@@ -470,6 +527,32 @@
+     return build_labels(input_ids_batch, conversations, processor)
+ 
+ 
++_LABEL_STATS = {"batches": 0, "empty": 0}  # PATCH(vlm): per process (each dataloader worker counts its own)
++_EMPTY_LABEL_MAX_SHARE = 0.05
++_EMPTY_LABEL_MIN_BATCHES = 20
++
++
++def _require_labels(labels: torch.Tensor, processor_type: str) -> torch.Tensor:
++    """PATCH(vlm): a batch with no assistant token trains on nothing (loss 0 or nan).
++
++    The FIRST batch must have labels: a chat template whose markers never match shows there. Later an empty batch
++    (e.g. one sample whose answer was truncated away) is counted and warned about; the run stops once more than 5 %
++    of at least 20 batches had nothing to learn.
++    """
++    _LABEL_STATS["batches"] += 1
++    if bool((labels != -100).any()):
++        return labels
++    _LABEL_STATS["empty"] += 1
++    batches, empty = _LABEL_STATS["batches"], _LABEL_STATS["empty"]
++    if batches == 1 or (batches >= _EMPTY_LABEL_MIN_BATCHES and empty > _EMPTY_LABEL_MAX_SHARE * batches):
++        raise ValueError(
++            f"{processor_type}: no assistant tokens found in {empty} of {batches} batches; the chat template's "
++            "assistant turn markers did not match the tokenized conversation, so there is nothing to train on"
++        )
++    logger.warning("%s: batch %d has no assistant token to learn (%d empty so far)", processor_type, batches, empty)
++    return labels
++
++
+ def phi4_mm_collate_fn(examples, processor):
+     """Collate function for Phi-4 MM model audio input"""
+ 

@@ -1,0 +1,89 @@
+diff --git a/nemo_automodel/components/utils/model_utils.py b/nemo_automodel/components/utils/model_utils.py
+--- a/nemo_automodel/components/utils/model_utils.py
++++ b/nemo_automodel/components/utils/model_utils.py
+@@ -376,6 +376,29 @@
+         logger.info("Enabled fused_attn on %d RADIO ViT blocks", flipped)
+ 
+ 
++def param_matches_prefix(name: str, prefix: str) -> bool:
++    """PATCH(vlm): True when ``prefix`` (``model.visual.merger``) appears as a run of whole module names anywhere in
++    ``name`` (so wrappers like ``_orig_mod.`` still match, ``model.visual.merger2`` does not). A short prefix such as
++    ``merger`` therefore matches every submodule of that name: give the full dotted path."""
++    prefix = prefix.rstrip(".")
++    return f".{name}".find(f".{prefix}.") >= 0 or f".{name}".endswith(f".{prefix}")
++
++
++def freeze_non_lora_params(model, freeze_config=None):
++    """PATCH(vlm): the PEFT freeze (every non-LoRA parameter) minus ``freeze_config.train_prefixes``, so a block trained
++    in full next to LoRA (two-stage stage 2: projector + LoRA) stays trainable. Matched by identity over every name
++    (``remove_duplicate=False``): a tied lm_head is listed under ``embed_tokens`` too."""
++    prefixes = tuple((freeze_config or {}).get("train_prefixes") or ())
++    keep = {
++        id(param)
++        for name, param in model.named_parameters(remove_duplicate=False)
++        if any(param_matches_prefix(name, p) for p in prefixes)
++    }
++    for name, param in model.named_parameters():
++        if id(param) not in keep and "lora_" not in name and param.requires_grad:
++            param.requires_grad_(False)
++
++
+ def apply_parameter_freezing(model, freeze_config):
+     """Apply parameter freezing based on configuration.
+ 
+@@ -390,7 +413,8 @@
+         - freeze_video_embedder: bool (default False)
+     """
+     # PATCH(vlm): unknown keys used to be ignored silently (e.g. `freeze_embeddings`); refuse them instead.
+-    _known = {"freeze_vision_tower", "freeze_audio_tower", "freeze_language_model", "freeze_video_embedder"}
++    _known = {"freeze_vision_tower", "freeze_audio_tower", "freeze_language_model", "freeze_video_embedder",
++              "freeze_prefixes", "train_prefixes"}  # PATCH(vlm): per-block training (stage/projector-only recipes)
+     unknown = sorted(set(freeze_config) - _known)
+     if unknown:
+         raise ValueError(f"freeze_config has unknown keys {unknown}; supported: {sorted(_known)}")
+@@ -421,6 +445,22 @@
+     if freeze_language_model:
+         _freeze_module_by_attribute_and_patterns(model, "language_model", ["language", "text", "llm"])
+ 
++    # PATCH(vlm): block-level control the name patterns above cannot express (Qwen keeps its projector, `merger`,
++    # inside `visual`; LLaVA-style lm_head sits outside `language_model`). `freeze_prefixes` freezes, then
++    # `train_prefixes` unfreezes (it wins, and also survives the PEFT freeze). Every prefix must match a parameter.
++    for key, trainable in (("freeze_prefixes", False), ("train_prefixes", True)):
++        prefixes = tuple(freeze_config.get(key) or ())
++        if not prefixes:
++            continue
++        matched = {p: 0 for p in prefixes}
++        # remove_duplicate=False: a tied lm_head is listed only under its own name this way
++        for pname, param in model.named_parameters(remove_duplicate=False):
++            for p in prefixes:
++                if param_matches_prefix(pname, p):
++                    param.requires_grad_(trainable)
++                    matched[p] += 1
++        if missing := [p for p, n in matched.items() if n == 0]:
++            raise RuntimeError(f"freeze_config.{key}: no parameter matched {missing}")
+     # NemotronOmni RADIO: patch_generator.video_embedder is only exercised on
+     # video inputs; on image-only training it sits in the optimizer without
+     # state (no grad → no lazy init), so dcp.load on resume raises
+diff --git a/nemo_automodel/_transformers/infrastructure.py b/nemo_automodel/_transformers/infrastructure.py
+--- a/nemo_automodel/_transformers/infrastructure.py
++++ b/nemo_automodel/_transformers/infrastructure.py
+@@ -69,6 +69,7 @@
+ from nemo_automodel.components.utils.model_utils import (
+     _supports_logits_to_keep,
+     apply_parameter_freezing,
++    freeze_non_lora_params,
+     count_model_parameters,
+     enable_radio_vit_fused_attn,
+     freeze_deepseek_v4_indexer_params,
+@@ -727,9 +728,8 @@
+     if peft_config is not None:
+         models_to_freeze = model.parts if hasattr(model, "parts") else [model]
+         for mp in models_to_freeze:
+-            for name, param in mp.named_parameters():
+-                if "lora_" not in name and param.requires_grad:
+-                    param.requires_grad_(False)
++            # PATCH(vlm): keep the blocks the recipe trains in full next to LoRA (freeze_config.train_prefixes).
++            freeze_non_lora_params(mp, freeze_config)
+ 
+     if autopipeline is None:
+         print_trainable_parameters(model)  # Once model's been sharded
