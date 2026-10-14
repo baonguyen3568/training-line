@@ -53,6 +53,9 @@ Cập nhật: 2026-10-12. Nguồn ở cuối file. Ký hiệu: ✅ đã đo/xác
 - v0.6.2 (18/09). VLM: Nemotron 3 Nano Omni, Gemma 4, Qwen3-Omni-MoE, Qwen3-VL... Nemotron Nano 12B v2 VL **sắp bị gỡ ở v0.7.0**, recipe chỉ multi-GPU (TP2/TP4). Không có container riêng — nằm trong `nemo:26.xx` (CUDA 13.3 → rủi ro driver).
 ### NeMo-RL (GRPO)
 - v0.7.0 (29/07), image arm64 nhưng CUDA 13.2. VLM GRPO có từ v0.4 (`examples/run_vlm_grpo.py`). 1-GPU GB10 cho VLM: ❓. VLM DPO: ❓.
+- (cập nhật 2026-10-14) README chính chủ: "SFT và GRPO trên VLM"; tin 04/2026: Qwen3.5 (dense + MoE, LLM + VLM) cho GRPO. VLM DPO: README KHÔNG xác nhận (ví dụ DPO chỉ text). Container `nvcr.io/nvidia/nemo-rl` có arm64 từ v0.5.0 (NGC layers, build 30/01/2026). Chưa pin tag, chưa probe 1 GPU GB10 ⇒ DPO/GRPO đề xuất sang 1.1. Nguồn: https://github.com/NVIDIA-NeMo/RL, https://catalog.ngc.nvidia.com/orgs/nvidia/containers/nemo-rl
+- Playbook DGX Spark vlm-finetuning: image tự build `vlm_demo` (Streamlit), GRPO Qwen2.5-VL-7B, reward format 2.0 + correctness 5.0, 4 generations, LoRA rank 8–64; không nêu thư viện. Nguồn: https://build.nvidia.com/spark/vlm-finetuning/instructions
+- QLoRA: recipe VLM AutoModel 26.08 đọc khối `quantization` (BitsAndBytes, recipes/vlm/finetune.py); có recipe chính chủ `llm_finetune/llama3_3/llama_3_3_70b_instruct_squad_peft_qlora_spark.yaml` (nf4, double quant, compute bf16).
 - Fallback RL: TRL (GRPO/DPO) trong pytorch:25.11 — playbook vlm-finetuning của NVIDIA dùng container riêng + LoRA + GRPO cho Qwen2.5-VL-7B (~2h/100 step).
 ### ModelOpt (quantize)
 - 0.47.0 (23/09); `examples/vlm_ptq` đã bị gộp vào `examples/hf_ptq/hf_ptq.py --vlm --calib_with_images --calib_size 512`.
