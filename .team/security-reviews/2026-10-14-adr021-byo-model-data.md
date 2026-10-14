@@ -109,3 +109,6 @@ Tests the PR must carry: `../x`, `/abs`, `a\b`, symlink, hardlink, device, dupli
   `obligations.yaml` as `non_commercial`, and only then let a card with no `license` but a known `license_name` count.
   Until then such a card is `unknown` (export blocked by SEC-006) and the UI shows the name from `license_card`.
   Reason: moving unknown → non_commercial unblocks export, so it needs the text read first (decided 2026-10-14).
+- SYS-006 (pids limit hit): 1.0 classifies from a narrow log regex on a non-zero exit. After 1.0 the runner should
+  read the container's cgroup `pids.events` (`max` > 0) before removing it and return it in the job state, as the
+  primary signal (protocol change, ADR-015).
