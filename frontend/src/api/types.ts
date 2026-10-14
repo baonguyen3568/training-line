@@ -676,6 +676,13 @@ export interface UserModel {
   trial_run_id?: string | null;
 }
 
+/** GET/PUT /api/user-assets/limits (ADR-021 A1): the cap of one user-added model; the machine quota still applies. */
+export interface UserAssetLimits {
+  max_model_gb: number;
+  max_model_gb_range: [number, number];
+  default_max_model_gb: number;
+}
+
 /** A plan-only hub job (resolve a model / inspect a dataset), polled until done or failed. */
 export interface HubJob<T> {
   status: "queued" | "running" | "done" | "failed";

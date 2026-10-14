@@ -13,6 +13,22 @@ import { Icon } from "./Icon";
 /** Ask the editor to show a toast (it owns the one toast slot). */
 export const toast = (message: string) =>
   window.dispatchEvent(new CustomEvent("vlm:toast", { detail: message }));
+/** The settings input the NET-004 "raise the limit" fix focuses (SettingsPanel, ADR-021 A1). */
+export const MODEL_LIMIT_INPUT = "set-max-model-gb";
+
+/** Focus an element once the page that holds it has rendered (a few frames, then give up quietly). */
+function focusWhenThere(id: string, frames = 30) {
+  const el = document.getElementById(id);
+  if (el) el.focus();
+  else if (frames > 0) requestAnimationFrame(() => focusWhenThere(id, frames - 1));
+}
+
+/** Settings, on the user-added model's size cap (NET-004 model_cap: the quick fix, and the hub panel's error card). */
+export function openModelLimit() {
+  navigate("settings");
+  focusWhenThere(MODEL_LIMIT_INPUT);
+}
+
 const navigate = (to: string) =>
   window.dispatchEvent(new CustomEvent("vlm:navigate", { detail: to }));
 
@@ -129,6 +145,8 @@ function navigation(
   }
   if (target === "settings_secrets" || target === "settings_network")
     return () => navigate("settings");
+  // NET-004 reason model_cap (the server sends the action only then): the cap's input, focused
+  if (target === "settings_limits") return openModelLimit;
   if (target === "bug_report") {
     // with a run the report carries its reference code; validate/preflight errors report without one (design)
     const runId = s.run?.id ?? null;

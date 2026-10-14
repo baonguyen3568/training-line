@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { EventError, ModelResolveJob, UserModel } from "../api/types";
-import { t } from "../i18n";
+import { t, tpOptional } from "../i18n";
 import { hubError, isRepoId, pollHubJob } from "../lib/hubJob";
 import { licenseName } from "../lib/licenses";
 import { runErrorText } from "../lib/runWarning";
@@ -9,6 +9,7 @@ import { useUserModels } from "../store/userModels";
 import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
+import { openModelLimit } from "./QuickFixes";
 
 export type ModelSourceTab = "catalog" | "hub";
 
@@ -194,6 +195,16 @@ export function ModelHubPanel({ nodeId }: { nodeId: string }) {
           <ErrorIcon tone="critical" />
           <strong>{errText?.title}</strong>
           {errText?.what && <p>{errText.what}</p>}
+          {/* over this machine's cap for one user-added model (not the shared quota): the setting that raises it */}
+          {error.code === "NET-004" &&
+            error.params?.reason === "model_cap" &&
+            tpOptional(["action", "raise_model_limit"]) && (
+              <p>
+                <button type="button" className="hairline" onClick={openModelLimit}>
+                  <Icon name="settings" size={14} /> {t("action.raise_model_limit")}
+                </button>
+              </p>
+            )}
         </div>
       )}
       {model && (

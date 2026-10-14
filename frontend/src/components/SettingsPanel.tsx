@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { appPrefix } from "../api/client";
-import type { HealthInfo, LanInfo, SecretField, SessionInfo, SettingsView } from "../api/types";
+import type {
+  HealthInfo,
+  LanInfo,
+  SecretField,
+  SessionInfo,
+  SettingsView,
+  UserAssetLimits,
+} from "../api/types";
 import { getLocale, type Locale, t, tpOptional } from "../i18n";
 import { switchLocale } from "../lib/localePref";
 import { reloadForSignIn } from "../lib/session";
 import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
-import { toast } from "./QuickFixes";
+import { MODEL_LIMIT_INPUT, toast } from "./QuickFixes";
 import { errorText, SecretRow } from "./SecretRow";
 
 const FIELDS: SecretField[] = ["HF_TOKEN", "NGC_API_KEY", "WANDB_API_KEY"];
@@ -388,6 +395,108 @@ function LanSection() {
 }
 
 /** Settings (D4, D-7): secrets the user may set; deployment policy shown read-only with who/why behind "?". */
+/**
+ * "Model tự thêm" (ADR-021 A1): the size cap of one user-added model, 1–1000 GB (default 40); a model above it is
+ * refused when added (NET-004). The machine's download quota still applies. Saved only on "Lưu", checked against the
+ * server's range first; the server checks again (422).
+ */
+function ModelLimitSection() {
+  const [limits, setLimits] = useState<UserAssetLimits | null>(null);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [bad, setBad] = useState(false);
+  useEffect(() => {
+    api.userAssetLimits().then(
+      (l) => {
+        setLimits(l);
+        setValue(String(l.max_model_gb));
+      },
+      () => undefined, // an older server has no limits: the section stays out
+    );
+  }, []);
+  if (!limits) return null;
+  const [lo, hi] = limits.max_model_gb_range;
+  const gb = Number(value);
+  const valid = value.trim() !== "" && Number.isFinite(gb) && gb >= lo && gb <= hi;
+  const save = async () => {
+    if (!valid) {
+      setBad(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const next = await api.setUserAssetLimits({ max_model_gb: gb });
+      setLimits(next);
+      setValue(String(next.max_model_gb));
+      setBad(false);
+      toast(t("settings.max_model_gb_saved", { gb: next.max_model_gb }));
+    } catch {
+      setBad(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section aria-labelledby="set-byo">
+      <h2 id="set-byo">
+        <Icon name="hard-drive" size={16} /> {t("settings.section_byo")}
+      </h2>
+      <div className="set-row">
+        <span className="set-label">
+          <label htmlFor={MODEL_LIMIT_INPUT}>{t("settings.row_max_model_gb")}</label>
+          <button
+            type="button"
+            className="help-btn inline"
+            popoverTarget="set-max-model-help"
+            aria-label={t("d4.explain")}
+          >
+            <Icon name="circle-question-mark" size={14} />
+          </button>
+        </span>
+        <div id="set-max-model-help" popover="auto" className="pop">
+          <strong>{t("settings.row_max_model_gb")}</strong>
+          <p>{t("settings.max_model_gb_help")}</p>
+        </div>
+        <div className="set-control set-input">
+          <input
+            id={MODEL_LIMIT_INPUT}
+            type="number"
+            inputMode="numeric"
+            className="mono set-num"
+            min={lo}
+            max={hi}
+            step={1}
+            value={value}
+            aria-invalid={bad || undefined}
+            aria-describedby={bad ? "set-max-model-range" : undefined}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setBad(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void save();
+            }}
+          />
+          <span className="muted">GB</span>
+          <button
+            type="button"
+            className="btn primary sm"
+            disabled={busy || String(limits.max_model_gb) === value.trim()}
+            onClick={() => void save()}
+          >
+            {t("settings.save")}
+          </button>
+          {bad && (
+            <p id="set-max-model-range" className="field-error" role="alert">
+              {t("settings.max_model_gb_range", { min: lo, max: hi })}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function SettingsPanel() {
   const [view, setView] = useState<SettingsView | null>(null);
   const [failed, setFailed] = useState(false);
@@ -425,6 +534,7 @@ export function SettingsPanel() {
       <SessionSection />
       <LanSection />
       <AppSection />
+      <ModelLimitSection />
       <section aria-labelledby="set-admin">
         <h2 id="set-admin">
           <Icon name="lock" size={16} /> {t("settings.section_admin")}

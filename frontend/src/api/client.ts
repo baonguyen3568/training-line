@@ -33,6 +33,7 @@ import type {
   TemplateMeta,
   TrialResult,
   UploadInfo,
+  UserAssetLimits,
   UserModel,
   ValidationResult,
   Workflow,
@@ -211,6 +212,9 @@ export interface Api {
   addUserModel(body: { repo: string; revision?: string }): Promise<{ resolve_id: string }>;
   userModelResolve(id: string): Promise<ModelResolveJob>;
   confirmUserModelLicense(id: string): Promise<{ model: UserModel }>;
+  /** ADR-021 A1: the size cap of one user-added model, in GB (settings); PUT outside the range → 422. */
+  userAssetLimits(): Promise<UserAssetLimits>;
+  setUserAssetLimits(body: { max_model_gb: number }): Promise<UserAssetLimits>;
   /** The user-added models this machine has a record of (the `user_model` widget's choices, backend H3). */
   listUserModels(): Promise<{ models: UserModel[] }>;
   inspectDataset(body: {
@@ -332,6 +336,8 @@ export const httpApi: Api = {
       accept: true,
     }),
   listUserModels: () => request("GET", "/api/user-assets/models"),
+  userAssetLimits: () => request("GET", "/api/user-assets/limits"),
+  setUserAssetLimits: (body) => request("PUT", "/api/user-assets/limits", body),
   inspectDataset: (body) => request("POST", "/api/user-assets/datasets/inspect", body),
   datasetInspection: (id) =>
     request("GET", `/api/user-assets/inspections/${encodeURIComponent(id)}`),

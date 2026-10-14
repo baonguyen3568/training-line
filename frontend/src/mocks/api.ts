@@ -27,6 +27,7 @@ import type {
   Template,
   TrialResult,
   UploadInfo,
+  UserAssetLimits,
   UserModel,
   ValidationIssue,
   ValidationResult,
@@ -79,6 +80,11 @@ const mockJobs = new Map<
 >();
 let mockJobSeq = 0;
 const mockUserModels = new Map<string, UserModel>();
+const mockLimits: UserAssetLimits = {
+  max_model_gb: 40,
+  max_model_gb_range: [1, 1000],
+  default_max_model_gb: 40,
+};
 
 const mockSession: SessionInfo = {
   origin_class: "local",
@@ -659,7 +665,7 @@ export const mockApi: Api = {
   },
   // G-5: a fake download, events in the server's order (progress… → verifying → completed)
   // ADR-021 / P021 §8 (luồng H): plan-only hub jobs, polled. The repo picks the outcome so every screen is reachable:
-  // "remote" → MODEL-004, "nope" → NET-005, "busy" → 409 SYS-002 (the one download slot), "script" → DATA-009,
+  // "remote" → MODEL-004, "nope" → NET-005, "huge" → NET-004 over the size cap, "busy" → 409 SYS-002, "script" → DATA-009,
   // "license" → unknown licence; the first poll is queued. A malformed id → 400 CFG-005, as the server says it.
   addUserModel: ({ repo, revision }) => {
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || repo.includes("--"))
@@ -685,6 +691,14 @@ export const mockApi: Api = {
       delay({ status: "failed" as const, error: { code, params: { repo: job.repo } } });
     if (job.repo.includes("remote")) return fail("MODEL-004");
     if (job.repo.includes("nope")) return fail("NET-005");
+    if (job.repo.includes("huge"))
+      return delay({
+        status: "failed" as const,
+        error: {
+          code: "NET-004",
+          params: { size_gb: 72, quota_gb: mockLimits.max_model_gb, reason: "model_cap" },
+        },
+      });
     const [org = "", name = ""] = job.repo.split("/");
     const model: UserModel = {
       id: `user--${org}--${name}--0f3a9c1e`,
@@ -714,6 +728,14 @@ export const mockApi: Api = {
     return delay({ model: confirmed });
   },
   listUserModels: () => delay({ models: [...mockUserModels.values()] }),
+  userAssetLimits: () => delay({ ...mockLimits }),
+  setUserAssetLimits: ({ max_model_gb }) => {
+    const [lo, hi] = mockLimits.max_model_gb_range;
+    if (!Number.isFinite(max_model_gb) || max_model_gb < lo || max_model_gb > hi)
+      return Promise.reject(new ApiError(422, { detail: [{ loc: ["body", "max_model_gb"] }] }));
+    mockLimits.max_model_gb = max_model_gb;
+    return delay({ ...mockLimits });
+  },
   inspectDataset: ({ repo, config, split }) => {
     const id = `ins-${++mockJobSeq}`;
     mockJobs.set(id, { polls: 0, repo, config, split });

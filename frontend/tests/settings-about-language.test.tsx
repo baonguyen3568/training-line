@@ -97,13 +97,14 @@ describe("Truy cập từ máy khác", () => {
     expect(section.textContent).toContain("so vân tay SHA-256");
     expect(screen.getByRole("button", { name: "Sao chép vân tay" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sao chép địa chỉ" })).toBeTruthy();
-    // order: Kết nối, Phiên đăng nhập, Truy cập từ máy khác, Ứng dụng, Do quản trị viên đặt
+    // order: Kết nối, Phiên đăng nhập, Truy cập từ máy khác, Ứng dụng, Model tự thêm, Do quản trị viên đặt
     const order = [...document.querySelectorAll("section h2")].map((h) => h.textContent?.trim());
     expect(order).toEqual([
       "Kết nối",
       "Phiên đăng nhập",
       "Truy cập từ máy khác",
       "Ứng dụng",
+      "Model tự thêm",
       "Do quản trị viên đặt",
     ]);
   });
