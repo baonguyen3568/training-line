@@ -159,7 +159,13 @@ def build_request(worker: RealWorker, job: NodeJob, image: Path) -> tuple[TrialR
 
 # Catalog ids whose vLLM answers passed the vLLM<->HF parity gate (proposal 014 §2, tester): only these run on vLLM;
 # every other request falls back to HF and says why (engine_used + engine_fallback). Empty until the gate passes.
-VLLM_PARITY_MODELS: frozenset[str] = frozenset()
+VLLM_PARITY_MODELS: frozenset[str] = frozenset(
+    {
+        # PASS 2026-10-14 (gate v3: base + R2 merged fine-tune, 100 CORD test images): ΔF1 -0.12 [-0.30, 0.04],
+        # 0 anomaly, 0 real divergence on the fine-tune. benchmarks/eval/parity-vllm-hf-qwen3.5-2b-20261014.json
+        "qwen3.5-2b",
+    }
+)
 
 
 def vllm_unavailable(entry: CatalogEntry, request: TrialRequest) -> str | None:
