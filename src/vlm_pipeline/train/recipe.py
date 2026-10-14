@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -129,6 +131,51 @@ def qlora_models(root: Path | None = None) -> frozenset[str]:
     return frozenset(found)
 
 
+# AutoModel applies optimizer.param_group_overrides lr_mult only through its lr_scheduler (research 2026-10-14);
+# the templates have none, so the recipe adds one that keeps today's constant LR. Keys: research's CPU run.
+LR_SCHEDULER_FOR_LR_MULT: dict[str, Any] = {"lr_decay_style": "constant", "lr_warmup_steps": 0}
+
+
+@dataclass(frozen=True)
+class Blocks:
+    """Module prefixes of a model's blocks (families.yaml / the catalog): what train_blocks freezes or trains."""
+
+    vision: tuple[str, ...] = ()
+    projector: tuple[str, ...] = ()
+
+
+def block_freeze(train_blocks: str, blocks: Blocks) -> dict[str, Any]:
+    """freeze_config for ``train_blocks`` (patch 0007 keys; ``train_prefixes`` wins over every freeze).
+
+    lm: the vision tower frozen (Qwen's projector sits inside ``visual``; a projector outside it keeps training, as
+    before train_blocks; projector / projector_lm need patch 0007 keys, image 26.08-8);
+    projector: only the projector (stage 1 of a two-stage recipe; the untied lm_head is frozen too);
+    projector_lm: projector + LM; all: nothing frozen.
+    """
+    if train_blocks not in ("lm", "projector", "projector_lm", "all"):
+        raise RecipeError(f"unknown train_blocks {train_blocks!r}")
+    if train_blocks in ("projector", "projector_lm") and not blocks.projector:
+        raise RecipeError("train_blocks needs the model's projector prefixes (families.yaml / catalog)")
+    if train_blocks == "lm":  # exactly the pre-train_blocks freeze: no patch-0007 key, so it runs on every image
+        return {"freeze_vision_tower": True, "freeze_language_model": False}
+    if train_blocks == "projector":
+        return {"freeze_vision_tower": True, "freeze_language_model": True, "freeze_prefixes": ["lm_head"],
+                "train_prefixes": list(blocks.projector)}  # fmt: skip
+    if train_blocks == "projector_lm":
+        return {"freeze_vision_tower": True, "freeze_language_model": False, "train_prefixes": list(blocks.projector)}
+    return {"freeze_vision_tower": False, "freeze_language_model": False}
+
+
+def vision_pattern(blocks: Blocks) -> str:
+    """Regex (re.search on parameter names, AutoModel param_group_overrides): the vision tower minus the projector."""
+    if not blocks.vision:
+        raise RecipeError("vision_lr_scale needs the model's vision prefixes (families.yaml / catalog)")
+    vision = "|".join(re.escape(v) for v in blocks.vision)
+    inner = [p[len(v) + 1 :] for p in blocks.projector for v in blocks.vision if p.startswith(v + ".")]
+    exclude = f"(?!(?:{'|'.join(re.escape(i) for i in inner)})\\.)" if inner else ""
+    return f"(?:^|\\.)(?:{vision})\\.{exclude}"
+
+
 NO_STEP_CADENCE = 1_000_000_000  # ckpt_every_steps that never fires (step % N == N - 1): epoch ends only
 
 
@@ -148,6 +195,7 @@ def build_recipe(
     train_meta: str | None = None,
     val_meta: str | None = None,
     model_id: str | None = None,
+    blocks: Blocks = Blocks(),  # noqa: B008 - frozen dataclass, an immutable default
 ) -> dict[str, Any]:
     """Return a new recipe dict (the template is not modified).
 
@@ -224,9 +272,12 @@ def build_recipe(
             r["quantization"] = {**QLORA_NF4, "llm_int8_skip_modules": modules}  # the vision part stays bf16
     else:
         r.pop("peft", None)
-        freeze = r.setdefault("freeze_config", {})
-        freeze["freeze_vision_tower"] = params.freeze_vision_tower
-        freeze.setdefault("freeze_language_model", False)
+        r["freeze_config"] = {**r.get("freeze_config", {}), **block_freeze(params.train_blocks, blocks)}
+        if params.train_blocks == "all" and params.vision_lr_scale != 1:
+            _section(r, "optimizer")["param_group_overrides"] = [
+                {"pattern": vision_pattern(blocks), "lr_mult": params.vision_lr_scale}
+            ]
+            r.setdefault("lr_scheduler", dict(LR_SCHEDULER_FOR_LR_MULT))  # lr_mult is applied by the scheduler only
 
     loss = r.get("loss_fn")
     if isinstance(loss, dict) and "class_token_start_idx" in loss:

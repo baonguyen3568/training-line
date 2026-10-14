@@ -334,6 +334,7 @@ error:
       advanced_not_for_model: 'Tuỳ chọn engine "{key}" không dùng được với model đang nối vào bước "{node}". Hãy xoá tuỳ chọn đó hoặc đổi model.'
       advanced: 'Một tuỳ chọn engine của bước "{node}" không hợp lệ. Mở mục Nâng cao của bước này để xem và sửa.'
       qlora_not_for_model: 'Model đang nối vào bước "{node}" chưa được thiết lập để nén 4-bit khi huấn luyện (QLoRA). Hãy đặt "{param}" về "Không nén" hoặc chọn model khác.'
+      blocks_not_for_model: 'App chưa biết các khối (phần nhìn ảnh, bộ nối) của model đang nối vào bước "{node}", nên chưa train theo khối được. Hãy đặt "{param}" về "Phần ngôn ngữ" hoặc chọn model khác.'
   CFG-006:
     title: Có dây nối tới bước không tồn tại
     what: Một dây trỏ tới "{node_id}" nhưng bước này đã bị xoá hoặc đổi tên.
@@ -1011,9 +1012,12 @@ node:
       seed:
         label: Hạt giống ngẫu nhiên (seed)
         help: Giữ nguyên để kết quả chạy lại giống hệt.
-      freeze_vision_tower:
-        label: Giữ nguyên phần nhìn ảnh
-        help: 'Không dạy lại phần đọc ảnh của model: nhanh hơn, ít RAM hơn, và ít làm hỏng khả năng nhìn.'
+      train_blocks:
+        label: Phần được train
+        help: 'Phần nào của model được học lại; phần còn lại giữ nguyên. Mặc định chỉ train phần ngôn ngữ: nhanh hơn, ít RAM hơn, và ít làm hỏng khả năng nhìn.'
+      vision_lr_scale:
+        label: Tốc độ học của phần nhìn ảnh
+        help: Khi train cả phần nhìn ảnh, tốc độ học của phần đó bằng con số này nhân với tốc độ của phần còn lại (0.05–0.2, tức chậm hơn 5–20 lần), để không làm hỏng khả năng nhìn.
   train.grpo_vlm:
     title: Học từ phản hồi (GRPO)
     desc: Cải thiện model bằng cách chấm điểm các câu trả lời. Dành cho người dùng nâng cao.
@@ -1353,6 +1357,11 @@ qa_focus:
   text_reading: Đọc chữ
   counting: Đếm
   charts: Biểu đồ
+train_blocks:
+  lm: Phần ngôn ngữ
+  projector: Chỉ bộ nối ảnh–chữ
+  projector_lm: Bộ nối + phần ngôn ngữ
+  all: Toàn bộ model
 lr_preset:
   slow: Chậm – an toàn
   medium: Vừa
@@ -1543,8 +1552,6 @@ docs_error:
   actions_lead: "Tuỳ trường hợp, app sẽ đề xuất một trong các cách sau:"
 pipelines:
   more_steps: "+{step_count} bước"
-  measured_with: 'Đo với: {model}'
-  paper: Bài báo
   swap_hint: Đổi model hoặc dữ liệu ở bước nguồn để dùng pipeline này với model, dữ liệu khác; số đo trên thẻ chỉ đúng với cấu hình đã đo.
   metric:
     field_f1: F1 theo trường

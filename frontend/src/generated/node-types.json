@@ -1585,14 +1585,6 @@
               "widget": "segmented"
             }
           },
-          "freeze_vision_tower": {
-            "default": true,
-            "title": "Freeze Vision Tower",
-            "type": "boolean",
-            "x-ui": {
-              "advanced": true
-            }
-          },
           "global_batch_size": {
             "default": 8,
             "maximum": 64,
@@ -1646,6 +1638,40 @@
             "type": "integer",
             "x-ui": {
               "advanced": true
+            }
+          },
+          "train_blocks": {
+            "default": "lm",
+            "enum": [
+              "lm",
+              "projector",
+              "projector_lm",
+              "all"
+            ],
+            "title": "Train Blocks",
+            "type": "string",
+            "x-ui": {
+              "advanced": true,
+              "disabled_options": {
+                "projector": "param_unsupported.worker_v1",
+                "projector_lm": "param_unsupported.worker_v1"
+              },
+              "option_keys": "train_blocks"
+            }
+          },
+          "vision_lr_scale": {
+            "default": 0.1,
+            "maximum": 0.2,
+            "minimum": 0.05,
+            "title": "Vision Lr Scale",
+            "type": "number",
+            "x-ui": {
+              "advanced": true,
+              "visible_when": {
+                "train_blocks": [
+                  "all"
+                ]
+              }
             }
           },
           "weight_decay": {

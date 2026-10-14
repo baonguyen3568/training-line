@@ -8,7 +8,9 @@ from vlm_pipeline.common.catalog import load_catalog
 from vlm_pipeline.common.paths import project_root
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
 from vlm_pipeline.train.recipe import (
+    LR_SCHEDULER_FOR_LR_MULT,
     NO_STEP_CADENCE,
+    Blocks,
     RecipeError,
     build_recipe,
     load_template,
@@ -130,3 +132,73 @@ def test_qlora_needs_the_templates_skip_list() -> None:
     with pytest.raises(RecipeError, match=QLORA_SKIP_KEY):
         build_recipe(bare, LoraParams(quantize_base="nf4"), model_dir="m", dataset_dir="d", run_dir="r")
     assert "quantization" not in build_recipe(bare, LoraParams(), model_dir="m", dataset_dir="d", run_dir="r")
+
+
+# ------------------------------------------------------------------------------------- train_blocks (ADR-022, P023 §1)
+QWEN_BLOCKS = Blocks(vision=("model.visual",), projector=("model.visual.merger",))
+
+
+@pytest.mark.parametrize(
+    ("blocks", "expected"),
+    [
+        ("lm", {"freeze_vision_tower": True, "freeze_language_model": False}),  # no 0007 key: runs on 26.08-7
+        ("projector", {"freeze_vision_tower": True, "freeze_language_model": True, "freeze_prefixes": ["lm_head"],
+                       "train_prefixes": ["model.visual.merger"]}),
+        ("projector_lm", {"freeze_vision_tower": True, "freeze_language_model": False,
+                          "train_prefixes": ["model.visual.merger"]}),
+        ("all", {"freeze_vision_tower": False, "freeze_language_model": False}),
+    ],
+)  # fmt: skip
+def test_train_blocks_map_to_patch_0007_freeze_keys(blocks: str, expected: dict) -> None:  # type: ignore[type-arg]
+    params = FullFinetuneParams(train_blocks=blocks)  # type: ignore[arg-type]
+    r = build_recipe(_tpl("nemotron-parse-v1.1"), params, model_dir="m", dataset_dir="d", run_dir="r",
+                     class_token_start_idx=1, blocks=QWEN_BLOCKS)  # fmt: skip
+    assert r["freeze_config"] == {**r["freeze_config"], **expected}
+    if blocks == "lm":
+        assert not {"freeze_prefixes", "train_prefixes"} & set(r["freeze_config"])
+
+
+def test_a_low_vision_lr_adds_its_override_and_the_scheduler_that_applies_it() -> None:
+    """research 2026-10-14: lr_mult is applied by the lr_scheduler only; the vision pattern spares the projector."""
+    import re
+
+    all_blocks = FullFinetuneParams(train_blocks="all", vision_lr_scale=0.1)
+    r = build_recipe(_tpl("nemotron-parse-v1.1"), all_blocks, model_dir="m", dataset_dir="d", run_dir="r",
+                     class_token_start_idx=1, blocks=QWEN_BLOCKS)  # fmt: skip
+    [override] = r["optimizer"]["param_group_overrides"]
+    assert override["lr_mult"] == 0.1
+    assert r["lr_scheduler"] == LR_SCHEDULER_FOR_LR_MULT
+    assert re.search(override["pattern"], "model.visual.blocks.0.attn.qkv.weight")
+    assert not re.search(override["pattern"], "model.visual.merger.mlp.0.weight")
+    lm_only = build_recipe(_tpl("nemotron-parse-v1.1"), FullFinetuneParams(), model_dir="m", dataset_dir="d",
+                           run_dir="r", class_token_start_idx=1, blocks=QWEN_BLOCKS)  # fmt: skip
+    assert "param_group_overrides" not in lm_only["optimizer"]  # the other direction (research)
+
+
+def test_old_workflows_keep_their_meaning() -> None:
+    assert FullFinetuneParams.model_validate({"freeze_vision_tower": True}).train_blocks == "lm"
+    assert FullFinetuneParams.model_validate({"freeze_vision_tower": False}).train_blocks == "all"
+
+
+def test_blocks_that_need_prefixes_refuse_a_model_without_them() -> None:
+    with pytest.raises(RecipeError, match="projector prefixes"):
+        build_recipe(_tpl("nemotron-parse-v1.1"), FullFinetuneParams(train_blocks="projector"), model_dir="m",
+                     dataset_dir="d", run_dir="r", class_token_start_idx=1)  # fmt: skip
+
+
+def test_train_blocks_without_module_prefixes_is_refused_on_the_canvas() -> None:
+    """validate == worker: a model whose blocks are unknown cannot train by block (CFG-005 not_for_model)."""
+    from vlm_pipeline.app.workers import TrainBlocksNotForModelError, _check_train
+    from vlm_pipeline.graph.worker import SupportQuery
+    from vlm_pipeline.nodes import REGISTRY
+
+    spec = REGISTRY.get("train.sft_vlm")
+    parse = load_catalog().get("nemotron-parse-v1.1")
+    assert spec is not None
+    assert parse is not None
+    _check_train(SupportQuery("t", spec, FullFinetuneParams(train_blocks="all"), parse, {}))  # Parse has its prefixes
+    unknown = parse.model_copy(update={"family": None, "vision_prefixes": (), "projector_prefixes": ()})
+    _check_train(SupportQuery("t", spec, FullFinetuneParams(), unknown, {}))  # lm needs no prefixes
+    with pytest.raises(TrainBlocksNotForModelError) as refused:
+        _check_train(SupportQuery("t", spec, FullFinetuneParams(train_blocks="all"), unknown, {}))
+    assert (refused.value.params["param"], refused.value.params["rule"]) == ("train_blocks", "not_for_model")

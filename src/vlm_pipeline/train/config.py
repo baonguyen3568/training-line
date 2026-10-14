@@ -16,6 +16,7 @@ DEFAULT_SEED = 1234
 
 LrPreset = Literal["slow", "medium", "fast"]
 Epochs = Literal[1, 2, 3, 5]
+TrainBlocks = Literal["lm", "projector", "projector_lm", "all"]
 
 # Learning rate per preset: full fine-tune follows the Nemotron-Parse / Qwen3-VL recipes (1e-5),
 # LoRA follows the qwen3_8 LoRA recipe (1e-4).
@@ -75,7 +76,34 @@ class FullFinetuneParams(_FinetuneParams):
         3,
         json_schema_extra=ui(order=0, widget="segmented", summary=True, option_keys="epoch_count", recommended=3),
     )
-    freeze_vision_tower: bool = Field(True, json_schema_extra=ui(advanced=True))
+    # ADR-022 #1/#4/#5 (P023 §1): which blocks are updated; the others are frozen. projector / projector_lm need patch
+    # 0007 (freeze_config prefixes, vlm-automodel:26.08-8): offered disabled until that image is the default.
+    train_blocks: TrainBlocks = Field(
+        "lm",
+        json_schema_extra=ui(
+            advanced=True,
+            option_keys="train_blocks",
+            disabled_options={
+                "projector": "param_unsupported.worker_v1",
+                "projector_lm": "param_unsupported.worker_v1",
+            },
+        ),
+    )
+    # #5: the vision tower learns at node LR x this (param_group_overrides lr_mult; the recipe adds the lr_scheduler
+    # that applies it, research 2026-10-14).
+    vision_lr_scale: float = Field(
+        0.1, ge=0.05, le=0.2, json_schema_extra=ui(advanced=True, visible_when={"train_blocks": ["all"]})
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _old_freeze_flag(cls, data: Any) -> Any:
+        """Workflows saved before train_blocks: freeze_vision_tower true -> lm, false -> all (drop after 1.1)."""
+        if isinstance(data, dict) and "freeze_vision_tower" in data:
+            data = dict(data)
+            frozen = data.pop("freeze_vision_tower")
+            data.setdefault("train_blocks", "lm" if frozen else "all")
+        return data
 
     @property
     def learning_rate(self) -> float:

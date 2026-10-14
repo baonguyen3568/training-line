@@ -334,6 +334,7 @@ error:
       advanced_not_for_model: 'Engine option "{key}" does not work with the model connected to "{node}". Remove the option or change the model.'
       advanced: 'An engine option of "{node}" is not valid. Open the step''s Advanced section to review it.'
       qlora_not_for_model: 'The model connected to "{node}" is not set up for 4-bit compression during training (QLoRA). Set "{param}" to "No compression" or choose another model.'
+      blocks_not_for_model: 'The app does not know the blocks (vision part, connector) of the model wired into "{node}", so it cannot train by block yet. Set "{param}" to "Language part" or pick another model.'
   CFG-006:
     title: A wire points to a missing step
     what: A wire points to "{node_id}", but that step was deleted or renamed.
@@ -1011,9 +1012,12 @@ node:
       seed:
         label: Random seed
         help: Keep it the same to get identical results when re-running.
-      freeze_vision_tower:
-        label: Keep the vision part frozen
-        help: 'Don''t retrain the model''s image reader: faster, less RAM, and less risk of harming its vision.'
+      train_blocks:
+        label: What is trained
+        help: 'Which parts of the model learn again; the rest stays as it is. By default only the language part: faster, less RAM, and less risk of harming its vision.'
+      vision_lr_scale:
+        label: Learning speed of the vision part
+        help: When the vision part is trained too, its learning speed is this number times the rest's (0.05–0.2, i.e. 5–20 times slower), so its vision is not harmed.
   train.grpo_vlm:
     title: Learn from feedback (GRPO)
     desc: Improve the model by scoring its answers. For advanced users.
@@ -1353,6 +1357,11 @@ qa_focus:
   text_reading: Reading text
   counting: Counting
   charts: Charts
+train_blocks:
+  lm: Language part
+  projector: Image–text connector only
+  projector_lm: Connector + language
+  all: Whole model
 lr_preset:
   slow: Slow – safe
   medium: Medium
@@ -1543,8 +1552,6 @@ docs_error:
   actions_lead: "Depending on the situation, the app suggests one of these:"
 pipelines:
   more_steps: "+{step_count} steps"
-  measured_with: 'Measured with: {model}'
-  paper: Paper
   swap_hint: Change the model or data in the source steps to use this pipeline with others; the numbers on the card only hold for the measured setup.
   metric:
     field_f1: Field F1

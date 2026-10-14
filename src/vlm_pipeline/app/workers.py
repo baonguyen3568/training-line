@@ -45,6 +45,7 @@ from vlm_pipeline.common.local_cache import (
 from vlm_pipeline.common.model_ref import PickedModel, is_model_ref, resolve_model_ref, write_model_ref
 from vlm_pipeline.common.run_log import log_tail
 from vlm_pipeline.common.runinfo import RunManifest, RunStatus, automodel_to_metrics, read_manifest
+from vlm_pipeline.download.resolver import block_prefixes
 from vlm_pipeline.graph.errors import ContainerExit
 from vlm_pipeline.graph.worker import (
     NOT_RESUMABLE_MARKER,
@@ -59,13 +60,19 @@ from vlm_pipeline.nodes.source import picked_model_id
 from vlm_pipeline.nodes.spec import NodeSpec, is_compatible, model_kind
 from vlm_pipeline.train.advanced import AdvancedNotForModelError, keys_not_for
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
-from vlm_pipeline.train.recipe import build_recipe, qlora_models, render_recipe, templates_digest
+from vlm_pipeline.train.recipe import Blocks, build_recipe, qlora_models, render_recipe, templates_digest
 
 logger = logging.getLogger(__name__)
 # Models whose AutoModel checkpoints cannot be resumed: a resume starts over instead of failing on every retry.
 # Empty since vlm-automodel:26.08-6 (patch 0005, BUG-003 closed: Parse resumes, also from 26.08-5 checkpoints).
 # Run dirs marked .not-resumable earlier stay so (graph.worker.NOT_RESUMABLE_MARKER).
 RESUME_UNSUPPORTED: frozenset[str] = frozenset()
+
+
+class TrainBlocksNotForModelError(VlmPipelineError):
+    """train_blocks needs module prefixes (families.yaml / catalog) this model does not have (CFG-005)."""
+
+    code: ClassVar[str] = "CFG-005"
 
 
 class QloraNotForModelError(VlmPipelineError):
@@ -459,6 +466,7 @@ class RealWorker:
             run_dir=self.container_path(run_dir),
             class_token_start_idx=class_token,
             model_id=entry.id,
+            blocks=_model_blocks(entry),  # P023 §1: train_blocks / vision_lr_scale act on these modules
         )
         if job.resume_from is not None and entry.id not in RESUME_UNSUPPORTED:
             # P017: the earlier attempt's checkpoint (chosen and checked by the executor, C1-C3) is read through the
@@ -628,7 +636,7 @@ class RealWorker:
 
 def _trainable_env(entry: CatalogEntry, params: LoraParams | FullFinetuneParams) -> dict[str, str]:
     """Patch-0002 guard: the job fails before step 1 if the trainable share is not what the catalog expects."""
-    if not isinstance(params, FullFinetuneParams) or not params.freeze_vision_tower:
+    if not isinstance(params, FullFinetuneParams) or params.train_blocks != "lm":  # the catalog % is for lm only
         return {}
     expected = entry.sft_trainable_pct
     if expected is None:
@@ -668,12 +676,32 @@ def _check_train(q: SupportQuery) -> None:
             "advanced option not in this model's template",
             params={"node": q.node_id, "param": "advanced", "key": wrong[0], "rule": "not_for_model"},
         )
+    blocks = getattr(q.params, "train_blocks", "lm")
+    if blocks != "lm" and q.model is not None and not _has_block_prefixes(q.model, blocks):
+        raise TrainBlocksNotForModelError(  # P023 §1: the recipe could not say which modules to freeze / train
+            "train_blocks needs module prefixes this model does not have",
+            params={"node": q.node_id, "param": "train_blocks", "value": blocks, "rule": "not_for_model", "key": ""},
+        )
     quantize = getattr(q.params, "quantize_base", "none")
     if quantize != "none" and q.model is not None and q.model.id not in qlora_models():
         raise QloraNotForModelError(  # QLoRA only where the template names the modules that stay bf16
             "QLoRA is not set up for this model",
             params={"node": q.node_id, "param": "quantize_base", "value": quantize, "rule": "not_for_model", "key": ""},
         )
+
+
+def _has_block_prefixes(entry: CatalogEntry, train_blocks: str) -> bool:
+    """Whether build_recipe can map ``train_blocks`` for this model (the same lists it receives)."""
+    prefixes = block_prefixes(entry)
+    if prefixes is None:
+        return False
+    vision, projector = prefixes
+    return bool(vision) if train_blocks == "all" else bool(projector)
+
+
+def _model_blocks(entry: CatalogEntry) -> Blocks:
+    prefixes = block_prefixes(entry)
+    return Blocks(*prefixes) if prefixes is not None else Blocks()
 
 
 def _check_merge(q: SupportQuery) -> None:
