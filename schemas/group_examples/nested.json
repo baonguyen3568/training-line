@@ -1,0 +1,275 @@
+{
+ "group": {
+  "id": "group.example_outer",
+  "version": "1.0.0",
+  "title_key": "groups.example_outer.title",
+  "nodes": [
+   {
+    "id": "ft",
+    "type": "group.example_lora",
+    "version": "1.0.0",
+    "params": {
+     "epochs": 2
+    }
+   },
+   {
+    "id": "ev",
+    "type": "eval.benchmarks",
+    "version": "1.0.0",
+    "params": {}
+   }
+  ],
+  "edges": [
+   {
+    "from": [
+     "ft",
+     "model"
+    ],
+    "to": [
+     "ev",
+     "model"
+    ]
+   }
+  ],
+  "inputs": {
+   "model": [
+    [
+     "ft",
+     "model"
+    ]
+   ],
+   "data": [
+    [
+     "ft",
+     "data"
+    ]
+   ]
+  },
+  "outputs": {
+   "report": [
+    "ev",
+    "report"
+   ]
+  },
+  "params": {
+   "epochs": [
+    "ft",
+    "epochs"
+   ]
+  }
+ },
+ "uses": [
+  {
+   "id": "group.example_lora",
+   "version": "1.0.0",
+   "title_key": "groups.example_lora.title",
+   "nodes": [
+    {
+     "id": "split",
+     "type": "data.split",
+     "version": "1.0.0",
+     "params": {
+      "val_fraction": 0.2
+     }
+    },
+    {
+     "id": "train",
+     "type": "train.lora_vlm",
+     "version": "1.0.0",
+     "params": {}
+    },
+    {
+     "id": "merge",
+     "type": "train.merge_lora",
+     "version": "1.0.0",
+     "params": {}
+    }
+   ],
+   "edges": [
+    {
+     "from": [
+      "split",
+      "train"
+     ],
+     "to": [
+      "train",
+      "train_data"
+     ]
+    },
+    {
+     "from": [
+      "split",
+      "val"
+     ],
+     "to": [
+      "train",
+      "val_data"
+     ]
+    },
+    {
+     "from": [
+      "train",
+      "adapter"
+     ],
+     "to": [
+      "merge",
+      "adapter"
+     ]
+    }
+   ],
+   "inputs": {
+    "model": [
+     [
+      "train",
+      "base_model"
+     ],
+     [
+      "merge",
+      "base_model"
+     ]
+    ],
+    "data": [
+     [
+      "split",
+      "dataset"
+     ]
+    ]
+   },
+   "outputs": {
+    "model": [
+     "merge",
+     "model"
+    ]
+   },
+   "params": {
+    "epochs": [
+     "train",
+     "epochs"
+    ],
+    "val_fraction": [
+     "split",
+     "val_fraction"
+    ]
+   }
+  }
+ ],
+ "expected": {
+  "group_id": "group.example_outer",
+  "version": "1.0.0",
+  "title_key": "groups.example_outer.title",
+  "desc_key": "groups.example_outer.desc",
+  "category": "eval",
+  "inputs": {
+   "model": {
+    "type": "Model",
+    "optional": false,
+    "many": false
+   },
+   "data": {
+    "type": "Dataset",
+    "optional": false,
+    "many": false
+   }
+  },
+  "outputs": {
+   "report": {
+    "type": "EvalReport",
+    "optional": false,
+    "many": false
+   }
+  },
+  "params_schema": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "epochs": {
+     "default": 2,
+     "enum": [
+      1,
+      2,
+      3,
+      5
+     ],
+     "title": "Epochs",
+     "type": "integer",
+     "x-ui": {
+      "option_keys": "epoch_count",
+      "order": 0,
+      "summary": true,
+      "widget": "segmented"
+     }
+    }
+   }
+  },
+  "cacheable": true,
+  "runner": "container",
+  "permissions": [],
+  "origin": {
+   "kind": "first_party",
+   "trust_min": "first_party"
+  },
+  "available": true,
+  "unavailable_reason": null,
+  "policy_block": null,
+  "body": {
+   "nodes": [
+    {
+     "id": "ft",
+     "type": "group.example_lora",
+     "version": "1.0.0",
+     "params": {
+      "epochs": 2
+     },
+     "ui": null,
+     "package": null
+    },
+    {
+     "id": "ev",
+     "type": "eval.benchmarks",
+     "version": "1.0.0",
+     "params": {},
+     "ui": null,
+     "package": null
+    }
+   ],
+   "edges": [
+    {
+     "from": [
+      "ft",
+      "model"
+     ],
+     "to": [
+      "ev",
+      "model"
+     ]
+    }
+   ],
+   "inputs": {
+    "model": [
+     [
+      "ft",
+      "model"
+     ]
+    ],
+    "data": [
+     [
+      "ft",
+      "data"
+     ]
+    ]
+   },
+   "outputs": {
+    "report": [
+     "ev",
+     "report"
+    ]
+   },
+   "params": {
+    "epochs": [
+     "ft",
+     "epochs"
+    ]
+   }
+  }
+ }
+}

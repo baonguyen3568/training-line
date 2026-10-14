@@ -1,0 +1,262 @@
+{
+ "group": {
+  "id": "group.example_lora",
+  "version": "1.0.0",
+  "title_key": "groups.example_lora.title",
+  "nodes": [
+   {
+    "id": "split",
+    "type": "data.split",
+    "version": "1.0.0",
+    "params": {
+     "val_fraction": 0.2
+    }
+   },
+   {
+    "id": "train",
+    "type": "train.lora_vlm",
+    "version": "1.0.0",
+    "params": {}
+   },
+   {
+    "id": "merge",
+    "type": "train.merge_lora",
+    "version": "1.0.0",
+    "params": {}
+   }
+  ],
+  "edges": [
+   {
+    "from": [
+     "split",
+     "train"
+    ],
+    "to": [
+     "train",
+     "train_data"
+    ]
+   },
+   {
+    "from": [
+     "split",
+     "val"
+    ],
+    "to": [
+     "train",
+     "val_data"
+    ]
+   },
+   {
+    "from": [
+     "train",
+     "adapter"
+    ],
+    "to": [
+     "merge",
+     "adapter"
+    ]
+   }
+  ],
+  "inputs": {
+   "model": [
+    [
+     "train",
+     "base_model"
+    ],
+    [
+     "merge",
+     "base_model"
+    ]
+   ],
+   "data": [
+    [
+     "split",
+     "dataset"
+    ]
+   ]
+  },
+  "outputs": {
+   "model": [
+    "merge",
+    "model"
+   ]
+  },
+  "params": {
+   "epochs": [
+    "train",
+    "epochs"
+   ],
+   "val_fraction": [
+    "split",
+    "val_fraction"
+   ]
+  }
+ },
+ "uses": [],
+ "expected": {
+  "group_id": "group.example_lora",
+  "version": "1.0.0",
+  "title_key": "groups.example_lora.title",
+  "desc_key": "groups.example_lora.desc",
+  "category": "train",
+  "inputs": {
+   "model": {
+    "type": "Model",
+    "optional": false,
+    "many": false
+   },
+   "data": {
+    "type": "Dataset",
+    "optional": false,
+    "many": false
+   }
+  },
+  "outputs": {
+   "model": {
+    "type": "Checkpoint",
+    "optional": false,
+    "many": false
+   }
+  },
+  "params_schema": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "epochs": {
+     "default": 3,
+     "enum": [
+      1,
+      2,
+      3,
+      5
+     ],
+     "title": "Epochs",
+     "type": "integer",
+     "x-ui": {
+      "option_keys": "epoch_count",
+      "order": 0,
+      "summary": true,
+      "widget": "segmented"
+     }
+    },
+    "val_fraction": {
+     "default": 0.2,
+     "maximum": 0.3,
+     "minimum": 0.05,
+     "title": "Val Fraction",
+     "type": "number",
+     "x-ui": {
+      "order": 0,
+      "widget": "slider"
+     }
+    }
+   }
+  },
+  "cacheable": true,
+  "runner": "container",
+  "permissions": [],
+  "origin": {
+   "kind": "first_party",
+   "trust_min": "first_party"
+  },
+  "available": true,
+  "unavailable_reason": null,
+  "policy_block": null,
+  "body": {
+   "nodes": [
+    {
+     "id": "split",
+     "type": "data.split",
+     "version": "1.0.0",
+     "params": {
+      "val_fraction": 0.2
+     },
+     "ui": null,
+     "package": null
+    },
+    {
+     "id": "train",
+     "type": "train.lora_vlm",
+     "version": "1.0.0",
+     "params": {},
+     "ui": null,
+     "package": null
+    },
+    {
+     "id": "merge",
+     "type": "train.merge_lora",
+     "version": "1.0.0",
+     "params": {},
+     "ui": null,
+     "package": null
+    }
+   ],
+   "edges": [
+    {
+     "from": [
+      "split",
+      "train"
+     ],
+     "to": [
+      "train",
+      "train_data"
+     ]
+    },
+    {
+     "from": [
+      "split",
+      "val"
+     ],
+     "to": [
+      "train",
+      "val_data"
+     ]
+    },
+    {
+     "from": [
+      "train",
+      "adapter"
+     ],
+     "to": [
+      "merge",
+      "adapter"
+     ]
+    }
+   ],
+   "inputs": {
+    "model": [
+     [
+      "train",
+      "base_model"
+     ],
+     [
+      "merge",
+      "base_model"
+     ]
+    ],
+    "data": [
+     [
+      "split",
+      "dataset"
+     ]
+    ]
+   },
+   "outputs": {
+    "model": [
+     "merge",
+     "model"
+    ]
+   },
+   "params": {
+    "epochs": [
+     "train",
+     "epochs"
+    ],
+    "val_fraction": [
+     "split",
+     "val_fraction"
+    ]
+   }
+  }
+ }
+}

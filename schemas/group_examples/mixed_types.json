@@ -1,0 +1,31 @@
+{
+ "group": {
+  "id": "group.example_mixed",
+  "version": "1.0.0",
+  "title_key": "groups.example_mixed.title",
+  "nodes": [
+   {
+    "id": "train",
+    "type": "train.lora_vlm",
+    "version": "1.0.0",
+    "params": {}
+   }
+  ],
+  "inputs": {
+   "x": [
+    [
+     "train",
+     "base_model"
+    ],
+    [
+     "train",
+     "train_data"
+    ]
+   ]
+  }
+ },
+ "uses": [],
+ "expected": {
+  "error": "group.example_mixed: input 'x' maps to ports of different types"
+ }
+}

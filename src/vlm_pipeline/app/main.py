@@ -5,6 +5,7 @@ Text for the user is rendered here (the edge) from i18n keys; domain objects onl
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
 import secrets
@@ -107,7 +108,25 @@ def _node_types(services: Services, locale: str) -> dict[str, Any]:
         node["desc"] = i18n.t(node["desc_key"], locale)
     for port in body["port_types"]:
         port["label"] = i18n.t(port["label_key"], locale)
+    body["groups"] = _first_party_groups(services, locale)  # P4-4, contract .team/proposals/016b
     return body
+
+
+def _first_party_groups(services: Services, locale: str) -> list[dict[str, Any]]:
+    from vlm_pipeline.graph.groups import groups_api
+    from vlm_pipeline.graph.worker import worker_supports
+
+    executor = getattr(services, "executor", None)
+    can_run = functools.partial(worker_supports, executor.worker) if executor is not None else None
+    try:
+        groups = groups_api(services.registry, can_run)
+    except ValueError:  # a first-party file that does not even load: node types must still be served
+        _log.exception("first-party groups could not be loaded")
+        return []
+    for group in groups:
+        group["title"] = i18n.t(group["title_key"], locale) if group["title_key"] else group["group_id"]
+        group["desc"] = i18n.t(group["desc_key"], locale) if group["desc_key"] else ""
+    return groups
 
 
 def _start_graph_run(services: Services, bus: EventBus, workflow: dict[str, Any]) -> str:

@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -24,8 +25,9 @@ from pydantic import ValidationError
 
 from vlm_pipeline.common.paths import configs_root
 from vlm_pipeline.graph.workflow import MAX_GROUP_DEFINITIONS, GroupDefinition
-from vlm_pipeline.nodes.spec import Issue, Registry
+from vlm_pipeline.nodes.spec import Issue, NodeSpec, Registry
 
+_log = logging.getLogger(__name__)
 GROUPS_DIR = Path("configs") / "groups"
 GROUP_CODE = "CFG-012"
 MAX_DEPTH = 3  # group inside group inside group
@@ -298,4 +300,136 @@ def _ends(raw: object) -> tuple[Endpoint, Endpoint] | None:
     return (a, b), (c, d)
 
 
-__all__ = ["GROUP_CODE", "MAX_DEPTH", "MAX_EDGES", "MAX_NODES", "Expansion", "expand", "first_party_groups"]
+# --------------------------------------------------------------------------------------------- API shape (P4-4)
+CanRun = Callable[[NodeSpec], bool]
+
+
+class GroupShapeError(ValueError):
+    """A group definition whose exposed ports / params cannot be derived (a first-party file fails at load)."""
+
+
+@dataclass(frozen=True)
+class _Shape:
+    inputs: dict[str, dict[str, Any]]
+    outputs: dict[str, dict[str, Any]]
+    params: dict[str, dict[str, Any]]
+    leaves: list[NodeSpec]  # every inner node spec, nested groups flattened
+    output_leads: dict[str, NodeSpec]  # exposed output -> the node spec that really produces it (through nesting)
+
+
+def _inner(
+    group: GroupDefinition, registry: Registry, groups: Mapping[str, GroupDefinition], stack: tuple[str, ...]
+) -> dict[str, tuple[NodeSpec | _Shape, Mapping[str, object]]]:
+    """Inner id -> (spec, or the derived shape of a nested group; the params the group sets on it)."""
+    if group.id in stack or len(stack) > MAX_DEPTH:
+        raise GroupShapeError(f"{group.id}: recursion or nesting deeper than {MAX_DEPTH}")
+    found: dict[str, tuple[NodeSpec | _Shape, Mapping[str, object]]] = {}
+    for node in group.nodes:
+        if node.type in groups:
+            found[node.id] = (_derive(groups[node.type], registry, groups, (*stack, group.id)), node.params)
+        elif (spec := registry.get(node.type)) is not None:
+            found[node.id] = (spec, node.params)
+        else:
+            raise GroupShapeError(f"{group.id}: unknown inner node type {node.type!r}")
+    return found
+
+
+def _derive(
+    group: GroupDefinition, registry: Registry, groups: Mapping[str, GroupDefinition], stack: tuple[str, ...] = ()
+) -> _Shape:
+    inner = _inner(group, registry, groups, stack)
+
+    def port(node_id: str, name: str, side: str) -> dict[str, Any]:
+        target, _ = inner[node_id]
+        if isinstance(target, _Shape):
+            derived = target.inputs if side == "in" else target.outputs
+            if name not in derived:
+                raise GroupShapeError(f"{group.id}: {node_id} exposes no {side}put {name!r}")
+            return dict(derived[name])
+        spec_ports = target.inputs if side == "in" else target.outputs
+        if name not in spec_ports:
+            raise GroupShapeError(f"{group.id}: {node_id} has no {side}put {name!r}")
+        dumped: dict[str, Any] = spec_ports[name].model_dump()
+        return dumped
+
+    inputs: dict[str, dict[str, Any]] = {}
+    for name, targets in group.inputs.items():
+        found = [port(n, p, "in") for n, p in targets]
+        if len({f["type"] for f in found}) != 1:
+            raise GroupShapeError(f"{group.id}: input {name!r} maps to ports of different types")
+        inputs[name] = {"type": found[0]["type"], "optional": all(f["optional"] for f in found), "many": False}
+    outputs = {name: {**port(n, p, "out"), "optional": False, "many": False} for name, (n, p) in group.outputs.items()}
+    params: dict[str, dict[str, Any]] = {}
+    for name, (node_id, param) in group.params.items():
+        target, set_params = inner[node_id]
+        props = target.params if isinstance(target, _Shape) else target.params_schema().get("properties", {})
+        if param not in props:
+            raise GroupShapeError(f"{group.id}: {node_id} has no param {param!r}")
+        prop = dict(props[param])
+        if param in set_params:
+            prop["default"] = set_params[param]  # what the group sets for its inner node
+        params[name] = prop
+    output_leads: dict[str, NodeSpec] = {}
+    for name, (node_id, out) in group.outputs.items():
+        target, _ = inner[node_id]
+        output_leads[name] = target.output_leads[out] if isinstance(target, _Shape) else target
+    leaves = [t for t, _ in inner.values() if not isinstance(t, _Shape)]
+    leaves += [leaf for t, _ in inner.values() if isinstance(t, _Shape) for leaf in t.leaves]
+    return _Shape(inputs, outputs, params, leaves, output_leads)
+
+
+def group_to_api(
+    group: GroupDefinition, registry: Registry, groups: Mapping[str, GroupDefinition], can_run: CanRun | None = None
+) -> dict[str, Any]:
+    """A ``groups[]`` item of ``GET /api/node-types`` (frontend adapter): ports / params like a node type + the body.
+
+    Read only: an instance is always expanded by the server. ``category`` is the lane of the inner node behind the
+    first exposed output (else the first inner node); ``available`` is false when any inner step cannot run.
+    """
+    shape = _derive(group, registry, groups)
+    lead = next(iter(shape.output_leads.values()), shape.leaves[0])  # the lane of what the group produces
+    blocked = next((leaf for leaf in shape.leaves if can_run is not None and not can_run(leaf)), None)
+    return {
+        "group_id": group.id,
+        "version": group.version,
+        "title_key": group.title_key,
+        "desc_key": f"{group.title_key.rsplit('.', 1)[0]}.desc" if group.title_key else None,
+        "category": lead.category,
+        "inputs": shape.inputs,
+        "outputs": shape.outputs,
+        "params_schema": {"type": "object", "additionalProperties": False, "properties": shape.params},
+        "cacheable": all(leaf.cacheable for leaf in shape.leaves),
+        "runner": "container" if any(leaf.runner == "container" for leaf in shape.leaves) else "host",
+        "permissions": [],  # first-party nodes declare none yet; the union goes here when they do
+        "origin": {"kind": "first_party", "trust_min": "first_party"},
+        "available": blocked is None,
+        "unavailable_reason": None if blocked is None else {"code": "CFG-011", "inner_type": blocked.type_id},
+        "policy_block": None,
+        "body": group.model_dump(mode="json", by_alias=True, include={"nodes", "edges", "inputs", "outputs", "params"}),
+    }
+
+
+def groups_api(registry: Registry, can_run: CanRun | None = None) -> list[dict[str, Any]]:
+    """Every first-party group as a ``groups[]`` item; a group whose shape cannot be derived is logged and left out."""
+    groups = first_party_groups()
+    items = []
+    for group in groups.values():
+        try:
+            items.append(group_to_api(group, registry, groups, can_run))
+        except GroupShapeError:  # tests catch it in CI; at run time one broken group never empties the palette
+            _log.exception("first-party group %s cannot be derived; left out of /api/node-types", group.id)
+    return items
+
+
+__all__ = [
+    "GROUP_CODE",
+    "MAX_DEPTH",
+    "MAX_EDGES",
+    "MAX_NODES",
+    "Expansion",
+    "GroupShapeError",
+    "expand",
+    "first_party_groups",
+    "group_to_api",
+    "groups_api",
+]
