@@ -706,6 +706,7 @@ def _issue_dict(issue: Issue) -> dict[str, Any]:
         "param": issue.param,
         "params": dict(issue.params),
         "inner_path": list(issue.inner_path),  # P016: where inside a group the problem is
+        "field_hint": issue.field_hint,  # a hint for the param, never a listed finding (H-prompt, P021)
     }
 
 

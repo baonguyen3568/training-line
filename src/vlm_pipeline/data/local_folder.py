@@ -34,6 +34,8 @@ class ScanResult:
     records: list[Record] = field(default_factory=list)
     problems: list[dict[str, Any]] = field(default_factory=list)  # {line, image?, reason}
     problem_count: int = 0
+    # Preview only (H-prompt): the distinct questions of the good lines ("" = none), at most two kept (two = mixed).
+    questions: set[str] = field(default_factory=set)
 
     def add(self, line: int, reason: str, image: str | None = None) -> None:
         self.problem_count += 1
@@ -194,6 +196,8 @@ def _preview_scan(
             checked = _check_line(folder, raw, seen, max_side, hashed=False)
             if isinstance(checked, Record):
                 seen.add(checked.image)
+                if len(result.questions) < 2:
+                    result.questions.add(checked.prompt or "")
             else:
                 result.add(n, *checked)
     if not seen and not result.problem_count:

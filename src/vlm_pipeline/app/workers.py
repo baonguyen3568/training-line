@@ -498,7 +498,7 @@ class RealWorker:
             logger.warning("%s: template has no validation_dataset; the wired val_data is not used", entry.id)
         source = next((d for d in load_dataset_catalog().datasets if train.repo and d.repo == train.repo), None)
         no_val_split = source is None or "validation" not in source.splits or "validation" in source.heldout_splits
-        train_meta, val_meta = self._local_meta(run_dir, entry, train, val, node_id=job.node_id)
+        train_meta, val_meta, train_prompt = self._local_meta(run_dir, entry, train, val, node_id=job.node_id)
         recipe = build_recipe(
             template,
             params,
@@ -543,6 +543,7 @@ class RealWorker:
             seed=params.seed,
             container_image=self.image,
             tags=["trial"] if job.trial_max_steps else [],  # the Runs page: "Chạy thử", never a real training
+            train_prompt=train_prompt,
         )
         container = ContainerJob(
             name=run_id,
@@ -590,14 +591,26 @@ class RealWorker:
 
     def _local_meta(
         self, run_dir: Path, entry: CatalogEntry, train: DatasetRef, val: DatasetRef | None, *, node_id: str
-    ) -> tuple[str | None, str | None]:
-        """Local data -> model-specific make_meta_dataset files in the train run dir (container paths), else None."""
+    ) -> tuple[str | None, str | None, str | None]:
+        """Local data -> model-specific make_meta_dataset files in the train run dir (container paths), else None.
+
+        Third: the one question every training sample is asked (H-prompt), None when they differ.
+        """
         if not train.records:
-            return None, None
-        from vlm_pipeline.common.local_records import Family, image_path, read_records, select, write_meta_dataset
+            return None, None, None
+        from vlm_pipeline.common.local_records import (
+            Family,
+            image_path,
+            read_records,
+            select,
+            single_prompt,
+            write_meta_dataset,
+        )
 
         family: Family = "nemotron_parse" if entry.loss == "nemotron_parse" else "chat"
         out = run_dir / "data"
+
+        prompts: dict[str, str | None] = {}
 
         def meta(ref: DatasetRef, name: str) -> str:
             records = list(read_records(self.host_path(str(ref.records))))
@@ -614,9 +627,12 @@ class RealWorker:
                     # first_line 0: after filter / dedupe / split the record order is not labels.jsonl's line order
                     bad = {"node": node_id, "problem_count": 1, "first_line": 0, "first_reason": "bad_image_name"}
                     raise LocalDatasetInvalidError(f"{name} image outside its folder", params=bad) from None
+            prompts[name] = single_prompt(chosen, family)
             return self.container_path(write_meta_dataset(out, name, chosen, family, media_dir=ref.path))
 
-        return meta(train, "train"), (meta(val, "validation") if val is not None and val.records else None)
+        train_meta = meta(train, "train")
+        val_meta = meta(val, "validation") if val is not None and val.records else None
+        return train_meta, val_meta, prompts["train"]
 
     def _merge_lora(self, job: NodeJob) -> NodeResult:
         """LoRA adapter + its base -> one HF checkpoint (CPU job in the training image; B-1)."""

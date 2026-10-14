@@ -70,6 +70,8 @@ class ConfirmLicenseRequest(BaseModel):
 
 
 def _dataset_status(root: Path) -> Any:
+    from vlm_pipeline.common.local_records import DEFAULT_PROMPT
+
     def status(dataset_id: str) -> dict[str, object] | None:
         from vlm_pipeline.app import user_datasets
 
@@ -81,7 +83,9 @@ def _dataset_status(root: Path) -> Any:
         api = record.to_api()
         download = None if ready else {"name": api["name"], "kind": "dataset", "catalog_id": record.id,
                                        "size_gb": api["size_gb"], "reason": "not_cached"}  # fmt: skip
+        own = record.columns.question or record.columns.messages  # each row brings its own question
         return {"rows": record.rows if ready else None, "download": download, "name": api["name"],
+                "prompt": None if own else record.columns.prompt or DEFAULT_PROMPT,  # H-prompt (validate hint)
                 "repo": record.repo, "revision": record.revision, "license": record.license}  # fmt: skip
 
     return status

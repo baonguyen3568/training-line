@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterator
 
 from vlm_pipeline.common.catalog import (
@@ -13,12 +14,13 @@ from vlm_pipeline.common.catalog import (
 )
 from vlm_pipeline.common.heldout_data import is_heldout_folder
 from vlm_pipeline.common.local_cache import dataset_missing, model_missing
+from vlm_pipeline.common.local_records import DEFAULT_PROMPT
 from vlm_pipeline.data.local_folder import preview_folder
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
-from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ
+from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ, SERVE_VLLM
 from vlm_pipeline.nodes.source import MODEL_HF_PICK, is_user_dataset, picked_model_id
 from vlm_pipeline.nodes.spec import GraphView, Issue, is_compatible, model_kind
-from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM
+from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM, TRIAL_CAPABLE
 
 _TRAIN_TYPES = frozenset({TRAIN_LORA_VLM.type_id, TRAIN_SFT_VLM.type_id})
 
@@ -282,6 +284,64 @@ def export_needs_known_dataset_licences(view: GraphView) -> Iterator[Issue]:
                 break
 
 
+def _nearest_taught(view: GraphView, node_id: str) -> str | None:
+    """The nearest LoRA / SFT step up ``node_id``'s model wires (breadth first), None for an untrained model."""
+    queue, seen = deque([node_id]), {node_id}
+    while queue:
+        current = queue.popleft()
+        if current != node_id and view.specs[current].type_id in TRIAL_CAPABLE:
+            return current
+        for name, pspec in view.specs[current].inputs.items():
+            if is_compatible(pspec.type, "Dataset"):  # the weights' own lineage only
+                continue
+            for src in view.sources.get((current, name), ()):
+                if src in view.specs and src not in seen:
+                    seen.add(src)
+                    queue.append(src)
+    return None
+
+
+def _taught_question(view: GraphView, train: str) -> str | None:
+    """The one question ``train``'s training data asks, from its single source; None when mixed or unknown."""
+    origins = _data_origins(view, train, "train_data")
+    sources = [o for o in origins if view.specs[o].type_id not in _DATA_PASS_THROUGH]
+    if len(sources) != 1:  # a mix, a caption step, two sources: not known before running
+        return None
+    source, params = sources[0], view.params.get(sources[0])
+    if view.specs[source].type_id == "data.hf_load" and is_user_dataset(params):
+        status = user_dataset_status(str(getattr(params, "user_dataset", "")))
+        prompt = status.get("prompt") if status is not None else None
+        return prompt if isinstance(prompt, str) and prompt else None
+    path = getattr(params, "path", None)
+    if view.specs[source].type_id != "data.local_folder" or view.workspace is None or not isinstance(path, str):
+        return None
+    root = view.workspace.resolve()
+    folder = (root / path).resolve()
+    if root not in folder.parents or not folder.is_dir():
+        return None
+    scan = preview_folder(folder, max_image_side_px=int(getattr(params, "max_image_side_px", 4096)))
+    if scan is None or len(scan.questions) != 1:  # over budget, no good line, or mixed
+        return None
+    return next(iter(scan.questions)) or DEFAULT_PROMPT
+
+
+def trained_question_hint(view: GraphView) -> Iterator[Issue]:
+    """MODEL-007 (info, field hint, P021 H-prompt): the question a trial's model will have been taught.
+
+    Known before running when the nearest LoRA / SFT step up the model trains on one source with one question: a
+    user-added HF dataset (its shared question, or the default when rows bring none) or a local folder (DATA-V's
+    preview: one read, cached). The UI shows it as the empty box's placeholder and never writes it into the workflow.
+    """
+    for node_id, spec in view.specs.items():
+        if spec.type_id != SERVE_VLLM.type_id:
+            continue
+        train = _nearest_taught(view, node_id)
+        question = _taught_question(view, train) if train is not None else None
+        if question:
+            yield Issue("MODEL-007", severity="info", node_id=node_id, param="prompt", field_hint=True,
+                        params={"node": node_id, "prompt": question})  # fmt: skip
+
+
 RULES = (
     train_node_matches_model,
     export_needs_portable_model,
@@ -289,5 +349,6 @@ RULES = (
     local_folder_preview,
     catalog_assets_on_this_machine,
     export_needs_known_dataset_licences,
+    trained_question_hint,
 )
 __all__ = ["RULES", "input_kinds", "model_input", "origin_model_id"]

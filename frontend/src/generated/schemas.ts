@@ -55,6 +55,7 @@ export type RunManifest = {
   status?: RunStatus;
   tags?: string[];
   task: string;
+  train_prompt?: string | null;
   trainable_pct?: number | null;
   [extra: string]: unknown;
 };

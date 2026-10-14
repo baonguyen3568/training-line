@@ -98,6 +98,9 @@ class RunManifest(BaseModel):
     memguard_abort_gb: float | None = None
     post_steps: list[dict[str, Any]] = Field(default_factory=list)  # host steps after the job (code sha recorded)
     tags: list[str] = Field(default_factory=list)
+    # H-prompt (P021): the one question every training sample was asked (the trial and the model card use it); None
+    # when they differ or it is not known (a catalog dataset converted inside the engine).
+    train_prompt: str | None = Field(None, max_length=2000)
 
     @model_validator(mode="after")
     def _revision_from_dataset_ref(self) -> Self:

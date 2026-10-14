@@ -144,6 +144,8 @@ class Issue:
     params: Mapping[str, object] = field(default_factory=dict)
     # Inside a group (P016): node_id is the top-level group node and this is the inner node ids per level.
     inner_path: tuple[str, ...] = ()
+    # A hint FOR the param (e.g. MODEL-007's placeholder), shown next to the field, never listed as a finding (P021).
+    field_hint: bool = False
 
 
 @dataclass(frozen=True)

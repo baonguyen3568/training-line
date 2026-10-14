@@ -289,6 +289,9 @@ error:
   MODEL-005:
     title: 'Try a quick run first'
     what: 'You added model "{model}" yourself, so it has not been verified. Do a quick test run of a few steps in "{node}" before the real training.'
+  MODEL-007:
+    title: 'Question taught in training'
+    what: 'The model behind "{node}" was trained with this question: "{prompt}". Leave the box empty to use it.'
   MODEL-006:
     title: 'This workflow uses a model not added here'
     what: 'This workflow uses model "{repo}", which its author added themselves and this machine does not have yet. Click "Add this model" to add the exact version the author used; you still review and confirm the license before downloading.'

@@ -289,6 +289,9 @@ error:
   MODEL-005:
     title: 'Nên chạy thử nhanh trước'
     what: 'Model "{model}" do bạn tự thêm nên chưa được kiểm chứng. Nên chạy thử nhanh vài bước ở bước "{node}" trước khi huấn luyện thật.'
+  MODEL-007:
+    title: 'Câu hỏi model được dạy lúc train'
+    what: 'Model ở bước "{node}" được train với câu hỏi này: "{prompt}". Để trống ô hỏi để dùng đúng câu đó.'
   MODEL-006:
     title: 'Workflow dùng model chưa có trên máy này'
     what: 'Workflow này dùng model "{repo}" do tác giả tự thêm, còn máy này chưa có. Bấm "Thêm model này" để thêm đúng bản tác giả đã dùng; bạn vẫn xem và xác nhận giấy phép trước khi tải.'

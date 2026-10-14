@@ -401,6 +401,19 @@
       "title": "Task",
       "type": "string"
     },
+    "train_prompt": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Train Prompt"
+    },
     "trainable_pct": {
       "anyOf": [
         {

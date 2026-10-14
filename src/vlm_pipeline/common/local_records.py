@@ -128,10 +128,28 @@ def target_text(target: Any, family: Family) -> str:
     return json.dumps(target, ensure_ascii=False)
 
 
+def asked(record: Record, family: Family) -> str:
+    """The question a training sample is asked (what ``conversations_for`` writes)."""
+    return DEFAULT_PROMPT if family == "nemotron_parse" or not record.prompt else record.prompt
+
+
+MAX_PROMPT_CHARS = 2000  # = data.local_folder.MAX_PROMPT_CHARS = RunManifest.train_prompt's cap
+
+
+def single_prompt(records: Iterable[Record], family: Family) -> str | None:
+    """The one question every sample is asked (H-prompt: model card, trial), or None when they differ / no sample.
+
+    A question over ``MAX_PROMPT_CHARS`` is None too, never cut (a cut question is not the one trained; security).
+    """
+    prompts = {asked(r, family) for r in records}
+    prompt = prompts.pop() if len(prompts) == 1 else None
+    return prompt if prompt is not None and len(prompt) <= MAX_PROMPT_CHARS else None
+
+
 def conversations_for(records: Iterable[Record], family: Family) -> Iterator[dict[str, Any]]:
     """ShareGPT lines for AutoModel's ``make_meta_dataset`` (images relative to the meta's ``media_dir``)."""
     for r in records:
-        prompt = DEFAULT_PROMPT if family == "nemotron_parse" or not r.prompt else r.prompt
+        prompt = asked(r, family)
         yield {
             "messages": [
                 {"role": "user", "content": f"<image>\n{prompt}"},
@@ -158,7 +176,9 @@ def write_meta_dataset(out_dir: Path, name: str, records: Iterable[Record], fami
 
 __all__ = [
     "DEFAULT_PROMPT",
+    "MAX_PROMPT_CHARS",
     "Record",
+    "asked",
     "conversations_for",
     "image_name_ok",
     "image_path",
@@ -166,6 +186,7 @@ __all__ = [
     "json2token",
     "read_records",
     "select",
+    "single_prompt",
     "target_text",
     "write_meta_dataset",
     "write_records",

@@ -536,6 +536,20 @@ MODEL-005:
   actions:
     - {id: run_smoke, kind: trial, confirm: false}
 
+MODEL-007:
+  slug: TRAINED_QUESTION
+  severity: info
+  prevent_in_preflight: false
+  # H-prompt (P021, frontend 2026-10-14): a field hint (Issue.field_hint) on serve.vllm's prompt: the question the
+  # model will have been taught, known before running. The UI shows it as the empty box's placeholder and never
+  # writes it into the workflow; an empty box runs this question. prompt = untrusted text from the dataset.
+  params:
+    - {name: node, ref: node}
+    - prompt
+  match:
+    - {kind: validate, value: "serve.vllm whose upstream LoRA/SFT step trains on data with one question (P021)"}
+  actions: []
+
 MODEL-006:
   slug: USER_MODEL_NOT_ADDED
   severity: error

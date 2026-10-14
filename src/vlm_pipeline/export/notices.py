@@ -63,6 +63,7 @@ class Modification(BaseModel):
     # A quantization run's parity check (ptq/report.json): "warn" = handed over with QNT-002, quality not measured.
     quant_check: Literal["pass", "warn"] | None = None
     quant_note: str | None = None  # the "warn" sentence, with the report's own numbers
+    train_prompt: str | None = None  # H-prompt: the one question its training samples were asked (train runs)
 
 
 class Attribution(BaseModel):
@@ -189,6 +190,44 @@ def _base_entry(catalog: Catalog, repo: str, rev: str | None) -> CatalogEntry | 
     return entry
 
 
+def _parent_run(run_dir: Path, manifest: RunManifest, root: Path) -> tuple[Path | None, str | None]:
+    """(the parent run dir, None) or (None, a gap sentence); (None, None) at the end of the chain."""
+    parent_id = manifest.parent_run_id
+    if parent_id is None or _GRAPH_RUN.match(parent_id):  # a graph run groups nodes; it is not a training step
+        return None, None
+    if not _RUN_ID.match(parent_id) or parent_id in {".", ".."}:  # run.json is data: never a path
+        return None, f"run {manifest.run_id}: invalid parent run id"
+    candidates = (run_dir.parent / parent_id, root / "outputs" / "runs" / parent_id)  # node run dirs: siblings
+    parent = next((c for c in candidates if (c / "run.json").is_file()), None)
+    if parent is None:
+        return None, f"run {manifest.run_id}: parent run {parent_id} not found"
+    return parent, None
+
+
+TRAIN_TASKS = frozenset({"lora", "sft"})
+
+
+def trained_prompt(artifact: Path, root: Path) -> str | None:
+    """The question the latest training behind ``artifact`` was taught (H-prompt), None when mixed or unknown.
+
+    Walks run.json -> parent_run_id like ``lineage``; the first training run decides (an older one never fills in).
+    """
+    run_dir = _run_dir_of(artifact)
+    seen: set[str] = set()
+    while run_dir is not None:
+        try:
+            manifest = read_manifest(run_dir)
+        except (OSError, ValueError):
+            return None
+        if manifest.run_id in seen:
+            return None
+        seen.add(manifest.run_id)
+        if manifest.stage == "train" and manifest.task in TRAIN_TASKS:
+            return manifest.train_prompt
+        run_dir, _ = _parent_run(run_dir, manifest, root)
+    return None
+
+
 def lineage(
     artifact: Path, *, root: Path, catalog: Catalog, datasets: DatasetCatalog, base_ref: str | None = None
 ) -> tuple[list[Component], list[Modification], list[str]]:
@@ -218,6 +257,7 @@ def lineage(
                 ended_at=manifest.ended_at,
                 quant_check=quant[0],
                 quant_note=quant[1],
+                train_prompt=manifest.train_prompt,
             )
         )
         if manifest.dataset:
@@ -225,16 +265,10 @@ def lineage(
             components += origins or [_dataset_component(manifest.dataset, datasets)]
         if manifest.base_model:
             base = f"{manifest.base_model}@{manifest.base_model_revision or ''}"
-        parent_id = manifest.parent_run_id
-        if parent_id is None or _GRAPH_RUN.match(parent_id):  # a graph run groups nodes; it is not a training step
-            break
-        if not _RUN_ID.match(parent_id) or parent_id in {".", ".."}:  # run.json is data: never a path
-            gaps.append(f"run {manifest.run_id}: invalid parent run id")
-            break
-        candidates = (run_dir.parent / parent_id, root / "outputs" / "runs" / parent_id)  # node run dirs: siblings
-        parent = next((c for c in candidates if (c / "run.json").is_file()), None)
+        parent, gap = _parent_run(run_dir, manifest, root)
+        if gap is not None:
+            gaps.append(gap)
         if parent is None:
-            gaps.append(f"run {manifest.run_id}: parent run {parent_id} not found")
             break
         run_dir = parent
     if base is None:
@@ -372,9 +406,21 @@ def _model_card(components: list[Component], modifications: list[Modification], 
     out += [f"- Training data: {c.name} ({c.repo or 'not recorded'})" for c in data] or ["- Training data: none"]
     out += [f"- Licences: {', '.join(sorted({c.license for c in components if c.license})) or 'not recorded'}"]
     out += ["- Licence texts and required notices: see LICENSE, LICENSES/ and NOTICE.", ""]
-    out += ["## Usage", *_usage(base), "", "## Known limitations"]
+    out += ["## Usage", *_usage(base), ""]
+    trained = next((m for m in modifications if m.task in TRAIN_TASKS), None)  # the latest training decides
+    if trained is not None and trained.train_prompt:
+        out += ["## How to ask", "Every training image came with this question; ask it the same way for the closest "
+                "results:", *_fenced(trained.train_prompt), ""]  # fmt: skip
+    out += ["## Known limitations"]
     out += [f"- {line}" for line in _limitations(base, modifications)]
     return "\n".join(out) + "\n"
+
+
+def _fenced(text: str) -> list[str]:
+    """``text`` (from the dataset: untrusted) as a code block no backtick run inside can close."""
+    longest = max((len(run) for run in re.findall(r"`+", text)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return [fence + "text", text, fence]
 
 
 def _usage(base: CatalogEntry | None) -> list[str]:

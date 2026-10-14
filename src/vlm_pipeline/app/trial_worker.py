@@ -131,6 +131,25 @@ def request_inputs(worker: RealWorker, request: TrialRequest, *extra: str) -> tu
     return tuple(worker.mount_input(p) for p in paths if p)
 
 
+def question_for(worker: RealWorker, job: NodeJob, entry: CatalogEntry) -> tuple[str, str]:
+    """(the question asked, its source: user | trained | default | fixed). H-prompt (P021).
+
+    An empty box means "the question the model was taught": the latest training run behind the model, else the
+    trainer's ``DEFAULT_PROMPT``. A model with one fixed task (Nemotron-Parse) is never asked a question.
+    """
+    from vlm_pipeline.common.local_records import DEFAULT_PROMPT
+    from vlm_pipeline.export.notices import trained_prompt
+
+    params = job.params
+    assert isinstance(params, InferenceParams)  # noqa: S101 - registry guarantees the params model
+    if entry.task_prompt_fixed:
+        return "", "fixed"
+    if params.prompt:
+        return params.prompt, "user"
+    trained = trained_prompt(worker.host_path(job.inputs["model"].path), worker.root)
+    return (trained, "trained") if trained else (DEFAULT_PROMPT, "default")
+
+
 def build_request(worker: RealWorker, job: NodeJob, image: Path) -> tuple[TrialRequest, CatalogEntry]:
     params = job.params
     assert isinstance(params, InferenceParams)  # noqa: S101 - registry guarantees the params model
@@ -146,7 +165,7 @@ def build_request(worker: RealWorker, job: NodeJob, image: Path) -> tuple[TrialR
         processor_dir=worker.container_path(base),
         family=family,
         image=worker.container_path(image),
-        prompt="" if entry.task_prompt_fixed else (params.prompt or "Describe this image."),
+        prompt=question_for(worker, job, entry)[0],
         max_new_tokens=params.max_tokens,
         temperature=params.temperature,
         top_p=params.top_p,
@@ -298,9 +317,10 @@ def run_trial(worker: RealWorker, job: NodeJob) -> NodeResult:
         ro_inputs=request_inputs(worker, request),
     )
     reason = vllm_unavailable(entry, request) if params.engine == "vllm" else None
+    asked = dict(zip(("prompt_used", "prompt_source"), question_for(worker, job, entry), strict=True))
     if params.engine == "vllm" and reason is None:
         answer = _run_vllm(worker, job, request, image, manifest)
-        _write_result(run_dir / "result.json", answer)
+        _write_result(run_dir / "result.json", {**answer, **asked})
         return _endpoint(job, run_dir / "result.json")
     try:
         final = run_job(
@@ -336,7 +356,8 @@ def run_trial(worker: RealWorker, job: NodeJob) -> NodeResult:
         )
     if params.engine == "vllm":  # proposal 014 §2: asked for vLLM, ran on HF, and says why (never silently)
         result.update(engine_requested="vllm", engine_fallback=reason)
-        _write_result(result_path, result)
+    result.update(asked)  # H-prompt: which question was asked and why (the box may have been empty)
+    _write_result(result_path, result)
     return _endpoint(job, result_path)
 
 
