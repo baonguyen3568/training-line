@@ -1505,6 +1505,8 @@ settings_error:
   settings_body_too_large: Nội dung gửi lên quá lớn.
   settings_key_unusable: File khoá có quyền truy cập sai, cần quản trị viên sửa.
 reference_pipeline:
+  data-cleanup-lora:
+    summary: Lọc ảnh hỏng, bỏ ảnh trùng và ảnh trùng với dữ liệu kiểm tra, rồi mới dạy nhẹ bằng LoRA.
   invoice-to-json:
     summary: Dạy model đọc ảnh hoá đơn và trả về JSON. Chạy ngay với bộ hoá đơn mẫu CORD-v2.
   invoice-qwen35-2b-lora:

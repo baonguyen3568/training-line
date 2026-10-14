@@ -1505,6 +1505,8 @@ settings_error:
   settings_body_too_large: The request is too large.
   settings_key_unusable: The key file has the wrong permissions; an admin must fix it.
 reference_pipeline:
+  data-cleanup-lora:
+    summary: Filter broken images, drop duplicates and images also in the test data, then LoRA-tune.
   invoice-to-json:
     summary: Teach a model to read receipt images into JSON. Runs right away on the CORD-v2 samples.
   invoice-qwen35-2b-lora:
