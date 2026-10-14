@@ -1389,7 +1389,8 @@ settings:
     row_cert: Chứng chỉ
     ca_download: Tải chứng chỉ
     fingerprint: Vân tay (SHA-256)
-    howto: Trên máy kia, cài chứng chỉ vừa tải làm chứng chỉ tin cậy, rồi so vân tay hiện ra lúc cài với dãy ở trên. Khớp hết thì mới mở địa chỉ.
+    howto: Chỉ chuyển file chứng chỉ qua kênh bạn tin cậy. Cài xong trên máy kia, mở chi tiết chứng chỉ trên máy đó và so vân tay SHA-256 với dãy ở trên; khớp hết thì mới mở địa chỉ, không khớp nghĩa là file đã bị tráo.
+    copy_fingerprint: Sao chép vân tay
     ca_missing: Chưa có chứng chỉ cho truy cập qua LAN. Quản trị viên chạy lại scripts/install.sh bản mới để tạo.
   section_about: Về app
   about:
