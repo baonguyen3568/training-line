@@ -1,0 +1,104 @@
+# ADR-022 #5 smoke (research 2026-10-14): Qwen3.5-0.8B FULL fine-tune with the vision encoder unfrozen at 0.1x LR
+# (Qwen2.5-VL report arXiv 2502.13923 / qwen-vl-finetune: ViT LR lower than the LLM), merger + LM at 1e-5, CORD v2,
+# 30 steps + 1 validation. Checks: both param groups exist with the right LR in the log, loss falls, RAM.
+# Not a template; RUN_DIR substituted by the launcher. Higher resolution (max_pixels up) is the next variant.
+
+recipe: FinetuneRecipeForVLM
+
+step_scheduler:
+  global_batch_size: 4
+  local_batch_size: 1
+  ckpt_every_steps: 30
+  val_every_steps: 30
+  num_epochs: 1
+  max_steps: 30
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1234
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForImageTextToText.from_pretrained
+  pretrained_model_name_or_path: /workspace/.cache/hf/hub/models--Qwen--Qwen3.5-0.8B/snapshots/2fc06364715b967f1860aea9cf38778875588b17
+  backend:
+    _target_: nemo_automodel.components.models.common.BackendConfig
+    attn: sdpa
+    linear: torch
+    rms_norm: torch
+    rope_fusion: false
+  attn_implementation: sdpa
+  torch_dtype: bfloat16
+
+processor:
+  _target_: transformers.AutoProcessor.from_pretrained
+  pretrained_model_name_or_path: /workspace/.cache/hf/hub/models--Qwen--Qwen3.5-0.8B/snapshots/2fc06364715b967f1860aea9cf38778875588b17
+  min_pixels: 200704  # catalog qwen_pixels (= 196 tokens at patch 16, merge 2)
+  max_pixels: 1003520  # without it the processor keeps up to 16.7 MP: ~9.8k tokens for a 2376x4224 receipt
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: RUN_DIR/checkpoints
+  model_save_format: safetensors
+  save_consolidated: final
+  max_recent_checkpoints: 2
+
+distributed:
+  _target_: nemo_automodel.components.distributed.fsdp2.FSDP2Manager
+  tp_size: 1
+  cp_size: 1
+  pp_size: 1
+  dp_replicate_size: 1
+  ep_size: 1
+  sequence_parallel: false
+  activation_checkpointing: true
+
+freeze_config:
+  freeze_vision_tower: false  # ADR-022 #5: the vision encoder trains too, at a lower LR (param_group_overrides)
+  freeze_audio_tower: true
+  freeze_language_model: false
+
+loss_fn:
+  _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
+
+dataset:
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: train
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.default_collate_fn
+
+validation_dataset:  # used when a val_data wire (or the catalog dataset's validation split) is present
+  _target_: nemo_automodel.components.datasets.vlm.datasets.make_cord_v2_dataset
+  path_or_dataset: /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/7f0115a4b758a71d6473b8d085751692da2fef98
+  split: validation
+  limit_dataset_samples: 100  # cap val cost on the shared GB10
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  num_workers: 0
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.vlm.collate_fns.default_collate_fn
+
+optimizer:
+  _target_: torch.optim.AdamW
+  betas: [0.9, 0.95]
+  eps: 1e-8
+  lr: 1.0e-5  # full fine-tune LR (P-3b preset family); the vision blocks get lr_mult below
+  weight_decay: 0.01
+  param_group_overrides:  # first match wins: the merger (projector) keeps the full LR, the ViT gets 0.1x
+    - {pattern: '(^|\.)model\.visual\.merger\.', lr_mult: 1.0}
+    - {pattern: '(^|\.)model\.visual\.', lr_mult: 0.1}
+
+lr_scheduler:  # lr_mult only takes effect through the scheduler (AutoModel 26.08 OptimizerParamScheduler)
+  lr_decay_style: constant
+  lr_warmup_steps: 0
+
