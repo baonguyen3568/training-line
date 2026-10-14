@@ -26,7 +26,7 @@ check_support refuses, before Run (canvas and run use the same check):
 - a dataset without the fields the node needs → **`DATA-008 DATASET_NOT_FOR_NODE`** `{node, dataset, missing}`, one
   code shared with DPO in 1.1 (cleancode + design write it). Local data: DATA-V preview. Hub data: the catalog's new
   `fields: [image, prompt, target]` (DATA-V cannot preview a hub dataset);
-- `reward=json_field_f1` with targets that are not JSON objects → the same DATA-008 (`missing: json_target`).
+- (`json_field_f1` is not in the first version: §3.)
 
 ## 3. Rewards (built-in only, security §2) — mapped onto NeMo-RL's own
 
