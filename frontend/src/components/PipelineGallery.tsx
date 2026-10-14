@@ -95,14 +95,17 @@ function timeParts(p: Pipeline): string[] {
   return [range ? formatMinutesRange(range) : null, ram].filter((x): x is string => !!x);
 }
 
-/** Parts of one line joined by " · ": the line wraps only between parts, never inside one ("RAM đỉnh 23.7 GB"). */
+/**
+ * Parts of one line joined by " · ": the line wraps only between parts, never inside one ("RAM đỉnh 23.7 GB"). Inside a
+ * `.nowrap` wrapper with its "?" the separators still wrap, so the "?" stays with the last part (design I r2).
+ */
 function Parts({ parts }: { parts: ReactNode[] }) {
   return (
     <>
       {parts.map((x, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list of line parts
         <Fragment key={i}>
-          {i > 0 && " · "}
+          {i > 0 && <span className="wrap"> · </span>}
           <span className="nowrap">{x}</span>
         </Fragment>
       ))}
@@ -247,61 +250,66 @@ export function PipelineGallery() {
                 <a href={p.source.url} target="_blank" rel="noopener noreferrer">
                   {p.source.publisher} <Icon name="external-link" size={12} />
                 </a>
-                <span className="chip">
-                  <Parts parts={licenseParts(p)} />
-                </span>
-                <Help id={`lic-${p.id}`} title={t("pipelines.license_detail")}>
-                  <p>
-                    {t("pipelines.license_parts", {
-                      code: lic(p.license.code),
-                      model: lic(p.license.model),
-                      data: lic(p.license.data),
-                    })}
-                  </p>
-                  {p.model_parts?.map((m) => (
-                    <p key={m.part}>
-                      {m.part}: {lic(m.license)}
+                {/* the "?" stays with the last licence (design I r2) */}
+                <span className="nowrap">
+                  <span className="chip">
+                    <Parts parts={licenseParts(p)} />
+                  </span>
+                  <Help id={`lic-${p.id}`} title={t("pipelines.license_detail")}>
+                    <p>
+                      {t("pipelines.license_parts", {
+                        code: lic(p.license.code),
+                        model: lic(p.license.model),
+                        data: lic(p.license.data),
+                      })}
                     </p>
-                  ))}
-                </Help>
+                    {p.model_parts?.map((m) => (
+                      <p key={m.part}>
+                        {m.part}: {lic(m.license)}
+                      </p>
+                    ))}
+                  </Help>
+                </span>
                 {measuredWith(p) && <span className="muted rp-with">{measuredWith(p)}</span>}
               </div>
               {p.measured && (
                 <div className="rp-measured">
-                  <Parts
-                    parts={[
-                      t("pipelines.measured"),
-                      ...timeParts(p),
-                      ...(p.measured.score
-                        ? [
-                            `${
-                              tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
-                              p.measured.score.metric
-                            } ${formatScore(p.measured.score.metric, p.measured.score.value)}`,
-                          ]
-                        : []),
-                    ]}
-                  />
-                  <Help id={`measured-${p.id}`} title={t("pipelines.measured")}>
-                    {p.measured.score && <MetricHelp score={p.measured.score} />}
-                    <ScoreCompare p={p} onShow={showCard} />
-                    {p.measured.score && <p>{t("pipelines.score_single_run")}</p>}
-                    {p.measured.config && <p className="small">{p.measured.config}</p>}
-                    <p className="small">
-                      <a href={p.source.url} target="_blank" rel="noopener noreferrer">
-                        {p.source.publisher}
-                      </a>
-                      {p.source.paper_url && (
-                        <>
-                          {" · "}
-                          <a href={p.source.paper_url} target="_blank" rel="noopener noreferrer">
-                            {t("pipelines.paper")}
-                          </a>
-                        </>
-                      )}
-                    </p>
-                    <p>{t("pipelines.swap_hint")}</p>
-                  </Help>
+                  <span className="nowrap">
+                    <Parts
+                      parts={[
+                        t("pipelines.measured"),
+                        ...timeParts(p),
+                        ...(p.measured.score
+                          ? [
+                              `${
+                                tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
+                                p.measured.score.metric
+                              } ${formatScore(p.measured.score.metric, p.measured.score.value)}`,
+                            ]
+                          : []),
+                      ]}
+                    />
+                    <Help id={`measured-${p.id}`} title={t("pipelines.measured")}>
+                      {p.measured.score && <MetricHelp score={p.measured.score} />}
+                      <ScoreCompare p={p} onShow={showCard} />
+                      {p.measured.score && <p>{t("pipelines.score_single_run")}</p>}
+                      {p.measured.config && <p className="small">{p.measured.config}</p>}
+                      <p className="small">
+                        <a href={p.source.url} target="_blank" rel="noopener noreferrer">
+                          {p.source.publisher}
+                        </a>
+                        {p.source.paper_url && (
+                          <>
+                            {" · "}
+                            <a href={p.source.paper_url} target="_blank" rel="noopener noreferrer">
+                              {t("pipelines.paper")}
+                            </a>
+                          </>
+                        )}
+                      </p>
+                      <p>{t("pipelines.swap_hint")}</p>
+                    </Help>
+                  </span>
                 </div>
               )}
               {p.requires_hf_terms && (

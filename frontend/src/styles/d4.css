@@ -1482,19 +1482,22 @@ fieldset.seg-radio {
   color: var(--color-text-muted);
 }
 .arch-diagram .arch-mark,
-.arch-diagram .arch-pill text {
+.arch-diagram .arch-pill-lora-text,
+.arch-diagram .arch-pill-quant-text {
   font-family: var(--font-family-mono);
   font-size: 10px;
 }
-.arch-pill.lora rect {
+.arch-diagram .arch-block rect.arch-pill-lora {
   fill: var(--color-accent-brand);
+  stroke: none;
 }
-.arch-diagram .arch-pill.lora text {
+.arch-diagram .arch-pill-lora-text {
   fill: #fff;
 }
-.arch-pill.quant rect {
+.arch-diagram .arch-block rect.arch-pill-quant {
   fill: var(--color-surface);
   stroke: var(--color-axis);
+  stroke-dasharray: none;
 }
 .arch-side rect {
   fill: var(--color-surface);
@@ -1569,9 +1572,7 @@ fieldset.seg-radio {
 }
 .rp-meta .chip {
   display: inline;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  box-decoration-break: clone;
+  box-decoration-break: clone; /* wraps at its " · " separators only (.wrap) */
 }
 .rp-meta a {
   display: inline-flex;
@@ -1592,4 +1593,7 @@ fieldset.seg-radio {
 }
 .rp-head .seg button {
   white-space: nowrap;
+}
+.rp-card .nowrap .wrap {
+  white-space: normal; /* a " · " inside a nowrap wrapper is still a place to break */
 }
