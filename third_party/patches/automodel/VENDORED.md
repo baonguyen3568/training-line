@@ -118,3 +118,27 @@ FusedAdam resume smoke from the 26.08-5 checkpoint. Run ids go into `.team/bugs/
 Result on 26.08-6 (`sha256:dc9da48f…`, bao-backend 2026-10-13): (a) `20261013-0924-resume6-a-6da1` and (b)
 `20261013-0928-resume6-b2-6b5b` both completed with no "unexpected"/"missing key" log line; resumed weights and loss
 within run-to-run noise (details in BUG-003).
+
+## 0006-qlora-keep-tied-lm-head-and-recipe-skips-unquantized.patch
+Files: `nemo_automodel/_transformers/model_init.py`, `nemo_automodel/components/quantization/qlora.py`
+
+QLoRA (nf4) on Qwen3.5 VLM failed at step 0 (bao-research 2026-10-14, run `20261014-0842-q35-2b-qlora-nf4-ab-cd64`,
+draft `.team/upstream/automodel-vlm-qlora-tied-lm-head.md`): `AssertionError` in bitsandbytes
+`fix_4bit_weight_quant_state_from_module` from `self.lm_head(...)`.
+1. **Root cause: the streaming BnB loader did not skip what HF's own BnB loader never quantizes.** On a single GPU,
+   AutoModel loads QLoRA through `_init_model_bnb_streaming` (meta skeleton → `replace_with_bnb_linear` → shard
+   streaming). Its skip list was `llm_int8_skip_modules` or `_keep_in_fp32_modules` only; HF's loader always adds
+   `get_keys_to_not_convert` (tied weights, output embeddings, last module). Qwen3.5 has `tie_word_embeddings: true`,
+   so `lm_head` became `Linear4bit` and `tie_weights()` then gave it the bf16 `embed_tokens.weight`. Fix:
+   `bnb_modules_to_not_convert()` = recipe skips + `_keep_in_fp32_modules` + HF's defaults, always (a tied output
+   embedding can never be 4-bit, whatever the recipe lists).
+2. **`create_bnb_config` dropped `llm_int8_skip_modules`** from the recipe's `quantization:` block, so a VLM could not
+   keep its vision tower / projector in bf16. Fix: passed through for 4-bit and 8-bit (None keeps the defaults).
+   Our recipes set `llm_int8_skip_modules: [model.visual]` for Qwen3.5 (HF matches a prefix followed by `.`; the
+   merger/projector lives under `model.visual`).
+
+Regression tests: `tests/integration/automodel/test_automodel_qlora_skip.py` (2 tests, CPU, meta device, real
+Qwen3.5-0.8B config). Verified 2026-10-14: **2 FAIL** on vlm-automodel:26.08-6 (lm_head `Linear4bit`; vision tower
+`Linear4bit` despite the recipe skip), **2 PASS** with the patched files bind-mounted. `patch -p1 --forward --dry-run`
+clean on the 26.08-6 tree. Still to do: research's QLoRA vs LoRA A/B on the patched image (GPU).
+Remove when AutoModel's streaming loader adds HF's default skips upstream.

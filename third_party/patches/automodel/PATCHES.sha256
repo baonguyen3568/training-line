@@ -3,3 +3,4 @@ a9c4d3506d9f95c112e57d102692d755fc0e2f27d0e9d74a7e7c64c093a8f46c  0002-nemotron-
 d4456d5f3286720ff9a7012152e2ff35693687e7d9205fb753717770ee01d80c  0003-nemotron-parse-generate-without-kv-cache.patch
 ad2315e2c0520c898025e355c610bd53a5b20eff768cd038681e15c7763c979b  0004-nemotron-parse-nvidia-decoder-prefix-and-positional-labels.patch
 4074e25fd961bca7a4720e79ba4403c7f154bab668592f784c257df1cd21960b  0005-nemotron-parse-externalize-radio-conditioner-at-build.patch
+03420b7f81c48f39520c07d33f02fd40919697731958b5d6c4fc1a719ed0195e  0006-qlora-keep-tied-lm-head-and-recipe-skips-unquantized.patch
