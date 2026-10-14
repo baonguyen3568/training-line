@@ -124,11 +124,13 @@ def gap_at(row: dict[str, Any], index: int, hf_token: int | None) -> tuple[float
 
 def kind_of(gap: float | None, own_recorded: bool) -> str:
     """First divergence kind: "near_tie", "anomaly" (greedy did not take its best token) or "divergence"."""
+    # Raw gap on purpose here: with logprobs in 0.125 steps, float noise cannot fake a -1e-6 anomaly.
     if not own_recorded or (gap is not None and gap < -EXACT_TIE_NATS):
         return "anomaly"
     if gap is None:
         return "divergence"  # HF's token is outside vLLM's recorded top-k
-    return "near_tie" if gap < NEAR_TIE_NATS else "divergence"
+    # Judged on the gap as reported (3 decimals): float noise put a 0.5 gap (bf16 steps of 0.125) on either side.
+    return "near_tie" if round(gap, 3) < NEAR_TIE_NATS else "divergence"
 
 
 def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dict[str, Any]:

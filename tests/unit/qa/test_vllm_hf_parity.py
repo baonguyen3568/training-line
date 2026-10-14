@@ -198,6 +198,15 @@ def test_vllm_stopping_where_hf_goes_on_is_ranked_at_vllm_eos() -> None:
     assert report["diverged"][0]["kind"] == "near_tie"
 
 
+def test_a_gap_of_half_a_nat_is_a_divergence_whatever_the_float_noise() -> None:
+    # 0.8B base, id 61: the stored logprobs carry more digits than the report; their gap fell just under 0.5 and
+    # passed as a near tie while it reports as 0.5 (the 2B base's 0.5 went the other way).
+    mod = _mod()
+    assert mod.kind_of(0.49999999999999994, True) == "divergence"
+    assert mod.kind_of(0.5000000000000001, True) == "divergence"
+    assert mod.kind_of(0.375, True) == "near_tie"
+
+
 def test_no_predictions_is_an_error() -> None:
     with pytest.raises(SystemExit, match="no HF predictions"):
         _mod().compare({}, {})
