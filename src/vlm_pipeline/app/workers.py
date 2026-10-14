@@ -58,13 +58,26 @@ from vlm_pipeline.graph.worker import (
 from vlm_pipeline.nodes.spec import NodeSpec, is_compatible, model_kind
 from vlm_pipeline.train.advanced import AdvancedNotForModelError, keys_not_for
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
-from vlm_pipeline.train.recipe import build_recipe, load_template, render_recipe, template_path, templates_digest
+from vlm_pipeline.train.recipe import (
+    build_recipe,
+    load_template,
+    qlora_models,
+    render_recipe,
+    template_path,
+    templates_digest,
+)
 
 logger = logging.getLogger(__name__)
 # Models whose AutoModel checkpoints cannot be resumed: a resume starts over instead of failing on every retry.
 # Empty since vlm-automodel:26.08-6 (patch 0005, BUG-003 closed: Parse resumes, also from 26.08-5 checkpoints).
 # Run dirs marked .not-resumable earlier stay so (graph.worker.NOT_RESUMABLE_MARKER).
 RESUME_UNSUPPORTED: frozenset[str] = frozenset()
+
+
+class QloraNotForModelError(VlmPipelineError):
+    """QLoRA (quantize_base=nf4) on a model whose template does not list the modules that stay bf16 (CFG-005)."""
+
+    code: ClassVar[str] = "CFG-005"
 
 
 class NotCachedError(VlmPipelineError):
@@ -659,9 +672,11 @@ def _check_train(q: SupportQuery) -> None:
             "advanced option not in this model's template",
             params={"node": q.node_id, "param": "advanced", "key": wrong[0], "rule": "not_for_model"},
         )
-    if getattr(q.params, "quantize_base", "none") != "none":  # QLoRA: offered disabled until smoke-tested on GB10
-        raise NodeNotRunnableError(
-            "QLoRA (quantize_base) is not runnable yet", params={"node": q.node_id, "node_type": q.spec.type_id}
+    quantize = getattr(q.params, "quantize_base", "none")
+    if quantize != "none" and q.model is not None and q.model.id not in qlora_models():
+        raise QloraNotForModelError(  # QLoRA only where the template names the modules that stay bf16
+            "QLoRA is not set up for this model",
+            params={"node": q.node_id, "param": "quantize_base", "value": quantize, "rule": "not_for_model", "key": ""},
         )
 
 

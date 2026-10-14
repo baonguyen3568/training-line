@@ -535,6 +535,7 @@ CFG-005:
     - {when: {param: advanced, rule: not_offered}, key: advanced_not_offered}
     - {when: {param: advanced, rule: not_for_model}, key: advanced_not_for_model}
     - {when: {param: advanced}, key: advanced}
+    - {when: {param: quantize_base, rule: not_for_model}, key: qlora_not_for_model}
     - {when: {}, key: default}
   match:
     - {kind: validate, value: "node params ValidationError"}

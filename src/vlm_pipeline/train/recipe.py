@@ -7,6 +7,7 @@ LoRA vs full fine-tune, freezing. Host-safe (pydantic + pyyaml). Paths given her
 
 from __future__ import annotations
 
+import functools
 import hashlib
 from collections.abc import Mapping
 from pathlib import Path
@@ -99,6 +100,33 @@ QLORA_NF4: dict[str, Any] = {
 # names differ per family (Qwen3.5: model.visual; Gemma: model.vision_tower + model.multi_modal_projector), so they
 # live with the model's template; lm_head (tied) is skipped by patch 0006 itself (fixcode).
 QLORA_SKIP_KEY = "qlora_skip_modules"
+
+
+def _valid_skip_list(value: object) -> list[str] | None:
+    """The one rule for ``qlora_skip_modules``: a non-empty list of non-empty module names, else None."""
+    if isinstance(value, list) and value and all(isinstance(m, str) and m for m in value):
+        return list(value)
+    return None
+
+
+def qlora_skip_modules(template: Mapping[str, Any]) -> list[str] | None:
+    """The template's bf16 modules for QLoRA, or None when the model is not set up for it (no or a malformed list)."""
+    return _valid_skip_list(template.get(QLORA_SKIP_KEY))
+
+
+@functools.cache  # read once per process (the templates ship with the app), like advanced.engine_options
+def qlora_models(root: Path | None = None) -> frozenset[str]:
+    """Catalog ids whose training template lists ``qlora_skip_modules``: the only models QLoRA is offered for."""
+    import yaml
+
+    found = set()
+    for path in sorted((configs_root(root) / TEMPLATE_DIR).glob("*.yaml")):
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and qlora_skip_modules(data) is not None:
+            found.add(path.stem)
+    return frozenset(found)
+
+
 NO_STEP_CADENCE = 1_000_000_000  # ckpt_every_steps that never fires (step % N == N - 1): epoch ends only
 
 
@@ -189,9 +217,9 @@ def build_recipe(
             "alpha": params.lora_alpha,
         }
         if params.quantize_base == "nf4":  # QLoRA: AutoModel's BitsAndBytes section (its DGX Spark QLoRA example)
-            if not (isinstance(skip, list) and skip and all(isinstance(m, str) and m for m in skip)):
+            if (modules := _valid_skip_list(skip)) is None:
                 raise RecipeError(f"QLoRA is not set up for this model: its template has no {QLORA_SKIP_KEY}")
-            r["quantization"] = {**QLORA_NF4, "llm_int8_skip_modules": list(skip)}  # the vision part stays bf16
+            r["quantization"] = {**QLORA_NF4, "llm_int8_skip_modules": modules}  # the vision part stays bf16
     else:
         r.pop("peft", None)
         freeze = r.setdefault("freeze_config", {})

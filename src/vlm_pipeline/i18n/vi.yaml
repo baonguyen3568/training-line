@@ -282,6 +282,7 @@ error:
       advanced_too_many: 'Bước "{node}" có quá nhiều tuỳ chọn engine đã đổi. Hãy bỏ bớt những tuỳ chọn không cần.'
       advanced_not_for_model: 'Tuỳ chọn engine "{key}" không dùng được với model đang nối vào bước "{node}". Hãy xoá tuỳ chọn đó hoặc đổi model.'
       advanced: 'Một tuỳ chọn engine của bước "{node}" không hợp lệ. Mở mục Nâng cao của bước này để xem và sửa.'
+      qlora_not_for_model: 'Model đang nối vào bước "{node}" chưa được thiết lập để nén 4-bit khi huấn luyện (QLoRA). Hãy đặt "{param}" về "Không nén" hoặc chọn model khác.'
   CFG-006:
     title: Có dây nối tới bước không tồn tại
     what: Một dây trỏ tới "{node_id}" nhưng bước này đã bị xoá hoặc đổi tên.
@@ -818,7 +819,7 @@ node:
         help: Độ mạnh của phần học thêm (8–128). Nên giữ mặc định.
       quantize_base:
         label: Nén model gốc khi học (QLoRA)
-        help: Nén model gốc xuống 4-bit để tiết kiệm bộ nhớ khi học. Chỉ có lợi với model lớn (từ ~9B). Chưa dùng được trên máy này.
+        help: Nén model gốc xuống 4-bit để tiết kiệm bộ nhớ khi học. Có lợi rõ nhất với model lớn (từ ~9B); chất lượng gần như học thường. Chỉ dùng được với model đã thiết lập sẵn cho QLoRA (hiện là các model Qwen3.5).
       advanced:
         label: Tuỳ chọn engine nâng cao
         help: Các tuỳ chọn của engine train (NeMo AutoModel), giữ nguyên tên gốc. Chỉ đổi khi bạn biết rõ tác dụng; để trống là dùng mặc định đã được kiểm tra. App vẫn kiểm tra giá trị trước khi chạy.
@@ -1420,7 +1421,6 @@ pipelines:
 param_unsupported:
   default: chưa hỗ trợ
   worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.
-  engine_qlora: Bản engine hiện tại chưa nén 4-bit được. Hãy để "Không nén".
 settings:
   section_app: Ứng dụng
   row_language: Ngôn ngữ

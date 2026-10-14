@@ -126,3 +126,45 @@ def test_build_recipe_refuses_keys_of_another_template() -> None:
     params = LoraParams(advanced={"optimizer.adam_w_mode": True})  # TE FusedAdam only (Parse templates)
     with pytest.raises(RecipeError, match="adam_w_mode"):
         build_recipe(template, params, model_dir="/m", dataset_dir="/d", run_dir="/r", model_id=entry.id)
+
+
+@pytest.mark.parametrize(("model_id", "ok"), [("qwen3.5-2b", True), ("qwen3.5-9b", True), ("gemma-4-e4b-it", False)])
+def test_qlora_runs_only_for_models_whose_template_keeps_the_vision_part_bf16(model_id: str, ok: bool) -> None:
+    """research A/B 2026-10-14 (26.08-7 PASS): nf4 is offered for every model, refused where the template has no
+    qlora_skip_modules (a quantized vision tower fails at step 0)."""
+    from vlm_pipeline.app.workers import QloraNotForModelError, _check_train
+    from vlm_pipeline.graph.worker import SupportQuery
+    from vlm_pipeline.nodes import REGISTRY
+    from vlm_pipeline.train.recipe import qlora_models
+
+    spec, model = REGISTRY.get("train.lora_vlm"), load_catalog().get(model_id)
+    assert spec is not None
+    assert model is not None
+    assert (model_id in qlora_models()) is ok
+    query = SupportQuery("t", spec, LoraParams(quantize_base="nf4"), model, {})
+    if ok:
+        _check_train(query)
+        return
+    with pytest.raises(QloraNotForModelError) as info:
+        _check_train(query)
+    assert info.value.code == "CFG-005"
+    assert info.value.params == {"node": "t", "param": "quantize_base", "value": "nf4", "rule": "not_for_model",
+                                 "key": ""}  # fmt: skip
+
+
+def test_nf4_is_no_longer_a_disabled_option() -> None:
+    from vlm_pipeline.train.config import LoraParams as Params
+
+    extra = Params.model_json_schema()["properties"]["quantize_base"]
+    assert "nf4" not in str(extra.get("disabled_options", {}))
+
+
+def test_qlora_needs_the_image_with_patch_0006() -> None:
+    """security 2026-10-14: nf4 fails at step 0 before vlm-automodel:26.08-7 (tied lm_head); a rollback of the default
+    image must also take QLoRA back out (disabled_options + the support check), or this test fails."""
+    from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
+
+    name, tag = DEFAULT_TRAIN_IMAGE.split(":")
+    assert name == "vlm-automodel"
+    assert tag.startswith("26.08-")
+    assert int(tag.rsplit("-", 1)[1]) >= 7

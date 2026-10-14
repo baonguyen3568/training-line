@@ -1416,9 +1416,6 @@
             "type": "string",
             "x-ui": {
               "advanced": true,
-              "disabled_options": {
-                "nf4": "param_unsupported.engine_qlora"
-              },
               "option_keys": "quantize_base"
             }
           },

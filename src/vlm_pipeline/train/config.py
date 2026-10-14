@@ -57,13 +57,11 @@ class LoraParams(_FinetuneParams):
     lora_dim: int = Field(8, ge=4, le=64, json_schema_extra=ui(advanced=True))
     lora_alpha: int = Field(32, ge=8, le=128, json_schema_extra=ui(advanced=True))
     # QLoRA = this option, not another node (research 2026-10-13: AutoModel create_bnb_config nf4 + double quant,
-    # bnb 0.49.2 in the image). Disabled: AutoModel 26.08 quantizes the tied lm_head / vision tower and fails at step 0
-    # (research A/B 2026-10-14, .team/upstream/automodel-vlm-qlora-tied-lm-head.md); the support check refuses it too.
+    # bnb 0.49.2 in the image). Runs on vlm-automodel:26.08-7 (patch 0006: tied lm_head stays bf16; research A/B
+    # 2026-10-14: val_loss = LoRA's, -3.4 GB host peak on 2B) for models whose template lists qlora_skip_modules (the
+    # vision part stays bf16); the support check refuses it for every other model (CFG-005 not_for_model).
     quantize_base: Literal["none", "nf4"] = Field(
-        "none",
-        json_schema_extra=ui(
-            advanced=True, option_keys="quantize_base", disabled_options={"nf4": "param_unsupported.engine_qlora"}
-        ),
+        "none", json_schema_extra=ui(advanced=True, option_keys="quantize_base")
     )
 
     @property
