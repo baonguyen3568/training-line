@@ -17,10 +17,10 @@ DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-7"
 
 
 # Extra groups a job may join, PER IMAGE ID (security 2026-10-14): never by tag, since anyone can retag another image
-# locally. vlm-nemo-rl:0.7.0-1 (docker/IMAGES.lock, PROBE ONLY) keeps /opt/nemo-rl 660/770 root:root, so its
+# locally. vlm-nemo-rl:0.7.0-3 (docker/IMAGES.lock, PROBE ONLY) keeps /opt/nemo-rl 660/770 root:root, so its
 # non-root user needs group 0. Never offered to any other image (a job in group 0 can read root-group files).
 GROUP_ADD_ALLOWED: dict[str, frozenset[int]] = {
-    "sha256:99f0fd748c0e428a13506a932c3d3b879ce74d61586096e924545db40138abbe": frozenset({0}),  # vlm-nemo-rl:0.7.0-2
+    "sha256:a573d5b6abc4999147b4ff91721980ad537e6a53f1318cb5bb9900653f35b86a": frozenset({0}),  # vlm-nemo-rl:0.7.0-3
 }
 
 

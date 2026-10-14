@@ -943,8 +943,8 @@ def test_a_container_that_never_appears_is_a_system_error(tmp_path: Path, monkey
         _race_run(tmp_path, monkeypatch, replies)
 
 
-NEMO_RL_ID = "sha256:99f0fd748c0e428a13506a932c3d3b879ce74d61586096e924545db40138abbe"  # 0.7.0-2, PROBE ONLY
-NEMO_RL_OLD_ID = "sha256:4c740d252ef90651621224005623546b4931582fa2eeb9ce816ba9d7576a4add"  # 0.7.0-1: replaced by -2
+NEMO_RL_ID = "sha256:a573d5b6abc4999147b4ff91721980ad537e6a53f1318cb5bb9900653f35b86a"  # 0.7.0-3, PROBE ONLY
+NEMO_RL_OLD_ID = "sha256:99f0fd748c0e428a13506a932c3d3b879ce74d61586096e924545db40138abbe"  # 0.7.0-2: replaced by -3
 
 
 @pytest.mark.parametrize(
@@ -952,7 +952,7 @@ NEMO_RL_OLD_ID = "sha256:4c740d252ef90651621224005623546b4931582fa2eeb9ce816ba9d
     [
         (NEMO_RL_ID, (0,), True),  # its /opt/nemo-rl is root-group only (security 2026-10-14)
         (NEMO_RL_ID, (0, 4), False),  # only the allowed group
-        ("vlm-nemo-rl:0.7.0-2", (0,), False),  # a tag is never trusted (anyone can retag another image)
+        ("vlm-nemo-rl:0.7.0-3", (0,), False),  # a tag is never trusted (anyone can retag another image)
         (NEMO_RL_OLD_ID, (0,), False),  # the replaced -1 image is off the allowlist (security 2026-10-14)
         ("sha256:" + "b" * 64, (0,), False),  # another image, whatever its tag says
         ("vlm-automodel:26.08-6", (), True),  # no extra group: always fine

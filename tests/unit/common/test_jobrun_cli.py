@@ -141,10 +141,10 @@ def test_a_looser_ceiling_is_refused_before_any_run_dir_exists(
 
 def test_group_add_reaches_the_job_only_for_its_allowed_image(tmp_path: Path) -> None:
     """research's NeMo-RL probe: --group-add 0 for vlm-nemo-rl only (security 2026-10-14)."""
-    nemo_rl = "sha256:99f0fd748c0e428a13506a932c3d3b879ce74d61586096e924545db40138abbe"  # 0.7.0-2; run_job pins to it
+    nemo_rl = "sha256:a573d5b6abc4999147b4ff91721980ad537e6a53f1318cb5bb9900653f35b86a"  # 0.7.0-3; run_job pins to it
     _root, _run, argv = _job(tmp_path, image=nemo_rl, group_add=[0])
     assert argv[argv.index("--group-add") + 1] == "0"
     with pytest.raises(ValueError, match="may not join group"):
-        _job(tmp_path / "tag", image="vlm-nemo-rl:0.7.0-2", group_add=[0])  # a tag alone is never trusted
+        _job(tmp_path / "tag", image="vlm-nemo-rl:0.7.0-3", group_add=[0])  # a tag alone is never trusted
     with pytest.raises(ValueError, match="may not join group"):
         _job(tmp_path / "other", group_add=[0])  # vlm-vllm: never
