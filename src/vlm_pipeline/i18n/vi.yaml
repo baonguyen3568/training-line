@@ -1874,6 +1874,9 @@ byo:
     image: Cột ảnh
     question: Cột câu hỏi (tuỳ chọn)
     answer: Cột câu trả lời
+    prompt: Câu hỏi dùng chung cho mọi ảnh
+    prompt_help: Dùng khi bộ dữ liệu không có cột câu hỏi. Model sẽ học trả lời đúng câu này, nên sau khi train hãy hỏi model bằng chính câu này (có thể viết tiếng Việt).
+    prompt_default_note: 'Câu mặc định của app, giữ nguyên tiếng Anh như lúc train'
     messages: Cột hội thoại
     suggested: gợi ý
     preview: Xem trước
