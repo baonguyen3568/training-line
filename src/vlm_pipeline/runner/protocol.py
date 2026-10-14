@@ -6,7 +6,7 @@ an env var, a container name or a free image name. Everything here is a pure che
 
 ``submit`` fields:
 * ``run_id``: ``^[0-9]{8}-[0-9]{4}-[a-z0-9-]{1,48}$`` (container ``vlm-job-<run_id>``);
-* ``job_kind``: train | eval | quantize | probe | download | serve;
+* ``job_kind``: train | eval | quantize | probe | download | serve | data (CPU, no network, never a GPU);
 * ``image_tag``: a tag; the server checks IMAGES.lock + APPROVED + image id (SEC-004), not this module;
 * ``argv``: must start with one of the kind's allowed prefixes (ALLOWED_ARGV); the rest are plain strings;
 * ``gpu``, ``memory_gb`` (1..MEMORY_CAP_GB), ``lock_token`` (required with gpu);
@@ -44,7 +44,7 @@ LOCK_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 MAX_DOWNLOAD_BYTES = 2 * 1024**4  # 2 TiB: far above any catalog entry, a sanity bound only
 HF_TOKEN = re.compile(r"^hf_[A-Za-z0-9]{20,100}$")  # the shape of a Hugging Face token
 COMMANDS = frozenset({"submit", "stop", "kill", "status", "logs", "remove", "image_id"})
-JOB_KINDS = frozenset({"train", "eval", "quantize", "probe", "download", "serve"})
+JOB_KINDS = frozenset({"train", "eval", "quantize", "probe", "download", "serve", "data"})
 RUN_DIR_PARENTS = (APP_ROOT / "outputs" / "runs", APP_ROOT / "outputs" / "graph" / "runs")
 INPUT_ROOTS = (
     APP_ROOT / "outputs" / "runs",

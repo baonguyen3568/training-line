@@ -43,3 +43,13 @@ def test_argv_outside_the_kind_is_refused(kind: str, argv: tuple[str, ...]) -> N
 def test_entrypoints_come_from_the_closed_set_only() -> None:
     assert {ep for rules in ALLOWED_ARGV.values() for _, ep in rules} <= ENTRYPOINTS
     assert len(ENTRYPOINTS) == 2
+
+
+def test_every_extraction_job_the_app_starts_is_a_data_job() -> None:
+    """The installed stack runs jobs through vlm-runner, which refuses an argv no kind allows (G-5 extraction)."""
+    from vlm_pipeline.common.job_kinds import job_kind
+    from vlm_pipeline.download.extracted import EXTRACTED
+
+    for spec in EXTRACTED.values():
+        argv = ("python", "-m", spec.module, "--parquet", "/workspace/x.parquet", "--out", "/workspace/o")
+        assert job_kind(argv) == "data"  # never "download": no network for work on files

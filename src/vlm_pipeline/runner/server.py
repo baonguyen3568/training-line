@@ -133,6 +133,8 @@ class Runner:
         entrypoint, command = job_entrypoint(sub.job_kind, sub.argv)  # the protocol already allowed this argv
         if entrypoint == NGC_ENTRYPOINT and image_entrypoint != [NGC_ENTRYPOINT]:
             return {"ok": False, "error": "entrypoint_mismatch"}  # not an NGC image: its wrapper is not there
+        if sub.job_kind == "data" and sub.gpu:  # CPU work on files: never the GPU (nor its lock)
+            return {"ok": False, "error": "data_without_gpu"}
         if sub.gpu:
             gpu_lock.verify_token(self.cfg.lock_path, sub.lock_token or "")
         download = sub.job_kind == "download"  # the ONLY kind with a network (HF-only proxy) and a token

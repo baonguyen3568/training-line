@@ -39,6 +39,9 @@ ALLOWED_ARGV: dict[str, tuple[tuple[tuple[str, ...], str], ...]] = {
     "probe": (),
     # P018 / security download-egress: the one job with a network (HF-only proxy) and a token file.
     "download": ((("python", "-m", "vlm_pipeline.download.hub"), NGC_ENTRYPOINT),),
+    # CPU work on downloaded files, no network, no GPU (the runner refuses gpu): eval data extraction (G-5). Without
+    # this kind the extraction argv matched nothing, and the installed stack refused it (argv_not_allowed).
+    "data": ((("python", "-m", "vlm_pipeline.eval.ocrbench_extract"), NGC_ENTRYPOINT),),
 }
 if not all(ep in ENTRYPOINTS for rules in ALLOWED_ARGV.values() for _, ep in rules):  # survives python -O
     raise RuntimeError("ALLOWED_ARGV uses an entrypoint outside the closed set")

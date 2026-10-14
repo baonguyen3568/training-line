@@ -441,3 +441,15 @@ def test_the_runner_gives_small_cpu_jobs_no_swap(tmp_path: Path, memory_gb: int,
     argv = started[0]
     assert (("--memory-swap", f"{memory_gb}g") in list(itertools.pairwise(argv))) is exempt
     assert ("--pids-limit" in argv) is exempt
+
+
+def test_a_data_job_never_gets_the_gpu(tmp_path: Path) -> None:
+    runner, started = _runner(_project(tmp_path), FakeDocker())
+    argv = ["python", "-m", "vlm_pipeline.eval.ocrbench_extract", "--parquet", "/workspace/x", "--out", "/workspace/o"]
+    body = json.loads(_submit(job_kind="data", argv=argv, gpu=True, lock_token="x" * 32))
+    assert runner.handle(json.dumps(body).encode()) == {"ok": False, "error": "data_without_gpu"}
+    assert started == []
+    ok = json.loads(_submit(job_kind="data", argv=argv))
+    assert runner.handle(json.dumps(ok).encode())["ok"] is True
+    assert "--network" in started[0]
+    assert started[0][started[0].index("--network") + 1] == "none"
