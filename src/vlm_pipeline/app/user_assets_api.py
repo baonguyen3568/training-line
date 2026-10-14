@@ -12,6 +12,7 @@ Behind ``SecurityMiddleware`` like every route (session, Host/Origin, CSRF on wr
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,7 +21,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from vlm_pipeline.app import user_assets
-from vlm_pipeline.common.catalog import REPO_ID_PATTERN, set_user_model_lookup
+from vlm_pipeline.common.catalog import REPO_ID_PATTERN, set_user_dataset_lookup, set_user_model_lookup
 from vlm_pipeline.common.runinfo import RunStatus
 from vlm_pipeline.download.resolver import RepoFilesInvalidError
 
@@ -68,6 +69,23 @@ class ConfirmLicenseRequest(BaseModel):
     accept: Literal[True]
 
 
+def _dataset_status(root: Path) -> Any:
+    def status(dataset_id: str) -> dict[str, object] | None:
+        from vlm_pipeline.app import user_datasets
+
+        record = user_datasets.load(root, dataset_id)
+        if record is None:
+            return None
+        folder = user_datasets.data_folder(root, dataset_id)
+        ready = not folder.is_symlink() and (folder / "labels.jsonl").is_file()
+        api = record.to_api()
+        download = None if ready else {"name": api["name"], "kind": "dataset", "catalog_id": record.id,
+                                       "size_gb": api["size_gb"], "reason": "not_cached"}  # fmt: skip
+        return {"rows": record.rows if ready else None, "download": download}
+
+    return status
+
+
 def _no_double_dash(repo: str) -> None:
     if "--" in repo or ".." in repo:  # security checklist §2
         raise HTTPException(status_code=400, detail={"code": "CFG-005", "params": {"param": "repo", "rule": "format"}})
@@ -84,6 +102,7 @@ def register_user_asset_routes(app: FastAPI) -> None:
         return record.entry if record is not None else None
 
     set_user_model_lookup(lookup)  # common.catalog.model_entry finds user-added models from now on
+    set_user_dataset_lookup(_dataset_status(root))
     _register_dataset_routes(app, service, root)
 
     @app.post("/api/user-assets/models", status_code=202)
@@ -142,7 +161,8 @@ def register_user_asset_routes(app: FastAPI) -> None:
 
 def _register_dataset_routes(app: FastAPI, service: Any, root: Path) -> None:
     """Inspect any Hugging Face dataset (P021 §3, H4): the resolve job, then the network-none inspect job."""
-    inspections: dict[str, Path] = {}  # inspect_id -> the inspect job's out dir (thumbnails)
+    inspections: dict[str, _Inspected] = {}  # inspect_id -> what the add-dataset step and the thumbnails need
+    _register_dataset_record_routes(app, service, root, inspections)
 
     @app.post("/api/user-assets/datasets/inspect", status_code=202)
     def inspect_dataset(body: InspectRequest) -> dict[str, Any]:
@@ -169,10 +189,12 @@ def _register_dataset_routes(app: FastAPI, service: Any, root: Path) -> None:
                 if final.status != RunStatus.COMPLETED:
                     raise RepoFilesInvalidError("inspect job failed")
                 inspected = user_datasets.read_inspect(out)
-            else:  # too big to sample, or no file the job could read: said, never guessed
-                inspected = user_datasets.InspectResult(columns=[], suggested={}, samples=[], rows_read=0,
-                                                        error="no_sample")  # fmt: skip
-            inspections[run_dir.name] = out
+            else:  # every file of the split is over the sample cap: said, never guessed
+                from vlm_pipeline.download.dataset_layout import SAMPLE_MAX
+
+                raise user_datasets.DatasetUnreadableError("sample too large", params={
+                    "repo": body.repo, "reason": "sample_too_large", "limit_mb": SAMPLE_MAX >> 20})  # fmt: skip
+            inspections[run_dir.name] = _Inspected(out, run_dir, body.repo, [c.name for c in inspected.columns])
             url = f"/api/user-assets/inspections/{run_dir.name}/thumbs"
             return user_datasets.api_result(body.repo, meta.sha, block, inspected, url)
 
@@ -198,12 +220,78 @@ def _register_dataset_routes(app: FastAPI, service: Any, root: Path) -> None:
         from vlm_pipeline.app.user_datasets import thumb_path
 
         _hub_job(service, inspect_id, "dataset")
-        folder = inspections.get(inspect_id)
-        path = thumb_path(folder, n) if folder is not None and 0 <= n < 20 else None
+        seen = inspections.get(inspect_id)
+        path = thumb_path(seen.out, n) if seen is not None and 0 <= n < 20 else None
         if path is None:
             raise HTTPException(status_code=404, detail={"code": "CFG-004", "params": {}})
         return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-store",
                                                                    "X-Content-Type-Options": "nosniff"})  # fmt: skip
+
+
+@dataclass(frozen=True)
+class _Inspected:
+    out: Path  # the inspect job's out dir (thumbnails)
+    run_dir: Path  # the resolve job's run dir (the split's files, from its resolve.json)
+    repo: str
+    columns: list[str]
+
+
+class AddDatasetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    inspect_id: str = Field(pattern=r"^[0-9]{8}-[0-9]{4}-rs-[0-9a-f]{8}$")
+    columns: dict[str, str]
+
+
+def _register_dataset_record_routes(app: FastAPI, service: Any, root: Path, inspections: dict[str, _Inspected]) -> None:
+    """Add an inspected split as a user dataset (its column mapping), list, confirm the licence, delete (H5)."""
+    from vlm_pipeline.app import user_datasets
+
+    def not_found() -> HTTPException:
+        return HTTPException(status_code=404, detail={"code": "CFG-004", "params": {}})
+
+    @app.post("/api/user-assets/datasets")
+    def add_dataset(body: AddDatasetRequest) -> dict[str, Any]:
+        from vlm_pipeline.common.errors import VlmPipelineError
+
+        seen = inspections.get(body.inspect_id)
+        if seen is None:
+            raise not_found()
+        try:
+            columns = user_datasets.ColumnMap.model_validate(body.columns)
+        except ValueError:
+            missing = "image" if "image" not in body.columns else "answer"
+            params = {"repo": seen.repo, "missing": missing, "available": ", ".join(seen.columns[:10])}
+            raise HTTPException(status_code=400, detail={"code": "DATA-010", "params": params}) from None
+        try:
+            record = user_datasets.from_inspection(seen.run_dir, seen.repo, columns, seen.columns)
+        except VlmPipelineError as exc:
+            raise HTTPException(status_code=400, detail={"code": exc.code, "params": exc.params}) from None
+        kept = user_datasets.load(root, record.id)  # the same split again: the licence answer stays
+        if kept is not None and kept.revision == record.revision:
+            record = record.model_copy(update={"license_confirmed": kept.license_confirmed,
+                                               "license_confirmed_sha": kept.license_confirmed_sha,
+                                               "rows": kept.rows if kept.columns == columns else None})  # fmt: skip
+        user_datasets.save(root, record)
+        return {"dataset": record.to_api()}
+
+    @app.get("/api/user-assets/datasets")
+    def list_datasets() -> dict[str, Any]:
+        return {"datasets": [r.to_api() for r in user_datasets.list_all(root)]}
+
+    @app.post("/api/user-assets/datasets/{dataset_id}/confirm-license")
+    def confirm_dataset(dataset_id: str, body: ConfirmLicenseRequest) -> dict[str, Any]:
+        del body
+        record = user_datasets.confirm_license(root, dataset_id)
+        if record is None:
+            raise not_found()
+        return {"dataset": record.to_api()}
+
+    @app.delete("/api/user-assets/datasets/{dataset_id}")
+    def remove_dataset(dataset_id: str) -> dict[str, Any]:
+        if not user_datasets.delete(root, dataset_id):
+            raise not_found()
+        return {"deleted": dataset_id}
 
 
 def _hub_job(service: Any, job_id: str, kind: str) -> Any:

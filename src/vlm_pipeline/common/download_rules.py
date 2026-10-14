@@ -24,6 +24,9 @@ MODEL_ALLOW = (
 DATASET_ALLOW = (
     "*.parquet", "*.arrow", "*.jsonl", "*.json", "*.csv", "*.png", "*.jpg", "*.jpeg", "*.webp", "README.md", "LICENSE*",
 )  # fmt: skip
+# WebDataset shards (ADR-021 A1, security §10): only for a user dataset whose format is webdataset, read by a
+# network-none job member by member (download.archives); never for a catalog download.
+ARCHIVE_ALLOW = ("*.tar", "*.tar.gz", "*.tgz", "*.zip")
 IGNORE = (
     "*.bin", "*.pt", "*.pth", "*.ckpt", "*.pkl", "*.pickle", "*.joblib", "*.npy", "*.npz", "*.h5", "*.msgpack",
     "*.gguf", "*.onnx", "*.zip", "*.7z", "*.tar.gz", "*.tgz", "*.sh", "*.exe", "*.so", ".git*", "*.py",
@@ -47,11 +50,13 @@ def name_ok(name: str) -> bool:
     )
 
 
-def wanted(name: str, kind: Kind, remote_code_files: Iterable[str] = ()) -> bool:
+def wanted(name: str, kind: Kind, remote_code_files: Iterable[str] = (), *, archives: bool = False) -> bool:
     """Whether ``name`` may be fetched: allowed for its kind, never ignored; ``*.py`` only if listed for the repo."""
     if not name_ok(name):
         return False
     if kind == "model" and name in set(remote_code_files):  # configs/security allowlist, exact names only
+        return True
+    if archives and kind == "dataset" and _match(name, ARCHIVE_ALLOW):  # shards, checked again by the job
         return True
     if _match(name, IGNORE):  # ignore wins over allow
         return False

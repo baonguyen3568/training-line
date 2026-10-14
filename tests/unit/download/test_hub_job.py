@@ -254,3 +254,19 @@ def test_resolve_refuses_a_strange_ref(tmp_path: Path, ref: str) -> None:
 def test_a_normal_download_still_needs_a_sha(tmp_path: Path) -> None:
     fake = _ResolveHub([], {})
     assert hub.run(_run_dir(tmp_path, revision="main"), api=fake, fetch=fake.fetch) == hub.EXIT_BAD_SPEC
+
+
+def test_only_the_named_files_of_a_split_are_fetched(tmp_path: Path) -> None:
+    """P021 H5: a user dataset downloads its split only, never the rest of the repo."""
+    sibs = [_sib("data/train-0.parquet", 10, "a" * 64), _sib("data/test-0.parquet", 10, "b" * 64)]
+    fake = _Hub(sibs, {"data/train-0.parquet": b"x" * 10})
+    run_dir = _run_dir(tmp_path, kind="dataset", only_files=["data/train-0.parquet"])
+    assert hub.run(run_dir, api=fake, fetch=fake.fetch) == 0
+    assert fake.fetched == ["data/train-0.parquet"]
+
+
+@pytest.mark.parametrize("only", [["data/gone.parquet"], [], ["../x"], "data/train-0.parquet"])
+def test_a_split_file_list_that_does_not_match_is_refused(tmp_path: Path, only: Any) -> None:
+    fake = _Hub([_sib("data/train-0.parquet", 10, "a" * 64)], {})
+    assert hub.run(_run_dir(tmp_path, kind="dataset", only_files=only), api=fake, fetch=fake.fetch) == hub.EXIT_BAD_SPEC
+    assert fake.fetched == []

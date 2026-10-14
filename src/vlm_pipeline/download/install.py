@@ -110,14 +110,14 @@ def _read_plan(stage: Path, params: dict[str, object]) -> dict[str, dict[str, An
 
 
 def _check_tree(files_dir: Path, planned: dict[str, dict[str, Any]], *, kind: Kind, pins: dict[str, str],
-                params: dict[str, object]) -> dict[str, Path]:  # fmt: skip
+                params: dict[str, object], archives: bool = False) -> dict[str, Path]:  # fmt: skip
     """Every file of ``files_dir`` is planned, allowed and hashes to what the plan (or the pin) says."""
     files = _walk(files_dir)
     if set(files) != set(planned):
         raise DownloadIntegrityError("files differ from the plan", params=params)
     remote_code = list(pins)
     for rel, path in files.items():
-        if not wanted(rel, kind, remote_code):
+        if not wanted(rel, kind, remote_code, archives=archives):
             raise DownloadIntegrityError(f"file not allowed: {rel}", params=params)
         entry = planned[rel]
         if rel.endswith(".py"):  # remote code: the security pin, never the hub's word
@@ -134,10 +134,14 @@ def _check_tree(files_dir: Path, planned: dict[str, dict[str, Any]], *, kind: Ki
     return files
 
 
-def verify(stage: Path, *, kind: Kind, pins: dict[str, str], name: str) -> dict[str, Path]:
-    """The verified ``name -> path`` of the staged files, or DownloadIntegrityError (params: the asset's name)."""
+def verify(stage: Path, *, kind: Kind, pins: dict[str, str], name: str, archives: bool = False) -> dict[str, Path]:
+    """The verified ``name -> path`` of the staged files, or DownloadIntegrityError (params: the asset's name).
+
+    ``archives``: a user dataset's WebDataset shards are allowed (read later by a network-none job, H5b).
+    """
     params: dict[str, object] = {"name": name, "reason": "mismatch"}
-    return _check_tree(stage / "files", _read_plan(stage, params), kind=kind, pins=pins, params=params)
+    planned = _read_plan(stage, params)
+    return _check_tree(stage / "files", planned, kind=kind, pins=pins, params=params, archives=archives)
 
 
 INSTALLED_REL = Path("outputs") / "system" / "downloads" / "installed"

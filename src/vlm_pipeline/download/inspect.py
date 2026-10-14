@@ -80,7 +80,7 @@ def read_rows(path: Path, fmt: str) -> list[dict[str, Any]]:
     if fmt in ("jsonl", "imagefolder") and path.suffix == ".jsonl":
         rows = []
         with path.open("rb") as fh:
-            for line in fh:
+            while line := fh.readline(MAX_LINE_BYTES + 1):  # bounded read, then the size check
                 if len(line) > MAX_LINE_BYTES:
                     raise ValueError("a json line over the size cap")
                 if line.strip():
@@ -88,6 +88,12 @@ def read_rows(path: Path, fmt: str) -> list[dict[str, Any]]:
                 if len(rows) >= MAX_ROWS:
                     break
         return [r for r in rows if isinstance(r, dict)]
+    if fmt == "webdataset":  # a shard read member by member under the archive rules (security §10)
+        from itertools import islice
+
+        from vlm_pipeline.download.archives import ShardReport, iter_samples, sample_to_row
+
+        return [sample_to_row(s) for s in islice(iter_samples([path], ShardReport()), MAX_ROWS)]
     if fmt == "json":
         data = json.loads(path.read_bytes())
         items = data if isinstance(data, list) else data.get("data", []) if isinstance(data, dict) else []
@@ -154,7 +160,8 @@ def suggest(cols: list[dict[str, str]]) -> dict[str, str]:
     def pick(role: str, kinds: tuple[str, ...]) -> None:
         for wanted in SUGGEST[role]:
             for c in cols:
-                if c["name"] not in used and c["kind"] in kinds and c["name"].lower() == wanted:
+                short = c["name"].lower().rsplit(".", 1)[-1]  # WebDataset json keys read "json.question"
+                if c["name"] not in used and c["kind"] in kinds and short == wanted:
                     out[role] = c["name"]
                     used.add(c["name"])
                     return
@@ -233,7 +240,8 @@ def preview(rows: list[dict[str, Any]], cols: list[dict[str, str]], mapping: Map
 
 def inspect(sample_dir: Path, fmt: str, out: Path) -> dict[str, Any]:
     files = sorted(p for p in sample_dir.rglob("*") if p.is_file() and not p.is_symlink())
-    data = next((p for p in files if p.suffix.lower() in (".parquet", ".arrow", ".jsonl", ".json", ".csv")), None)
+    suffixes = (".parquet", ".arrow", ".jsonl", ".json", ".csv", ".tar", ".tgz", ".gz", ".zip")
+    data = next((p for p in files if p.suffix.lower() in suffixes), None)
     if data is None:
         return {"columns": [], "suggested": {}, "samples": [], "rows_read": 0, "error": "no_sample"}
     rows = read_rows(data, fmt)
@@ -248,13 +256,14 @@ def inspect(sample_dir: Path, fmt: str, out: Path) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m vlm_pipeline.download.inspect")
     parser.add_argument("--sample", type=Path, required=True)
-    parser.add_argument("--format", required=True, choices=("parquet", "arrow", "jsonl", "json", "csv", "imagefolder"))
+    parser.add_argument("--format", required=True,
+                        choices=("parquet", "arrow", "jsonl", "json", "csv", "imagefolder", "webdataset"))  # fmt: skip
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
     try:
         result = inspect(args.sample, args.format, args.out)
-    except (OSError, ValueError, UnicodeDecodeError) as exc:  # a file that does not parse: said, never guessed
+    except (OSError, ValueError, UnicodeDecodeError) as exc:  # unparsable, or a refused shard: said, never guessed
         print(f"download.inspect: {type(exc).__name__}", file=sys.stderr, flush=True)
         result = {"columns": [], "suggested": {}, "samples": [], "rows_read": 0, "error": "unreadable"}
     (args.out / "inspect.json").write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")

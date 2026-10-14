@@ -44,6 +44,7 @@ ALLOWED_ARGV: dict[str, tuple[tuple[tuple[str, ...], str], ...]] = {
     "data": (
         (("python", "-m", "vlm_pipeline.eval.ocrbench_extract"), NGC_ENTRYPOINT),
         (("python", "-m", "vlm_pipeline.download.inspect"), NGC_ENTRYPOINT),  # ADR-021 H4: a user-picked dataset
+        (("python", "-m", "vlm_pipeline.download.convert"), NGC_ENTRYPOINT),  # H5: its split -> a local folder
     ),
 }
 if not all(ep in ENTRYPOINTS for rules in ALLOWED_ARGV.values() for _, ep in rules):  # survives python -O

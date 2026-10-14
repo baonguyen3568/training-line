@@ -16,8 +16,9 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 DATA_SUFFIXES = (".parquet", ".arrow", ".jsonl", ".json", ".csv")
+SHARD_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".zip")  # WebDataset (download.archives reads them)
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
-FORMAT_ORDER = ("parquet", "arrow", "jsonl", "json", "csv")  # the sample prefers the first one present
+FORMAT_ORDER = ("parquet", "arrow", "jsonl", "json", "csv", "webdataset")  # the sample prefers the first present
 SAMPLE_MAX = 256 << 20  # one data file fetched to inspect a split (a parquet footer + its first row group)
 SAMPLE_IMAGES = 3  # imagefolder: metadata + this many images
 _SPLIT_ALIASES = {
@@ -25,7 +26,7 @@ _SPLIT_ALIASES = {
     "validation": "validation", "valid": "validation", "val": "validation", "dev": "validation",
     "test": "test", "testing": "test", "eval": "test",
 }  # fmt: skip
-_SPLIT_IN_NAME = re.compile(r"^(train|training|validation|valid|val|dev|test|testing|eval)(?:[-_.0-9]|$)")
+_SPLIT_WORD = re.compile(r"(?:^|[-_.])(train|training|validation|valid|val|dev|test|testing|eval)(?=[-_.0-9]|$)")
 _NOT_DATA = ("README.md", ".gitattributes")
 
 
@@ -39,8 +40,8 @@ class DataFile:
 
 def _split_of(parts: list[str]) -> str | None:
     """The split a path names: a directory or the file's own name, by the hub's conventions."""
-    for part in reversed(parts):
-        match = _SPLIT_IN_NAME.match(part.lower())
+    for part in reversed(parts):  # "train-0000.tar", "docvqa-train-0001.tar", "data/validation/0.parquet"
+        match = _SPLIT_WORD.search(part.lower())
         if match:
             return _SPLIT_ALIASES[match.group(1)]
     return None
@@ -49,7 +50,7 @@ def _split_of(parts: list[str]) -> str | None:
 def classify(name: str) -> DataFile | None:
     """The data file ``name`` is, or None (a README, a script, an image, something unknown)."""
     lower = name.lower()
-    if name in _NOT_DATA or not lower.endswith(DATA_SUFFIXES):
+    if name in _NOT_DATA or not lower.endswith((*DATA_SUFFIXES, *SHARD_SUFFIXES)):
         return None
     parts = name.split("/")
     split = _split_of(parts)
@@ -59,6 +60,8 @@ def classify(name: str) -> DataFile | None:
     stem = parts[-1].lower()
     if stem.startswith("metadata.") and len(parts) >= 1:
         return DataFile(name, config, split, "imagefolder")
+    if lower.endswith(SHARD_SUFFIXES):
+        return DataFile(name, config, split, "webdataset")
     fmt = next(s.lstrip(".") for s in DATA_SUFFIXES if lower.endswith(s))
     return DataFile(name, config, split, fmt)
 

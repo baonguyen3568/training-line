@@ -87,6 +87,12 @@ class NotCachedError(VlmPipelineError):
     code: ClassVar[str] = "NET-002"  # "not on this machine yet", not a network / sign-in failure (NET-001)
 
 
+class UserDatasetNotAddedError(VlmPipelineError):
+    """The workflow names a user dataset this machine never added (DATA-013: offer to add it)."""
+
+    code: ClassVar[str] = "DATA-013"
+
+
 class LocalDatasetInvalidError(VlmPipelineError):
     """The user's dataset folder has lines/images that cannot be used (all problems listed in problems.json)."""
 
@@ -332,6 +338,8 @@ class RealWorker:
         return NodeResult(outputs={"report": report})
 
     def _hub_dataset(self, job: NodeJob) -> NodeResult:
+        if user_id := str(getattr(job.params, "user_dataset", "") or ""):
+            return self._user_hub_dataset(job, user_id)
         repo = str(getattr(job.params, "repo"))  # noqa: B009
         entry = next((d for d in load_dataset_catalog().datasets if d.repo == repo), None)
         if entry is None:
@@ -358,14 +366,34 @@ class RealWorker:
 
     def _local_folder(self, job: NodeJob) -> NodeResult:
         """User folder of images + labels.jsonl -> checked, normalized records (B-3b). Host, CPU only."""
+        folder = (self.root / str(getattr(job.params, "path"))).resolve()  # noqa: B009 - LocalPath (SEC-001)
+        if not folder.is_relative_to(self.root) or not folder.is_dir():
+            missing = {"node": job.node_id, "problem_count": 1, "first_line": 0, "first_reason": "labels_missing"}
+            raise LocalDatasetInvalidError("dataset folder missing", params=missing)
+        return self._folder_dataset(job, folder)
+
+    def _user_hub_dataset(self, job: NodeJob, dataset_id: str) -> NodeResult:
+        """A user-added HF split (ADR-021 H5): its converted folder, checked exactly like a local folder (DATA-V)."""
+        from vlm_pipeline.app import user_datasets
+
+        record = user_datasets.load(self.root, dataset_id)
+        folder = user_datasets.data_folder(self.root, dataset_id)
+        if record is None:
+            raise UserDatasetNotAddedError("dataset not added here", params={
+                "node": job.node_id, "repo": str(getattr(job.params, "user_repo", "")),
+                "revision": str(getattr(job.params, "user_revision", ""))})  # fmt: skip
+        if folder.is_symlink() or not (folder / "labels.jsonl").is_file():
+            params = {"name": record.to_api()["name"], "kind": "dataset", "catalog_id": record.id,
+                      "size_gb": record.to_api()["size_gb"], "reason": "not_cached"}  # fmt: skip
+            raise NotCachedError("user dataset not downloaded", params=params)
+        return self._folder_dataset(job, folder.resolve())
+
+    def _folder_dataset(self, job: NodeJob, folder: Path) -> NodeResult:
+        """A folder of images + labels.jsonl -> checked, normalized records, the local dataset artifact."""
         from vlm_pipeline.common.local_records import write_records
         from vlm_pipeline.data.local_folder import scan_folder
 
         params = job.params
-        folder = (self.root / str(getattr(params, "path"))).resolve()  # noqa: B009 - LocalPath (SEC-001 validated)
-        if not folder.is_relative_to(self.root) or not folder.is_dir():
-            missing = {"node": job.node_id, "problem_count": 1, "first_line": 0, "first_reason": "labels_missing"}
-            raise LocalDatasetInvalidError("dataset folder missing", params=missing)
         scan = scan_folder(folder, max_samples=int(getattr(params, "max_samples", 0) or 0),
                            max_image_side_px=int(getattr(params, "max_image_side_px", 4096)))  # fmt: skip
         job.run_dir.mkdir(parents=True, exist_ok=True)

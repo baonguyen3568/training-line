@@ -33,7 +33,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
-from vlm_pipeline.common.download_rules import Kind, check_repo, wanted
+from vlm_pipeline.common.download_rules import Kind, check_repo, name_ok, wanted
 from vlm_pipeline.common.runinfo import read_small_json
 
 SPEC_NAME = "download_spec.json"
@@ -66,7 +66,7 @@ _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 def read_spec(run_dir: Path) -> dict[str, Any]:
-    spec = read_small_json(run_dir / SPEC_NAME, max_bytes=64 * 1024)
+    spec = read_small_json(run_dir / SPEC_NAME, max_bytes=512 * 1024)  # only_files: up to 2 000 names
     if not isinstance(spec, dict) or spec.get("kind") not in ("model", "dataset"):
         raise ValueError("bad spec")
     if spec.get("resolve") is True:  # a ref the job pins; the repo id rules are the same
@@ -85,16 +85,22 @@ def read_spec(run_dir: Path) -> dict[str, Any]:
     budget = spec.get("max_bytes")
     if isinstance(budget, bool) or not isinstance(budget, int) or budget <= 0:
         raise ValueError("bad budget")
+    only = spec.get("only_files")  # a user dataset: the files of ONE split, from the host's checked record
+    if only is not None and not (isinstance(only, list) and 0 < len(only) <= MAX_REPO_FILES
+                                 and all(isinstance(n, str) and name_ok(n) for n in only)):  # fmt: skip
+        raise ValueError("bad only_files")
     return spec
 
 
-def plan_files(siblings: Iterable[Any], kind: Kind, remote_code_files: Iterable[str]) -> list[dict[str, Any]]:
+def plan_files(
+    siblings: Iterable[Any], kind: Kind, remote_code_files: Iterable[str], *, archives: bool = False
+) -> list[dict[str, Any]]:
     """The hub's file list filtered by the shared rules, with size and LFS sha256 (None for small git files)."""
     allowed = tuple(remote_code_files)
     plan = []
     for sib in siblings:
         name = getattr(sib, "rfilename", "")
-        if not wanted(name, kind, allowed):
+        if not wanted(name, kind, allowed, archives=archives):
             continue
         lfs = getattr(sib, "lfs", None)
         sha = getattr(lfs, "sha256", None) if lfs is not None else None
@@ -193,7 +199,7 @@ def resolve(run_dir: Path, spec: dict[str, Any], *, api: Any, fetch: Callable[..
         (stage / "error.json").write_text(json.dumps({"reason": "too_many_files"}), encoding="utf-8")
         return _stop(EXIT_HUB, f"the repo has {len(siblings)} files (over {MAX_REPO_FILES})")
     names = sorted(str(getattr(sib, "rfilename", "")) for sib in siblings)
-    files = plan_files(siblings, kind, ())  # never a *.py for a user-added repo (security §3)
+    files = plan_files(siblings, kind, (), archives=kind == "dataset")  # never a *.py for a user-added repo (§3)
     gated = getattr(info, "gated", False)
     sizes = {f["name"]: f["size"] for f in files}
     caps = meta_caps() if kind == "model" else {}
@@ -220,7 +226,7 @@ def resolve(run_dir: Path, spec: dict[str, Any], *, api: Any, fetch: Callable[..
     return 0
 
 
-def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = None) -> int:
+def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = None) -> int:  # noqa: PLR0911 - one exit per refusal
     """The whole job; ``api`` / ``fetch`` are injectable (unit tests never touch the network)."""
     try:
         spec = read_spec(run_dir)
@@ -237,7 +243,13 @@ def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = No
     info = (api.model_info if kind == "model" else api.dataset_info)(
         spec["repo"], revision=spec["revision"], files_metadata=True
     )
-    files = plan_files(info.siblings or (), kind, spec.get("remote_code_files") or ())
+    files = plan_files(info.siblings or (), kind, spec.get("remote_code_files") or (),
+                       archives=spec.get("archives") is True and kind == "dataset")  # fmt: skip
+    if spec.get("only_files") is not None:
+        wanted_names = set(spec["only_files"])
+        files = [f for f in files if f["name"] in wanted_names]
+        if {f["name"] for f in files} != wanted_names:  # a file the record names is gone or not allowed: refuse
+            return _stop(EXIT_BAD_SPEC, "a file of the split is not in the repo at this revision")
     stage = run_dir / "stage"
     stage.mkdir(parents=True, exist_ok=True)
     total = sum(f["size"] for f in files)

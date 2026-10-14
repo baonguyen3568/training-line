@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import secrets
+import shutil
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -182,6 +183,8 @@ class DownloadService:
     # ------------------------------------------------------------------------------------------ start
     def start(self, kind: Kind, catalog_id: str, *, confirm: bool = False, check: bool = False) -> dict[str, Any]:
         """Download ``catalog_id``, or with ``check`` verify a snapshot already there (plan only, no blob)."""
+        if kind == "dataset" and catalog_id.startswith("user--ds--"):
+            return self._start_user_dataset(catalog_id, confirm=confirm)
         asset = self._user_asset(catalog_id) if kind == "model" and catalog_id.startswith("user--") else None
         asset = asset or resolve(kind, catalog_id)
         if self.installed(asset):
@@ -204,6 +207,66 @@ class DownloadService:
 
         e = downloadable_entry(self.root, model_id)
         return Asset("model", e.id, e.repo, e.revision, e.display_name, e.disk_gb, e.license, e.gated)
+
+    # ------------------------------------------------------------------------------------------ user datasets (H5)
+    def _start_user_dataset(self, dataset_id: str, *, confirm: bool) -> dict[str, Any]:
+        """Download ONE split of a user dataset, verify it, convert it to a local folder (P021 H5)."""
+        from vlm_pipeline.app import user_datasets
+        from vlm_pipeline.app.user_assets import LicenseNotConfirmedError
+
+        record = user_datasets.load(self.root, dataset_id)
+        if record is None:
+            raise DownloadUnknownError("not an added dataset", params={})
+        if not record.license_confirmed or record.license_confirmed_sha != record.revision:
+            raise LicenseNotConfirmedError("licence not confirmed for this revision", params={
+                "name": record.to_api()["name"], "repo": record.repo, "license": record.license,
+                "catalog_id": record.id, "kind": "dataset"})  # fmt: skip
+        asset = Asset("dataset", record.id, record.repo, record.revision, str(record.to_api()["name"]),
+                      round(record.size_bytes / GIB, 2), record.license, record.gated)  # fmt: skip
+        if (user_datasets.data_folder(self.root, record.id) / "labels.jsonl").is_file():
+            return {**asset.to_api(), "status": "completed", "verified": True, "download_id": None}
+        planned = self.check_budget(asset)
+        if planned > CONFIRM_GB * GIB and not confirm:
+            return {**asset.to_api(), "needs_confirm": True, "threshold_gb": CONFIRM_GB}
+        run_id = f"{time.strftime('%Y%m%d-%H%M')}-ud-{secrets.token_hex(4)}"
+        self._take_active(run_id)
+        download = Download(download_id=run_id, asset=asset, run_id=run_id)
+        with self._lock:
+            self.downloads[run_id] = download
+        threading.Thread(target=self._user_dataset_run, args=(download, record, planned),
+                         name=f"download-{run_id}", daemon=True).start()  # fmt: skip
+        threading.Thread(target=self._heartbeat, args=(download,), name=f"download-lock-{run_id}", daemon=True).start()
+        return download.to_api()
+
+    def _user_dataset_run(self, d: Download, record: Any, planned: int) -> None:
+        from vlm_pipeline.app import user_datasets
+        from vlm_pipeline.download.install import verify
+
+        part = d.asset
+        run_dir = self.root / "outputs" / "runs" / d.run_id
+        shards = record.format == "webdataset"
+        spec = {"kind": "dataset", "repo": part.repo, "revision": part.revision, "remote_code_files": [],
+                "max_bytes": planned, "plan_only": False, "only_files": [f.name for f in record.files],
+                "archives": shards}  # fmt: skip
+        try:
+            final = self._job(d, part, run_dir, spec, planned)
+            if final.status != RunStatus.COMPLETED:
+                self._fail(d, _job_failure(final.exit_code, part))
+                return
+            self._set(d, "verifying", part=part.repo)
+            verify(run_dir / "stage", kind="dataset", pins={}, name=part.name, archives=shards)  # LFS sha256 / blobs
+            self._set(d, "installing")
+            rows = user_datasets.convert_and_install(self, d, record, run_dir / "stage" / "files", planned)
+            user_datasets.save(self.root, record.model_copy(update={"rows": rows}))
+            shutil.rmtree(run_dir / "stage" / "files", ignore_errors=True)  # the local folder is what stays
+            self._set(d, "completed")
+        except (DownloadIntegrityError, VlmPipelineError) as exc:
+            self._fail(d, {"code": exc.code, "params": exc.params})
+        except Exception:  # never a traceback to the UI
+            logger.exception("user dataset download %s failed", d.download_id)
+            self._fail(d, {"code": "SYS-000", "params": {}})
+        finally:
+            self._release(d.run_id)
 
     def _launch(self, asset: Asset, planned: int, *, plan_only: bool) -> dict[str, Any]:
         stamp = time.strftime("%Y%m%d-%H%M")
@@ -402,7 +465,7 @@ class DownloadService:
             self._fail(d, {"code": "NET-004", "params": exc.params})
         except RepoFilesInvalidError:  # a file the app cannot read safely: never used (security H2)
             if part.kind == "dataset":
-                self._fail(d, {"code": "DATA-010", "params": {"repo": part.repo, "missing": "image", "available": ""}})
+                self._fail(d, {"code": "DATA-012", "params": {"repo": part.repo, "reason": "unreadable_sample"}})
             else:
                 unreadable = {"repo": part.repo, "revision": "", "reason": "unreadable_config", "file": "unknown"}
                 self._fail(d, {"code": "MODEL-004", "params": unreadable})
