@@ -38,3 +38,10 @@
 
 ## Hệ quả
 - 1.0 lùi khoảng 2–3 ngày. Site/docs cập nhật: "mọi VLM kiến trúc chuẩn", giới hạn đã biết ghi rõ.
+
+## Amendment A1 (2026-10-14, USER) — 3 quyết định từ checklist security (.team/security-reviews/2026-10-14-adr021-byo-model-data.md, 458f8d0)
+1. **License không rõ**: cho tải + cảnh báo rõ, ghi vào lineage; **chặn export/chia sẻ** cho tới khi license rõ.
+2. **Trần dung lượng model tự thêm: 40 GB mỗi model**, user nâng được trong Cài đặt (setting DB); quota chung 500/800 GB vẫn áp.
+3. **WebDataset (tar/zip) từ repo bất kỳ: CÓ trong 1.0.** Giải nén chỉ trong job (network none), chống path traversal/symlink/
+   hardlink/device file, giới hạn số file, tổng dung lượng sau giải nén và tỉ lệ nén (chống bom nén); chỉ giữ đuôi ảnh/text/json
+   được phép; ảnh re-encode. Security chốt ngưỡng cụ thể. Lùi thêm khoảng 1 ngày.
