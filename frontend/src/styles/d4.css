@@ -577,7 +577,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
-  padding: 0 0 var(--space-16);
+  padding: var(--space-16) 0;
   border: 1px solid var(--color-axis);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -587,45 +587,14 @@
   border-style: dashed;
   background: transparent;
 }
-.rp-card > :not(.mini) {
+.rp-card > * {
   margin-left: var(--space-16);
   margin-right: var(--space-16);
 }
 .rp-card h2 {
-  margin: var(--space-4) var(--space-16) 0;
+  margin: 0;
   font-size: var(--font-size-body);
   line-height: 1.3;
-}
-.mini {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-16);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 92px;
-  /* safe: when chips wrap past the box, keep the first row visible instead of clipping both ends */
-  align-content: safe center;
-  background-color: var(--color-canvas-background);
-  background-image: radial-gradient(var(--color-canvas-grid-dot) 1px, transparent 1px);
-  background-size: 16px 16px;
-  border-bottom: 1px solid var(--color-grid);
-}
-.mini li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 var(--space-8);
-  border: 1px solid var(--color-canvas-node-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
-}
-.mini li.no-node {
-  border-style: dashed;
-  color: var(--color-text-muted);
 }
 .rp-src,
 .rp-notice,
@@ -637,25 +606,6 @@
   gap: 6px;
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-}
-.rp-card dl {
-  margin-top: var(--space-4);
-  margin-bottom: 0;
-  display: grid;
-  gap: var(--space-4);
-  font-size: var(--font-size-caption);
-}
-.rp-card dl > div {
-  display: grid;
-  grid-template-columns: 92px 1fr;
-  gap: var(--space-8);
-}
-.rp-card dt {
-  color: var(--color-text-muted);
-}
-.rp-card dd {
-  margin: 0;
-  color: var(--color-text-secondary);
 }
 .rp-part {
   display: block;
@@ -690,10 +640,6 @@
 }
 .pop p {
   margin: 0 0 4px;
-}
-.mini li.more {
-  border-style: dashed;
-  color: var(--color-text-muted);
 }
 .rp-status {
   display: inline-flex;
@@ -1495,4 +1441,134 @@ fieldset.seg-radio {
 .byo-added-row[aria-current="true"] {
   background: var(--color-canvas-placeholder-bg);
   color: var(--color-text-primary);
+}
+/* Luồng I: training architecture diagram (spec I §2); states never colour-only */
+.arch-diagram {
+  display: block;
+  height: auto;
+  overflow: visible;
+}
+.arch-diagram text {
+  font-size: 11px;
+  fill: var(--color-text-primary);
+}
+.arch-block rect {
+  fill: none;
+  stroke: var(--color-axis);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+.arch-block.train rect {
+  fill: color-mix(in srgb, var(--color-accent-brand) 16%, transparent);
+  stroke: var(--color-accent-brand);
+  stroke-dasharray: none;
+}
+.arch-block.train-low rect {
+  fill: color-mix(in srgb, var(--color-accent-brand) 8%, transparent);
+  stroke: var(--color-accent-brand);
+  stroke-dasharray: none;
+}
+.arch-block.na {
+  opacity: 0.5;
+}
+.arch-lock {
+  color: var(--color-text-muted);
+}
+.arch-diagram .arch-mark,
+.arch-diagram .arch-pill text {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+}
+.arch-pill.lora rect {
+  fill: var(--color-accent-brand);
+}
+.arch-diagram .arch-pill.lora text {
+  fill: #fff;
+}
+.arch-pill.quant rect {
+  fill: var(--color-surface);
+  stroke: var(--color-axis);
+}
+.arch-side rect {
+  fill: var(--color-surface);
+  stroke: var(--color-axis);
+}
+.arch-side {
+  color: var(--color-text-secondary);
+}
+.arch-side.ghost {
+  opacity: 0.6;
+}
+.arch-diagram .arch-stage {
+  fill: var(--color-text-secondary);
+  font-size: 10px;
+}
+.arch-wire {
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+}
+.arch-arrowhead {
+  fill: var(--color-text-muted);
+}
+.arch-diagram .arch-side text {
+  font-size: 10px;
+  fill: var(--color-text-secondary);
+}
+.arch-legend {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-8);
+}
+.arch-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.arch-legend .arch-diagram {
+  flex: none;
+}
+/* Luồng I method card (spec I §1): method + difficulty, when to use, architecture, meta, measured, footer */
+.rp-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+.rp-when {
+  margin-top: 0;
+  margin-bottom: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.rp-arch {
+  position: relative;
+  padding: var(--space-8) 0;
+}
+.rp-arch > .help-btn.inline {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+.rp-meta,
+.rp-measured {
+  line-height: 1.7;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+}
+.rp-meta > * + * {
+  margin-left: var(--space-8);
+}
+.rp-meta .chip {
+  display: inline;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-decoration-break: clone;
+}
+.rp-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
 }

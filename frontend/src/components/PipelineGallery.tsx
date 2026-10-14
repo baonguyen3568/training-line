@@ -8,51 +8,61 @@ import {
   useState,
 } from "react";
 import data from "../generated/reference-pipelines.json";
-import { getLocale, t, tpOptional } from "../i18n";
+import { t, tpOptional } from "../i18n";
 import { formatMinutesRange } from "../lib/format";
 import { licenseName } from "../lib/licenses";
 import { portShape, tokenVar } from "../lib/ports";
 import { formatScore } from "../lib/score";
 import { fold } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
+import { ArchDiagram, ArchLegend, type TrainArch } from "./ArchDiagram";
 import { Icon } from "./Icon";
 
 type Text = { vi: string; en: string };
+/** configs/reference_pipelines.yaml v2 (common/reference_pipelines.py): one pipeline per training METHOD (ADR-022). */
 interface Pipeline {
   id: string;
+  method: string;
   kind: "app_template" | "candidate" | "external";
   template_id: string | null;
   status: "available" | "planned" | "reference_only";
   difficulty: "basic" | "advanced" | null;
   title: Text;
-  source_url: string;
+  /** i18n key of the method's one "when to use" sentence: method.<method>.when */
+  when_to_use_key: string;
+  summary_key?: string;
+  train_arch: TrainArch;
+  source: { url: string; publisher: string; paper_url?: string | null };
   license: { code: string | null; model: string | null; data: string | null };
   model_parts?: { part: string; license: string }[];
   requires_hf_terms?: boolean;
-  notice?: string;
+  notice?: string | null;
   steps: { node: string | null; label: Text }[];
-  /** i18n key of the one-line "what you get" (design gallery r2 #3). */
-  summary_key?: string;
+  /** The configuration the numbers were measured with; the method itself works with any model/data (ADR-021). */
+  measured_with?: { model: string; data: string } | null;
   /** Numbers from a real run on this machine (research), with their source in the data file. */
   measured?: {
-    train_minutes?: number;
-    peak_ram_gb?: number;
-    /** compare_with: another pipeline scored on the same benchmark/metric (checked by the generator). */
+    train_minutes?: number | null;
+    peak_ram_gb?: number | null;
+    config?: string;
+    /** compare_with: another pipeline scored on the same benchmark/metric (checked by the schema). */
     score?: {
       metric: string;
       value: number;
-      ci95?: [number, number];
+      ci95?: [number, number] | null;
       n?: number;
-      compare_with?: string;
-    };
+      compare_with?: string | null;
+    } | null;
   } | null;
 }
-const pipelines = (data as { pipelines: Pipeline[] }).pipelines;
+const pipelines = (data as unknown as { pipelines: Pipeline[] }).pipelines;
 type Filter = "all" | Pipeline["kind"];
 const FILTERS: Filter[] = ["all", "app_template", "external", "candidate"];
 
 const lic = (id: string | null) => (id ? licenseName(id) : t("pipelines.see_source"));
-const loc = (x: Text) => (getLocale() === "en" ? x.en : x.vi);
+/** One short licence line for the badge: code and model licences, each once; the details sit behind "?". */
+const licenseLine = (p: Pipeline) =>
+  [...new Set([p.license.code, p.license.model, p.license.data].map(lic))].join(" · ");
 const host = (url: string) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -92,7 +102,7 @@ function ScoreCompare({ p, onShow }: { p: Pipeline; onShow: (id: string) => void
     <p>
       {before}
       <button type="button" className="link" onClick={() => onShow(other.id)}>
-        {loc(other.title)}
+        {t(`method.${other.method}.title`)}
       </button>
       {after}
     </p>
@@ -117,70 +127,6 @@ function Help({ id, title, children }: { id: string; title: string; children: Re
         {children}
       </div>
     </>
-  );
-}
-
-// Two rows of chips at most so every card has the same height (design gallery r1 #1); the rest folds into "+N".
-const MAX_CHIPS = 5;
-
-/**
- * At most two rows of chips (design gallery r2 #1): every card's title then starts at the same height. Chips that
- * would wrap to a third row fold into "+N bước", measured after layout (and again when the card resizes).
- */
-function MiniDiagram({ steps }: { steps: Pipeline["steps"] }) {
-  const specs = useWorkflow((s) => s.specs);
-  const ports = useWorkflow((s) => s.ports);
-  const ref = useRef<HTMLOListElement>(null);
-  const [fit, setFit] = useState(Math.min(steps.length, MAX_CHIPS));
-  const shown = fit < steps.length ? steps.slice(0, Math.max(1, fit - 1)) : steps;
-  const rest = steps.slice(shown.length);
-  useLayoutEffect(() => {
-    const ol = ref.current;
-    if (!ol) return;
-    const rows = new Set([...ol.children].map((li) => (li as HTMLElement).offsetTop)).size;
-    if (rows > 2 && fit > 1) setFit(fit - 1);
-  });
-  useEffect(() => {
-    const ol = ref.current;
-    if (!ol || typeof ResizeObserver === "undefined") return;
-    let width = ol.clientWidth;
-    const ro = new ResizeObserver(() => {
-      if (ol.clientWidth === width) return;
-      width = ol.clientWidth;
-      setFit(Math.min(steps.length, MAX_CHIPS)); // re-measure from the start at the new width
-    });
-    ro.observe(ol);
-    return () => ro.disconnect();
-  }, [steps.length]);
-  return (
-    <ol className="mini" aria-hidden="true" ref={ref}>
-      {shown.map((st, i) => {
-        const spec = st.node ? specs.get(st.node) : undefined;
-        const out = spec && Object.values(spec.outputs)[0];
-        const pt = out && ports.find((p) => p.id === out.type);
-        return (
-          // biome-ignore lint/suspicious/noArrayIndexKey: steps are a fixed ordered list
-          <li key={i} className={st.node ? "" : "no-node"}>
-            {out && (
-              <span
-                className={`pg pg-${portShape(out.type)}`}
-                style={
-                  {
-                    "--pc": pt ? tokenVar(pt.color_token) : "var(--color-port-value)",
-                  } as CSSProperties
-                }
-              />
-            )}
-            {loc(st.label)}
-          </li>
-        );
-      })}
-      {rest.length > 0 && (
-        <li className="more" title={rest.map((st) => loc(st.label)).join(" → ")}>
-          {t("pipelines.more_steps", { step_count: rest.length })}
-        </li>
-      )}
-    </ol>
   );
 }
 
@@ -217,7 +163,7 @@ export function PipelineGallery() {
   const shown = pipelines.filter(
     (p) =>
       (filter === "all" || p.kind === filter) &&
-      (!q || fold(`${p.title.vi} ${p.title.en}`).includes(q)),
+      (!q || fold(`${t(`method.${p.method}.title`)} ${p.title.vi} ${p.title.en}`).includes(q)),
   );
 
   return (
@@ -264,92 +210,87 @@ export function PipelineGallery() {
               tabIndex={-1}
               className={`rp-card ${p.kind}${p.status !== "available" ? " dim" : ""}`}
             >
-              <MiniDiagram steps={p.steps} />
-              <h2>{loc(p.title)}</h2>
-              {p.summary_key && (
-                <p className="rp-summary">{tpOptional(p.summary_key.split(".")) ?? ""}</p>
-              )}
-              {/* where it comes from; the status (candidate, planned…) is said once, in the footer */}
-              <p className="rp-src">
-                {p.kind === "app_template" ? (
-                  <>
-                    <Icon name="boxes" size={14} /> {t("pipelines.kind.app_template")}
-                  </>
-                ) : (
-                  <>
-                    <Icon name="link" size={14} /> {host(p.source_url)}
-                  </>
+              <header className="rp-card-head">
+                <h2>{t(`method.${p.method}.title`)}</h2>
+                {p.difficulty && (
+                  <span className="chip">{t(`pipelines.level.${p.difficulty}`)}</span>
                 )}
-              </p>
+              </header>
+              <p className="rp-when clamp2">{tpOptional(p.when_to_use_key.split(".")) ?? ""}</p>
+              <div className="rp-arch">
+                <ArchDiagram arch={p.train_arch} />
+                <Help id={`arch-${p.id}`} title={t("arch.legend_title")}>
+                  <ArchLegend />
+                </Help>
+              </div>
               {p.notice && <p className="rp-notice">{p.notice}</p>}
-              <dl>
-                <div>
-                  <dt>
-                    {t("pipelines.license")}
-                    <Help id={`lic-${p.id}`} title={t("pipelines.license_detail")}>
-                      <p>
-                        {t("pipelines.license_parts", {
-                          code: lic(p.license.code),
-                          model: lic(p.license.model),
-                          data: lic(p.license.data),
-                        })}
-                      </p>
-                      {p.model_parts?.map((m) => (
-                        <p key={m.part}>
-                          {m.part}: {lic(m.license)}
-                        </p>
-                      ))}
-                    </Help>
-                  </dt>
-                  {/* one short line on the card (design gallery r1 B1): the three licences, details behind "?" */}
-                  <dd>
-                    {[...new Set([p.license.code, p.license.model, p.license.data].map(lic))].join(
-                      " · ",
-                    )}
-                  </dd>
+              <div className="rp-meta">
+                <a href={p.source.url} target="_blank" rel="noopener noreferrer">
+                  {p.source.publisher} <Icon name="external-link" size={12} />
+                </a>
+                <span className="chip">{licenseLine(p)}</span>
+                <Help id={`lic-${p.id}`} title={t("pipelines.license_detail")}>
+                  <p>
+                    {t("pipelines.license_parts", {
+                      code: lic(p.license.code),
+                      model: lic(p.license.model),
+                      data: lic(p.license.data),
+                    })}
+                  </p>
+                  {p.model_parts?.map((m) => (
+                    <p key={m.part}>
+                      {m.part}: {lic(m.license)}
+                    </p>
+                  ))}
+                </Help>
+                {p.measured_with && (
+                  <span className="muted">
+                    {t("pipelines.measured_with", { model: p.measured_with.model })}
+                  </span>
+                )}
+              </div>
+              {p.measured && (
+                <div className="rp-measured">
+                  {t("pipelines.measured")}
+                  {timeText(p) && ` · ${timeText(p)}`}
+                  {p.measured.score && (
+                    <>
+                      {" · "}
+                      {tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
+                        p.measured.score.metric}{" "}
+                      {formatScore(p.measured.score.metric, p.measured.score.value)}
+                    </>
+                  )}
+                  <Help id={`measured-${p.id}`} title={t("pipelines.measured")}>
+                    {p.measured.score && <MetricHelp score={p.measured.score} />}
+                    <ScoreCompare p={p} onShow={showCard} />
+                    {p.measured.score && <p>{t("pipelines.score_single_run")}</p>}
+                    {p.measured.config && <p className="small">{p.measured.config}</p>}
+                    <p className="small">
+                      <a href={p.source.url} target="_blank" rel="noopener noreferrer">
+                        {p.source.publisher}
+                      </a>
+                      {p.source.paper_url && (
+                        <>
+                          {" · "}
+                          <a href={p.source.paper_url} target="_blank" rel="noopener noreferrer">
+                            {t("pipelines.paper")}
+                          </a>
+                        </>
+                      )}
+                    </p>
+                    <p>{t("pipelines.swap_hint")}</p>
+                  </Help>
                 </div>
-                <div>
-                  <dt>{t("pipelines.difficulty")}</dt>
-                  <dd>
-                    {p.difficulty
-                      ? t(`pipelines.level.${p.difficulty}`)
-                      : t("pipelines.not_assessed")}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{t("pipelines.measured")}</dt>
-                  <dd>
-                    {timeText(p)}
-                    {p.measured?.score && (
-                      <>
-                        {" · "}
-                        {tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
-                          p.measured.score.metric}{" "}
-                        {formatScore(p.measured.score.metric, p.measured.score.value)}
-                        <Help
-                          id={`score-${p.id}`}
-                          title={
-                            tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
-                            p.measured.score.metric
-                          }
-                        >
-                          <MetricHelp score={p.measured.score} />
-                          <ScoreCompare p={p} onShow={showCard} />
-                          <p>{t("pipelines.score_single_run")}</p>
-                        </Help>
-                      </>
-                    )}
-                  </dd>
-                </div>
-              </dl>
+              )}
               {p.requires_hf_terms && (
-                <p className="rp-gated" data-testid="needs-hf-account">
+                <div className="rp-gated" data-testid="needs-hf-account">
                   <Icon name="key-round" size={14} />
                   {t("pipelines.hf_terms")}
                   <Help id={`hf-${p.id}`} title={t("pipelines.hf_terms")}>
                     <p>{t("pipelines.hf_terms_detail")}</p>
                   </Help>
-                </p>
+                </div>
               )}
               <div className="rp-actions">
                 {open ? (
@@ -368,7 +309,7 @@ export function PipelineGallery() {
                 )}
                 <a
                   className="btn ghost sm"
-                  href={p.source_url}
+                  href={p.source.url}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

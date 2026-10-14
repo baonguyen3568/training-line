@@ -30,7 +30,7 @@ describe("score format", () => {
     const text = card.textContent ?? "";
     expect(text).toContain(`${t("pipelines.metric.accuracy_delta_fp8_minus_bf16")} −0.6`);
     expect(text).not.toContain(t("estimate.source.unknown"));
-    const pop = document.getElementById("score-quantize-fp8-benchmark");
+    const pop = document.getElementById("measured-quantize-fp8-benchmark");
     // the help is the popover's first paragraph (under its title), before the compare / single-run lines
     expect(pop?.querySelector("p")?.textContent).toContain("500");
     expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);

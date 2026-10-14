@@ -1,19 +1,28 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "pipelines": [
     {
       "id": "invoice-to-json",
+      "method": "full_sft",
+      "title": {
+        "vi": "Fine-tune toàn bộ (Full SFT)",
+        "en": "Full fine-tune (SFT)"
+      },
       "summary_key": "reference_pipeline.invoice-to-json.summary",
+      "when_to_use_key": "method.full_sft.when",
       "kind": "app_template",
       "template_id": "invoice_to_json",
       "status": "available",
       "difficulty": "basic",
-      "title": {
-        "vi": "Đọc hoá đơn → JSON (Nemotron Parse)",
-        "en": "Receipts → JSON (Nemotron Parse)"
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "full",
+        "lm": "full"
       },
-      "source_url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/nemotron",
-      "publisher": "NVIDIA",
+      "source": {
+        "url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/nemotron",
+        "publisher": "NVIDIA"
+      },
       "license": {
         "code": "apache-2.0",
         "model": "nvidia-open-model-license",
@@ -41,13 +50,17 @@
             75.38
           ],
           "n": 100,
-          "compare_with": "invoice-qwen35-2b-lora"
+          "compare_with": "image-video-understanding"
         },
         "config": "3 epochs on the 800 CORD train images, GBS 8, lr 1e-5, FusedAdam fp32 master; image vlm-automodel:26.08-6",
         "sources": [
           "benchmarks/eval/p3b-parse-v1.1-cord-test-s299-20261013.json",
           ".team/proposals/001a-nvidia-default-model.md"
         ]
+      },
+      "measured_with": {
+        "model": "Nemotron Parse v1.1",
+        "data": "CORD v2"
       },
       "steps": [
         {
@@ -81,18 +94,28 @@
       ]
     },
     {
-      "id": "invoice-qwen35-2b-lora",
-      "summary_key": "reference_pipeline.invoice-qwen35-2b-lora.summary",
-      "kind": "candidate",
-      "template_id": null,
-      "status": "planned",
-      "difficulty": "basic",
+      "id": "image-video-understanding",
+      "method": "lora",
       "title": {
-        "vi": "Đọc hoá đơn → JSON (Qwen3.5-2B, fine-tune nhẹ)",
-        "en": "Receipts → JSON (Qwen3.5-2B LoRA)"
+        "vi": "Fine-tune nhẹ (LoRA)",
+        "en": "LoRA fine-tune"
       },
-      "source_url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/qwen3_5",
-      "publisher": "NVIDIA",
+      "summary_key": "reference_pipeline.image-video-understanding.summary",
+      "when_to_use_key": "method.lora.when",
+      "kind": "app_template",
+      "template_id": "image_video_understanding",
+      "status": "available",
+      "difficulty": "basic",
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "frozen",
+        "lm": "lora"
+      },
+      "source": {
+        "url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/qwen3_5",
+        "publisher": "NVIDIA",
+        "paper_url": "https://arxiv.org/abs/2106.09685"
+      },
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
@@ -112,11 +135,15 @@
           "n": 100,
           "compare_with": "invoice-to-json"
         },
-        "config": "LoRA 3 epochs on 720 CORD train images (+ merge), answer = the receipt fields as JSON; one training seed. Same 100 test images and field F1 as the Nemotron Parse pipeline, which reads its own CORD tokens instead of JSON",
+        "config": "Template \"Hiểu ảnh\" on CORD v2: LoRA 3 epochs on 720 train images (+ merge), GBS 8, lr 1e-4, pixels 200704-1003520; answer = the receipt fields as JSON; one training seed; image vlm-automodel:26.08-6",
         "sources": [
           "benchmarks/eval/r2-qwen3.5-2b-lora-cord-test-20261013.json",
           "benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json"
         ]
+      },
+      "measured_with": {
+        "model": "Qwen3.5-2B",
+        "data": "CORD v2"
       },
       "steps": [
         {
@@ -129,8 +156,8 @@
         {
           "node": "data.local_folder",
           "label": {
-            "vi": "CORD v2 (thư mục)",
-            "en": "CORD v2 (folder)"
+            "vi": "Dữ liệu của bạn",
+            "en": "Your data"
           }
         },
         {
@@ -157,25 +184,36 @@
         {
           "node": "eval.benchmarks",
           "label": {
-            "vi": "Chấm CORD",
-            "en": "Score on CORD"
+            "vi": "Đo điểm",
+            "en": "Benchmark"
           }
         }
       ]
     },
     {
       "id": "qlora-4bit-qwen35-2b",
+      "method": "qlora",
+      "title": {
+        "vi": "Fine-tune nhẹ 4-bit (QLoRA)",
+        "en": "4-bit QLoRA"
+      },
       "summary_key": "reference_pipeline.qlora-4bit-qwen35-2b.summary",
+      "when_to_use_key": "method.qlora.when",
       "kind": "candidate",
       "template_id": null,
       "status": "planned",
       "difficulty": "advanced",
-      "title": {
-        "vi": "Fine-tune nhẹ 4-bit (QLoRA) Qwen3.5-2B",
-        "en": "4-bit QLoRA (Qwen3.5-2B)"
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "frozen",
+        "lm": "lora",
+        "quant": "nf4"
       },
-      "source_url": "https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/llm_finetune/llama3_3/llama_3_3_70b_instruct_squad_peft_qlora_spark.yaml",
-      "publisher": "NVIDIA",
+      "source": {
+        "url": "https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/llm_finetune/llama3_3/llama_3_3_70b_instruct_squad_peft_qlora_spark.yaml",
+        "publisher": "NVIDIA",
+        "paper_url": "https://arxiv.org/abs/2305.14314"
+      },
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
@@ -189,6 +227,10 @@
         "sources": [
           "benchmarks/perf/qlora-vs-lora-qwen3.5-2b-26.08-7-20261014.json"
         ]
+      },
+      "measured_with": {
+        "model": "Qwen3.5-2B",
+        "data": "CORD v2"
       },
       "steps": [
         {
@@ -222,31 +264,46 @@
       ]
     },
     {
-      "id": "image-video-understanding",
-      "summary_key": "reference_pipeline.image-video-understanding.summary",
-      "kind": "app_template",
-      "template_id": "image_video_understanding",
-      "status": "available",
-      "difficulty": "basic",
+      "id": "two-stage-qwen35-2b",
+      "method": "two_stage",
       "title": {
-        "vi": "Hiểu ảnh (Qwen3.5-2B)",
-        "en": "Image understanding (Qwen3.5-2B)"
+        "vi": "Train 2 giai đoạn (kiểu LLaVA)",
+        "en": "Two-stage training (LLaVA-style)"
       },
-      "source_url": "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/vlm_finetune/qwen3_5",
-      "publisher": "NVIDIA",
+      "summary_key": "reference_pipeline.two-stage-qwen35-2b.summary",
+      "when_to_use_key": "method.two_stage.when",
+      "kind": "candidate",
+      "template_id": null,
+      "status": "planned",
+      "difficulty": "advanced",
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "full",
+        "lm": "lora",
+        "stages": [
+          {
+            "name_key": "reference_pipeline.two-stage-qwen35-2b.stage1",
+            "vision": "frozen",
+            "projector": "full",
+            "lm": "frozen"
+          },
+          {
+            "name_key": "reference_pipeline.two-stage-qwen35-2b.stage2",
+            "vision": "frozen",
+            "projector": "full",
+            "lm": "lora"
+          }
+        ]
+      },
+      "source": {
+        "url": "https://github.com/haotian-liu/LLaVA",
+        "publisher": "LLaVA (Liu et al.)",
+        "paper_url": "https://arxiv.org/abs/2310.03744"
+      },
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
-        "data": null
-      },
-      "measured": {
-        "train_minutes": 58.8,
-        "peak_ram_gb": 16.7,
-        "score": null,
-        "config": "LoRA 3 epochs on 720 CORD receipt images (+ merge), GBS 8, lr 1e-4, pixels 200704-1003520; image vlm-automodel:26.08-6",
-        "sources": [
-          "benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json"
-        ]
+        "data": "cc-by-4.0"
       },
       "steps": [
         {
@@ -257,24 +314,299 @@
           }
         },
         {
-          "node": "data.local_folder",
+          "node": "data.hf_load",
           "label": {
-            "vi": "Dữ liệu của bạn",
-            "en": "Your data"
+            "vi": "Ảnh + mô tả",
+            "en": "Image-text pairs"
           }
         },
         {
-          "node": "data.split",
+          "node": "train.sft_vlm",
           "label": {
-            "vi": "Chia dữ liệu",
-            "en": "Split data"
+            "vi": "GĐ1: chỉ dạy bộ nối",
+            "en": "Stage 1: projector only"
           }
         },
         {
           "node": "train.lora_vlm",
           "label": {
-            "vi": "Fine-tune nhẹ (LoRA)",
-            "en": "LoRA fine-tune"
+            "vi": "GĐ2: bộ nối + LoRA",
+            "en": "Stage 2: projector + LoRA"
+          }
+        },
+        {
+          "node": "train.merge_lora",
+          "label": {
+            "vi": "Gộp vào model",
+            "en": "Merge"
+          }
+        },
+        {
+          "node": "eval.benchmarks",
+          "label": {
+            "vi": "Đo điểm",
+            "en": "Benchmark"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vision-unfrozen-qwen35-2b",
+      "method": "vision_unfrozen",
+      "title": {
+        "vi": "Mở phần nhìn ảnh, ảnh độ phân giải cao",
+        "en": "Unfrozen vision encoder, high resolution"
+      },
+      "summary_key": "reference_pipeline.vision-unfrozen-qwen35-2b.summary",
+      "when_to_use_key": "method.vision_unfrozen.when",
+      "kind": "candidate",
+      "template_id": null,
+      "status": "planned",
+      "difficulty": "advanced",
+      "train_arch": {
+        "vision": "full_low_lr",
+        "projector": "full",
+        "lm": "full"
+      },
+      "source": {
+        "url": "https://github.com/QwenLM/Qwen2.5-VL/tree/main/qwen-vl-finetune",
+        "publisher": "Qwen",
+        "paper_url": "https://arxiv.org/abs/2502.13923"
+      },
+      "license": {
+        "code": "apache-2.0",
+        "model": "apache-2.0",
+        "data": "cc-by-4.0"
+      },
+      "steps": [
+        {
+          "node": "model.hf_pick",
+          "label": {
+            "vi": "Qwen3.5-2B",
+            "en": "Qwen3.5-2B"
+          }
+        },
+        {
+          "node": "data.hf_load",
+          "label": {
+            "vi": "CORD v2",
+            "en": "CORD v2"
+          }
+        },
+        {
+          "node": "train.sft_vlm",
+          "label": {
+            "vi": "Train cả phần nhìn (LR thấp)",
+            "en": "Train vision too (low LR)"
+          }
+        },
+        {
+          "node": "eval.benchmarks",
+          "label": {
+            "vi": "Chấm CORD",
+            "en": "Score on CORD"
+          }
+        }
+      ]
+    },
+    {
+      "id": "distill-synthetic-qwen35",
+      "method": "distill",
+      "title": {
+        "vi": "Distillation bằng dữ liệu tổng hợp",
+        "en": "Distillation with synthetic data"
+      },
+      "summary_key": "reference_pipeline.distill-synthetic-qwen35.summary",
+      "when_to_use_key": "method.distill.when",
+      "kind": "candidate",
+      "template_id": null,
+      "status": "planned",
+      "difficulty": "advanced",
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "frozen",
+        "lm": "lora",
+        "extras": [
+          "teacher"
+        ]
+      },
+      "source": {
+        "url": "https://github.com/ShareGPT4Omni/ShareGPT4V",
+        "publisher": "ShareGPT4V (Chen et al.)",
+        "paper_url": "https://arxiv.org/abs/2311.12793"
+      },
+      "license": {
+        "code": "apache-2.0",
+        "model": "apache-2.0",
+        "data": null
+      },
+      "steps": [
+        {
+          "node": "model.hf_pick",
+          "label": {
+            "vi": "Model thầy (lớn)",
+            "en": "Teacher (large)"
+          }
+        },
+        {
+          "node": "data.local_folder",
+          "label": {
+            "vi": "Ảnh của bạn",
+            "en": "Your images"
+          }
+        },
+        {
+          "node": "data.caption_vlm",
+          "label": {
+            "vi": "Thầy viết câu trả lời",
+            "en": "Teacher writes answers"
+          }
+        },
+        {
+          "node": "model.hf_pick",
+          "label": {
+            "vi": "Model trò (nhỏ)",
+            "en": "Student (small)"
+          }
+        },
+        {
+          "node": "train.lora_vlm",
+          "label": {
+            "vi": "Trò học theo",
+            "en": "Student learns"
+          }
+        },
+        {
+          "node": "eval.benchmarks",
+          "label": {
+            "vi": "Đo điểm",
+            "en": "Benchmark"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dpo-qwen35",
+      "method": "dpo",
+      "title": {
+        "vi": "DPO (học theo cặp tốt/kém)",
+        "en": "DPO (good/bad answer pairs)"
+      },
+      "summary_key": "reference_pipeline.dpo-qwen35.summary",
+      "when_to_use_key": "method.dpo.when",
+      "kind": "candidate",
+      "template_id": null,
+      "status": "planned",
+      "difficulty": "advanced",
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "frozen",
+        "lm": "lora",
+        "extras": [
+          "reference_shared"
+        ]
+      },
+      "source": {
+        "url": "https://github.com/NVIDIA-NeMo/RL",
+        "publisher": "NVIDIA",
+        "paper_url": "https://arxiv.org/abs/2305.18290"
+      },
+      "license": {
+        "code": "apache-2.0",
+        "model": "apache-2.0",
+        "data": null
+      },
+      "steps": [
+        {
+          "node": "model.hf_pick",
+          "label": {
+            "vi": "Qwen3.5",
+            "en": "Qwen3.5"
+          }
+        },
+        {
+          "node": "data.hf_load",
+          "label": {
+            "vi": "Cặp trả lời tốt/kém",
+            "en": "Chosen/rejected pairs"
+          }
+        },
+        {
+          "node": "train.dpo_vlm",
+          "label": {
+            "vi": "Học chọn câu tốt (DPO)",
+            "en": "Learn to prefer (DPO)"
+          }
+        },
+        {
+          "node": "train.merge_lora",
+          "label": {
+            "vi": "Gộp vào model",
+            "en": "Merge"
+          }
+        },
+        {
+          "node": "eval.benchmarks",
+          "label": {
+            "vi": "Đo điểm",
+            "en": "Benchmark"
+          }
+        }
+      ]
+    },
+    {
+      "id": "grpo-geometry",
+      "method": "grpo",
+      "title": {
+        "vi": "GRPO (học từ điểm thưởng)",
+        "en": "GRPO (learn from rewards)"
+      },
+      "summary_key": "reference_pipeline.grpo-geometry.summary",
+      "when_to_use_key": "method.grpo.when",
+      "kind": "candidate",
+      "template_id": null,
+      "status": "planned",
+      "difficulty": "advanced",
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "frozen",
+        "lm": "lora",
+        "extras": [
+          "rollout",
+          "reward",
+          "reference_shared"
+        ]
+      },
+      "source": {
+        "url": "https://github.com/NVIDIA-NeMo/RL",
+        "publisher": "NVIDIA",
+        "paper_url": "https://arxiv.org/abs/2402.03300"
+      },
+      "license": {
+        "code": "apache-2.0",
+        "model": "apache-2.0",
+        "data": "mit"
+      },
+      "steps": [
+        {
+          "node": "model.hf_pick",
+          "label": {
+            "vi": "Qwen3.5",
+            "en": "Qwen3.5"
+          }
+        },
+        {
+          "node": "data.hf_load",
+          "label": {
+            "vi": "Geometry3K",
+            "en": "Geometry3K"
+          }
+        },
+        {
+          "node": "train.grpo_vlm",
+          "label": {
+            "vi": "Thử nhiều câu, học từ điểm",
+            "en": "Sample, score, learn"
           }
         },
         {
@@ -295,17 +627,27 @@
     },
     {
       "id": "quantize-fp8-benchmark",
+      "method": "ptq",
+      "title": {
+        "vi": "Nén sau khi train (PTQ)",
+        "en": "Post-training quantization (PTQ)"
+      },
       "summary_key": "reference_pipeline.quantize-fp8-benchmark.summary",
+      "when_to_use_key": "method.ptq.when",
       "kind": "app_template",
       "template_id": "quantize_bench",
       "status": "available",
       "difficulty": "basic",
-      "title": {
-        "vi": "Nén FP8 và đo lại điểm (ModelOpt)",
-        "en": "FP8 quantization + re-score (ModelOpt)"
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "frozen",
+        "lm": "frozen",
+        "quant": "fp8"
       },
-      "source_url": "https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/hf_ptq",
-      "publisher": "NVIDIA",
+      "source": {
+        "url": "https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/hf_ptq",
+        "publisher": "NVIDIA"
+      },
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
@@ -330,6 +672,10 @@
           ".team/proposals/001-stack-model-catalog.md",
           ".team/release/1.0-checklist.md"
         ]
+      },
+      "measured_with": {
+        "model": "Qwen3.5-2B",
+        "data": "CORD v2 (calibration), OCRBench (score)"
       },
       "steps": [
         {
@@ -363,30 +709,40 @@
       ]
     },
     {
-      "id": "gemma4-e4b-lora",
-      "summary_key": "reference_pipeline.gemma4-e4b-lora.summary",
+      "id": "qat-qwen35",
+      "method": "qat",
+      "title": {
+        "vi": "Train có lượng tử (QAT)",
+        "en": "Quantization-aware training (QAT)"
+      },
+      "summary_key": "reference_pipeline.qat-qwen35.summary",
+      "when_to_use_key": "method.qat.when",
       "kind": "candidate",
       "template_id": null,
       "status": "planned",
-      "difficulty": null,
-      "title": {
-        "vi": "Gemma 4 E4B fine-tune nhẹ (NVIDIA AutoModel)",
-        "en": "Gemma 4 E4B LoRA (NVIDIA AutoModel)"
+      "difficulty": "advanced",
+      "train_arch": {
+        "vision": "frozen",
+        "projector": "frozen",
+        "lm": "full",
+        "quant": "fp8",
+        "fake_quant": true
       },
-      "source_url": "https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/vlm_finetune/gemma4/gemma4_4b_peft.yaml",
-      "publisher": "NVIDIA",
+      "source": {
+        "url": "https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/llm_qat",
+        "publisher": "NVIDIA"
+      },
       "license": {
         "code": "apache-2.0",
         "model": "apache-2.0",
         "data": "cc-by-4.0"
       },
-      "measured": null,
       "steps": [
         {
           "node": "model.hf_pick",
           "label": {
-            "vi": "Gemma 4 E4B",
-            "en": "Gemma 4 E4B"
+            "vi": "Qwen3.5",
+            "en": "Qwen3.5"
           }
         },
         {
@@ -397,392 +753,17 @@
           }
         },
         {
-          "node": "train.lora_vlm",
+          "node": "quantize.qat",
           "label": {
-            "vi": "Fine-tune nhẹ (LoRA)",
-            "en": "LoRA fine-tune"
-          }
-        },
-        {
-          "node": "train.merge_lora",
-          "label": {
-            "vi": "Gộp vào model",
-            "en": "Merge"
+            "vi": "Train ngắn có giả lập nén",
+            "en": "Short training with fake quantization"
           }
         },
         {
           "node": "eval.benchmarks",
           "label": {
-            "vi": "Chấm theo trường",
-            "en": "Field-level scoring"
-          }
-        }
-      ]
-    },
-    {
-      "id": "qwen35-4b-lora",
-      "summary_key": "reference_pipeline.qwen35-4b-lora.summary",
-      "kind": "candidate",
-      "template_id": null,
-      "status": "planned",
-      "difficulty": null,
-      "title": {
-        "vi": "Qwen3.5-4B fine-tune nhẹ (NVIDIA AutoModel)",
-        "en": "Qwen3.5-4B LoRA (NVIDIA AutoModel)"
-      },
-      "source_url": "https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/vlm_finetune/qwen3_5/qwen3_5_4b.yaml",
-      "publisher": "NVIDIA",
-      "license": {
-        "code": "apache-2.0",
-        "model": "apache-2.0",
-        "data": null
-      },
-      "measured": {
-        "train_minutes": 13.9,
-        "peak_ram_gb": 24.4,
-        "score": null,
-        "config": "Template 2 steps with Qwen3.5-4B: LoRA 1 epoch on 200 CORD receipt images (not the recipe's MedPix data) + merge; a memory measurement run, no task score",
-        "sources": [
-          "benchmarks/perf/qwen3.5-4b-9b-lora-mem-20261013.json"
-        ]
-      },
-      "steps": [
-        {
-          "node": "model.hf_pick",
-          "label": {
-            "vi": "Qwen3.5-4B",
-            "en": "Qwen3.5-4B"
-          }
-        },
-        {
-          "node": "data.local_folder",
-          "label": {
-            "vi": "Dữ liệu của bạn",
-            "en": "Your data"
-          }
-        },
-        {
-          "node": "train.lora_vlm",
-          "label": {
-            "vi": "Fine-tune nhẹ (LoRA)",
-            "en": "LoRA fine-tune"
-          }
-        },
-        {
-          "node": "train.merge_lora",
-          "label": {
-            "vi": "Gộp vào model",
-            "en": "Merge"
-          }
-        }
-      ]
-    },
-    {
-      "id": "grpo-geometry",
-      "summary_key": "reference_pipeline.grpo-geometry.summary",
-      "kind": "external",
-      "template_id": null,
-      "status": "reference_only",
-      "difficulty": "advanced",
-      "title": {
-        "vi": "Học từ phản hồi (GRPO) giải hình học, NVIDIA NeMo-RL",
-        "en": "GRPO on geometry problems (NVIDIA NeMo-RL)"
-      },
-      "source_url": "https://github.com/NVIDIA-NeMo/RL",
-      "publisher": "NVIDIA",
-      "license": {
-        "code": "apache-2.0",
-        "model": "apache-2.0",
-        "data": "mit"
-      },
-      "measured": null,
-      "steps": [
-        {
-          "node": "model.hf_pick",
-          "label": {
-            "vi": "Gemma 4 E4B",
-            "en": "Gemma 4 E4B"
-          }
-        },
-        {
-          "node": "data.hf_load",
-          "label": {
-            "vi": "geometry3k",
-            "en": "geometry3k"
-          }
-        },
-        {
-          "node": null,
-          "label": {
-            "vi": "GRPO + hàm thưởng",
-            "en": "GRPO + reward functions"
-          }
-        },
-        {
-          "node": "eval.benchmarks",
-          "label": {
-            "vi": "Đo điểm",
-            "en": "Benchmark"
-          }
-        }
-      ]
-    },
-    {
-      "id": "dgx-spark-vlm-playbook",
-      "summary_key": "reference_pipeline.dgx-spark-vlm-playbook.summary",
-      "kind": "external",
-      "template_id": null,
-      "status": "reference_only",
-      "difficulty": "advanced",
-      "title": {
-        "vi": "DGX Spark playbook: fine-tune VLM",
-        "en": "DGX Spark playbook: VLM fine-tuning"
-      },
-      "source_url": "https://build.nvidia.com/spark/vlm-finetuning",
-      "publisher": "NVIDIA",
-      "license": {
-        "code": null,
-        "model": "apache-2.0",
-        "data": null
-      },
-      "measured": null,
-      "steps": [
-        {
-          "node": "model.hf_pick",
-          "label": {
-            "vi": "Qwen2.5-VL-7B",
-            "en": "Qwen2.5-VL-7B"
-          }
-        },
-        {
-          "node": null,
-          "label": {
-            "vi": "Dữ liệu ảnh có nhãn",
-            "en": "Labelled images"
-          }
-        },
-        {
-          "node": null,
-          "label": {
-            "vi": "GRPO + LoRA",
-            "en": "GRPO + LoRA"
-          }
-        },
-        {
-          "node": "serve.vllm",
-          "label": {
-            "vi": "So sánh trước/sau",
-            "en": "Before/after comparison"
-          }
-        }
-      ]
-    },
-    {
-      "id": "donut-cord",
-      "summary_key": "reference_pipeline.donut-cord.summary",
-      "kind": "external",
-      "template_id": null,
-      "status": "reference_only",
-      "difficulty": null,
-      "title": {
-        "vi": "Donut trên CORD (mốc so sánh)",
-        "en": "Donut on CORD (baseline)"
-      },
-      "source_url": "https://github.com/clovaai/donut",
-      "publisher": "NAVER Clova",
-      "license": {
-        "code": "mit",
-        "model": "mit",
-        "data": "cc-by-4.0"
-      },
-      "measured": null,
-      "steps": [
-        {
-          "node": null,
-          "label": {
-            "vi": "donut-base",
-            "en": "donut-base"
-          }
-        },
-        {
-          "node": "data.hf_load",
-          "label": {
-            "vi": "CORD v2",
-            "en": "CORD v2"
-          }
-        },
-        {
-          "node": null,
-          "label": {
-            "vi": "Fine-tune toàn bộ",
-            "en": "Full fine-tune"
-          }
-        }
-      ]
-    },
-    {
-      "id": "data-cleanup-lora",
-      "summary_key": "reference_pipeline.data-cleanup-lora.summary",
-      "kind": "candidate",
-      "template_id": null,
-      "status": "planned",
-      "difficulty": "basic",
-      "title": {
-        "vi": "Lọc, bỏ trùng rồi fine-tune nhẹ",
-        "en": "Filter, dedupe, then LoRA"
-      },
-      "source_url": "https://github.com/NVIDIA-NeMo/Curator/tree/main/tutorials/image",
-      "publisher": "NVIDIA",
-      "license": {
-        "code": "apache-2.0",
-        "model": "apache-2.0",
-        "data": "cc-by-4.0"
-      },
-      "measured": {
-        "train_minutes": 18.7,
-        "peak_ram_gb": 18.3,
-        "score": null,
-        "config": "CORD v2 train (800): the filter dropped 1 oversized image, dedupe dropped 2 identical images and found no train image in the test set; then Qwen3.5-0.8B LoRA 1 epoch + merge",
-        "sources": [
-          "benchmarks/perf/r7-filter-dedupe-lora-20261014.json"
-        ]
-      },
-      "steps": [
-        {
-          "node": "data.local_folder",
-          "label": {
-            "vi": "Dữ liệu của bạn",
-            "en": "Your data"
-          }
-        },
-        {
-          "node": "data.filter",
-          "label": {
-            "vi": "Lọc dữ liệu",
-            "en": "Filter"
-          }
-        },
-        {
-          "node": "data.dedupe",
-          "label": {
-            "vi": "Bỏ mẫu trùng",
-            "en": "Dedupe"
-          }
-        },
-        {
-          "node": "data.split",
-          "label": {
-            "vi": "Chia dữ liệu",
-            "en": "Split data"
-          }
-        },
-        {
-          "node": "train.lora_vlm",
-          "label": {
-            "vi": "Fine-tune nhẹ (LoRA)",
-            "en": "LoRA fine-tune"
-          }
-        },
-        {
-          "node": "train.merge_lora",
-          "label": {
-            "vi": "Gộp vào model",
-            "en": "Merge"
-          }
-        }
-      ]
-    },
-    {
-      "id": "curator-image-curation",
-      "summary_key": "reference_pipeline.curator-image-curation.summary",
-      "kind": "external",
-      "template_id": null,
-      "status": "reference_only",
-      "difficulty": "advanced",
-      "title": {
-        "vi": "Lọc và khử trùng ảnh (NVIDIA NeMo Curator)",
-        "en": "Image filtering & dedup (NVIDIA NeMo Curator)"
-      },
-      "source_url": "https://github.com/NVIDIA-NeMo/Curator/tree/main/tutorials/image",
-      "publisher": "NVIDIA",
-      "license": {
-        "code": "apache-2.0",
-        "model": null,
-        "data": null
-      },
-      "measured": null,
-      "steps": [
-        {
-          "node": null,
-          "label": {
-            "vi": "Đọc WebDataset",
-            "en": "Read WebDataset"
-          }
-        },
-        {
-          "node": null,
-          "label": {
-            "vi": "Tính embedding",
-            "en": "Embed"
-          }
-        },
-        {
-          "node": null,
-          "label": {
-            "vi": "Lọc thẩm mỹ / NSFW",
-            "en": "Aesthetic / NSFW filter"
-          }
-        },
-        {
-          "node": null,
-          "label": {
-            "vi": "Khử trùng",
-            "en": "Dedup"
-          }
-        }
-      ]
-    },
-    {
-      "id": "cosmos-reason2-lora",
-      "summary_key": "reference_pipeline.cosmos-reason2-lora.summary",
-      "kind": "candidate",
-      "template_id": null,
-      "status": "reference_only",
-      "difficulty": null,
-      "title": {
-        "vi": "Cosmos Reason2 2B fine-tune nhẹ",
-        "en": "Cosmos Reason2 2B LoRA"
-      },
-      "source_url": "https://github.com/nvidia-cosmos/cosmos-reason2",
-      "publisher": "NVIDIA",
-      "notice": "Built on NVIDIA Cosmos",
-      "requires_hf_terms": true,
-      "license": {
-        "code": "apache-2.0",
-        "model": "nvidia-open-model-license",
-        "data": null
-      },
-      "measured": null,
-      "steps": [
-        {
-          "node": "model.hf_pick",
-          "label": {
-            "vi": "Cosmos Reason2 2B",
-            "en": "Cosmos Reason2 2B"
-          }
-        },
-        {
-          "node": "data.local_folder",
-          "label": {
-            "vi": "Dữ liệu của bạn",
-            "en": "Your data"
-          }
-        },
-        {
-          "node": "train.lora_vlm",
-          "label": {
-            "vi": "Fine-tune nhẹ (LoRA)",
-            "en": "LoRA fine-tune"
+            "vi": "So điểm với bản gốc",
+            "en": "Compare with the original"
           }
         }
       ]
