@@ -1714,7 +1714,7 @@ method:
     when: When you have few reference answers; a large model writes them and a small model learns from them.
     note: Check that the large model's license allows using its answers to train another model.
   dpo:
-    title: DPO (learn from good/bad pairs)
+    title: Learn from good/bad pairs (DPO)
     when: When you have good and bad answers for the same image; teaches the model to prefer the better one and invent fewer details.
   grpo:
     title: Learn from feedback (GRPO)

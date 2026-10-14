@@ -1714,7 +1714,7 @@ method:
     when: 'Khi có ít đáp án mẫu: một model lớn viết đáp án, rồi dạy model nhỏ học theo.'
     note: Kiểm tra giấy phép của model lớn có cho dùng câu trả lời của nó để train model khác không.
   dpo:
-    title: DPO (học theo cặp tốt/kém)
+    title: Học theo cặp tốt/kém (DPO)
     when: 'Khi có cặp câu trả lời tốt và kém cho cùng ảnh: dạy model chọn câu tốt hơn, bớt bịa chi tiết.'
   grpo:
     title: Học từ phản hồi (GRPO)
@@ -1723,5 +1723,5 @@ method:
     title: Nén sau khi train (PTQ)
     when: 'Khi cần model nhỏ hơn để chạy: nén rồi đo lại điểm, không train thêm.'
   qat:
-    title: Train có giả lập nén (QAT)
+    title: Nén có học lại (QAT)
     when: 'Khi nén làm điểm giảm nhiều: train ngắn có giả lập nén để lấy lại điểm.'
