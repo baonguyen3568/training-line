@@ -282,6 +282,9 @@ error:
   MODEL-005:
     title: 'Nên chạy thử nhanh trước'
     what: 'Model "{model}" do bạn tự thêm nên chưa được kiểm chứng. Nên chạy thử nhanh vài bước ở bước "{node}" trước khi huấn luyện thật.'
+  MODEL-006:
+    title: 'Workflow dùng model chưa có trên máy này'
+    what: 'Workflow này dùng model "{repo}" do tác giả tự thêm, còn máy này chưa có. Bấm "Thêm model này" để thêm đúng bản tác giả đã dùng; bạn vẫn xem và xác nhận giấy phép trước khi tải.'
   SEC-005:
     title: 'Chưa xác nhận giấy phép'
     what: 'Bạn cần đọc và xác nhận giấy phép ({license}) của "{name}" trước khi app tải về.'
@@ -366,6 +369,7 @@ action:
   open_column_mapping: 'Ghép cột dữ liệu'
   use_parquet_export: 'Dùng bản chuyển đổi'
   run_smoke: 'Chạy thử nhanh'
+  add_user_model: 'Thêm model này'
   open_inner_step: 'Mở bước bị lỗi'
   check_files: Kiểm tra tệp
   migrate_node: Xem thay đổi và cập nhật

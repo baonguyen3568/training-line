@@ -282,6 +282,9 @@ error:
   MODEL-005:
     title: 'Try a quick run first'
     what: 'You added model "{model}" yourself, so it has not been verified. Do a quick test run of a few steps in "{node}" before the real training.'
+  MODEL-006:
+    title: 'This workflow uses a model not added here'
+    what: 'This workflow uses model "{repo}", which its author added themselves and this machine does not have yet. Click "Add this model" to add the exact version the author used; you still review and confirm the license before downloading.'
   SEC-005:
     title: 'License not confirmed yet'
     what: 'Read and confirm the license ({license}) of "{name}" before the app downloads it.'
@@ -366,6 +369,7 @@ action:
   open_column_mapping: 'Map the data columns'
   use_parquet_export: 'Use the converted copy'
   run_smoke: 'Quick test run'
+  add_user_model: 'Add this model'
   open_inner_step: 'Open the failing step'
   check_files: Check files
   migrate_node: Review changes and update

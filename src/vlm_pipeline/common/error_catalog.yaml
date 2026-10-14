@@ -491,6 +491,21 @@ MODEL-005:
   actions:
     - {id: run_smoke, kind: trial, confirm: false}
 
+MODEL-006:
+  slug: USER_MODEL_NOT_ADDED
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 §7.1: a model.hf_pick step names a user-added model (repo + 40-char sha) this machine has no record of
+  # (workflow opened from another machine, or the model was removed). The dialog is prefilled; the licence tick stays.
+  params:
+    - {name: node, ref: node}
+    - repo
+    - revision
+  match:
+    - {kind: validate, value: "model.hf_pick names a user model this machine has not added (ADR-021 §7.1)"}
+  actions:
+    - {id: add_user_model, kind: navigate, target: add_model_dialog, confirm: false}
+
 NET-001:
   slug: DOWNLOAD_FAILED
   severity: error
