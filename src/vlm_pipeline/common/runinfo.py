@@ -14,7 +14,7 @@ import secrets
 import stat
 import threading
 import time
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -135,8 +135,12 @@ def write_manifest(run_dir: Path, manifest: RunManifest) -> None:
 RUN_JSON_MAX = 1 << 20  # run.json is written by the job too: never read more than this, never a fifo or a symlink
 
 
-def read_small_json(path: Path, max_bytes: int = RUN_JSON_MAX) -> object:
+def read_small_json(
+    path: Path, max_bytes: int = RUN_JSON_MAX, *, loads: Callable[[bytes], object] | None = None
+) -> object:
     """JSON of a small regular file a job may have written (run.json). Never blocks, never follows a symlink.
+
+    ``loads``: a stricter parser for untrusted content (download.resolver: no NaN, bounded depth); default json.
 
     Raises:
         FileNotFoundError: no file.
@@ -151,7 +155,7 @@ def read_small_json(path: Path, max_bytes: int = RUN_JSON_MAX) -> object:
         data = fh.read(max_bytes + 1)
     if len(data) > max_bytes:
         raise ValueError("file grew past the limit")
-    return json.loads(data.decode("utf-8"))
+    return loads(data) if loads is not None else json.loads(data.decode("utf-8"))
 
 
 def read_manifest(run_dir: Path) -> RunManifest:

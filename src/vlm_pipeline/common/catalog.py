@@ -35,7 +35,8 @@ def _snapshot_relative(path: str) -> str:
 # Relative path inside the dataset snapshot: no leading "/", no ".." segment.
 DataFile = Annotated[str, Field(pattern=r"^[A-Za-z0-9_][A-Za-z0-9_./-]*$"), AfterValidator(_snapshot_relative)]
 
-Tier = Literal["default", "template", "catalog", "baseline", "rnd"]
+# "user": a model the user added (ADR-021); never in configs/catalog/models.yaml (Catalog refuses it there).
+Tier = Literal["default", "template", "catalog", "baseline", "rnd", "user"]
 
 
 # Required notice sentences (Proposal 012 §2.2): research-written, security-approved, copied into an export's NOTICE.
@@ -75,7 +76,8 @@ class CatalogEntry(BaseModel):
     license: str
     commercial: Literal["yes", "no", "conditional"]
     attribution: str
-    security: Literal["approved", "approved_with_conditions", "conditional", "rejected"]
+    # "unreviewed": a user-added model (ADR-021), never in the catalog file
+    security: Literal["approved", "approved_with_conditions", "conditional", "rejected", "unreviewed"]
     params_b: float = Field(gt=0)
     disk_gb: float = Field(gt=0)
     train_node: Literal["train.sft_vlm", "train.lora_vlm", "none"]
@@ -161,6 +163,8 @@ class Catalog(BaseModel):
         ids = [m.id for m in self.models]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate model id in catalog")
+        if any(m.tier == "user" or m.security == "unreviewed" for m in self.models):
+            raise ValueError("tier user / security unreviewed are for user-added models, never in the catalog file")
         if [m.tier for m in self.models].count("default") != 1:
             raise ValueError("catalog needs exactly one model with tier: default")
         if unknown := sorted({m.vendor for m in self.models} - set(self.vendors)):
