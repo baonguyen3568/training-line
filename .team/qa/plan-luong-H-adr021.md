@@ -95,3 +95,8 @@ security: ca config.json bất thường + review · frontend: UI dán repo / gh
   không chỉ nhìn status; (c) run.json tags ["trial"]; (d) sau đó validate không còn MODEL-005 cho model@sha đó.
 - Ca âm (tester thêm): trial vẫn phải qua support check / preflight RAM / chặn remote code; đổi revision thì MODEL-005
   quay lại; trial fail thì MODEL-005 vẫn còn.
+- Backend xác nhận (14/10): "không validation" = bỏ validation_dataset/dataloader trong recipe (không đo val loss lúc
+  train), KHÔNG bỏ chặn nào: services.validate đầy đủ trên workflow đã cắt (error ⇒ 422), check_support ở worker
+  (MODEL-004 remote code, CFG-0xx), preflight/lock/runner/budget, SEC-005 license. MODEL-005 là info. trial_run_id chỉ ghi
+  khi train completed/cached; id model = user_model_id(repo, sha40), đổi sha thì MODEL-005 quay lại. Cache key trial có
+  "+trial5" (test_trial_executor). Ca âm phải kiểm: remote code + chạy thử ⇒ 422 / MODEL-004.
