@@ -202,6 +202,7 @@ error:
       lock: 'Workflow đã chờ {minutes} phút nhưng GPU vẫn đang bận với một việc nặng khác.'
       memory: 'Workflow đã chờ {minutes} phút nhưng máy vẫn chưa đủ bộ nhớ trống: cần khoảng {need_gb} GB, đang trống {avail_gb} GB.'
       vram: 'Workflow đã chờ {minutes} phút nhưng GPU vẫn chưa đủ bộ nhớ riêng (VRAM) trống: cần khoảng {need_gb} GB, đang trống {avail_gb} GB.'
+      swap: 'Workflow đã chờ {minutes} phút: bộ nhớ trống đủ ({avail_gb} GB) nhưng máy đang dùng gần hết bộ nhớ trao đổi (swap), nên app chưa chạy thêm việc nặng để máy không bị treo. Hãy chờ các việc khác chạy xong rồi thử lại.'
   GPU-003:
     title: Kiểu nén này chạy chậm trên máy
     what: NVFP4 trên máy này có thể chạy chậm hơn FP8 mà chất lượng tương đương.

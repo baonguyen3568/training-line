@@ -127,3 +127,29 @@ def test_timeout_says_what_it_waited_for() -> None:
         wait_for_memory(20.0, read=_feed(*[5.0] * 5), read_cgroup=lambda: None, cancel=_Tick(clock), clock=clock,
                         timeout_s=60.0, poll_s=30.0, gpus=lambda: [])  # fmt: skip
     assert ei.value.params["waiting_for"] == "memory"
+
+
+def _low_swap(avail: float, swap: float):  # type: ignore[no-untyped-def]
+    return lambda: MemSnapshot(mem_total_gb=121.7, mem_available_gb=avail, cached_gb=0.0, swap_free_gb=swap)
+
+
+def test_enough_ram_but_no_swap_is_reported_as_swap() -> None:
+    """PM install8 2026-10-14: 38 GB free, need 18, but SwapFree 1 GB < 2: the event said "memory"; it is swap."""
+    clock = _Clock()
+    seen: list[dict[str, float]] = []
+    with pytest.raises(MemoryWaitTimeoutError) as exc:
+        wait_for_memory(10.0, read=_low_swap(38.0, 1.0), read_cgroup=lambda: None, on_wait=seen.append,
+                        cancel=_Tick(clock), clock=clock, poll_s=30.0, timeout_s=60.0)  # fmt: skip
+    assert {w["waiting_for"] for w in seen} == {"swap"}
+    assert seen[0]["swap_free_gb"] == 1.0
+    assert exc.value.params["waiting_for"] == "swap"
+
+
+def test_too_little_ram_is_memory_even_when_swap_is_also_low() -> None:
+    clock = _Clock()
+    seen: list[dict[str, float]] = []
+    with pytest.raises(MemoryWaitTimeoutError) as exc:
+        wait_for_memory(10.0, read=_low_swap(5.0, 1.0), read_cgroup=lambda: None, on_wait=seen.append,
+                        cancel=_Tick(clock), clock=clock, poll_s=30.0, timeout_s=30.0)  # fmt: skip
+    assert {w["waiting_for"] for w in seen} == {"memory"}
+    assert exc.value.params["waiting_for"] == "memory"

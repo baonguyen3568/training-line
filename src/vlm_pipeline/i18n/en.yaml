@@ -202,6 +202,7 @@ error:
       lock: 'The workflow has waited {minutes} minutes, but the GPU is still busy with another heavy job.'
       memory: 'The workflow has waited {minutes} minutes, but there is still not enough free memory: it needs about {need_gb} GB and {avail_gb} GB is free.'
       vram: 'The workflow has waited {minutes} minutes, but the GPU still lacks free VRAM: it needs about {need_gb} GB and {avail_gb} GB is free.'
+      swap: 'The workflow has waited {minutes} minutes: there is enough free memory ({avail_gb} GB), but the machine has almost no free swap left, so the app starts no more heavy work to keep it from freezing. Wait for other jobs to finish, then try again.'
   GPU-003:
     title: This compression is slow here
     what: On this machine NVFP4 may run slower than FP8 with similar quality.

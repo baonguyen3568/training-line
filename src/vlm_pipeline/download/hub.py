@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import sys
 import time
 from collections.abc import Callable, Iterable
@@ -80,12 +81,18 @@ def _token() -> str | None:
         return None
 
 
+def _stop(code: int, why: str) -> int:
+    """Say why on stderr (the run log) before a refusing exit: never a silent exit code (tester 2026-10-14)."""
+    print(f"download.hub: {why} (exit {code})", file=sys.stderr, flush=True)
+    return code
+
+
 def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = None) -> int:
     """The whole job; ``api`` / ``fetch`` are injectable (unit tests never touch the network)."""
     try:
         spec = read_spec(run_dir)
-    except (OSError, ValueError):
-        return EXIT_BAD_SPEC
+    except (OSError, ValueError) as exc:
+        return _stop(EXIT_BAD_SPEC, f"bad download spec: {exc}")
     kind: Kind = spec["kind"]
     token = _token()
     if api is None or fetch is None:  # pragma: no cover - the real hub, inside the job only
@@ -101,11 +108,12 @@ def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = No
     total = sum(f["size"] for f in files)
     (stage / "plan.json").write_text(json.dumps({"files": files, "total_bytes": total}, indent=1), encoding="utf-8")
     if kind == "model" and not any(f["name"].endswith(".safetensors") for f in files):
-        return EXIT_NO_SAFETENSORS  # pickle-only weights are never fetched (security A.3)
+        return _stop(EXIT_NO_SAFETENSORS, "no .safetensors weights in the repo")  # pickle-only: never (security A.3)
     if spec.get("plan_only") is True:  # "Check": the host compares an existing snapshot with this plan, no blob
         return 0
     if total > spec["max_bytes"]:
-        return EXIT_OVER_BUDGET
+        return _stop(EXIT_OVER_BUDGET, f"the planned files are {total} bytes, over this job's budget of "
+                                       f"{spec['max_bytes']} bytes (the catalog size is too small)")  # fmt: skip
     out = stage / "files"
     done = 0
     with (stage / "progress.jsonl").open("a", encoding="utf-8") as progress:
@@ -116,6 +124,12 @@ def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = No
             progress.write(json.dumps({"ts": time.time(), "files_done": n, "files_total": len(files),
                                        "bytes_done": done, "bytes_total": total}) + "\n")  # fmt: skip
             progress.flush()
+    # huggingface_hub keeps its own bookkeeping under <local_dir>/.cache/huggingface (metadata, locks, CACHEDIR.TAG):
+    # not part of the repo. Removed here so files/ holds exactly the plan (PM 2026-10-14: the host's check refused
+    # 21 extra files with NET-003). The host check stays exact: anything else left behind is still refused.
+    shutil.rmtree(out / ".cache" / "huggingface", ignore_errors=True)
+    if (out / ".cache").is_dir() and not any((out / ".cache").iterdir()):
+        (out / ".cache").rmdir()
     manifest = [{"name": f["name"], "size": (out / f["name"]).stat().st_size, "sha256": _sha256(out / f["name"])}
                 for f in files]  # fmt: skip
     (stage / "manifest.json").write_text(json.dumps({"files": manifest}, indent=1), encoding="utf-8")

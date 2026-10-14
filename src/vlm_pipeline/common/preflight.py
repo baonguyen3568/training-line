@@ -16,7 +16,7 @@ import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from vlm_pipeline.common.diskguard import DiskSnapshot, LockStatus, check_disk, check_lock, read_disk, required_disk_gb
 from vlm_pipeline.common.errors import ExitCode, VlmPipelineError
@@ -339,9 +339,12 @@ def wait_for_memory(
         if host_ok and vram is None:
             return True
         waited = clock() - start
+        avail = snapshot.mem_available_gb if cgroup is None else min(snapshot.mem_available_gb, cgroup)
+        # Enough free memory but too little free swap (host under pressure): say so, never "memory" with 38 GB free
+        # (PM 2026-10-14).
+        blocked_by = "swap" if avail >= need and snapshot.swap_free_gb < thresholds.min_swap_free_gb else "memory"
         if waited >= timeout_s:
-            avail = snapshot.mem_available_gb if cgroup is None else min(snapshot.mem_available_gb, cgroup)
-            short = {"waiting_for": "memory", "need_gb": round(need, 1), "avail_gb": round(avail, 1)}
+            short = {"waiting_for": blocked_by, "need_gb": round(need, 1), "avail_gb": round(avail, 1)}
             if host_ok and vram is not None:  # the host fits: it is the GPU's own memory the job waited for
                 short = {"waiting_for": "vram", "need_gb": round(vram[0], 1), "avail_gb": round(vram[1], 1)}
             raise MemoryWaitTimeoutError(
@@ -349,8 +352,8 @@ def wait_for_memory(
                 params={"minutes": math.ceil(waited / 60), **short},
             )
         if on_wait is not None:
-            avail = snapshot.mem_available_gb if cgroup is None else min(snapshot.mem_available_gb, cgroup)
-            info = {"need_gb": round(need, 2), "avail_gb": round(avail, 2), "waited_s": waited}
+            info: dict[str, Any] = {"need_gb": round(need, 2), "avail_gb": round(avail, 2), "waited_s": waited}
+            info.update(waiting_for=blocked_by, swap_free_gb=round(snapshot.swap_free_gb, 2))
             if vram is not None:
                 info.update(vram_need_gb=round(vram[0], 2), vram_avail_gb=round(vram[1], 2))
             on_wait(info)

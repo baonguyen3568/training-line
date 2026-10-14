@@ -355,3 +355,20 @@ def test_a_download_waiting_for_memory_says_so(svc: Any, monkeypatch: pytest.Mon
     assert _wait(service, started["download_id"]) == "completed"
     [waiting] = [e for _i, e in events if e.get("type") == "waiting"]
     assert waiting == {"type": "waiting", "waiting_for": "memory", "need_gb": 10.0, "avail_gb": 3.9, "waited_s": 30.0}
+
+
+_PART = Asset(kind="dataset", catalog_id="x", repo="org/x", revision="a" * 40, name="x", size_gb=0.1, license="mit",
+              gated=False)  # fmt: skip
+
+
+@pytest.mark.parametrize("exit_code", [3, 4, 5])
+def test_the_jobs_own_refusals_are_not_the_network(exit_code: int) -> None:
+    """PM 2026-10-14: cord-v2 exit 3 (repo bigger than the catalog) read NET-001; the catalog is wrong, not the net."""
+    part = _PART
+    assert downloads._job_failure(exit_code, part) == {"code": "SYS-000", "params": {}}
+
+
+@pytest.mark.parametrize("exit_code", [1, 2, 137, None])
+def test_other_job_failures_stay_network(exit_code: int | None) -> None:
+    part = _PART
+    assert downloads._job_failure(exit_code, part) == {"code": "NET-001", "params": {"reason": "network"}}

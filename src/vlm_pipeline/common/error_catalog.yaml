@@ -190,15 +190,17 @@ SYS-002:
   severity: warn
   prevent_in_preflight: false
   # waiting_for: what the queue waited for. memory = the host's free RAM under the 80%-of-free rule (ADR-005 A1),
-  # vram = a discrete GPU's free VRAM (D-4); both carry need_gb / avail_gb. Absent (older emitters) = lock.
+  # vram = a discrete GPU's free VRAM (D-4); both carry need_gb / avail_gb. swap = enough free RAM but the host's
+  # free swap stays under min_swap_free_gb (the host is under memory pressure). Absent (older emitters) = lock.
   params:
     - minutes
-    - {name: waiting_for, type: enum, values: [lock, memory, vram]}
+    - {name: waiting_for, type: enum, values: [lock, memory, vram, swap]}
     - need_gb
     - avail_gb
   variants:
     - {when: {waiting_for: memory}, key: memory}
     - {when: {waiting_for: vram}, key: vram}
+    - {when: {waiting_for: swap}, key: swap}
     - {when: {}, key: lock}
   match:
     - {kind: executor, value: queue_wait_timeout}

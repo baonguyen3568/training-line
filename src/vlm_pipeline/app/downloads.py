@@ -233,12 +233,15 @@ class DownloadService:
                 f.write(body)
             return
 
-    def _waiting(self, d: Download) -> Callable[[dict[str, float]], None]:
+    def _waiting(self, d: Download) -> Callable[[dict[str, Any]], None]:
         """The memory queue's report as an event: a job that waits says why (need vs available GB), never silently."""
 
-        def report(info: dict[str, float]) -> None:
-            fields: dict[str, float] = {k: info[k] for k in ("need_gb", "avail_gb", "waited_s") if k in info}
-            self._emit(d.download_id, {"type": "waiting", "waiting_for": "memory", **fields})
+        def report(info: dict[str, Any]) -> None:
+            fields: dict[str, Any] = {
+                k: info[k] for k in ("need_gb", "avail_gb", "waited_s", "swap_free_gb") if k in info
+            }
+            waiting_for = info.get("waiting_for") if info.get("waiting_for") in ("memory", "swap", "vram") else "memory"
+            self._emit(d.download_id, {"type": "waiting", "waiting_for": waiting_for, **fields})
 
         return report
 
@@ -330,7 +333,7 @@ class DownloadService:
                         take_gpu_lock=False, launcher=self._launcher, on_wait=self._waiting(d),
                         memory_wait_s=self.memory_wait_s)  # fmt: skip
         if final.status != RunStatus.COMPLETED:
-            self._fail(d, {"code": "NET-001", "params": {"reason": "network"}})
+            self._fail(d, _job_failure(final.exit_code, part))
             return False
         self._set(d, "verifying", part=part.repo)
         finish = verify_existing if plan_only else install
@@ -398,6 +401,22 @@ def _last_line(path: Path, max_bytes: int = 4096) -> dict[str, int] | None:
     if not isinstance(data, dict) or not all(isinstance(data.get(k), int) for k in keys):
         return None
     return {k: int(data[k]) for k in keys}
+
+
+def _job_failure(exit_code: int | None, part: Asset) -> dict[str, Any]:
+    """The download job's own exit codes (download.hub) as what really went wrong; anything else: the network.
+
+    3 = the repo is bigger than the catalog says (the job refused to exceed its budget), 4 = no safetensors,
+    5 = a bad spec: the catalog or the app is wrong, never the user's network (PM 2026-10-14: a size error read
+    "network" and cord-v2 failed with NET-001). Those are SYS-000: install.sh stops on them.
+    """
+    from vlm_pipeline.download.hub import EXIT_BAD_SPEC, EXIT_NO_SAFETENSORS, EXIT_OVER_BUDGET
+
+    if exit_code in (EXIT_OVER_BUDGET, EXIT_NO_SAFETENSORS, EXIT_BAD_SPEC):
+        logger.error("download job for %s@%s exited %s (catalog/app problem, not the network)", part.repo,
+                     part.revision[:8], exit_code)  # fmt: skip
+        return {"code": "SYS-000", "params": {}}
+    return {"code": "NET-001", "params": {"reason": "network"}}
 
 
 def _untouched_for(path: Path, seconds: float) -> bool:

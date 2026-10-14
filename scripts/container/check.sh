@@ -17,9 +17,12 @@ while [[ $# -gt 0 ]]; do
 done
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "image $IMAGE not found (see docker/IMAGES.lock)" >&2; exit 2; }
 
+GATE_N=0
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 run() {  # run a command in a throw-away, locked-down container with the repo mounted read-only
-  docker run --rm --label project=vlm-training --network none --cap-drop ALL --security-opt no-new-privileges \
+  # Named vlm-* like every project container (CLAUDE.md: prefix vlm-), so it is never mistaken for another service's.
+  docker run --rm --name "vlm-gate-$$-$((++GATE_N))" --label project=vlm-training --network none --cap-drop ALL \
+    --security-opt no-new-privileges \
     --user "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONPATH=/workspace/src -e VLM_PROJECT_ROOT=/workspace \
     -e HF_HUB_OFFLINE=1 -e HF_HOME=/workspace/.cache/hf -e HF_DATASETS_CACHE=/tmp/hf_datasets \
     -e HF_DATASETS_OFFLINE=1 -e NO_ALBUMENTATIONS_UPDATE=1 -e PYTHONDONTWRITEBYTECODE=1 \
