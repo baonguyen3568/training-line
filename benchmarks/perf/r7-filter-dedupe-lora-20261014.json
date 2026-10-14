@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "pipeline": "R7 data cleanup then fine-tune, built with app nodes (graph g-20261014-092151-4a2365)",
+  "hardware": "1x NVIDIA GB10 (DGX Spark), UMA, driver 580.142",
+  "workflow": "data.local_folder(CORD v2 train, 800) -> data.filter(defaults) -> data.dedupe(sha256, check_leak, heldout = CORD v2 test folder) -> data.split(0.1) -> train.lora_vlm(Qwen3.5-0.8B, 1 epoch) -> train.merge_lora",
+  "data": {
+    "source": "naver-clova-ix/cord-v2@7f0115a4b758a71d6473b8d085751692da2fef98 in data.local_folder form (data/reference/cord-v2-{train,test})",
+    "license": "cc-by-4.0"
+  },
+  "code": {
+    "commit": "d798363ca2726e5d30c6b5d7e90c147b7954571c",
+    "git_dirty": false,
+    "image": "vlm-automodel:26.08-6",
+    "note": "host + job code from a clean worktree (VLM_CODE_ROOT)"
+  },
+  "filter": {
+    "input": 800,
+    "kept": 799,
+    "dropped": {
+      "image_too_large": 1
+    },
+    "seconds": 0.6
+  },
+  "dedupe": {
+    "input": 799,
+    "kept": 797,
+    "dropped": {
+      "duplicate": 2
+    },
+    "leaked_into_test": 0,
+    "compare": "sha256",
+    "seconds": 0.0
+  },
+  "train": {
+    "run_id": "n7-7bdf9804540e01ad",
+    "minutes": 18.2,
+    "peak_mem_gb": 18.3,
+    "steps": 91
+  },
+  "merge": {
+    "run_id": "n8-610449f0ba21f6cd",
+    "minutes": 0.5,
+    "peak_mem_gb": null,
+    "note": "run.json recorded 0.0 GB (no memguard sample for this short CPU job; reported to bao-backend)"
+  },
+  "finding": "CORD v2 train holds 2 byte-identical images; none of the train images is in the test split; one train image is larger than the default 4096 px side"
+}
