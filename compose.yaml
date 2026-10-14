@@ -54,7 +54,8 @@ services:
     group_add: ["${DOCKER_GID:?}"]  # the host's docker group: the socket, nothing else
     network_mode: none  # a unix socket needs no network
     environment:
-      VLM_HOST_PROJECT_ROOT: "${VLM_HOST_PROJECT_ROOT:?}"
+      # The code jobs run: the installed commit's read-only snapshot (install.sh keeps it), never the working tree.
+      VLM_HOST_PROJECT_ROOT: "${VLM_CODE_ROOT:?run scripts/install.sh}"
       VLM_DATA_ROOT: "${VLM_DATA_ROOT}"
       VLM_RUNNER_STATE: /var/lib/vlm-runner
       VLM_GPU_LOCK_PATH: /run/vlm-lock/GPU_LOCK
@@ -66,10 +67,10 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       # Same host paths inside the runner: it checks mount sources where the daemon will read them.
-      - "${VLM_HOST_PROJECT_ROOT}/src:${VLM_HOST_PROJECT_ROOT}/src:ro"
-      - "${VLM_HOST_PROJECT_ROOT}/configs:${VLM_HOST_PROJECT_ROOT}/configs:ro"
-      - "${VLM_HOST_PROJECT_ROOT}/docker/IMAGES.lock:${VLM_HOST_PROJECT_ROOT}/docker/IMAGES.lock:ro"
-      - "${VLM_HOST_PROJECT_ROOT}/scripts/qa/eval_cord_worker.py:${VLM_HOST_PROJECT_ROOT}/scripts/qa/eval_cord_worker.py:ro"
+      - "${VLM_CODE_ROOT}/src:${VLM_CODE_ROOT}/src:ro"
+      - "${VLM_CODE_ROOT}/configs:${VLM_CODE_ROOT}/configs:ro"
+      - "${VLM_CODE_ROOT}/docker/IMAGES.lock:${VLM_CODE_ROOT}/docker/IMAGES.lock:ro"
+      - "${VLM_CODE_ROOT}/scripts/qa/eval_cord_worker.py:${VLM_CODE_ROOT}/scripts/qa/eval_cord_worker.py:ro"
       # The data dirs only, at their host paths (run logs are appended in run dirs; claims in outputs/system).
       # Never the data root itself: by default it IS the project folder (.env.local, .git).
       - "${VLM_DATA_ROOT}/outputs:${VLM_DATA_ROOT}/outputs"

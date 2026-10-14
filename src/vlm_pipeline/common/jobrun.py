@@ -691,7 +691,9 @@ def git_state(root: Path, dirs: tuple[str, ...] = _CODE_DIRS) -> tuple[str | Non
             capture_output=True, text=True, check=True,
         ).stdout  # fmt: skip
     except (OSError, subprocess.CalledProcessError):
-        return None, None
+        # The installed app has no .git: its image and the code its jobs mount are one commit (install.sh snapshot).
+        built = os.environ.get("VLM_BUILD_COMMIT", "")
+        return (built, False) if re.fullmatch(r"[0-9a-f]{40}", built) else (None, None)
     return head, bool(status.strip() or untracked.strip())
 
 

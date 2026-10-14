@@ -1014,3 +1014,13 @@ def test_only_the_swap_floor_is_dropped_for_an_exempt_job(tmp_path: Path, monkey
         jobrun.run_job(cpu, manifest, tmp_path / f"run{exempt_job}", project_root=root, who="t", est_peak_gb=2)  # type: ignore[arg-type]
     assert seen[False] == DEFAULT_THRESHOLDS
     assert seen[True] == replace(DEFAULT_THRESHOLDS, min_swap_free_gb=0.0)
+
+
+def test_the_installed_app_names_its_build_commit_without_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PM 2026-10-14: run.json git_commit was None on the installed stack (no .git in the app image)."""
+    from vlm_pipeline.common.jobrun import git_state
+
+    monkeypatch.setenv("VLM_BUILD_COMMIT", "a" * 40)
+    assert git_state(tmp_path) == ("a" * 40, False)  # its image and its jobs' code are that one commit
+    monkeypatch.setenv("VLM_BUILD_COMMIT", "not-a-sha")
+    assert git_state(tmp_path) == (None, None)

@@ -121,3 +121,31 @@ def test_outermost_inputs_drop_duplicates_and_nested_paths(tmp_path: Path) -> No
 
     a, b = tmp_path / "a", tmp_path / "b"
     assert outermost_inputs([b, a / "x", a, a, tmp_path / "ab"]) == (a, tmp_path / "ab", b)
+
+
+def test_what_the_launcher_sends_passes_the_runners_own_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """bao-tester 2026-10-14: the unit tests never met the runner's validation; this sends a split-fed train job's
+    real submit body through vlm_pipeline.runner.protocol.parse_submit (the code the runner runs)."""
+    import json
+
+    from vlm_pipeline.common.jobrun import ContainerJob
+    from vlm_pipeline.common.launcher import RunnerLauncher
+    from vlm_pipeline.runner.protocol import parse_request
+
+    data = tmp_path / ".cache" / "hf" / "hub" / "datasets--o--d" / "snapshots" / "x"
+    model = tmp_path / ".cache" / "hf" / "hub" / "models--o--m"
+    run = tmp_path / "outputs" / "graph" / "runs" / "n4-0123456789abcdef"
+    job = ContainerJob(name=run.name, image="vlm-x:1", argv=("automodel", "c.yaml"), narrow=True, rw_dirs=(run,),
+                       ro_inputs=(model, data, data))  # fmt: skip
+    parsed: list[Any] = []
+    launcher = RunnerLauncher(tmp_path / "runner.sock")
+
+    def call(body: dict[str, Any]) -> dict[str, Any]:
+        parsed.append(parse_request(json.dumps(body).encode()))  # raises ProtocolError like the runner would
+        return {"ok": False, "error": "stop_here"}
+
+    monkeypatch.setattr(launcher, "_call", call)
+    token = "A" * 43  # a well-formed dummy (the protocol checks its shape)
+    with pytest.raises(Exception, match="stop_here"):
+        launcher.run(job, tmp_path, lock_token=token, log_path=tmp_path / "l", image_id=None)
+    assert len(parsed[0].inputs) == 2
