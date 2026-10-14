@@ -178,3 +178,57 @@ test("a CPU job runs end to end through the real worker: pick a model, export it
   // A test export is not kept: remove exactly this folder (under <data root>/outputs/e2e-compose/).
   rmSync(folder, { recursive: true, force: true });
 });
+
+test("QLoRA validates on Qwen3.5 and is refused where it cannot run (validate only, no job)", async ({
+  page,
+}) => {
+  // PM 2026-10-14 (850e1ba): nf4 runs only for models whose template keeps the vision part bf16 (qlora_models).
+  const session = await page.request.get("/api/session", {
+    headers: { Accept: "application/json" },
+  });
+  expect(session.status()).toBe(200);
+  const { csrf_token: csrf } = (await session.json()) as { csrf_token: string };
+  const origin = new URL(process.env.E2E_BASE_URL ?? "").origin;
+  const workflow = (model: string, type: string, params: Record<string, unknown>) => ({
+    format: "vlm-workflow",
+    schema_version: 1,
+    name: `e2e-qlora-${model}`,
+    nodes: [
+      { id: "m", type: "model.hf_pick", version: "1.0.0", params: { model } },
+      {
+        id: "d",
+        type: "data.hf_load",
+        version: "1.0.0",
+        params: { repo: "naver-clova-ix/cord-v2" },
+      },
+      { id: "s", type: "data.split", version: "1.0.0", params: { val_fraction: 0.1 } },
+      { id: "t", type, version: "1.0.0", params: { epochs: 1, ...params } },
+    ],
+    edges: [
+      { from: ["d", "dataset"], to: ["s", "dataset"] },
+      { from: ["m", "model"], to: ["t", "base_model"] },
+      { from: ["s", "train"], to: ["t", "train_data"] },
+      { from: ["s", "val"], to: ["t", "val_data"] },
+    ],
+  });
+  type Issue = { code: string; severity?: string; params?: { rule?: string } };
+  const blocking = async (wf: object): Promise<Issue[]> => {
+    const res = await page.request.post("/api/graphs/validate", {
+      data: wf,
+      headers: { "x-vlm-csrf": csrf, Origin: origin, "Content-Type": "application/json" },
+    });
+    expect(res.status(), await res.text()).toBe(200);
+    const { errors } = (await res.json()) as { errors: Issue[] };
+    return errors.filter((e) => (e.severity ?? "error") === "error"); // a not-downloaded model is only a warning
+  };
+  const nf4 = { quantize_base: "nf4" };
+  expect(await blocking(workflow("qwen3.5-2b", "train.lora_vlm", nf4))).toEqual([]);
+  expect(await blocking(workflow("qwen3.5-0.8b", "train.lora_vlm", nf4))).toEqual([]);
+  // A LoRA-capable model without qlora_skip_modules: refused for nf4 only (the same graph without it is clean).
+  const gemma = await blocking(workflow("gemma-4-e4b-it", "train.lora_vlm", nf4));
+  expect(gemma.map((e) => [e.code, e.params?.rule])).toEqual([["CFG-005", "not_for_model"]]);
+  expect(await blocking(workflow("gemma-4-e4b-it", "train.lora_vlm", {}))).toEqual([]);
+  // Nemotron-Parse takes full fine-tuning only: LoRA (and so QLoRA) is refused before the nf4 check (CFG-010).
+  const parse = await blocking(workflow("nemotron-parse-v1.1", "train.lora_vlm", nf4));
+  expect(parse.map((e) => e.code)).toEqual(["CFG-010"]);
+});
