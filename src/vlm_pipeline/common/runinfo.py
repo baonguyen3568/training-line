@@ -44,6 +44,9 @@ Stage = Literal["data", "train", "quantize", "eval", "bench", "serve", "export"]
 
 
 _DATASET_REF = re.compile(r"@([0-9a-f]{40})(?:#|$)")
+# Local data (data.local_folder and its splits, DatasetRef.hash): the records' content digest IS the revision. Each
+# record carries its image's sha256, so the digest pins the labels AND the images.
+_LOCAL_REF = re.compile(r"^local:([0-9a-f]{64})(?:#|$)")
 
 
 class RunManifest(BaseModel):
@@ -98,12 +101,22 @@ class RunManifest(BaseModel):
 
     @model_validator(mode="after")
     def _revision_from_dataset_ref(self) -> Self:
-        """``dataset`` given as ``repo@<sha>[#...]`` (smoke CLI, app artifacts) also pins ``dataset_revision``."""
-        if self.dataset and (m := _DATASET_REF.search(self.dataset)):
-            if self.dataset_revision is None:
-                self.dataset_revision = m.group(1)
-            elif self.dataset_revision != m.group(1):  # a self-contradicting manifest is worse than a missing field
-                raise ValueError(f"dataset_revision {self.dataset_revision} != revision in dataset {self.dataset}")
+        """``dataset`` given as ``repo@<sha>[#...]`` (smoke CLI, app artifacts) also pins ``dataset_revision``.
+
+        Local data (``local:<sha256>[#...]``) pins it as ``sha256:<content digest>`` (TD-2).
+        """
+        if not self.dataset:
+            return self
+        if m := _DATASET_REF.search(self.dataset):
+            revision = m.group(1)
+        elif m := _LOCAL_REF.match(self.dataset):
+            revision = f"sha256:{m.group(1)}"
+        else:
+            return self
+        if self.dataset_revision is None:
+            self.dataset_revision = revision
+        elif self.dataset_revision != revision:  # a self-contradicting manifest is worse than a missing field
+            raise ValueError(f"dataset_revision {self.dataset_revision} != revision in dataset {self.dataset}")
         return self
 
 
@@ -148,6 +161,7 @@ def read_manifest(run_dir: Path) -> RunManifest:
 
 _REPRO_REQUIRED = ("git_commit", "container_digest", "config_hash", "seed", "base_model_revision")
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
+_CONTENT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$")  # hub commit, or local content digest
 
 
 def reproducibility_gaps(manifest: RunManifest) -> list[str]:
@@ -157,7 +171,7 @@ def reproducibility_gaps(manifest: RunManifest) -> list[str]:
         gaps.append("git_commit")
     if manifest.git_dirty:
         gaps.append("git_dirty")
-    if manifest.dataset is not None and not _SHA40.match(manifest.dataset_revision or ""):
+    if manifest.dataset is not None and not _CONTENT_REVISION.match(manifest.dataset_revision or ""):
         gaps.append("dataset_revision")  # a dataset without a pinned revision cannot be re-read identically
     for step in manifest.post_steps:  # host post-processing must also come from committed code
         if step.get("git_dirty") or not _SHA40.match(str(step.get("git_commit") or "")):

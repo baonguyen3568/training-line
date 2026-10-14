@@ -119,6 +119,11 @@ def test_post_steps_from_dirty_code_are_reproducibility_gaps() -> None:
         ("naver-clova-ix/cord-v2@" + "d" * 40 + "#limit=20", "d" * 40, []),
         ("naver-clova-ix/cord-v2", None, ["dataset_revision"]),
         ("naver-clova-ix/cord-v2@main", None, ["dataset_revision"]),
+        # TD-2: local data (data.local_folder, its splits) is pinned by its records' content digest
+        ("local:" + "f" * 64 + "#split=train#val=0.1#seed=42", "sha256:" + "f" * 64, []),
+        ("local:" + "f" * 64 + "#split=all#limit=50", "sha256:" + "f" * 64, []),
+        ("local:" + "f" * 63, None, ["dataset_revision"]),  # not a digest
+        ("local:/home/me/folder", None, ["dataset_revision"]),  # a path is never a revision
         (None, None, []),
     ],
 )
@@ -130,6 +135,17 @@ def test_dataset_revision_derived_from_pinned_ref_else_gap(
                     dataset=dataset)  # fmt: skip
     assert m.dataset_revision == revision
     assert reproducibility_gaps(m) == gaps
+
+
+def test_the_dataset_ref_of_local_data_pins_the_run() -> None:
+    """The real producer: DatasetRef.hash of a split local folder -> a reproducible run."""
+    from vlm_pipeline.common.dataset_ref import DatasetRef
+
+    ref = DatasetRef(path="/workspace/x", split="train", records="/workspace/r.jsonl", records_sha256="a" * 64,
+                     val_fraction=0.1, seed=42)  # fmt: skip
+    m = RunManifest(run_id="r", name="n", stage="train", task="sft", dataset=ref.hash)
+    assert m.dataset_revision == "sha256:" + "a" * 64
+    assert "dataset_revision" not in reproducibility_gaps(m)  # the point of TD-2: the run is reproducible
 
 
 def test_dataset_revision_contradicting_dataset_ref_is_rejected() -> None:
