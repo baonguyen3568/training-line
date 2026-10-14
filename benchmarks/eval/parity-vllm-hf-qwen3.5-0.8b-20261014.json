@@ -1,0 +1,116 @@
+{
+ "purpose": "vLLM <-> HF parity gate (B7-3) for Qwen3.5-0.8B: joins VLLM_PARITY_MODELS only on PASS",
+ "rule": "scripts/qa/vllm_hf_parity.py v3 (fixed before these runs; gap judged at 3 decimals): base passes 1 same input / 2 no anomaly / 5 trunc+parse within 2 points; the fine-tune passes all five, quality-informative",
+ "data": "CORD-v2 test[0:100] PNG folder, prompt 'Read this receipt and return its fields as JSON.', pixels 200704-1003520, greedy, max 1024 tokens, no thinking; HF batch 1 bf16 (vlm-automodel:26.08-6), vLLM 0.31 kv 8 GB logprobs 5",
+ "base": {
+  "model": "Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17",
+  "hf_run": "20261014-1016-parity-hf-q08-f040",
+  "vllm_run": "20261014-1028-parity-vllm-0a6b",
+  "verdict": "FAIL",
+  "checks": {
+   "1_same_input": true,
+   "2_no_anomaly": true,
+   "3_real_divergences_le_5pct": true,
+   "4_f1_delta_le_2_and_ci_has_0": true,
+   "5_trunc_and_parse_fail_le_2": false
+  },
+  "quality_informative": false,
+  "n": 100,
+  "same_input_pct": 100.0,
+  "exact_match_pct": 74.0,
+  "field_f1": {
+   "hf": 0.0,
+   "vllm": 0.0
+  },
+  "delta_f1_vllm_minus_hf": {
+   "delta": 0.0,
+   "ci95": [
+    0.0,
+    0.0
+   ]
+  },
+  "truncated_pct": {
+   "hf": 4.0,
+   "vllm": 0.0
+  },
+  "parse_fail_pct": {
+   "hf": 11.0,
+   "vllm": 9.0
+  },
+  "near_ties": 25,
+  "anomalies": [],
+  "real_divergences": [
+   61
+  ],
+  "real_divergence_pct": 1.0,
+  "near_tie_gap_nats": {
+   "median": 0.0,
+   "max": 0.25
+  },
+  "truncated_rows": {
+   "ids": [
+    10,
+    12,
+    49,
+    61
+   ],
+   "pattern": "each forks at an early near tie (token 3-84, gap 0.0-0.5); HF then loops (repeated keys) to 1024 tokens while vLLM stops: a greedy property of a small base, not an engine fault, but condition 5 is decisive on the base"
+  }
+ },
+ "fine_tune": {
+  "model": "R7 merged, outputs/graph/runs/n8-610449f0ba21f6cd/merged (Qwen3.5-0.8B LoRA 1 epoch, 797 CORD train images)",
+  "hf_run": "20261014-1041-parity-hf-r7-06d8",
+  "vllm_run": "20261014-1105-parity-vllm-50a5",
+  "verdict": "PASS",
+  "checks": {
+   "1_same_input": true,
+   "2_no_anomaly": true,
+   "3_real_divergences_le_5pct": true,
+   "4_f1_delta_le_2_and_ci_has_0": true,
+   "5_trunc_and_parse_fail_le_2": true
+  },
+  "quality_informative": true,
+  "n": 100,
+  "same_input_pct": 100.0,
+  "exact_match_pct": 95.0,
+  "field_f1": {
+   "hf": 82.69,
+   "vllm": 82.7
+  },
+  "delta_f1_vllm_minus_hf": {
+   "delta": 0.01,
+   "ci95": [
+    -0.56,
+    0.52
+   ]
+  },
+  "truncated_pct": {
+   "hf": 0.0,
+   "vllm": 0.0
+  },
+  "parse_fail_pct": {
+   "hf": 0.0,
+   "vllm": 0.0
+  },
+  "near_ties": 5,
+  "anomalies": [],
+  "real_divergences": [],
+  "real_divergence_pct": 0.0,
+  "near_tie_gap_nats": {
+   "median": 0.125,
+   "max": 0.125
+  },
+  "note": "HF field F1 82.69 = a data point for R7 (1 epoch, checkpoint not chosen on validation), not a published score"
+ },
+ "gate": {
+  "verdict": "FAIL",
+  "failed": [
+   "base:5_trunc_and_parse_fail_le_2"
+  ]
+ },
+ "decision": "not added to VLLM_PARITY_MODELS under rule v3; an exception (e.g. vLLM only for 0.8B fine-tunes) would be a PM decision with its reason, and needs a code change (the list is keyed by catalog id)",
+ "caveats": [
+  "one prompt, one dataset, 100 images",
+  "vLLM greedy is not bit-reproducible run to run"
+ ]
+}
