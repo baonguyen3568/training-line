@@ -51,7 +51,11 @@ export function LicenseTerms({
   return (
     <div className="license-terms">
       <p>
-        <strong>{licenseName(license)}</strong>
+        <strong>
+          {license === "unknown"
+            ? tpOptional(["license", "badge", "unknown"])
+            : licenseName(license)}
+        </strong>
         {badge && licenseClass && (
           <span className="badge license-verdict">
             <span className={`si ${BADGE[licenseClass].tone}`} aria-hidden="true">

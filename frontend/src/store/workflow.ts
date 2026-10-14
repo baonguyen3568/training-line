@@ -82,7 +82,8 @@ interface WorkflowState {
   undo(): void;
   redo(): void;
   validate(): Promise<void>;
-  startRun(): Promise<void>;
+  /** `trial`: the 5-step trial run of one step (ADR-021 "Chạy thử nhanh"). */
+  startRun(trial?: { node: string }): Promise<void>;
   cancelRun(): Promise<void>;
   stopWatching(): void;
 }
@@ -344,11 +345,11 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       }
     },
 
-    async startRun() {
+    async startRun(trial) {
       const wf = get().workflow;
       if (!wf) return;
       get().stopWatching();
-      const { run_id } = await api.startRun(wf);
+      const { run_id } = await api.startRun(wf, trial);
       const nodes: Record<string, NodeRunState> = {};
       for (const n of wf.nodes) nodes[n.id] = { status: "pending" };
       set({ run: { id: run_id, nodes, done: false, startedAt: Date.now() } });

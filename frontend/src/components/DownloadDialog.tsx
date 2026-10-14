@@ -112,6 +112,15 @@ export function DownloadDialog({
             />
           </>
         )}
+        {license === "unknown" && (
+          // A1: allowed with a warning; export/sharing stays blocked until the licence is known (SEC-005)
+          <p className="small" role="note">
+            <span className="si si-warn" aria-hidden="true">
+              <Icon name="triangle-alert" size={14} />
+            </span>{" "}
+            {t("download.license_unknown")}
+          </p>
+        )}
         {!busy && entry?.status !== "completed" && entry?.status !== "unverified" && (
           <label className="field check">
             <input

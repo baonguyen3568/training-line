@@ -27,7 +27,8 @@ describe("M1 journey (store)", () => {
     const data = s().addNode("data.hf_load", { x: 0, y: 200 });
     const train = s().addNode("train.sft_vlm", { x: 500, y: 0 });
     expect(model && data && train).toBeTruthy();
-    expect(s().workflow?.nodes.find((n) => n.id === model)?.params).toEqual({
+    // the catalog default model (model.hf_pick 1.1.0 also carries user_model "", ADR-021)
+    expect(s().workflow?.nodes.find((n) => n.id === model)?.params).toMatchObject({
       model: "nemotron-parse-v1.1",
     });
     expect(s().connect([model as string, "model"], [train as string, "base_model"]).ok).toBe(true);

@@ -40,7 +40,9 @@ export interface UiHint {
     | "toggle"
     | "textarea"
     | "image_upload"
-    | "advanced"; // P016 §3 engine options (object); widget not built yet
+    | "advanced" // P016 §3 engine options (object); widget not built yet
+    | "user_model" // ADR-021 H3: a user-added model, picked in the "Từ Hugging Face" tab
+    | "hidden"; // kept and validated, never rendered (user_repo/user_revision)
   order?: number;
   preset?: boolean;
   advanced?: boolean;
@@ -234,7 +236,8 @@ export interface Estimate {
  */
 export interface ResolvedAction {
   id: string;
-  kind: "patch" | "resume" | "navigate";
+  /** "trial" (ADR-021 MODEL-005 run_smoke): a 5-step trial run of node_id; the workflow's params stay as they are. */
+  kind: "patch" | "resume" | "navigate" | "trial";
   confirm: boolean;
   target?: string | null;
   node_id?: string;
@@ -649,4 +652,58 @@ export interface LanInfo {
   urls: string[];
   /** The LAN CA (public, name-constrained): fingerprint "AB:CD:…" upper-case pairs, as browsers show it. */
   ca: { fingerprint_sha256: string; download: string } | null;
+}
+
+/** ADR-021 / P021 §8: a model the user added from Hugging Face (unverified, pinned to a commit sha). */
+export interface UserModel {
+  id: string;
+  name: string;
+  repo: string;
+  /** 40-char commit sha the add pinned. */
+  revision: string;
+  family: string;
+  architecture: string;
+  params_b: number;
+  size_gb: number;
+  /** A license id, or "unknown" (A1: allowed with a warning; export stays blocked, SEC-005). */
+  license: string;
+  license_confirmed: boolean;
+  gated: boolean;
+  ram_gb_train: number;
+  ram_source: string;
+  verified: false;
+  /** The quick test run recorded for this model, once one finished. */
+  trial_run_id?: string | null;
+}
+
+/** A plan-only hub job (resolve a model / inspect a dataset), polled until done or failed. */
+export interface HubJob<T> {
+  status: "queued" | "running" | "done" | "failed";
+  waiting_for?: "download_slot" | "memory" | "swap";
+  error?: EventError;
+  result?: T;
+}
+
+/** GET /api/user-assets/resolves/{id}: the model resolve answers with `model`, not `result`. */
+export type ModelResolveJob = Omit<HubJob<never>, "result"> & { model?: UserModel };
+
+export interface DatasetColumn {
+  name: string;
+  kind: "image" | "text" | "messages" | "other";
+}
+
+/** POST /api/user-assets/datasets/inspect result (P021 §8): schema, a few samples, suggested mapping. */
+export interface DatasetInspection {
+  repo: string;
+  revision: string;
+  configs: string[];
+  splits: string[];
+  config?: string;
+  split: string;
+  format: "parquet" | "json" | "imagefolder" | "webdataset";
+  columns: DatasetColumn[];
+  suggested: { image?: string; question?: string; answer?: string; messages?: string };
+  /** Untrusted text from the repo: rendered as plain text only. thumb_url is relative (/api/...). */
+  samples: { thumb_url?: string; question?: string; answer?: string; error?: string }[];
+  rows_estimate?: number;
 }

@@ -99,6 +99,10 @@ export const useDownloads = create<DownloadsState>((set, get) => {
       const key = downloadKey(kind, catalogId);
       set({ entries: { ...get().entries, [key]: { kind, catalogId, status: "starting" } } });
       try {
+        // ADR-021: a model the user added needs its licence confirmed first (SEC-005 otherwise); the dialog's
+        // "I agree" tick is that confirmation
+        if (kind === "model" && catalogId.startsWith("user--"))
+          await api.confirmUserModelLicense(catalogId);
         const body = { kind, catalog_id: catalogId, ...opts };
         const res = await api.startDownload(body).catch(async (e: unknown) => {
           if (!busyCode(e)) throw e;

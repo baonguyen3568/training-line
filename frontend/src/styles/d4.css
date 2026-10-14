@@ -1335,3 +1335,142 @@ fieldset.seg-radio {
   margin: var(--space-8) 0;
   color: var(--color-text-secondary);
 }
+
+/* ADR-021 (spec H): the two sources of a model/dataset step, and the Hugging Face panel */
+.byo-tabs {
+  margin: var(--space-8) 0 var(--space-12);
+}
+.byo-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+.byo-input {
+  display: flex;
+  gap: var(--space-8);
+}
+.byo-input input {
+  flex: 1;
+  min-width: 0;
+}
+.byo-result {
+  padding: var(--space-8);
+  border: 1px solid var(--color-grid);
+  border-radius: var(--radius-sm);
+}
+.byo-result p {
+  margin: var(--space-4) 0;
+}
+/* "Chưa kiểm chứng": secondary ink, never a warning colour (spec H §2) */
+.chip.unverified {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+}
+.vlm-node > .chip.unverified {
+  margin: 0 var(--space-8) var(--space-4);
+}
+.spin svg {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin svg {
+    animation: none;
+  }
+}
+/* spec H §4 "Ghép cột dữ liệu" */
+.byo-map {
+  width: min(560px, 100%);
+}
+.byo-map-mode {
+  display: flex;
+  gap: var(--space-16);
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  border: 0;
+}
+.byo-map-row {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+.byo-preview {
+  list-style: none;
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  display: grid;
+  gap: var(--space-8);
+}
+.byo-preview li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: center;
+}
+.byo-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-page);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.byo-thumb.err {
+  color: var(--color-status-warning);
+}
+.byo-sample {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* the panel's own inputs and selects look like every inspector field (dark, hairline) */
+.byo-panel input[type="text"],
+.byo-panel select,
+.byo-map select,
+.byo-map input[type="text"] {
+  padding: var(--space-8);
+  border: 1px solid var(--color-axis);
+  border-radius: var(--radius-sm);
+  background: var(--color-page);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.byo-panel input.mono {
+  font-family: var(--font-family-mono);
+}
+.byo-tabs {
+  display: flex;
+}
+.byo-tabs button {
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 0 var(--space-8);
+}
+.byo-panel input[type="text"],
+.byo-panel select {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+.byo-panel .byo-map-row select {
+  width: 100%;
+}
+.byo-map-head {
+  margin: 0;
+}

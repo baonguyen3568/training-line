@@ -6,13 +6,16 @@ import { getLocale } from "../i18n";
 import type {
   AdvancedOption,
   BugReport,
+  DatasetInspection,
   DownloadEvent,
   DownloadRequest,
   DownloadStart,
   HealthInfo,
+  HubJob,
   LanInfo,
   MetricsPage,
   MetricsQuery,
+  ModelResolveJob,
   NodeResetPlan,
   NodeResetResult,
   NodeTypesResponse,
@@ -30,6 +33,7 @@ import type {
   TemplateMeta,
   TrialResult,
   UploadInfo,
+  UserModel,
   ValidationResult,
   Workflow,
 } from "./types";
@@ -175,7 +179,8 @@ export interface Api {
   runs(): Promise<RunInfo[]>;
   run(id: string): Promise<RunInfo>;
   runMetrics(id: string, q: MetricsQuery): Promise<MetricsPage>;
-  startRun(workflow: Workflow): Promise<{ run_id: string }>;
+  /** `trial`: run up to that step with a 5-step trial (ADR-021, backend H5); params are never changed. */
+  startRun(workflow: Workflow, trial?: { node: string }): Promise<{ run_id: string }>;
   cancelRun(id: string): Promise<void>;
   /** Subscribe to run events; returns an unsubscribe function. */
   watchRun(id: string, onEvent: (ev: RunEvent) => void): () => void;
@@ -202,6 +207,17 @@ export interface Api {
   revokeAllSessions(): Promise<void>;
   /** Local session only (LAN: 403 local_only). */
   unlockLan(): Promise<SessionInfo["lan_login"]>;
+  /** ADR-021: start resolving a Hugging Face model (plan-only job); 400 {detail} for a malformed repo id. */
+  addUserModel(body: { repo: string; revision?: string }): Promise<{ resolve_id: string }>;
+  userModelResolve(id: string): Promise<ModelResolveJob>;
+  confirmUserModelLicense(id: string): Promise<{ model: UserModel }>;
+  inspectDataset(body: {
+    repo: string;
+    revision?: string;
+    config?: string;
+    split?: string;
+  }): Promise<{ inspect_id: string }>;
+  datasetInspection(id: string): Promise<HubJob<DatasetInspection>>;
   startDownload(body: DownloadRequest): Promise<DownloadStart>;
   /** G-5 progress; the socket closes after completed/failed. Returns an unsubscribe function. */
   watchDownload(id: string, onEvent: (ev: DownloadEvent) => void): () => void;
@@ -242,8 +258,10 @@ export const httpApi: Api = {
     if (q.downsample_to) qs.set("downsample_to", String(q.downsample_to));
     return request("GET", `/api/runs/${encodeURIComponent(id)}/metrics?${qs}`);
   },
-  startRun: async (workflow) => {
-    const res = await request<{ graph_run_id: string }>("POST", "/api/runs", workflow);
+  startRun: async (workflow, trial) => {
+    // a normal run posts the workflow itself (unchanged); a trial wraps it as {workflow, trial}
+    const body = trial ? { workflow, trial } : workflow;
+    const res = await request<{ graph_run_id: string }>("POST", "/api/runs", body);
     return { run_id: res.graph_run_id };
   },
   cancelRun: (id) => request("POST", `/api/runs/${encodeURIComponent(id)}/cancel`, {}),
@@ -305,6 +323,15 @@ export const httpApi: Api = {
   unlockLan: async () =>
     (await request<{ lan_login?: SessionInfo["lan_login"] }>("POST", "/api/session/unlock-lan"))
       .lan_login,
+  addUserModel: (body) => request("POST", "/api/user-assets/models", body),
+  userModelResolve: (id) => request("GET", `/api/user-assets/resolves/${encodeURIComponent(id)}`),
+  confirmUserModelLicense: (id) =>
+    request("POST", `/api/user-assets/models/${encodeURIComponent(id)}/confirm-license`, {
+      accept: true,
+    }),
+  inspectDataset: (body) => request("POST", "/api/user-assets/datasets/inspect", body),
+  datasetInspection: (id) =>
+    request("GET", `/api/user-assets/inspections/${encodeURIComponent(id)}`),
   startDownload: (body) => request("POST", "/api/downloads", body),
   watchDownload: (id, onEvent) =>
     // same handshake as run events (D13): cookie + Origin, then the CSRF token as the first message

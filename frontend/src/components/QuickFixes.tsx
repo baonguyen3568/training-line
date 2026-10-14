@@ -1,10 +1,12 @@
 import { type ReactNode, useState } from "react";
 import type { ResolvedAction, ValidationIssue } from "../api/types";
 import { t, tpOptional } from "../i18n";
+import { downloadTargetOf } from "../lib/downloadTarget";
 import { isModelType, nearestUpstream } from "../lib/graph";
 import { requestRun } from "../lib/requestRun";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
+import { ISSUES_URL } from "./BugReportDialog";
 import { Icon } from "./Icon";
 
 /** Ask the editor to show a toast (it owns the one toast slot). */
@@ -94,6 +96,24 @@ function navigation(
   }
   if (target === "memory_panel" || target === "cleanup_dry_run") return () => navigate("storage");
   if (target === "queue_until_memory") return requestRun; // the run waits for memory by itself
+  // ADR-021 targets (fixcode): the repo's own page, a catalog request, the column mapping, the licence dialog
+  const repo = typeof issue.params.repo === "string" ? issue.params.repo : "";
+  if (target === "hub_page")
+    return /^[\w.-]+\/[\w.-]+$/.test(repo)
+      ? () => window.open(`https://huggingface.co/${repo}`, "_blank", "noopener,noreferrer")
+      : undefined;
+  if (target === "request_catalog")
+    return () => window.open(ISSUES_URL, "_blank", "noopener,noreferrer"); // no query: the user writes it
+  if (target === "column_mapping") return () => selectAndFocus(nodeId);
+  if (target === "license_dialog") {
+    const t0 = downloadTargetOf(
+      { ...issue, code: "NET-002", params: { reason: "not_cached", ...issue.params } },
+      s.specs,
+    );
+    return t0 ? () => useUi.getState().setDownloadTarget(t0) : undefined;
+  }
+  if (target === "settings_secrets" || target === "settings_network")
+    return () => navigate("settings");
   if (target === "bug_report") {
     // with a run the report carries its reference code; validate/preflight errors report without one (design)
     const runId = s.run?.id ?? null;
@@ -157,6 +177,10 @@ export function QuickFixes({ issue, nodeId }: { issue: ValidationIssue; nodeId: 
       run = graphOp(a, issue, a.node_id ?? nodeId);
     } else if (a.kind === "navigate") {
       run = navigation(a, issue, a.node_id ?? nodeId);
+    } else if (a.kind === "trial") {
+      // "Chạy thử nhanh": a separate 5-step run of this step; nothing in the workflow changes (backend H5)
+      const node = a.node_id ?? nodeId;
+      run = () => void useWorkflow.getState().startRun({ node });
     } else if (a.kind === "resume" && !a.patch) {
       // P017: posting the same workflow again resumes from the last valid checkpoint (same cache key)
       run = requestRun;
@@ -172,7 +196,7 @@ export function QuickFixes({ issue, nodeId }: { issue: ValidationIssue; nodeId: 
     <div className="quick-fixes">
       {buttons.map(({ a, text, run }) => (
         <button key={a.id} type="button" className="quick-fix" onClick={run} data-action={a.id}>
-          <Icon name="wrench" size={14} /> {text}
+          <Icon name={a.kind === "trial" ? "play" : "wrench"} size={14} /> {text}
         </button>
       ))}
       {previewed?.a.patch && (

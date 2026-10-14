@@ -29,9 +29,11 @@ import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { AdvancedOptions } from "./AdvancedOptions";
+import { DatasetHubPanel } from "./DatasetSource";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
 import { ImageUpload } from "./ImageUpload";
+import { ModelHubPanel, SourceTabs, setUserModel, USER_MODEL_PARAMS } from "./ModelSource";
 import { QuickFixes } from "./QuickFixes";
 import { TrialResult } from "./TrialResult";
 
@@ -607,6 +609,7 @@ export function Inspector() {
   const { setParam, connect, disconnect } = useWorkflow.getState();
   const mode = useUi((s) => s.mode);
   const [expanded, setExpanded] = useState(false);
+  const [hubTab, setHubTab] = useState(false);
   const groupPath = useUi((st) => st.groupPath);
   const node = workflow?.nodes.find((n) => n.id === selectedId);
   // a step inside a group (flat id "g__step"): its own view-only inspector
@@ -641,7 +644,24 @@ export function Inspector() {
       const cur = node.params[k] ?? props[k]?.default;
       return vals.map(String).includes(String(cur));
     }) || fieldErrors(name).length > 0;
+  const modelTab: "catalog" | "hub" = hubTab || node.params.user_model ? "hub" : "catalog";
+  const dataTab: "catalog" | "hub" =
+    hubTab || (typeof node.params.repo === "string" && node.params.repo !== props.repo?.default)
+      ? "hub"
+      : "catalog";
   const params = Object.entries(props)
+    // the catalog choice lives in the "Đã kiểm chứng" tab only; `user_model` is set by the hub panel, never typed
+    // `x-ui.widget: "hidden"` (backend H3): never a row, the value stays and its errors still show in the check bar
+    .filter(([, schema]) => schema["x-ui"]?.widget !== "hidden")
+    .filter(([name]) =>
+      node.type === "model.hf_pick"
+        ? !USER_MODEL_PARAMS.includes(name) && !(modelTab === "hub" && name === "model")
+        : node.type === "data.hf_load"
+          ? // the hub panel sets these; the catalog tab keeps its own repo row
+            !["revision", "config", "split", "columns"].includes(name) &&
+            !(dataTab === "hub" && name === "repo")
+          : true,
+    )
     // P016 `advanced` (object) has no widget yet: no row at all, not even its "?" help
     .filter(([, s]) => s["x-ui"]?.widget !== "advanced" && s.type !== "object")
     .filter(([name, s]) => applies(name, s))
@@ -682,6 +702,26 @@ export function Inspector() {
         <>
           <h2>{nodeTitle(spec, node.type)}</h2>
           <p className="muted">{nodeDesc(spec, node.type)}</p>
+        </>
+      )}
+      {node.type === "model.hf_pick" && (
+        // ADR-021 / spec H §1: a verified catalog model, or one the user adds from Hugging Face
+        <>
+          <SourceTabs
+            value={modelTab}
+            onChange={(v) => {
+              setHubTab(v === "hub");
+              if (v === "catalog" && node.params.user_model) setUserModel(node.id, null);
+            }}
+          />
+          {modelTab === "hub" && <ModelHubPanel nodeId={node.id} />}
+        </>
+      )}
+      {node.type === "data.hf_load" && (
+        // ADR-021 / spec H §4: the catalog dataset, or any Hugging Face dataset with its columns mapped
+        <>
+          <SourceTabs value={dataTab} onChange={(v) => setHubTab(v === "hub")} />
+          {dataTab === "hub" && <DatasetHubPanel nodeId={node.id} />}
         </>
       )}
       {nodeEst && (

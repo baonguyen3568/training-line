@@ -2,9 +2,11 @@
 // shapes only; the real validation lives in the backend (`POST /api/graphs/validate`) and is the source of truth.
 
 import type { Api } from "../api/client";
+import { ApiError } from "../api/client";
 import type {
   AdvancedOption,
   BugReport,
+  DatasetInspection,
   DownloadStart,
   HealthInfo,
   LanInfo,
@@ -12,6 +14,7 @@ import type {
   NodeResetResult,
   NodeSpec,
   NodeTypesResponse,
+  ParamSchema,
   ParamsSchema,
   PortType,
   RunInfo,
@@ -24,6 +27,7 @@ import type {
   Template,
   TrialResult,
   UploadInfo,
+  UserModel,
   ValidationIssue,
   ValidationResult,
   Workflow,
@@ -62,6 +66,19 @@ function mockGroups(): GroupTypeEntry[] {
       };
     });
 }
+
+const mockJobs = new Map<
+  string,
+  {
+    polls: number;
+    repo: string;
+    revision?: string | undefined;
+    config?: string | undefined;
+    split?: string | undefined;
+  }
+>();
+let mockJobSeq = 0;
+const mockUserModels = new Map<string, UserModel>();
 
 const mockSession: SessionInfo = {
   origin_class: "local",
@@ -454,6 +471,30 @@ export function mockValidate(
       );
     }
   }
+  // ADR-021 MODEL-005: a train step fed by a user-added model gets the catalog's "try a quick run first" hint
+  for (const node of workflow.nodes) {
+    if (!node.type.startsWith("train.")) continue;
+    const src = workflow.edges
+      .filter((e) => e.to[0] === node.id)
+      .map((e) => workflow.nodes.find((n) => n.id === e.from[0]))
+      .find((n) => typeof n?.params.user_model === "string" && n.params.user_model);
+    if (!src) continue;
+    const model = String(src.params.user_model).split("--")[2] ?? String(src.params.user_model);
+    errors.push(
+      issue(
+        "MODEL-005",
+        {
+          node_id: node.id,
+          severity: "info",
+          action_ids: ["run_smoke"],
+          actions: [
+            { id: "run_smoke", kind: "trial", confirm: false, node_id: node.id, target: null },
+          ],
+        },
+        { model, node: nodeTitle(node.type) },
+      ),
+    );
+  }
   const heavy = workflow.nodes.some((n) => byType.get(n.type)?.runner === "container");
   // Never invent numbers: reuse the template's own estimate (unknown until measured), else unknown.
   const est = templates.find((x) => x.id === workflow.name)?.estimate;
@@ -617,6 +658,101 @@ export const mockApi: Api = {
     return delay(mockSession.lan_login);
   },
   // G-5: a fake download, events in the server's order (progress… → verifying → completed)
+  // ADR-021 / P021 §8 (luồng H): plan-only hub jobs, polled. The repo picks the outcome so every screen is reachable:
+  // "remote" → MODEL-004, "nope" → NET-005, "busy" → 409 SYS-002 (the one download slot), "script" → DATA-009,
+  // "license" → unknown licence; the first poll is queued. A malformed id → 400 CFG-005, as the server says it.
+  addUserModel: ({ repo, revision }) => {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || repo.includes("--"))
+      return Promise.reject(
+        new ApiError(400, {
+          detail: { code: "CFG-005", params: { param: "repo", rule: "format" } },
+        }),
+      );
+    if (repo.includes("busy"))
+      return Promise.reject(
+        new ApiError(409, { detail: { code: "SYS-002", params: { minutes: 0 } } }),
+      );
+    const id = `res-${++mockJobSeq}`;
+    mockJobs.set(id, { polls: 0, repo, revision });
+    return delay({ resolve_id: id });
+  },
+  userModelResolve: (id) => {
+    const job = mockJobs.get(id);
+    if (!job) return Promise.reject(new ApiError(404, { detail: { code: "SYS-000", params: {} } }));
+    job.polls++;
+    if (job.polls === 1) return delay({ status: "queued" as const });
+    const fail = (code: string) =>
+      delay({ status: "failed" as const, error: { code, params: { repo: job.repo } } });
+    if (job.repo.includes("remote")) return fail("MODEL-004");
+    if (job.repo.includes("nope")) return fail("NET-005");
+    const [org = "", name = ""] = job.repo.split("/");
+    const model: UserModel = {
+      id: `user--${org}--${name}--0f3a9c1e`,
+      name,
+      repo: job.repo,
+      revision: "0f3a9c1e2b7d4a6f8e9c0b1a2d3e4f5a6b7c8d9e",
+      family: "Qwen2.5-VL",
+      architecture: "Qwen2_5_VLForConditionalGeneration",
+      params_b: 3.8,
+      size_gb: 7.6,
+      license: job.repo.includes("license") ? "unknown" : "apache-2.0",
+      license_confirmed: false,
+      gated: job.repo.includes("gated"),
+      ram_gb_train: 31.5,
+      ram_source: "estimated",
+      verified: false,
+    };
+    mockUserModels.set(model.id, model);
+    return delay({ status: "done" as const, model });
+  },
+  confirmUserModelLicense: (id) => {
+    const model = mockUserModels.get(id);
+    if (!model)
+      return Promise.reject(new ApiError(404, { detail: { code: "SYS-000", params: {} } }));
+    const confirmed = { ...model, license_confirmed: true };
+    mockUserModels.set(id, confirmed);
+    return delay({ model: confirmed });
+  },
+  inspectDataset: ({ repo, config, split }) => {
+    const id = `ins-${++mockJobSeq}`;
+    mockJobs.set(id, { polls: 0, repo, config, split });
+    return delay({ inspect_id: id });
+  },
+  datasetInspection: (id) => {
+    const job = mockJobs.get(id);
+    if (!job) return Promise.reject(new ApiError(404, { detail: { code: "SYS-000", params: {} } }));
+    job.polls++;
+    if (job.polls === 1)
+      return delay({ status: "running" as const, waiting_for: "download_slot" as const });
+    if (job.repo.includes("script"))
+      return delay({
+        status: "failed" as const,
+        error: { code: "DATA-009", params: { repo: job.repo } },
+      });
+    const result: DatasetInspection = {
+      repo: job.repo,
+      revision: "7f0115a4b758a71d6473b8d085751692da2fef98",
+      configs: ["default"],
+      splits: ["train", "validation", "test"],
+      config: job.config ?? "default",
+      split: job.split ?? "train",
+      format: job.repo.includes("wds") ? "webdataset" : "parquet",
+      columns: [
+        { name: "image", kind: "image" },
+        { name: "query", kind: "text" },
+        { name: "ground_truth", kind: "text" },
+        { name: "id", kind: "other" },
+      ],
+      suggested: { image: "image", question: "query", answer: "ground_truth" },
+      samples: [
+        { question: "Tổng tiền trên hoá đơn là bao nhiêu?", answer: '{"total": "125.000"}' },
+        { question: "Cửa hàng tên gì?", answer: '{"store": "Bánh mì Hoà"}' },
+        { error: "Ảnh hỏng: không đọc được tệp" },
+      ],
+      rows_estimate: 800,
+    };
+    return delay({ status: "done" as const, result });
+  },
   startDownload: (body) =>
     delay<DownloadStart>({
       download_id: `dl-${body.kind}-${body.catalog_id}`,
@@ -776,7 +912,54 @@ function mockNodeTitle(nodeId: string): string {
   return type ? tp(["node", type, "title"]) : nodeId;
 }
 /** Real registry (REGISTRY.to_api() snapshot from schemas/); the hand-written mockNodeTypes are for tests only. */
-const registry = registrySnapshot as unknown as NodeTypesResponse;
+const registry = withUserModelParam(registrySnapshot as unknown as NodeTypesResponse);
+
+/**
+ * model.hf_pick 1.1.0 (P021 §2) gains `user_model` (a user-added model's id, "" = the catalog choice). Until the
+ * backend snapshot has it, the mock adds it so the "Từ Hugging Face" tab works end to end.
+ */
+/** data.hf_load 1.1.0 (P021 §3): any HF repo, pinned revision, config/split and the column mapping. Mock only. */
+function withHubDatasetParams(n: NodeSpec): NodeSpec {
+  const { repo, ...rest } = n.params_schema.properties;
+  return {
+    ...n,
+    params_schema: {
+      ...n.params_schema,
+      properties: {
+        ...rest,
+        repo: { ...(repo ?? { type: "string" }), const: undefined } as ParamSchema,
+        revision: { type: "string", default: "" },
+        config: { type: "string", default: "" },
+        split: { type: "string", default: "train" },
+        columns: { type: "object", default: {} },
+      },
+    },
+  };
+}
+
+function withUserModelParam(res: NodeTypesResponse): NodeTypesResponse {
+  return {
+    ...res,
+    node_types: res.node_types.map((n) =>
+      n.type_id === "data.hf_load" && !("columns" in n.params_schema.properties)
+        ? withHubDatasetParams(n)
+        : n.type_id !== "model.hf_pick" || "user_model" in n.params_schema.properties
+          ? n
+          : {
+              ...n,
+              params_schema: {
+                ...n.params_schema,
+                properties: {
+                  ...n.params_schema.properties,
+                  user_model: { type: "string", default: "", "x-ui": { widget: "user_model" } },
+                  user_repo: { type: "string", default: "", "x-ui": { widget: "hidden" } },
+                  user_revision: { type: "string", default: "", "x-ui": { widget: "hidden" } },
+                },
+              },
+            },
+    ),
+  };
+}
 const fakeCancel = new Map<string, () => void>();
 /** Duration of one fake progress step; tests shorten it via setFakeStepMs. */
 let FAKE_STEP_MS = 400;

@@ -21,6 +21,11 @@ function lazyMock(): Api {
     signOut: () => load().then((m) => m.signOut()),
     revokeAllSessions: () => load().then((m) => m.revokeAllSessions()),
     unlockLan: () => load().then((m) => m.unlockLan()),
+    addUserModel: (body) => load().then((m) => m.addUserModel(body)),
+    userModelResolve: (id) => load().then((m) => m.userModelResolve(id)),
+    confirmUserModelLicense: (id) => load().then((m) => m.confirmUserModelLicense(id)),
+    inspectDataset: (body) => load().then((m) => m.inspectDataset(body)),
+    datasetInspection: (id) => load().then((m) => m.datasetInspection(id)),
     startDownload: (body) => load().then((m) => m.startDownload(body)),
     watchDownload: (id, onEvent) => {
       let stop = () => {};
@@ -41,7 +46,7 @@ function lazyMock(): Api {
     deleteSecret: (f) => load().then((m) => m.deleteSecret(f)),
     run: (id) => load().then((m) => m.run(id)),
     runMetrics: (id, q) => load().then((m) => m.runMetrics(id, q)),
-    startRun: (wf) => load().then((m) => m.startRun(wf)),
+    startRun: (wf, trial) => load().then((m) => m.startRun(wf, trial)),
     cancelRun: (id) => load().then((m) => m.cancelRun(id)),
     watchRun: (id, onEvent) => {
       let stop: (() => void) | null = null;
