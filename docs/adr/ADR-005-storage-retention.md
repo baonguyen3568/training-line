@@ -51,3 +51,13 @@ User: "cứ chơi đi, không quá 80% VRAM". Team dùng GPU tự do (bỏ cơ c
 - Lý do: host dùng chung, SwapFree dao động 1–4 GB do service khác, khiến job tải chờ mãi. Job miễn mà vượt cap thì bị OOM-kill trong cgroup riêng, không kéo host xuống.
 - Job train/eval/quantize/serve giữ nguyên sàn swap. Khi chờ swap, UI/CLI báo `waiting_for: swap` (SYS-002 riêng), không ghi "memory".
 - Test: `test_swap_exempt_jobs_get_no_swap_and_a_pids_limit`, `test_only_the_swap_floor_is_dropped_for_an_exempt_job`, `test_the_runner_gives_small_cpu_jobs_no_swap`.
+
+## Amendment A4 (2026-10-14, PM; duyệt: bao-security) — Không swap cho mọi job + pids-limit
+- **Mọi job container: `--memory-swap = --memory`** (không swap), kể cả job GPU. Lý do: job đẩy hàng chục GB vào swap làm chậm cả máy
+  dùng chung trước khi memguard kịp cắt (14/10: gates ăn swap làm GRPO probe #8 bị dừng; job train Parse dùng 4 GB swap). Không swap thì
+  job vượt trần bị OOM-kill trong cgroup của chính nó. Trên GB10 bộ nhớ CUDA có thể không tính vào cgroup → memguard vẫn là lớp chính.
+- **pids-limit**: 512 cho job CPU ≤ 4 GB (swap_exempt, A3); **4096** cho job còn lại (= max(peak×4, 4096)). pids-limit đếm cả thread.
+- Sàn `SwapFree ≥ 2 GB` vẫn áp cho job không exempt (GPU).
+- **Điều kiện hiệu lực**: chỉ bật sau khi lượt hồi quy image 26.08-8 đo `pids.peak` của train / eval vLLM / quantize / bench đều ≤ 1024
+  (số đầu: train Parse full SFT 174) và R0 / R2 / QLoRA 2B PASS với không swap. Lượt nào hỏng VÌ thay đổi này → loại job đó giữ như cũ,
+  ghi lý do vào đây. Owner code: bao-backend (chưa commit tới khi đủ số đo).
