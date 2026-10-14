@@ -371,7 +371,10 @@ def test_resume_of_unresumable_model_starts_over(tmp_path: Path, monkeypatch: py
 def test_parse_resumes_since_patch_0005() -> None:
     """BUG-003 closed (26.08-6): no model starts over anymore; the error card offers "resume" again for Parse."""
     assert frozenset() == workers.RESUME_UNSUPPORTED
-    assert workers.DEFAULT_TRAIN_IMAGE == "vlm-automodel:26.08-6"
+    name, tag = workers.DEFAULT_TRAIN_IMAGE.split(":")
+    assert name == "vlm-automodel"
+    assert tag.startswith("26.08-")
+    assert int(tag.rsplit("-", 1)[1]) >= 6  # patch 0005 is in every build from 26.08-6 on
 
 
 def test_merge_lora_runs_on_cpu_and_completes_from_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
