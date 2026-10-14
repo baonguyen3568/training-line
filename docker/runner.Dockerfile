@@ -32,6 +32,7 @@ COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=deps /opt/venv /opt/venv
 # The commit this image was built from (release report, checklist S3): `--build-arg VLM_BUILD_COMMIT=$(git rev-parse HEAD)`.
 ARG VLM_BUILD_COMMIT=""
+LABEL org.opencontainers.image.revision="${VLM_BUILD_COMMIT}"
 ENV PATH=/opt/venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 VLM_BUILD_COMMIT=${VLM_BUILD_COMMIT}
 USER runner
 CMD ["python", "-m", "vlm_pipeline.runner.server"]

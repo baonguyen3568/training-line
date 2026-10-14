@@ -48,6 +48,7 @@ COPY configs/ configs/
 COPY --from=web /w/frontend/dist/ frontend/dist/
 # The commit this image was built from (/api/health, checklist F): `--build-arg VLM_BUILD_COMMIT=$(git rev-parse HEAD)`.
 ARG VLM_BUILD_COMMIT=""
+LABEL org.opencontainers.image.revision="${VLM_BUILD_COMMIT}"
 ENV PATH=/opt/venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 VLM_BUILD_COMMIT=${VLM_BUILD_COMMIT} \
     VLM_PROJECT_ROOT=/app VLM_IN_COMPOSE=1 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
 USER app

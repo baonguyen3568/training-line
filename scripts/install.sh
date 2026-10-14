@@ -193,14 +193,43 @@ if (( DRY_RUN )); then say "[dry-run] write $COMPOSE_ENV:"; compose_env; else
 fi
 
 # ------------------------------------------------------------------------------------------------ build + start
-COMPOSE=(docker compose --project-directory "$ROOT" -f "$ROOT/compose.yaml" --env-file "$COMPOSE_ENV")
+# Build AND start from a clean snapshot of the commit, never from the working tree (PM 2026-10-14: an unfinished,
+# uncommitted file in the checkout broke `npm run build` inside the image; an unreviewed compose.yaml edit must not
+# reach the running stack either). The snapshot is the build context and gives compose.yaml (same project name, same
+# image tags); `up` keeps the repo as project directory. The images are labelled with the commit. A release folder
+# without .git builds and starts from itself, as before.
+SNAPSHOT="$ROOT"
+if [[ -n "$COMMIT" ]]; then
+  BUILD_PARENT="$ROOT/.cache/install-build"
+  # rm -rf below: a symlinked parent would point it outside the project (security 2026-10-14).
+  [[ ! -L "$ROOT/.cache" && ! -L "$BUILD_PARENT" ]] || fail ".cache/install-build must not be a symlink"
+  for stale in "$BUILD_PARENT"/*-[0-9]*; do  # left by an install that died (its PID is gone)
+    [[ -d "$stale" && ! -L "$stale" ]] && ! kill -0 "${stale##*-}" 2>/dev/null && rm -rf --one-file-system "$stale"
+  done
+  SNAPSHOT="$BUILD_PARENT/${COMMIT:0:12}-$$"
+  if [[ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]]; then
+    say "NOTE: installing commit ${COMMIT:0:12}: uncommitted or untracked files in $ROOT are not part of the images"
+  fi
+  if ! git -C "$ROOT" diff --quiet "$COMMIT" -- compose.yaml 2>/dev/null; then
+    say "NOTE: compose.yaml differs from commit ${COMMIT:0:12}: the stack uses the committed compose.yaml"
+  fi
+  if (( DRY_RUN )); then say "[dry-run] git archive ${COMMIT:0:12} -> $SNAPSHOT"; else
+    trap '[[ -d "$SNAPSHOT" && ! -L "$SNAPSHOT" ]] && rm -rf --one-file-system "$SNAPSHOT"' EXIT
+    mkdir -p "$SNAPSHOT"
+    git -C "$ROOT" archive "$COMMIT" | tar -x -C "$SNAPSHOT"
+  fi
+fi
+COMPOSE=(docker compose --project-directory "$ROOT" -f "$SNAPSHOT/compose.yaml" --env-file "$COMPOSE_ENV")
 [[ -z "$LAN_BIND" ]] || COMPOSE+=(--profile lan)
+# What the user types later (the snapshot is gone by then): the repo's own compose.yaml, enough for `logs`.
+SHOW="docker compose --project-directory $ROOT -f $ROOT/compose.yaml --env-file $COMPOSE_ENV"
 # The port must be free, or already ours (a re-run): another app on it would get the browser's requests.
 ours="$(docker ps --filter label=com.docker.compose.project=ntc-training --format '{{.Ports}}' 2>/dev/null || true)"
 if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && [[ "$ours" != *":$PORT->"* ]]; then
   fail "port $PORT is already used by another program: set another VLM_PORT in .env.local"
 fi
-run "${COMPOSE[@]}" build
+# The build context is the snapshot itself (its compose.yaml says `context: .`).
+run docker compose --project-directory "$SNAPSHOT" -f "$SNAPSHOT/compose.yaml" --env-file "$COMPOSE_ENV" build
 # Upgrade: the proxy's control-socket volume is now a tmpfs owned by the app user. One made by an older install is
 # root's (the proxy cannot bind its socket there): it only ever holds that socket, so it is recreated.
 EGRESS_VOL=ntc-training_egress-control
@@ -230,10 +259,10 @@ answers() {  # answers <url> [curl args...]: the app replied 401 unauthenticated
 if (( DRY_RUN )); then
   say "[dry-run] smoke: GET http://127.0.0.1:$PORT/api/health${LAN_BIND:+ and https://$LAN_BIND:$LAN_PORT/api/health}"
 else
-  answers "http://127.0.0.1:$PORT/api/health" || fail "the app does not answer on http://127.0.0.1:$PORT/ (see: ${COMPOSE[*]} logs app)"
+  answers "http://127.0.0.1:$PORT/api/health" || fail "the app does not answer on http://127.0.0.1:$PORT/ (see: $SHOW logs app)"
   if [[ -n "$LAN_BIND" ]]; then
     answers "https://$LAN_BIND:$LAN_PORT/api/health" --cacert "$TLS_DIR/ca.crt" \
-      || fail "the app does not answer on https://$LAN_BIND:$LAN_PORT/ (see: ${COMPOSE[*]} logs nginx app)"
+      || fail "the app does not answer on https://$LAN_BIND:$LAN_PORT/ (see: $SHOW logs nginx app)"
   fi
   say "smoke: the app answers on http://127.0.0.1:$PORT/${LAN_BIND:+ and https://$LAN_BIND:$LAN_PORT/}"
 fi
@@ -250,13 +279,13 @@ if (( ! SKIP_DOWNLOAD )); then
     run "${COMPOSE[@]}" exec -T app python -m vlm_pipeline.app.downloads --template invoice_to_json --memory-wait-min 10 \
       "${large[@]}" || dl_rc=$?
     # 2 = the system failed (runner, verify...), not the network: that is a broken install, never just a warning.
-    (( dl_rc != 2 )) || fail "the download failed inside the app (system error): see ${COMPOSE[*]} logs app runner"
+    (( dl_rc != 2 )) || fail "the download failed inside the app (system error): see $SHOW logs app runner"
     (( dl_rc == 0 )) || say "WARNING: the download did not finish; the app offers it again (\"Download\" on the step)."
   fi
 fi
 say ""
 say "NTC-Training is running on http://127.0.0.1:$PORT/"
-say "Open the link printed by:  ${COMPOSE[*]} logs app | grep 'open http'"
+say "Open the link printed by:  $SHOW logs app | grep 'open http'"
 if [[ -n "$LAN_BIND" ]]; then
   say "On the LAN: https://$LAN_BIND:$LAN_PORT/ (each device must trust $TLS_DIR/ca.crt first)."
   say "Anyone with the link controls this project: share it only with people you trust (Settings: sign out everywhere)."
