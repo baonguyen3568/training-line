@@ -196,21 +196,21 @@ function LanguageRow() {
         {t("settings.row_language")}
       </span>
       <div className="set-control">
-        <div className="seg" role="radiogroup" aria-labelledby="set-language-label">
+        {/* native radios (keyboard arrows, one tab stop), drawn as the segmented control */}
+        <fieldset className="seg seg-radio" aria-labelledby="set-language-label">
           {(Object.keys(LANGUAGE_NAME) as Locale[]).map((l) => (
-            <button
-              key={l}
-              type="button"
-              role="radio"
-              lang={l}
-              aria-checked={l === current}
-              className={l === current ? "on" : ""}
-              onClick={() => setBlocked(!switchLocale(l, workflow))}
-            >
+            <label key={l} lang={l} className={l === current ? "on" : ""}>
+              <input
+                type="radio"
+                name="app-language"
+                className="sr-only"
+                checked={l === current}
+                onChange={() => setBlocked(!switchLocale(l, workflow))}
+              />
               {LANGUAGE_NAME[l]}
-            </button>
+            </label>
           ))}
-        </div>
+        </fieldset>
         {blocked && (
           <p className="set-warning" role="alert">
             <span className="si si-warn" aria-hidden="true">

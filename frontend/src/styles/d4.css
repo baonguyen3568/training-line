@@ -1211,3 +1211,26 @@ button.hairline.sm {
   overflow-wrap: normal;
   word-break: normal;
 }
+
+/* A5 language: native radios drawn like .seg buttons; focus shows on the label */
+fieldset.seg-radio {
+  margin: 0;
+  min-inline-size: 0;
+}
+.seg-radio label {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.seg-radio label.on {
+  background: var(--color-canvas-placeholder-bg);
+  color: var(--color-text-primary);
+}
+.seg-radio label:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent-focus);
+  outline-offset: 2px;
+}

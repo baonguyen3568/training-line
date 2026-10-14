@@ -38,11 +38,11 @@ describe("Ngôn ngữ", () => {
   it("names each language in itself and marks the current one", async () => {
     const { SettingsPanel } = await import("../src/components/SettingsPanel");
     render(<SettingsPanel />);
-    const group = await screen.findByRole("radiogroup");
+    const group = await screen.findByRole("group", { name: "Ngôn ngữ" });
     const radios = screen.getAllByRole("radio");
-    expect(radios.map((r) => r.textContent)).toEqual(["Tiếng Việt", "English"]);
-    expect(radios[0]?.getAttribute("aria-checked")).toBe("true");
-    expect(radios[1]?.getAttribute("lang")).toBe("en");
+    expect(radios.map((r) => r.closest("label")?.textContent)).toEqual(["Tiếng Việt", "English"]);
+    expect((radios[0] as HTMLInputElement).checked).toBe(true);
+    expect(radios[1]?.closest("label")?.getAttribute("lang")).toBe("en");
     expect(group).toBeTruthy();
   });
 
