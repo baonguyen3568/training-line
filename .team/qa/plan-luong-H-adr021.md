@@ -79,3 +79,12 @@ security: ca config.json bất thường + review · frontend: UI dán repo / gh
   - gated: google/gemma-3-4b-it @093f9f388b31
   - dataset có script: nlphuji/flickr30k @2b239befc81b (dự phòng HuggingFaceM4/VQAv2 @4b98c864262e)
 - Bảng họ kiến trúc: .team/knowledge/vlm-families-26.08-7.md.
+
+### Cập nhật H1 (research, 14/10 chiều): 3 họ KHÔNG phải Qwen, bản nhỏ đã smoke trên image -8
+- HuggingFaceTB/SmolVLM-256M-Instruct @7e3e67edbbed (idefics3, apache-2.0, 0.51 GB)
+- OpenGVLab/InternVL3-1B-hf @014c0583a0d4 (internvl, license qwen: kiểm luồng xác nhận license, 1.88 GB)
+- llava-hf/llava-onevision-qwen2-0.5b-ov-hf @74dd0bf8 (llava_onevision, apache-2.0; repo có onnx: kiểm bộ lọc chỉ tải safetensors)
+- Ca Qwen ngoài catalog: Qwen/Qwen3-VL-4B-Instruct @ebb281ec70b0
+- Gemma-4-E2B nằm trong catalog nên KHÔNG tính cho H1.
+- Bằng chứng H1 phải đi qua đường của app: tải bằng G-5 vào data root, KHÔNG dùng bản có sẵn trong .cache/hf của repo.
+  Smoke của research chỉ là điều kiện cần.
