@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "purpose": "ADR-022 #8: NeMo-RL v0.7.0 VLM GRPO on ONE GB10 (no official 1-GPU VLM recipe; smallest is Qwen2.5-VL-3B on 2 GPUs)",
+  "hardware": "1x GB10 (DGX Spark), 121.7 GiB unified memory shared with other services, driver 580.142",
+  "model": "Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17, LoRA dim 8",
+  "data": "hiyouga/geometry3k (MIT), rewards format 0.1 + math_expr 0.9 (NeMo-RL built-ins)",
+  "base_config": "examples/configs/vlm_grpo_3B.yaml + overrides in outputs/research/grpo_probe/probe.sh (4 prompts x 4 generations, 3 steps)",
+  "images": {
+    "-2": "sha256:99f0fd748c0e428a13506a932c3d3b879ce74d61586096e924545db40138abbe",
+    "-3": "sha256:a573d5b6abc4999147b4ff91721980ad537e6a53f1318cb5bb9900653f35b86a (NVML patch, third_party/patches/nemo-rl/0001)"
+  },
+  "probes": [
+    {
+      "n": 3,
+      "run": "20261014-1041-grpo-probe3-q08-1a17",
+      "image": "-2",
+      "reached": "vLLM colocated init + sleep (freed 9.76 GiB)",
+      "peak_gb": 21.7,
+      "stopped_by": "nemo_rl/utils/nvml.py get_free_memory_bytes: NVMLError_NotSupported (UMA)",
+      "fix": "patch 0001 -> image -3 (security vetted)"
+    },
+    {
+      "n": 4,
+      "run": "20261014-1113-grpo-probe4-q08-3a02",
+      "image": "-3",
+      "reached": "Step 1 weight refit",
+      "stopped_by": "refit buffer 54 MB < embed_tokens 508 MB: free memory from cudaMemGetInfo is ~0.5 GB on UMA (page cache not counted)",
+      "fix": "++policy.refit_buffer_size_gb=4"
+    },
+    {
+      "n": 5,
+      "run": "20261014-1127-grpo-probe5-q08-f245",
+      "stopped_by": "Hydra: key not in struct",
+      "fix": "++ prefix"
+    },
+    {
+      "n": 6,
+      "run": "20261014-1128-grpo-probe6-q08-ac5e",
+      "stopped_by": "vLLM: No available memory for the cache blocks (gpu_memory_utilization 0.15; profiling on a shared UMA host)",
+      "fix": "++policy.generation.vllm_kwargs.kv_cache_memory_bytes=3 GiB + enforce_eager"
+    },
+    {
+      "n": 8,
+      "run": "20261014-1147-grpo-probe8-q08-1826",
+      "image": "-3",
+      "setup_s": {
+        "vllm": 272.7,
+        "policy": 84.1,
+        "other": 59.8
+      },
+      "reached": "Step 1: 16 rollouts generated (6.5 min, eager, CPU contended by a parallel gates container) and rewards computed",
+      "stopped_by": "memguard MEM-002 fast-fall (host available 12.5 GB, abort 10.24 GB) during logprob/train; container peak 38.7 GB",
+      "suspect": "logprob over the 248k vocab not chunked (policy.logprob_chunk_size None) + a parallel 8 GB gates container",
+      "next": "probe 9: policy.logprob_chunk_size=256, max_total_sequence_length 1024, max_new_tokens 384, no parallel heavy container",
+      "safety_note": "the memory guard stopped the job before the host ran out (designed behaviour)"
+    }
+  ],
+  "status": "not passed yet (no completed GRPO step)"
+}
