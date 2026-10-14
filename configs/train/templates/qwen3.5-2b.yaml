@@ -114,3 +114,6 @@ optimizer:
   eps: 1e-8
   lr: 1.0e-4
   weight_decay: 0.01
+
+# QLoRA (quantize_base: nf4) keeps these in bf16: the vision tower and its merger/projector (fixcode patch 0006 test).
+qlora_skip_modules: [model.visual]

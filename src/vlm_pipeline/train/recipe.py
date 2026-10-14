@@ -95,6 +95,10 @@ QLORA_NF4: dict[str, Any] = {
     "bnb_4bit_quant_type": "nf4",
     "bnb_4bit_quant_storage": "bfloat16",
 }
+# Ours, not an AutoModel key: the template lists the modules QLoRA must keep in bf16 (vision tower + projector). Their
+# names differ per family (Qwen3.5: model.visual; Gemma: model.vision_tower + model.multi_modal_projector), so they
+# live with the model's template; lm_head (tied) is skipped by patch 0006 itself (fixcode).
+QLORA_SKIP_KEY = "qlora_skip_modules"
 NO_STEP_CADENCE = 1_000_000_000  # ckpt_every_steps that never fires (step % N == N - 1): epoch ends only
 
 
@@ -130,6 +134,7 @@ def build_recipe(
 
     r: dict[str, Any] = copy.deepcopy(dict(template))
     r.pop(DECODE_OVERRIDES_KEY, None)  # ours, not an AutoModel key: applied by the Eval / "Try it" nodes
+    skip = r.pop(QLORA_SKIP_KEY, None)
     _section(r, "model")["pretrained_model_name_or_path"] = model_dir
     _section(r, "processor")["pretrained_model_name_or_path"] = model_dir
     _apply_data(
@@ -184,7 +189,9 @@ def build_recipe(
             "alpha": params.lora_alpha,
         }
         if params.quantize_base == "nf4":  # QLoRA: AutoModel's BitsAndBytes section (its DGX Spark QLoRA example)
-            r["quantization"] = dict(QLORA_NF4)
+            if not (isinstance(skip, list) and skip and all(isinstance(m, str) and m for m in skip)):
+                raise RecipeError(f"QLoRA is not set up for this model: its template has no {QLORA_SKIP_KEY}")
+            r["quantization"] = {**QLORA_NF4, "llm_int8_skip_modules": list(skip)}  # the vision part stays bf16
     else:
         r.pop("peft", None)
         freeze = r.setdefault("freeze_config", {})

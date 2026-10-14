@@ -65,7 +65,8 @@ def test_qlora_adds_the_bitsandbytes_section_and_only_then() -> None:
     from vlm_pipeline.train.recipe import QLORA_NF4
 
     q = build_recipe(_tpl("qwen3.5-2b"), LoraParams(quantize_base="nf4"), model_dir="m", dataset_dir="d", run_dir="r")
-    assert q["quantization"] == QLORA_NF4
+    assert q["quantization"] == {**QLORA_NF4, "llm_int8_skip_modules": ["model.visual"]}  # vision stays bf16
+    assert "qlora_skip_modules" not in q  # ours, never passed to AutoModel
     assert (q["quantization"]["bnb_4bit_quant_type"], q["quantization"]["load_in_4bit"]) == ("nf4", True)
     assert q["peft"]["dim"] == LoraParams().lora_dim  # still LoRA adapters on top
     plain = dict(_tpl("qwen3.5-2b"), quantization={"load_in_4bit": True})  # a template never forces it on
@@ -119,3 +120,13 @@ def test_a_template_step_cadence_never_reaches_a_node_recipe() -> None:
     )
     assert "val_every_steps" not in r["step_scheduler"]
     assert r["step_scheduler"]["ckpt_every_steps"] == NO_STEP_CADENCE
+
+
+def test_qlora_needs_the_templates_skip_list() -> None:
+    """A model whose template does not say which vision modules to keep in bf16 never gets 4-bit (fail closed)."""
+    from vlm_pipeline.train.recipe import QLORA_SKIP_KEY
+
+    bare = {k: v for k, v in _tpl("qwen3.5-2b").items() if k != QLORA_SKIP_KEY}
+    with pytest.raises(RecipeError, match=QLORA_SKIP_KEY):
+        build_recipe(bare, LoraParams(quantize_base="nf4"), model_dir="m", dataset_dir="d", run_dir="r")
+    assert "quantization" not in build_recipe(bare, LoraParams(), model_dir="m", dataset_dir="d", run_dir="r")
