@@ -6,6 +6,7 @@
 #                                            questions/images, end user downloads it themselves; P002 A4)
 #   splits        splits available; test splits listed in heldout_splits are NEVER used for training/calibration
 #   attribution   text the app must show (and ship with exports derived from it)
+#   disk_gb       GiB (2^30), >= the total of every file at `revision` (the download job refuses to go over it)
 schema_version: 1
 datasets:
   - id: cord-v2
@@ -23,7 +24,7 @@ datasets:
     format: parquet
     loader: make_cord_v2_dataset
     gated: false
-    disk_gb: 0.24
+    disk_gb: 2.15  # 8 planned files, 2,307,285,347 bytes at 7f0115a4 (download plan 2026-10-14; was 0.24)
 
   - id: ocrbench
     repo: echo840/OCRBench
