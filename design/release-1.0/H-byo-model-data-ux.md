@@ -66,3 +66,4 @@ Bước dữ liệu (`data.hf_load`) có cùng segmented `byo.source.*`. Tab "T�
 2. Lỗi bị chặn vì chạy mã riêng.
 3. Dialog Ghép cột với phần xem trước.
 4. Mặt node có chip Chưa kiểm chứng và preflight có gợi ý Chạy thử nhanh.
+5. H-prompt (mock, 2026-10-14, design đã duyệt): ô Câu hỏi để trống thì hiện câu đã train làm gợi ý, kèm chú thích dưới ô; kết quả Chạy thử có dòng "Câu đã hỏi: … (câu lúc train)". Ảnh: `outputs/review/byo/10-trained-prompt-hint.png`, `11-trial-prompt-used.png`. Model một tác vụ (Nemotron Parse) không có ô Câu hỏi, đây là hành vi đúng.
