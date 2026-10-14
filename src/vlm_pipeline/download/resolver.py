@@ -247,6 +247,27 @@ def user_model_id(repo: str, revision: str) -> str:
     return f"user--{parts[0]}--{parts[1]}--{revision[:8]}"
 
 
+def _id_part(text: str) -> str:
+    """One id segment: lowercase [a-z0-9.-], never two dots in a row, no dot or dash at either end."""
+    part = re.sub(r"\.{2,}", ".", _ID_PART.sub("-", text.lower()))
+    return part.strip(".-") or "x"
+
+
+def user_dataset_id_prefix(repo: str, revision: str) -> str:
+    """``user--ds--<org>--<name>--<sha8>--``: what every user dataset id of that repo revision starts with."""
+    org, name = repo.split("/", 1)
+    return f"user--ds--{_id_part(org)}--{_id_part(name)}--{revision[:8]}--"
+
+
+def user_dataset_id(repo: str, revision: str, config: str, split: str) -> str:
+    """A user dataset (one config + split of a pinned repo revision): lowercase, path-safe, never a catalog id.
+
+    The segments lose information (``a_b`` and ``a-b`` both read ``a-b``); the commit's sha8 keeps two repos apart,
+    so never drop it from the id (cleancode review).
+    """
+    return f"{user_dataset_id_prefix(repo, revision)}{_id_part(config)}--{_id_part(split)}"
+
+
 def ram_upper_bound(family: Family, params_b: float) -> float:
     """The family's RAM bound from research (LoRA bf16, bs 1, pixel cap); +20 % past the sizes it was fitted on."""
     ram = family.ram_gb_train
@@ -350,6 +371,8 @@ __all__ = [
     "remote_code_signs",
     "render_template",
     "resolve_family",
+    "user_dataset_id",
+    "user_dataset_id_prefix",
     "user_entry",
     "user_model_id",
 ]
