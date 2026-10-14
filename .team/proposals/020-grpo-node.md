@@ -85,3 +85,4 @@ node is refused by check_support (no guessing on a shared 128 GB machine).
 
 If 1 fails within the PM's time box: the node ships as "sắp có" (disabled, real reason shown), all of this moves
 to 1.1, and DPO joins it there.
+- 1.1 custom reward environment: a user format regex returns with it; rebuild the static checker from `7d48ffb` (common/safe_regex: length, nested/alternation repeats, backref/lookaround, long-repeat budget, timing test) and send it to security again (cleancode, 2026-10-14).
