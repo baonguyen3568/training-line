@@ -56,9 +56,17 @@ describe("PipelineGallery", () => {
       name: /Xem nguồn/,
     });
     expect(external.getAttribute("rel")).toBe("noopener noreferrer");
-    fireEvent.click(screen.getByRole("tab", { name: /Ứng viên/ }));
+    // no card ever shows a copy key instead of words (a missing key hides its line)
+    for (const card of cards)
+      expect(card.textContent).not.toMatch(/\b(pipelines|method|arch)\.[a-z_]+/);
+    // tabs by status: what opens now, what is being prepared
+    fireEvent.click(screen.getByRole("tab", { name: new RegExp(t("pipelines.filter.preparing")) }));
     expect(document.querySelectorAll(".rp-card").length).toBe(
-      data.pipelines.filter((p) => p.kind === "candidate").length,
+      data.pipelines.filter((p) => p.status !== "available").length,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: new RegExp(t("pipelines.filter.available")) }));
+    expect(document.querySelectorAll(".rp-card").length).toBe(
+      data.pipelines.filter((p) => p.status === "available").length,
     );
   });
 

@@ -1,5 +1,6 @@
 import {
   type CSSProperties,
+  Fragment,
   type ReactNode,
   useEffect,
   useLayoutEffect,
@@ -56,13 +57,17 @@ interface Pipeline {
   } | null;
 }
 const pipelines = (data as unknown as { pipelines: Pipeline[] }).pipelines;
-type Filter = "all" | Pipeline["kind"];
-const FILTERS: Filter[] = ["all", "app_template", "external", "candidate"];
+/** By status (design I r1): what opens now, what is being prepared; the old kind tabs had empty ones. */
+type Filter = "all" | "available" | "preparing";
+const FILTERS: Filter[] = ["all", "available", "preparing"];
+const filterOf = (p: Pipeline): Exclude<Filter, "all"> =>
+  p.status === "available" ? "available" : "preparing";
 
 const lic = (id: string | null) => (id ? licenseName(id) : t("pipelines.see_source"));
 /** One short licence line for the badge: code and model licences, each once; the details sit behind "?". */
-const licenseLine = (p: Pipeline) =>
-  [...new Set([p.license.code, p.license.model, p.license.data].map(lic))].join(" · ");
+const licenseParts = (p: Pipeline) => [
+  ...new Set([p.license.code, p.license.model, p.license.data].map(lic)),
+];
 const host = (url: string) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -76,14 +81,33 @@ const host = (url: string) => {
  * is measured on the user's machine, which may not be a DGX Spark, so it belongs to the Inspector / workflow summary
  * ("đã đo trên máy này"), never to this card (design 1.0). Peak RAM joins when measured.
  */
-function timeText(p: Pipeline): string {
+/** "Đo với: {model}", or nothing: a missing copy hides the line instead of showing its key (design). */
+const measuredWith = (p: Pipeline) =>
+  p.measured_with
+    ? tpOptional(["pipelines", "measured_with"], { model: p.measured_with.model })
+    : undefined;
+
+function timeParts(p: Pipeline): string[] {
   const m = p.measured;
   const range = m?.train_minutes ? { lo: m.train_minutes, hi: m.train_minutes } : null;
   const ram = m?.peak_ram_gb ? t("pipelines.ram_peak", { gb: m.peak_ram_gb }) : null;
   // a part that does not apply (no training, train_minutes null) is left out, never "no measurement yet"
-  if (!range && ram) return ram;
-  const time = formatMinutesRange(range);
-  return ram ? `${time} · ${ram}` : time;
+  return [range ? formatMinutesRange(range) : null, ram].filter((x): x is string => !!x);
+}
+
+/** Parts of one line joined by " · ": the line wraps only between parts, never inside one ("RAM đỉnh 23.7 GB"). */
+function Parts({ parts }: { parts: ReactNode[] }) {
+  return (
+    <>
+      {parts.map((x, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list of line parts
+        <Fragment key={i}>
+          {i > 0 && " · "}
+          <span className="nowrap">{x}</span>
+        </Fragment>
+      ))}
+    </>
+  );
 }
 
 /**
@@ -150,19 +174,14 @@ export function PipelineGallery() {
     });
   };
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = {
-      all: pipelines.length,
-      app_template: 0,
-      external: 0,
-      candidate: 0,
-    };
-    for (const p of pipelines) c[p.kind]++;
+    const c: Record<Filter, number> = { all: pipelines.length, available: 0, preparing: 0 };
+    for (const p of pipelines) c[filterOf(p)]++;
     return c;
   }, []);
   const q = fold(query);
   const shown = pipelines.filter(
     (p) =>
-      (filter === "all" || p.kind === filter) &&
+      (filter === "all" || filterOf(p) === filter) &&
       (!q || fold(`${t(`method.${p.method}.title`)} ${p.title.vi} ${p.title.en}`).includes(q)),
   );
 
@@ -228,7 +247,9 @@ export function PipelineGallery() {
                 <a href={p.source.url} target="_blank" rel="noopener noreferrer">
                   {p.source.publisher} <Icon name="external-link" size={12} />
                 </a>
-                <span className="chip">{licenseLine(p)}</span>
+                <span className="chip">
+                  <Parts parts={licenseParts(p)} />
+                </span>
                 <Help id={`lic-${p.id}`} title={t("pipelines.license_detail")}>
                   <p>
                     {t("pipelines.license_parts", {
@@ -243,24 +264,24 @@ export function PipelineGallery() {
                     </p>
                   ))}
                 </Help>
-                {p.measured_with && (
-                  <span className="muted">
-                    {t("pipelines.measured_with", { model: p.measured_with.model })}
-                  </span>
-                )}
+                {measuredWith(p) && <span className="muted rp-with">{measuredWith(p)}</span>}
               </div>
               {p.measured && (
                 <div className="rp-measured">
-                  {t("pipelines.measured")}
-                  {timeText(p) && ` · ${timeText(p)}`}
-                  {p.measured.score && (
-                    <>
-                      {" · "}
-                      {tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
-                        p.measured.score.metric}{" "}
-                      {formatScore(p.measured.score.metric, p.measured.score.value)}
-                    </>
-                  )}
+                  <Parts
+                    parts={[
+                      t("pipelines.measured"),
+                      ...timeParts(p),
+                      ...(p.measured.score
+                        ? [
+                            `${
+                              tpOptional(["pipelines", "metric", p.measured.score.metric]) ??
+                              p.measured.score.metric
+                            } ${formatScore(p.measured.score.metric, p.measured.score.value)}`,
+                          ]
+                        : []),
+                    ]}
+                  />
                   <Help id={`measured-${p.id}`} title={t("pipelines.measured")}>
                     {p.measured.score && <MetricHelp score={p.measured.score} />}
                     <ScoreCompare p={p} onShow={showCard} />

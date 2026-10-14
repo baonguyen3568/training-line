@@ -57,6 +57,13 @@
   pointer-events: none;
   transition: opacity 0.12s;
 }
+/* the toolbar's last button sits at the right edge: its tip grows leftwards, never past the viewport (a hidden tip
+   still widens the page, 390px had a 7px horizontal scroll) */
+.editor.d4 .tb > [data-tip]:last-child::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
 .editor.d4 [data-tip-side="right"]::after {
   left: calc(100% + 8px);
   top: 50%;
@@ -1557,8 +1564,8 @@ fieldset.seg-radio {
   font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
 }
-.rp-meta > * + * {
-  margin-left: var(--space-8);
+.rp-meta > * {
+  margin-right: var(--space-8); /* trailing gap: a wrapped line starts flush left */
 }
 .rp-meta .chip {
   display: inline;
@@ -1571,4 +1578,18 @@ fieldset.seg-radio {
   align-items: center;
   gap: 4px;
   color: var(--color-text-secondary);
+}
+.rp-card .nowrap {
+  white-space: nowrap;
+}
+.rp-card .rp-with {
+  display: inline-block; /* wraps as one unit to the next line, never inside "Đo với: <model>" */
+  max-width: 100%;
+}
+.rp-head .seg {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.rp-head .seg button {
+  white-space: nowrap;
 }
