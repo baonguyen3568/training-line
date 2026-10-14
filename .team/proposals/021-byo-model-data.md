@@ -159,6 +159,19 @@ native is enough to test the path). Depends on: research `families.yaml` + recip
   range}`); control characters dropped and trimmed; blank or absent = `DEFAULT_PROMPT` (no error). The UI pre-fills
   the inspection's `default_question`. The record's `{dataset}` returns `prompt` (null = default). The convert job
   writes it into labels.jsonl, so another prompt (or mapping) drops the converted folder and the next download
-  converts again (a new dataset hash for the cache).
+  converts again (a new dataset hash for the cache). Re-mapping or DELETE while the dataset downloads / a live run
+  reads it → 409 `DATA-014 {name, run}` (folder untouched).
+- **H-prompt: the trained question (PLAN, backend 2026-10-14; review: frontend, design, cleancode):**
+  1. Train runs write `train_prompt` in run.json: the one question every chosen training sample was asked
+     (`DEFAULT_PROMPT` counts), null when they differ.
+  2. Export: the model card says that question (from the lineage) when it is known.
+  3. `serve.vllm` at run time: an EMPTY `prompt` param means "the trained question" (lineage `train_prompt`, else
+     `DEFAULT_PROMPT`); result.json gets `prompt_used` + `prompt_source: user | trained | default`.
+  4. Before any run (UI prefill): validate adds an info issue `MODEL-007 TRAINED_PROMPT {node, prompt}` on a
+     `serve.vllm` step when the question is known statically: the upstream train step's data is a user HF dataset
+     (its shared question, or `DEFAULT_PROMPT` when no question / messages column is mapped) or a local folder whose
+     labels.jsonl has a single prompt (bounded read). Not emitted when mixed or unknown. The UI fills the empty
+     prompt with `params.prompt` and shows `trial.prefilled_prompt` while the box still equals it; the issue is a
+     field hint, not a card.
 - Unknown licence: SEC-005 `{name, repo, license: "unknown"}` at VALIDATE of an export step (check_support follows
   the step's model lineage) and again at run time; no override.
