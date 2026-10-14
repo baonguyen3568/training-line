@@ -1582,6 +1582,7 @@ download:
   dialog_title: Tải về máy
   intro: 'App sẽ tải "{name}" (khoảng {size_gb} GB) về máy này. Sau đó các bước chạy dùng bản trên máy, không cần mạng.'
   intro_prepare: '"{name}" đã có trên máy nhưng cần thêm một bước chuẩn bị trước khi chạy. App làm bước đó, không tải lại phần đã có.'
+  license_unknown: Chưa rõ giấy phép của model này. Bạn vẫn tải và dạy được, nhưng chưa xuất hay chia sẻ được model cho tới khi giấy phép rõ ràng.
   prepare_only: Chỉ cần chuẩn bị, không tải lại
   estimate: Dự kiến khoảng {duration}, tuỳ tốc độ mạng.
   license_lead: "Giấy phép:"
@@ -1681,13 +1682,46 @@ arch:
     nf4: 4-bit
     fp8: FP8
     nvfp4: NVFP4
-    fp8_fake: FP8 giả lập
   extra:
     teacher: Model thầy
     reference: Bản tham chiếu
+    reference_shared: Bản tham chiếu (dùng chung model gốc, không tốn thêm bộ nhớ)
     rollout: Sinh câu trả lời
     reward: Chấm điểm
+  fake_quant: giả lập
   stage: GĐ{n}
   legend_title: Cách đọc sơ đồ
   aria_stage: "Giai đoạn {n}: {blocks}."
   aria_block: "{block} {state}"
+method:
+  full_sft:
+    title: Fine-tune toàn bộ (Full SFT)
+    when: 'Khi có nhiều dữ liệu và cần model đổi cách trả lời nhiều nhất; tốn bộ nhớ nhất.'
+  lora:
+    title: Fine-tune nhẹ (LoRA)
+    when: 'Lựa chọn mặc định: dạy thêm nhanh, ít bộ nhớ, model gốc giữ nguyên.'
+  qlora:
+    title: Fine-tune nhẹ 4-bit (QLoRA)
+    when: 'Khi model lớn hơn phần bộ nhớ còn trống: giữ model gốc ở 4-bit rồi dạy LoRA.'
+  two_stage:
+    title: Train 2 giai đoạn kiểu LLaVA
+    when: 'Khi loại ảnh rất mới với model và có nhiều cặp ảnh–chú thích: dạy bộ nối trước, rồi dạy trả lời.'
+  vision_unfrozen:
+    title: Mở phần nhìn ảnh, ảnh độ phân giải cao
+    when: 'Khi ảnh rất khác ảnh thường gặp: dạy cả phần nhìn ảnh với tốc độ học thấp; cần nhiều dữ liệu và bộ nhớ hơn.'
+  distill:
+    title: Chưng cất từ model lớn
+    when: 'Khi có ít đáp án mẫu: một model lớn viết đáp án, rồi dạy model nhỏ học theo.'
+    note: Kiểm tra giấy phép của model lớn có cho dùng câu trả lời của nó để train model khác không.
+  dpo:
+    title: DPO (học theo cặp tốt/kém)
+    when: 'Khi có cặp câu trả lời tốt và kém cho cùng ảnh: dạy model chọn câu tốt hơn, bớt bịa chi tiết.'
+  grpo:
+    title: Học từ phản hồi (GRPO)
+    when: 'Khi đúng/sai chấm tự động được (số, JSON): model tự thử nhiều câu rồi học từ điểm; chạy lâu nhất.'
+  ptq:
+    title: Nén sau khi train (PTQ)
+    when: 'Khi cần model nhỏ hơn để chạy: nén rồi đo lại điểm, không train thêm.'
+  qat:
+    title: Train có giả lập nén (QAT)
+    when: 'Khi nén làm điểm giảm nhiều: train ngắn có giả lập nén để lấy lại điểm.'

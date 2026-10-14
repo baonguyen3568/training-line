@@ -1582,6 +1582,7 @@ download:
   dialog_title: Download to this machine
   intro: 'The app will download "{name}" (about {size_gb} GB) to this machine. After that, steps use the local copy and need no network.'
   intro_prepare: '"{name}" is already on this machine but needs an extra preparation step before it can run. The app does that step without downloading again.'
+  license_unknown: This model's license is unclear. You can still download and train it, but you can't export or share the model until the license is clear.
   prepare_only: Only needs preparing, no download
   estimate: Expected to take about {duration}, depending on your connection.
   license_lead: "License:"
@@ -1681,13 +1682,46 @@ arch:
     nf4: 4-bit
     fp8: FP8
     nvfp4: NVFP4
-    fp8_fake: Simulated FP8
   extra:
     teacher: Teacher model
     reference: Reference copy
+    reference_shared: Reference copy (shares the base model, no extra memory)
     rollout: Answer sampling
     reward: Scoring
+  fake_quant: simulated
   stage: Stage {n}
   legend_title: How to read the diagram
   aria_stage: "Stage {n}: {blocks}."
   aria_block: "{block} {state}"
+method:
+  full_sft:
+    title: Full fine-tune (SFT)
+    when: When you have plenty of data and need the biggest change in how the model answers; uses the most memory.
+  lora:
+    title: Light fine-tune (LoRA)
+    when: 'The default choice: quick to train, little memory, and the base model stays unchanged.'
+  qlora:
+    title: 4-bit light fine-tune (QLoRA)
+    when: When the model is bigger than the free memory; keeps the base model in 4-bit and trains LoRA.
+  two_stage:
+    title: Two-stage training (LLaVA-style)
+    when: When the image type is very new to the model and you have many image–caption pairs; train the connector first, then the answers.
+  vision_unfrozen:
+    title: Unfrozen vision part, high-res images
+    when: When your images look very different from usual ones; trains the vision part too at a low learning rate and needs more data and memory.
+  distill:
+    title: Distill from a larger model
+    when: When you have few reference answers; a large model writes them and a small model learns from them.
+    note: Check that the large model's license allows using its answers to train another model.
+  dpo:
+    title: DPO (learn from good/bad pairs)
+    when: When you have good and bad answers for the same image; teaches the model to prefer the better one and invent fewer details.
+  grpo:
+    title: Learn from feedback (GRPO)
+    when: When right/wrong can be scored automatically (numbers, JSON); the model tries several answers and learns from the scores; the slowest method.
+  ptq:
+    title: Post-training quantization (PTQ)
+    when: When you need a smaller model to run; quantize, then re-score, with no extra training.
+  qat:
+    title: Quantization-aware training (QAT)
+    when: When quantization costs too much score; a short training run with simulated quantization wins it back.
