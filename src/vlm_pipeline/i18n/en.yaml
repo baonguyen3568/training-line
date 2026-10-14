@@ -1377,6 +1377,7 @@ pipelines:
 param_unsupported:
   default: not supported yet
   worker_v1: This option is still being built and the app cannot run it yet. Choose another value.
+  engine_qlora: The current engine version cannot do 4-bit compression yet. Keep "No compression".
 settings:
   section_app: App
   row_language: Language

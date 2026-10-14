@@ -57,11 +57,12 @@ class LoraParams(_FinetuneParams):
     lora_dim: int = Field(8, ge=4, le=64, json_schema_extra=ui(advanced=True))
     lora_alpha: int = Field(32, ge=8, le=128, json_schema_extra=ui(advanced=True))
     # QLoRA = this option, not another node (research 2026-10-13: AutoModel create_bnb_config nf4 + double quant,
-    # bnb 0.49.2 in the image). Disabled until smoke-tested on GB10 aarch64; the support check refuses it meanwhile.
+    # bnb 0.49.2 in the image). Disabled: AutoModel 26.08 quantizes the tied lm_head / vision tower and fails at step 0
+    # (research A/B 2026-10-14, .team/upstream/automodel-vlm-qlora-tied-lm-head.md); the support check refuses it too.
     quantize_base: Literal["none", "nf4"] = Field(
         "none",
         json_schema_extra=ui(
-            advanced=True, option_keys="quantize_base", disabled_options={"nf4": "param_unsupported.worker_v1"}
+            advanced=True, option_keys="quantize_base", disabled_options={"nf4": "param_unsupported.engine_qlora"}
         ),
     )
 

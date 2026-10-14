@@ -1377,6 +1377,7 @@ pipelines:
 param_unsupported:
   default: chưa hỗ trợ
   worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.
+  engine_qlora: Bản engine hiện tại chưa nén 4-bit được. Hãy để "Không nén".
 settings:
   section_app: Ứng dụng
   row_language: Ngôn ngữ
