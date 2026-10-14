@@ -192,4 +192,18 @@ describe("dataset from Hugging Face", () => {
     expect(inspect).toHaveBeenCalledTimes(2);
     expect(inspect.mock.calls[1]?.[0]).toMatchObject({ split: "validation" });
   }, 15000);
+
+  it("without a question column the preview shows the question every sample gets", async () => {
+    await setup();
+    const input = screen.getByPlaceholderText(/naver-clova-ix\/cord-v2/);
+    fireEvent.change(input, { target: { value: "acme/invoices-vi" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 4000 });
+    expect(dialog.querySelector(".byo-default-q")).toBeNull(); // a question column is mapped
+    const q = within(dialog).getByLabelText(/Cột câu hỏi/) as HTMLSelectElement;
+    fireEvent.change(q, { target: { value: "" } });
+    const shown = dialog.querySelectorAll(".byo-default-q");
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown[0]?.textContent).toBe("Describe this image."); // the server's, never typed in the UI
+  });
 });

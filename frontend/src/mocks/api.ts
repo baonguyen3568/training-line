@@ -835,6 +835,7 @@ export const mockApi: Api = {
       split_bytes: 48_000_000,
       has_script: false,
       sample_error: null,
+      default_question: "Describe this image.",
     };
     return delay({ status: "done" as const, result });
   },

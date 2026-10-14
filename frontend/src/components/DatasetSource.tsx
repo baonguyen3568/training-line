@@ -180,7 +180,12 @@ function ColumnMapDialog({
                   <span className="small">{sampleErrorText(smp.error)}</span>
                 ) : (
                   <>
-                    <span className="clamp2">{untrustedText(smp.question ?? "", 300)}</span>
+                    {map.question || !inspection.default_question ? (
+                      <span className="clamp2">{untrustedText(smp.question ?? "", 300)}</span>
+                    ) : (
+                      // no question column: the one every sample gets, said so (design: not "no question at all")
+                      <span className="clamp2 byo-default-q">{inspection.default_question}</span>
+                    )}
                     <span className="clamp2 muted mono">
                       {untrustedText(smp.answer ?? "", 300)}
                     </span>
@@ -318,6 +323,16 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
     }
   };
 
+  const splitSelect = !!found && found.result.splits.length > 1;
+  const summary = inUse
+    ? { repo: inUse.repo, config: inUse.config ?? undefined, split: inUse.split }
+    : found
+      ? {
+          repo: found.result.repo,
+          config: found.result.config ?? undefined,
+          split: found.result.split,
+        }
+      : null;
   const errText = error ? runErrorText(error, (id) => id) : undefined;
   const choices = found?.result;
   return (
@@ -360,13 +375,32 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
           onChange={(e) => setRevision(e.target.value)}
         />
       </details>
-      {inUse && !mapping && (
-        <p className="small byo-in-use">
-          <code>{untrustedText(inUse.name, 120)}</code>{" "}
-          <span className="chip unverified">
-            <Icon name="badge-question-mark" size={12} /> {t("byo.unverified")}
-          </span>
-        </p>
+      {summary && !mapping && (
+        // one block (design H r2): repo + chip, "config · split" (the split only when there is no split select),
+        // then "Ghép cột dữ liệu"
+        <div className="byo-ds-summary">
+          <p className="small">
+            <code>{untrustedText(summary.repo, 120)}</code>{" "}
+            {inUse && (
+              <span className="chip unverified">
+                <Icon name="badge-question-mark" size={12} /> {t("byo.unverified")}
+              </span>
+            )}
+          </p>
+          <p className="small muted">
+            {[summary.config, splitSelect ? null : summary.split]
+              .filter((x): x is string => !!x)
+              .map((x) => untrustedText(x, 60))
+              .join(" · ")}
+          </p>
+          {found && (
+            <p className="small">
+              <button type="button" className="link" onClick={() => setMapping(true)}>
+                {t("byo.map.title")}
+              </button>
+            </p>
+          )}
+        </div>
       )}
       {choices && choices.configs.length > 1 && (
         <label className="byo-map-row">
@@ -381,7 +415,7 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
           </select>
         </label>
       )}
-      {choices && choices.splits.length > 1 && (
+      {splitSelect && choices && (
         <label className="byo-map-row">
           {t("byo.data.split")}
           <select value={split || choices.split} onChange={(e) => setSplit(e.target.value)}>
@@ -418,14 +452,6 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
           <strong>{errText?.title}</strong>
           {errText?.what && <p>{errText.what}</p>}
         </div>
-      )}
-      {found && !mapping && (
-        <p className="small">
-          <code>{found.result.repo}</code> ·{" "}
-          <button type="button" className="link" onClick={() => setMapping(true)}>
-            {t("byo.map.title")}
-          </button>
-        </p>
       )}
       {found && mapping && (
         <ColumnMapDialog

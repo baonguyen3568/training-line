@@ -755,4 +755,6 @@ export interface DatasetInspection {
   has_script?: boolean;
   /** Why there is no preview at all: no sample row, or none could be read. */
   sample_error?: "no_sample" | "unreadable" | null;
+  /** The question every sample gets when no question column is mapped (the server's default prompt). */
+  default_question?: string | null;
 }

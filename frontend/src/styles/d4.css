@@ -1636,3 +1636,13 @@ fieldset.seg-radio {
 .trial-chip-wrap .pop {
   white-space: normal; /* the chip stays on one line, its explanation wraps */
 }
+.byo-ds-summary p {
+  margin: 0 0 2px;
+}
+.byo-default-q {
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+.byo-ds-summary .link {
+  padding: 0;
+}
