@@ -17,6 +17,7 @@ from vlm_pipeline.app import downloads, user_datasets
 from vlm_pipeline.app.downloads import DownloadService
 from vlm_pipeline.common.catalog import set_user_model_lookup
 from vlm_pipeline.common.jobrun import CONTAINER_ROOT
+from vlm_pipeline.common.local_records import DEFAULT_PROMPT
 from vlm_pipeline.common.runinfo import RunStatus
 from vlm_pipeline.download import inspect as ins
 
@@ -98,6 +99,7 @@ def test_an_inspection_maps_columns_and_serves_its_thumbnails(service: Any, monk
     got = (result["revision"], result["format"], result["config"], result["split"])
     assert got == (SHA, "imagefolder", "default", "train")
     assert result["suggested"] == {"image": "file_name", "question": "question", "answer": "answer"}
+    assert result["default_question"] == DEFAULT_PROMPT  # the preview shows what a sample without a question is asked
     [sample] = result["samples"]
     assert (sample["question"], sample["answer"]) == ("Q?", "A")
     thumb = client.get(sample["thumb_url"])

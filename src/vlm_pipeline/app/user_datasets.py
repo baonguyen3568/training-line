@@ -23,6 +23,7 @@ from vlm_pipeline.app.user_assets import _card_text, _card_words
 from vlm_pipeline.common.catalog import normalize_license
 from vlm_pipeline.common.download_rules import name_ok
 from vlm_pipeline.common.errors import VlmPipelineError
+from vlm_pipeline.common.local_records import DEFAULT_PROMPT
 from vlm_pipeline.common.runinfo import read_small_json
 from vlm_pipeline.download.resolver import RepoFilesInvalidError, user_dataset_id
 
@@ -155,7 +156,9 @@ def api_result(repo: str, sha: str, block: DatasetBlock, inspected: InspectResul
             "split": block.split, "format": block.format,
             "columns": [c.model_dump() for c in inspected.columns], "suggested": inspected.suggested,
             "samples": samples, "rows_estimate": None, "split_bytes": block.split_bytes,
-            "has_script": block.has_script, "sample_error": inspected.error}  # fmt: skip
+            "has_script": block.has_script, "sample_error": inspected.error,
+            # what each sample is asked when no question column is mapped (the preview shows it; never translated)
+            "default_question": DEFAULT_PROMPT}  # fmt: skip
 
 
 # --------------------------------------------------------------------------------------------- the record (H5)
