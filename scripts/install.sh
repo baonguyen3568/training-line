@@ -109,7 +109,8 @@ LAN_BIND="$(setting VLM_LAN_BIND)"
 LAN_PORT="$(setting VLM_LAN_PORT)"; LAN_PORT="${LAN_PORT:-4000}"
 EDGE_SUBNET="$(setting VLM_EDGE_SUBNET)"; EDGE_SUBNET="${EDGE_SUBNET:-10.231.47.0/29}"
 TLS_DIR="$CONFIG_DIR/tls"
-LAN_CONF="$CONFIG_DIR/lan/nginx.conf"
+LAN_DIR="$CONFIG_DIR/lan"  # public files only (nginx.conf, the CA certificate): mounted read-only into the app
+LAN_CONF="$LAN_DIR/nginx.conf"
 PROXY_PEER=""
 PUBLIC_ORIGINS=""
 command -v python3 >/dev/null || fail "python3 is needed to check the network settings"
@@ -147,8 +148,11 @@ if [[ -n "$LAN_BIND" ]]; then
     (( ! new_ca )) || say "created a local certificate authority: $TLS_DIR/ca.crt (install it on the devices that open the app)"
     render_nginx_conf "$ROOT/docker/nginx/nginx.conf.template" "$LAN_CONF" "$SERVER_NAMES" "$LAN_ALLOW" "$LAN_PORT" \
       || fail "could not write $LAN_CONF"
+    install -m 644 "$TLS_DIR/ca.crt" "$LAN_DIR/ca.crt"  # the public certificate only: Settings offers it
   fi
 fi
+
+run mkdir -p "$LAN_DIR"  # always: the app mounts it (empty while LAN access is off)
 
 # ------------------------------------------------------------------------------------------------ compose env
 # Only computed, non-secret values: compose reads them with --env-file; nothing here is a password or token.
@@ -176,6 +180,7 @@ VLM_EGRESS_IP_RANGE=$EGRESS_IP_RANGE
 VLM_EGRESS_PROXY_IP=$EGRESS_PROXY_IP
 VLM_PUBLIC_ORIGINS=$PUBLIC_ORIGINS
 VLM_PROXY_PEER=$PROXY_PEER
+VLM_LAN_DIR=$LAN_DIR
 EOF
   if [[ -n "$LAN_BIND" ]]; then
     printf '%s\n' "VLM_LAN_BIND=$LAN_BIND" "VLM_LAN_PORT=$LAN_PORT" "VLM_LAN_CONF=$LAN_CONF" "VLM_TLS_DIR=$TLS_DIR"

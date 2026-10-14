@@ -28,6 +28,7 @@ services:
       VLM_PUBLIC_PORT: "${VLM_PORT:-4001}"  # the published port: the Host allowlist and the link (listens on 7870)
       VLM_PUBLIC_ORIGINS: "${VLM_PUBLIC_ORIGINS:-}"  # ADR-019: the LAN origins nginx serves (empty: local only)
       VLM_PROXY_PEER: "${VLM_PROXY_PEER:-}"  # nginx's fixed address on the edge network
+      VLM_LAN_CA_FILE: /run/vlm-lan/ca.crt  # the local CA's PUBLIC certificate (Settings: install it on devices)
     volumes:  # data only: the image carries the code (no repo mount)
       - "${VLM_DATA_ROOT:?}/outputs:/app/outputs"  # includes outputs/system: the app is trusted for it (security N2)
       - "${VLM_DATA_ROOT}/.cache:/app/.cache"
@@ -37,6 +38,7 @@ services:
       - "runner-sock:/run/vlm-runner"
       - "${VLM_POLICY_FILE:?}:/home/app/.config/ntc-training/policy.toml:ro"  # one file, never the folder
       - "${VLM_SECRETS_KEY_FILE:?}:/home/app/.config/ntc-training/secrets.key:ro"
+      - "${VLM_LAN_DIR:?run scripts/install.sh}:/run/vlm-lan:ro"  # nginx.conf + ca.crt only (never a key)
     networks: [default, edge]
     depends_on: [runner]
     mem_limit: 4g

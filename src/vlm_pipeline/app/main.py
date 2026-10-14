@@ -535,6 +535,9 @@ def create_app(
     _register_graph_routes(app, services, bus)
     _register_run_routes(app, services)
     _register_info_routes(app, services, bus)
+    from vlm_pipeline.app.lan import register_lan_routes
+
+    register_lan_routes(app)  # A5: LAN links + the local CA, for a local session only
     _register_advanced_routes(app, services)
     _register_download_routes(app, services, bus, ws_auth)
     _register_template_routes(app, services)

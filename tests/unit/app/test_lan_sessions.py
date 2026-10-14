@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import threading
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -346,3 +347,51 @@ def test_the_lan_settings_the_server_starts_with(monkeypatch: pytest.MonkeyPatch
     assert isinstance(lan_settings(), str)
     monkeypatch.setenv("VLM_PUBLIC_ORIGINS", "http://192.168.2.178:4000")
     assert isinstance(lan_settings(), str)
+
+
+def _pem(der: bytes) -> bytes:
+    import base64
+
+    body = base64.encodebytes(der)
+    return b"-----BEGIN CERTIFICATE-----\n" + body + b"-----END CERTIFICATE-----\n"
+
+
+def test_the_owner_gets_the_lan_links_and_the_ca(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A5: Settings shows the LAN links and offers the local CA (public certificate) to install on devices."""
+    import hashlib
+
+    from vlm_pipeline.app import lan
+
+    der = b"0\x82fake-der-bytes"
+    (tmp_path / "ca.crt").write_bytes(_pem(der))
+    monkeypatch.setenv(lan.CA_FILE_ENV, str(tmp_path / "ca.crt"))
+    c = _client()
+    info = c.get("/api/lan", headers=_local(c)).json()
+    digest = hashlib.sha256(der).hexdigest().upper()
+    fingerprint = ":".join(digest[i : i + 2] for i in range(0, 64, 2))
+    ca = {"fingerprint_sha256": fingerprint, "download": "/api/lan/ca.crt"}
+    assert info == {"enabled": True, "urls": [f"{LAN_ORIGIN}/"], "ca": ca}
+    got = c.get("/api/lan/ca.crt", headers=_local(c))
+    assert got.content == _pem(der)
+    assert got.headers["content-disposition"] == 'attachment; filename="ntc-training-ca.crt"'
+    assert (got.headers["x-content-type-options"], got.headers["cache-control"]) == ("nosniff", "no-store")
+    assert c.get("/api/lan", headers=_signed_in(c)).status_code == 403  # never for a LAN session
+    assert c.get("/api/lan/ca.crt", headers=_signed_in(c)).json() == {"code": "local_only"}
+
+
+def test_lan_off_or_a_bad_ca_file_shows_no_ca(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.app import lan
+
+    monkeypatch.setenv(lan.CA_FILE_ENV, str(tmp_path / "ca.crt"))
+    off = TestClient(create_app(token=TOKEN, port=PORT), base_url=f"http://{LOCAL}")
+    assert off.get("/api/lan", headers=_local(off)).json() == {"enabled": False, "urls": [], "ca": None}
+    c = _client()
+    for bad in (b"", _pem(b"a") + _pem(b"b"), b"-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n",
+                _pem(b"a") + b"-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n"):  # fmt: skip
+        (tmp_path / "ca.crt").write_bytes(bad)
+        assert c.get("/api/lan", headers=_local(c)).json()["ca"] is None
+        assert c.get("/api/lan/ca.crt", headers=_local(c)).status_code == 404
+    (tmp_path / "ca.crt").unlink()
+    (tmp_path / "ca.crt").symlink_to(tmp_path / "elsewhere.pem")
+    (tmp_path / "elsewhere.pem").write_bytes(_pem(b"x"))
+    assert c.get("/api/lan", headers=_local(c)).json()["ca"] is None  # never through a link
