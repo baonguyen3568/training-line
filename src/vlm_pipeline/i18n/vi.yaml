@@ -1499,6 +1499,7 @@ engine_warning:
     title: Model có thể học được ít hơn mong đợi
     what: Trọng số được train ở bf16 mà không giữ bản fp32, nên các bước cập nhật quá nhỏ bị làm tròn mất. Model có thể học được ít hơn nhiều so với số bước đã chạy. Hãy so điểm với model gốc trước khi dùng.
 trial:
+  prefilled_prompt: Đã điền sẵn câu hỏi model được dạy lúc train. Hỏi đúng câu này cho kết quả sát nhất.
   image_too_large: Ảnh lớn hơn 20 MB. Hãy dùng ảnh nhỏ hơn.
   upload_failed: Không tải ảnh lên được. Thử lại.
   uploading: Đang tải ảnh lên…
@@ -1875,7 +1876,7 @@ byo:
     question: Cột câu hỏi (tuỳ chọn)
     answer: Cột câu trả lời
     prompt: Câu hỏi dùng chung cho mọi ảnh
-    prompt_help: Dùng khi bộ dữ liệu không có cột câu hỏi. Model sẽ học trả lời đúng câu này, nên sau khi train hãy hỏi model bằng chính câu này (có thể viết tiếng Việt).
+    prompt_help: Dùng khi bộ dữ liệu không có cột câu hỏi. Model học trả lời đúng câu này, nên sau khi train hãy hỏi bằng chính câu này. Viết câu hỏi cùng ngôn ngữ với câu trả lời trong dữ liệu; dữ liệu tiếng Anh thì giữ câu tiếng Anh.
     prompt_default_note: 'Câu mặc định của app, giữ nguyên tiếng Anh như lúc train'
     messages: Cột hội thoại
     suggested: gợi ý

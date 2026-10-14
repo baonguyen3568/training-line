@@ -1499,6 +1499,7 @@ engine_warning:
     title: The model may have learned less than expected
     what: Weights were trained in bf16 without an fp32 copy, so very small updates were rounded away. The model may have learned much less than the number of steps suggests. Compare its score with the base model before using it.
 trial:
+  prefilled_prompt: Prefilled with the question the model was trained on. Asking it this way gives the closest results.
   image_too_large: The image is larger than 20 MB. Use a smaller one.
   upload_failed: Could not upload the image. Try again.
   uploading: Uploading the image…
@@ -1875,7 +1876,7 @@ byo:
     question: Question column (optional)
     answer: Answer column
     prompt: One question for every image
-    prompt_help: Used when the dataset has no question column. The model learns to answer this exact question, so after training ask it the same way (it can be in Vietnamese).
+    prompt_help: Used when the dataset has no question column. The model learns to answer this exact question, so after training ask it the same way. Write it in the same language as the answers in your data; for English data, keep it in English.
     prompt_default_note: The app's default question, kept in English as used in training
     messages: Conversation column
     suggested: suggested
