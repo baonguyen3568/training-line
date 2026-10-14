@@ -115,3 +115,4 @@ quantization:  # AutoModel components/quantization/qlora.py create_bnb_config (b
   bnb_4bit_use_double_quant: true
   bnb_4bit_quant_type: nf4
   bnb_4bit_quant_storage: bfloat16
+  llm_int8_skip_modules: [model.visual]  # vision tower + merger stay bf16 (fixcode patch 0006, image 26.08-7)
