@@ -6,7 +6,8 @@ import { ICONS } from "../generated/icons";
  * that has no other accessible name. Unknown names render nothing (and fail the icon test).
  */
 export function Icon({ name, size = 16, label }: { name: string; size?: number; label?: string }) {
-  const nodes = ICONS[name];
+  // own keys only: a name from a manifest ("constructor") must not read Object.prototype
+  const nodes = Object.hasOwn(ICONS, name) ? ICONS[name] : undefined;
   if (!nodes) return null;
   return (
     <svg

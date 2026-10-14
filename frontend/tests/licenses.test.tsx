@@ -14,3 +14,15 @@ describe("licenseName", () => {
     expect(licenseName("apache-2.0")).toBe("Apache-2.0");
   });
 });
+
+describe("Icon", () => {
+  it("an unknown or prototype name renders nothing instead of throwing", async () => {
+    const { render } = await import("@testing-library/react");
+    const { Icon } = await import("../src/components/Icon");
+    for (const name of ["constructor", "__proto__", "no-such-icon"]) {
+      const { container, unmount } = render(<Icon name={name} />);
+      expect(container.innerHTML).toBe("");
+      unmount();
+    }
+  });
+});
