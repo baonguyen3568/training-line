@@ -26,6 +26,8 @@ export interface DownloadEntry {
   filesDone?: number;
   filesTotal?: number;
   error?: EventError;
+  /** Queued until enough RAM is free (event "waiting"); cleared once it starts downloading. */
+  waiting?: { need_gb?: number; avail_gb?: number };
   /** From the server's answer (the pinned catalog): preferred over the client's option_meta once known. */
   name?: string;
   license?: string;
@@ -126,6 +128,7 @@ export const useDownloads = create<DownloadsState>((set, get) => {
           if (ev.type === "progress") {
             put(key, {
               status: "downloading",
+              waiting: undefined,
               bytesDone: ev.bytes_done,
               bytesTotal: ev.bytes_total,
               filesDone: ev.files_done,
@@ -138,9 +141,17 @@ export const useDownloads = create<DownloadsState>((set, get) => {
               void useWorkflow.getState().validate(); // the step's NET-002 goes away
             }
             if (ev.status === "failed") stop();
-          } else {
+          } else if (ev.type === "waiting") {
+            put(key, {
+              waiting: {
+                ...(ev.need_gb !== undefined ? { need_gb: ev.need_gb } : {}),
+                ...(ev.avail_gb !== undefined ? { avail_gb: ev.avail_gb } : {}),
+              },
+            });
+          } else if (ev.type === "download_not_found" || ev.type === "connection_lost") {
             put(key, { status: "failed" }); // socket lost / unknown download: say it failed, no made-up code
           }
+          // any other event type is a newer server's: ignored, never read as a failure
         });
       } catch (e) {
         const detail =

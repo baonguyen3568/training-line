@@ -471,6 +471,14 @@ export type DownloadEvent =
       status: "downloading" | "verifying" | "completed" | "failed";
       error?: EventError;
     }
+  | {
+      /** The job waits for enough free RAM before it starts (polled ~every 30 s, backend). */
+      type: "waiting";
+      waiting_for: "memory";
+      need_gb?: number;
+      avail_gb?: number;
+      waited_s?: number;
+    }
   | { type: "download_not_found" | "connection_lost" };
 
 export interface NodeResetResult {

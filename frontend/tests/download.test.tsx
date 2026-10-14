@@ -353,3 +353,37 @@ describe("gated model", () => {
     expect(target?.repo).toBeUndefined();
   });
 });
+
+describe("waiting for memory", () => {
+  it("a queued download waiting for RAM says so, an unknown event is not a failure, progress clears it", async () => {
+    const { api } = await import("../src/api");
+    let emit: (ev: DownloadEvent) => void = () => {};
+    vi.spyOn(api, "startDownload").mockResolvedValue({ download_id: "dw", status: "queued" });
+    vi.spyOn(api, "watchDownload").mockImplementation((_id, onEvent) => {
+      emit = onEvent;
+      return () => {};
+    });
+    const { useDownloads } = await import("../src/store/downloads");
+    const { DownloadDialog } = await import("../src/components/DownloadDialog");
+    render(
+      <DownloadDialog target={{ kind: "model", catalogId: "xw", name: "X" }} onClose={() => {}} />,
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /Tải về/ }));
+    await waitFor(() => expect(useDownloads.getState().entries["model:xw"]?.status).toBe("queued"));
+    act(() =>
+      emit({ type: "waiting", waiting_for: "memory", need_gb: 41.6, avail_gb: 30.2, waited_s: 30 }),
+    );
+    const line = await screen.findByTestId("download-waiting");
+    expect(line.textContent).not.toMatch(/\{\w+\}/);
+    // a newer server's event this client does not know: ignored, never read as a failure
+    act(() => emit({ type: "brand_new_event" } as unknown as DownloadEvent));
+    expect(useDownloads.getState().entries["model:xw"]?.status).toBe("queued");
+    expect(screen.queryByRole("alert")).toBeNull();
+    act(() =>
+      emit({ type: "progress", bytes_done: 1e9, bytes_total: 4e9, files_done: 0, files_total: 2 }),
+    );
+    expect(screen.queryByTestId("download-waiting")).toBeNull();
+    expect(useDownloads.getState().entries["model:xw"]?.waiting).toBeUndefined();
+  });
+});

@@ -134,6 +134,19 @@ export function DownloadDialog({
           <div className="download-progress" role="status" aria-live="polite">
             {entry.status === "verifying" ? (
               <p>{t("download.verifying")}</p>
+            ) : entry.waiting && entry.status !== "downloading" ? (
+              // queued until enough RAM is free; the numbers when the server sent them, never "{need_gb}"
+              <p data-testid="download-waiting">
+                <span className="si si-warn" aria-hidden="true">
+                  <Icon name="clock" size={14} />
+                </span>{" "}
+                {(entry.waiting.need_gb !== undefined && entry.waiting.avail_gb !== undefined
+                  ? tpOptional(["download", "waiting_memory"], {
+                      need_gb: Math.round(entry.waiting.need_gb),
+                      avail_gb: Math.round(entry.waiting.avail_gb),
+                    })
+                  : undefined) ?? t("node_state.waiting_memory")}
+              </p>
             ) : (
               <>
                 <progress max={100} value={percent ?? 0} aria-label={t("download.dialog_title")} />
