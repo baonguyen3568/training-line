@@ -19,6 +19,12 @@
 #                   Sources: benchmarks/perf/r2-qwen3.5-2b-lora-cord-20261013.json,
 #                   benchmarks/perf/r7-filter-dedupe-lora-20261014.json, benchmarks/perf/qwen3.5-4b-9b-lora-mem-20261013.json,
 #                   benchmarks/perf/qlora-vs-lora-qwen3.5-2b-26.08-7-20261014.json
+#                   Families never trained on GB10 (verified B/C) take the same fit + 20% margin (a 2.2, b 30): an
+#                   estimate, shown as such (ram_source estimated), until a measured run replaces it.
+#   Qwen2-VL / Qwen2.5-VL / Qwen3-VL share one recipe: the catalog Qwen3-VL template (qwen2_5_collate_fn, the collate
+#   AutoModel's own Qwen2.5-VL and Qwen3-VL examples use). Pixel caps: 200704/1003520 = 256..1280 tokens at 28 px
+#   (Qwen2/2.5-VL, patch 14) and 196..980 at 32 px (Qwen3-VL, patch 16); both are Qwen's documented processor range.
+#   Non-Qwen families (gemma3, llava_onevision, idefics3/smolvlm, mistral3) wait for image_policy processor_default.
 schema_version: 1
 families:
   - id: qwen3_5
@@ -37,3 +43,51 @@ families:
     min_pixels: 200704
     max_pixels: 1003520
     ram_gb_train: {a: 1.8, b: 25.0, valid_up_to_params_b: 10.0}
+  - id: qwen3_vl
+    model_types: [qwen3_vl]
+    architectures: [Qwen3VLForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: B  # AutoModel ships Qwen3-VL examples; the catalog Qwen3-VL 2B has no GB10 training run yet
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/qwen3-vl-2b-instruct.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*vision*", "*visual*", "*image_encoder*", "*lm_head*", "*audio*"]
+    qlora_skip_modules: [model.visual]
+    loss: masked_ce
+    image_policy: qwen_pixels
+    min_pixels: 200704
+    max_pixels: 1003520
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: qwen2_5_vl
+    model_types: [qwen2_5_vl]
+    architectures: [Qwen2_5_VLForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: B  # AutoModel ships Qwen2.5-VL examples (vlm_finetune/qwen2_5)
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/qwen3-vl-2b-instruct.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*vision*", "*visual*", "*image_encoder*", "*lm_head*", "*audio*"]
+    qlora_skip_modules: [model.visual]
+    loss: masked_ce
+    image_policy: qwen_pixels
+    min_pixels: 200704
+    max_pixels: 1003520
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
+  - id: qwen2_vl
+    model_types: [qwen2_vl]
+    architectures: [Qwen2VLForConditionalGeneration]
+    auto_class: AutoModelForImageTextToText
+    attn: sdpa
+    verified: C  # transformers native; same module layout and processor as Qwen2.5-VL
+    train_node: train.lora_vlm
+    recipe: configs/train/templates/qwen3-vl-2b-instruct.yaml
+    freeze_vision_tower: true
+    lora_exclude: ["*vision_tower*", "*vision*", "*visual*", "*image_encoder*", "*lm_head*", "*audio*"]
+    qlora_skip_modules: [model.visual]
+    loss: masked_ce
+    image_policy: qwen_pixels
+    min_pixels: 200704
+    max_pixels: 1003520
+    ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
