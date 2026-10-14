@@ -1,20 +1,10 @@
 import { tpOptional } from "../i18n";
 import { untrustedText } from "./safeText";
 
-// Licence ids → display names: design's copy license.name.<id> (security: names live in i18n), else these labels
-// (until that copy exists), else the id as written, never invented. Names only: the class and obligations always
-// come from the server (security's obligations table), never from here.
-const LICENSE_NAME: Record<string, string> = {
-  "apache-2.0": "Apache-2.0",
-  mit: "MIT",
-  "cc-by-4.0": "CC-BY-4.0",
-  "nvidia-open-model-license": "NVIDIA Open Model License",
-  "openmdw-1.1": "OpenMDW-1.1",
-};
-export const licenseName = (id: string): string =>
-  tpOptional(["license", "name", id]) ??
-  // own keys only: an id like "constructor" must not read Object.prototype
-  (Object.hasOwn(LICENSE_NAME, id) ? (LICENSE_NAME[id] as string) : id);
+// Licence ids → display names: design's copy license.name.<id> (security: names live in i18n), else the id as
+// written, never invented. Names only: the class and obligations always come from the server (security's
+// obligations table). The id is one path segment: ids with dots ("llama3.1", "lfm1.0") are never split.
+export const licenseName = (id: string): string => tpOptional(["license", "name", id]) ?? id;
 
 /** "Tác giả ghi: “…”": a user-added asset's licence in its author's words (untrusted: plain text, clamped), or
  * undefined while the copy is missing (the line hides, never a key). */

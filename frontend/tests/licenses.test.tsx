@@ -10,8 +10,13 @@ describe("licenseName", () => {
       expect(licenseName(id)).toBe(id);
     },
   );
-  it("a known id reads as its name", () => {
+  it("a known id reads as design's name, a dotted id as one key", async () => {
+    const { t } = await import("../src/i18n");
     expect(licenseName("apache-2.0")).toBe("Apache-2.0");
+    expect(licenseName("llama3.1")).not.toBe("llama3.1"); // "license.name.llama3.1", not license.name.llama3 → 1
+    expect(licenseName("lfm1.0")).toContain("LFM");
+    expect(licenseName("no-such-licence")).toBe("no-such-licence");
+    expect(t("license.badge.unknown")).not.toBe("license.badge.unknown");
   });
 });
 

@@ -54,13 +54,10 @@ export const minutes = (m: number) => {
   return h === 0 ? fill(est.dur_m, { m: r }) : r ? fill(est.dur_hm, { h, m: r }) : fill(est.dur_h, { h });
 };
 
-const LICENSE: Record<string, string> = {
-  "apache-2.0": "Apache-2.0",
-  mit: "MIT",
-  "cc-by-4.0": "CC-BY-4.0",
-  "nvidia-open-model-license": "NVIDIA Open Model License",
-  "openmdw-1.1": "OpenMDW-1.1",
-};
+/** license.name.<id> from the app's copy (design; security: names live in i18n), else the id as written. The id is one
+ * key: dotted ids ("llama3.1") are never split, and only own keys are read. */
+const licenseNames = ((copy as Record<string, unknown>).license as { name?: Record<string, string> } | undefined)?.name ?? {};
+const licenseName = (id: string) => (Object.hasOwn(licenseNames, id) ? (licenseNames[id] as string) : id);
 export const METRIC = (pl.metric ?? {}) as Record<string, string>; // pipelines.metric.<id> (design copy)
 /** pipelines.metric_help.<id>: what the number means, first in the card's "?" when design wrote it ({n}). */
 export const metricHelp = (s: { metric: string; n?: number }) => {
@@ -84,7 +81,7 @@ export const formatCi = (metric: string, [lo, hi]: [number, number]) => {
   return `${b(lo)} – ${b(hi)}`;
 };
 export const licenseOf = (p: Pipe) =>
-  [...new Set([p.license.code, p.license.model].filter(Boolean).map((x) => LICENSE[x as string] ?? x))].join(" · ");
+  [...new Set([p.license.code, p.license.model].filter(Boolean).map((x) => licenseName(x as string)))].join(" · ");
 /** The measured line's parts (the card wraps only between them): time · peak RAM · score. */
 export const measuredParts = (m: NonNullable<Pipe["measured"]>) =>
   [
@@ -96,7 +93,7 @@ export const measuredLine = (m: NonNullable<Pipe["measured"]>) => measuredParts(
 /** The licences, each once (code, model, data), for the badge; the line wraps only between them. */
 export const licenseParts = (p: Pipe) => [
   ...new Set(
-    [p.license.code, p.license.model, p.license.data].map((x) => (x ? (LICENSE[x] ?? x) : pl.see_source)),
+    [p.license.code, p.license.model, p.license.data].map((x) => (x ? licenseName(x) : pl.see_source)),
   ),
 ];
 /** The pipeline this one's score is compared with (generator-checked: same benchmark and metric). */

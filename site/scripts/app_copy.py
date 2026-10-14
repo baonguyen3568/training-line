@@ -30,6 +30,7 @@ KEYS = (
     "estimate",
     "method",
     "arch",
+    "license",
 )
 ERRORS = ("MEM-001", "CFG-003")
 
