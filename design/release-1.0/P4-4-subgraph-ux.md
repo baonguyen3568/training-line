@@ -41,7 +41,9 @@ Ghi chú về từ ngữ: UI gọi là **"nhóm"**; "subgraph" chỉ dùng trong
   - Không kéo thêm bước, không nối hay gỡ dây.
   - Inspector của bước con vẫn mở được để xem. Tham số nào được expose thì hiện ghi chú `canvas.group.param_exposed` và một link quay về nhóm để sửa ở đó.
 - **Nhóm tự tạo (`user.*`)**: ở 1.0 cũng chỉ xem được (PM dời Gộp/Tách sang 1.1, nên sửa bên trong nhóm cũng sang 1.1). Breadcrumb có khoá, tooltip `canvas.group.readonly_user`.
-- Chuyển cảnh khi vào/ra: scale từ vị trí node nhóm, 180 ms, ease-out. Có `prefers-reduced-motion` thì cắt thẳng, không animation.
+- Chuyển cảnh khi vào/ra: 1.0 dùng scale 0.96 → 1 + opacity, từ giữa khung, 180 ms, ease-out (scale từ đúng vị trí node để 1.1). Có `prefers-reduced-motion` thì cắt thẳng, không animation.
+- Không có nút "Lên một cấp" riêng: phần breadcrumb cấp cha có tooltip `canvas.group.up` (Alt+↑).
+- Khi không chọn gì bên trong nhóm, Inspector hiện tóm tắt CỦA NHÓM (tên, số bước, lỗi bên trong, dòng khoá), không hiện tóm tắt workflow ngoài.
 - **Focus:**
   - Khi vào nhóm, focus đặt vào bước con đầu tiên.
   - Khi ra, focus về lại node nhóm.
