@@ -1756,6 +1756,14 @@ session:
   ended_body: Mở đường link đăng nhập mới nhất mà app in trong nhật ký (log) để đăng nhập lại. Nếu app chạy trên máy khác, hãy hỏi người quản trị đường link đó.
   ended_retry: Thử lại
 byo:
+  sample_error:
+    image_missing: Không có tệp ảnh của mẫu này trong repo.
+    image_not_a_file: Đường dẫn ảnh của mẫu này không trỏ tới một tệp ảnh.
+    image_too_large: Tệp ảnh của mẫu này quá lớn.
+    image_too_many_pixels: Ảnh của mẫu này có độ phân giải quá lớn.
+    image_unreadable: Không đọc được ảnh của mẫu này.
+    no_sample: Bộ dữ liệu này không có mẫu nào để xem trước.
+    unreadable: Không đọc được mẫu nào của bộ dữ liệu này. Hãy kiểm tra lại cách ghép cột.
   role:
     image: cột ảnh
     question: cột câu hỏi

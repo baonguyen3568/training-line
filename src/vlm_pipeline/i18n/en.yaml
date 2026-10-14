@@ -1756,6 +1756,14 @@ session:
   ended_body: Open the latest sign-in link the app printed in its log to sign in again. If the app runs on another machine, ask its admin for that link.
   ended_retry: Try again
 byo:
+  sample_error:
+    image_missing: This sample's image file is not in the repo.
+    image_not_a_file: This sample's image path does not point to an image file.
+    image_too_large: This sample's image file is too large.
+    image_too_many_pixels: This sample's image resolution is too high.
+    image_unreadable: Could not read this sample's image.
+    no_sample: This dataset has no samples to preview.
+    unreadable: Could not read any sample from this dataset. Check the column mapping.
   role:
     image: image column
     question: question column
