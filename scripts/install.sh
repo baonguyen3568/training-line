@@ -7,6 +7,9 @@
 #   scripts/install.sh --ref v1.0.0      install that tag / commit instead of HEAD (a frozen release build)
 # Never run as root: the app, the runner and every job run as YOUR user id (security F2).
 set -euo pipefail
+# The whole script is one block, read completely before it runs: an edit (git pull, a commit) while it runs cannot
+# make bash continue in the middle of the new text (PM 2026-10-14: "line 286: too: command not found").
+{
 
 DRY_RUN=0
 SKIP_DOWNLOAD=0
@@ -301,3 +304,5 @@ if [[ -n "$LAN_BIND" ]]; then
   say "On the LAN: https://$LAN_BIND:$LAN_PORT/ (each device must trust $TLS_DIR/ca.crt first)."
   say "Anyone with the link controls this project: share it only with people you trust (Settings: sign out everywhere)."
 fi
+exit 0
+}
