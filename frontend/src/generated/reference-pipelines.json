@@ -379,7 +379,15 @@
         "model": "apache-2.0",
         "data": null
       },
-      "measured": null,
+      "measured": {
+        "train_minutes": 13.9,
+        "peak_ram_gb": 24.4,
+        "score": null,
+        "config": "Template 2 steps with Qwen3.5-4B: LoRA 1 epoch on 200 CORD receipt images (not the recipe's MedPix data) + merge; a memory measurement run, no task score",
+        "sources": [
+          "benchmarks/perf/qwen3.5-4b-9b-lora-mem-20261013.json"
+        ]
+      },
       "steps": [
         {
           "node": "model.hf_pick",
