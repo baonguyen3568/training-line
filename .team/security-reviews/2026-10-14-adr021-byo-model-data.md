@@ -112,3 +112,6 @@ Tests the PR must carry: `../x`, `/abs`, `a\b`, symlink, hardlink, device, dupli
 - SYS-006 (pids limit hit): 1.0 classifies from a narrow log regex on a non-zero exit. After 1.0 the runner should
   read the container's cgroup `pids.events` (`max` > 0) before removing it and return it in the job state, as the
   primary signal (protocol change, ADR-015).
+- User dataset conversions: name the converted folder by a hash of (columns, prompt) so a new mapping never deletes
+  the folder an earlier run read (reproducibility; no in-use races); unreferenced folders go to GC. 1.0 instead
+  refuses (409) to drop/delete a converted folder while its download is active or a run uses it.
