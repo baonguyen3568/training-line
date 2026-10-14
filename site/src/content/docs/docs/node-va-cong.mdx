@@ -44,6 +44,10 @@ LoRA không sửa model gốc mà học thêm một phần nhỏ đặt bên c�
 | Nguồn | <span id="data.hf_load"></span>**Dataset Hugging Face** | → `Dataset` |
 | Nguồn | <span id="data.local_folder"></span>**Thư mục ảnh + câu hỏi/đáp án** | → `Dataset` |
 | Dữ liệu | <span id="data.split"></span>**Chia dữ liệu học / kiểm tra** | `Dataset` → `Dataset` (học), `Dataset` (kiểm tra) |
+| Dữ liệu | <span id="data.filter"></span>**Lọc dữ liệu** | `Dataset` → `Dataset` |
+| Dữ liệu | <span id="data.dedupe"></span>**Bỏ mẫu trùng** | `Dataset` (+ `Dataset` kiểm tra, tuỳ chọn, nối được nhiều dây) → `Dataset` |
+| Dữ liệu | <span id="data.mix"></span>**Trộn dữ liệu** | 2 đến 4 `Dataset` → `Dataset` |
+| Dữ liệu | <span id="data.caption_vlm"></span>**Tạo mô tả ảnh bằng model** | `Dataset` + `Model` → `Dataset` |
 | Train | <span id="train.lora_vlm"></span>**Fine-tune nhẹ (LoRA)** | `Model` + `Dataset` (+ `Dataset` kiểm tra, tuỳ chọn) → `Adapter` |
 | Train | <span id="train.sft_vlm"></span>**Fine-tune toàn bộ** | `Model` + `Dataset` (+ `Dataset` kiểm tra, tuỳ chọn) → `Checkpoint` |
 | Train | <span id="train.merge_lora"></span>**Gộp phần học thêm vào model** | `Model` + `Adapter` → `Checkpoint` |
@@ -54,7 +58,15 @@ LoRA không sửa model gốc mà học thêm một phần nhỏ đặt bên c�
 | Xuất | <span id="export.hf_dir"></span>**Lưu model** | `Model` → `ExportArtifact` |
 
 <Hint title="Node nặng và node nhẹ">
-Các node train, nén, đo điểm và chạy thử chạy trên GPU, mỗi lúc một bước; bước sau tự chờ. Các node nguồn và chia dữ liệu chạy nhẹ, không cần GPU.
+Các node train, nén, đo điểm, chạy thử và tạo mô tả ảnh chạy trên GPU, mỗi lúc một bước; bước sau tự chờ. Các node nguồn, chia, lọc, bỏ trùng và trộn dữ liệu chạy nhẹ, không cần GPU.
+</Hint>
+
+<Hint title="Vì sao nên nối cổng Dữ liệu kiểm tra vào bước Bỏ mẫu trùng?">
+Nếu một ảnh dùng để train cũng nằm trong dữ liệu kiểm tra, model được chấm trên chính ảnh nó đã học và điểm sẽ cao hơn thực tế. Nối dữ liệu kiểm tra vào cổng **Dữ liệu kiểm tra** để bước này bỏ các ảnh trùng đó khỏi dữ liệu train. Không nối thì app nhắc bạn.
+</Hint>
+
+<Hint title="Dùng bước Tạo mô tả ảnh bằng model thế nào cho an toàn?">
+Model có thể viết sai. Trước khi train, hãy mở kết quả và đọc lại vài câu mô tả; câu sai sẽ dạy model mới học sai theo.
 </Hint>
 
 ## App chặn lỗi trước khi chạy
