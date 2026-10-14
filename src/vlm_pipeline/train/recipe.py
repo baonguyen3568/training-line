@@ -85,6 +85,16 @@ def _apply_data(
         _section(r, "dataset")["limit_dataset_samples"] = train_limit  # "quick run" sizes of the data node
 
 
+# QLoRA base weights (LoraParams.quantize_base="nf4"): AutoModel 26.08 create_bnb_config, as in its
+# llama_3_3_70b_instruct_squad_peft_qlora_spark.yaml (bitsandbytes 0.49.2 aarch64 in vlm-automodel:26.08-6).
+QLORA_NF4: dict[str, Any] = {
+    "load_in_4bit": True,
+    "load_in_8bit": False,
+    "bnb_4bit_compute_dtype": "bfloat16",
+    "bnb_4bit_use_double_quant": True,
+    "bnb_4bit_quant_type": "nf4",
+    "bnb_4bit_quant_storage": "bfloat16",
+}
 NO_STEP_CADENCE = 1_000_000_000  # ckpt_every_steps that never fires (step % N == N - 1): epoch ends only
 
 
@@ -161,6 +171,7 @@ def build_recipe(
     )
     _section(r, "distributed")["activation_checkpointing"] = params.activation_checkpointing
 
+    r.pop("quantization", None)  # only the node turns 4-bit on (QLoRA below), never a template; never for full FT
     if isinstance(params, LoraParams):
         existing = r.get("peft")
         peft: dict[str, Any] = existing if isinstance(existing, dict) else {}
@@ -172,6 +183,8 @@ def build_recipe(
             "dim": params.lora_dim,
             "alpha": params.lora_alpha,
         }
+        if params.quantize_base == "nf4":  # QLoRA: AutoModel's BitsAndBytes section (its DGX Spark QLoRA example)
+            r["quantization"] = dict(QLORA_NF4)
     else:
         r.pop("peft", None)
         freeze = r.setdefault("freeze_config", {})

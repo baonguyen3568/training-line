@@ -60,6 +60,20 @@ def test_lora_sets_peft_from_params() -> None:
     assert r["optimizer"]["lr"] == 1e-4
 
 
+def test_qlora_adds_the_bitsandbytes_section_and_only_then() -> None:
+    """QLoRA (quantize_base=nf4): AutoModel's own create_bnb_config keys, as in its DGX Spark QLoRA example."""
+    from vlm_pipeline.train.recipe import QLORA_NF4
+
+    q = build_recipe(_tpl("qwen3.5-2b"), LoraParams(quantize_base="nf4"), model_dir="m", dataset_dir="d", run_dir="r")
+    assert q["quantization"] == QLORA_NF4
+    assert (q["quantization"]["bnb_4bit_quant_type"], q["quantization"]["load_in_4bit"]) == ("nf4", True)
+    assert q["peft"]["dim"] == LoraParams().lora_dim  # still LoRA adapters on top
+    plain = dict(_tpl("qwen3.5-2b"), quantization={"load_in_4bit": True})  # a template never forces it on
+    assert "quantization" not in build_recipe(plain, LoraParams(), model_dir="m", dataset_dir="d", run_dir="r")
+    full = build_recipe(plain, FullFinetuneParams(), model_dir="m", dataset_dir="d", run_dir="r")
+    assert "quantization" not in full  # 4-bit weights cannot be trained: never for a full fine-tune
+
+
 def test_missing_template(tmp_path: Path) -> None:
     entry = load_catalog().get("qwen3.5-9b")
     assert entry is not None
