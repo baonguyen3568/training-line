@@ -1,6 +1,6 @@
 ---
-title: Template và pipeline tham chiếu
-description: Mở một mẫu có sẵn, chạy được ngay, rồi sửa theo ý bạn. Kèm các pipeline đã công bố của NVIDIA, Qwen, Hugging Face và cộng đồng.
+title: Pipeline theo phương pháp train
+description: Các phương pháp train và nén model ảnh–chữ đang được dùng rộng rãi, dựng sẵn thành pipeline; đổi model và dữ liệu ở bước nguồn để dùng với của bạn.
 sources:
   - configs/reference_pipelines.yaml
   - configs/templates/invoice_to_json.json
@@ -13,10 +13,10 @@ numbers_without_source: []
 import Hint from '~/components/Hint.astro';
 import PipelineLibrary from '~/components/PipelineLibrary.astro';
 
-Mỗi mẫu là một workflow dựng sẵn bằng chính các bước trong app. Bạn mở mẫu, bấm Chạy để xem nó chạy, rồi thay dữ liệu hay đổi bước tuỳ ý. Mẫu không có gì đặc biệt: mọi thứ trong mẫu bạn đều tự ghép lại được.
+Mỗi thẻ là một phương pháp train hoặc nén model ảnh–chữ đang được dùng rộng rãi, dựng lại bằng chính các bước trong app và ghi nguồn công bố gốc. Model và dữ liệu trên thẻ chỉ là cấu hình đã đo; bạn đổi chúng ở bước nguồn để dùng phương pháp đó với model và dữ liệu của mình. <Hint title="Đọc sơ đồ trên thẻ">Sơ đồ chia model thành ba phần: phần nhìn ảnh, bộ nối ảnh–chữ và phần ngôn ngữ. Khối viền nét đứt có ổ khoá là phần giữ nguyên; khối tô màu là phần được train; nhãn LoRA nghĩa là phần đó chỉ học thêm một lớp nhỏ; nhãn 4-bit hay FP8 là mức nén. Phương pháp nhiều giai đoạn có một hàng cho mỗi giai đoạn. Bấm "?" ở góc sơ đồ để xem chú giải.</Hint>
 
-Bên dưới là toàn bộ thư viện. Thẻ **Mẫu của app** mở được ngay trong app. Các thẻ khác là pipeline do NVIDIA, Qwen, Hugging Face hay cộng đồng công bố; app đang dựng lại chúng bằng chính các bước của mình, hoặc chỉ ghi lại để tham khảo. <Hint title="Đọc một thẻ thế nào">Mỗi thẻ ghi các bước chính, giấy phép của mã, model và dữ liệu, độ khó, và nguồn công bố gốc. Thời gian, RAM và điểm chỉ ghi khi đã đo thật trên một máy DGX Spark; bấm "?" cạnh số để xem cấu hình đã chạy và nguồn của số. Chưa đo thì thẻ ghi "chưa có số đo".</Hint>
+Thẻ ghi "Đang chuẩn bị" là phương pháp đang được dựng và chạy thử; các thẻ còn lại mở được ngay trong app. Thời gian, RAM và điểm chỉ ghi khi đã đo thật trên một máy DGX Spark; bấm "?" cạnh số để xem cấu hình đã chạy và nguồn của số. Trên máy của bạn, app ước lượng lại theo thiết lập và phần bộ nhớ còn trống thật.
 
-Trên máy của bạn, thời gian và bộ nhớ có thể khác. Khi bạn mở một mẫu, app ước lượng lại theo thiết lập và phần bộ nhớ còn trống thật của máy.
+Làm sạch dữ liệu (lọc ảnh hỏng, bỏ mẫu trùng, chặn trùng với dữ liệu kiểm tra) không phải một phương pháp riêng. Đó là các bước có sẵn, ghép được vào trước bất kỳ phương pháp nào; xem [Node và cổng](/docs/node-va-cong/).
 
 <PipelineLibrary />
