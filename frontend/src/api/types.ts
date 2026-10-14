@@ -253,6 +253,8 @@ export interface ValidationIssue {
   param?: string;
   /** P016: on a step inside a group, node_id is the outermost group node and this lists the inner ids per level. */
   inner_path?: string[];
+  /** H-prompt (P021): a hint for one field of a step (`param`), never a problem: not listed, not counted. */
+  field_hint?: boolean;
   code: string;
   severity: Severity;
   params: Record<string, string | number>;
@@ -265,6 +267,8 @@ export interface ValidationIssue {
 export interface ValidationResult {
   ok: boolean;
   errors: ValidationIssue[];
+  /** Client side: the server's field_hint issues, taken out of `errors` (the store splits them on arrival). */
+  fieldHints?: ValidationIssue[];
   estimate: {
     ram_gb_peak: Range | null;
     disk_gb: Range | null;
@@ -602,6 +606,9 @@ export interface TrialResult {
   decoding: Record<string, unknown>;
   overrides: Record<string, unknown>;
   model_class?: string;
+  /** H-prompt: the question actually asked (untrusted text; "" for a one-task model) and where it came from. */
+  prompt_used?: string;
+  prompt_source?: "user" | "trained" | "default" | "fixed";
 }
 
 /** D-7 settings (backend, P015 §4.5). The token value never leaves the server again. */

@@ -1651,3 +1651,13 @@ fieldset.seg-radio {
 .byo-ds-summary .link {
   padding: 0;
 }
+/* H-prompt: the trained question as an empty prompt's placeholder: real information, so text.muted at full
+   opacity (>= 4.5:1 on the input, design), never the browser's faded default */
+textarea.has-suggestion::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+.field-suggestion {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-secondary);
+}

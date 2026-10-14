@@ -339,7 +339,13 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       const key = graphKey(wf);
       set({ validating: true });
       try {
-        const validation = await api.validate(wf, getLocale());
+        const res = await api.validate(wf, getLocale());
+        // field hints (H-prompt MODEL-007) are no problem: out of the issue list every view counts, kept for the field
+        const validation: ValidationResult = {
+          ...res,
+          errors: res.errors.filter((e) => !e.field_hint),
+          fieldHints: res.errors.filter((e) => e.field_hint),
+        };
         // Ignore stale responses if the graph changed meanwhile (moving nodes does not count).
         if (graphKey(get().workflow) === key) set({ validation });
       } finally {

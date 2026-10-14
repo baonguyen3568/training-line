@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { ApiError, uploadUrl } from "../api/client";
 import type { TrialResult as Result } from "../api/types";
-import { t } from "../i18n";
+import { t, tpOptional } from "../i18n";
 import { stripInvisible, untrustedText } from "../lib/safeText";
 
 type State =
@@ -13,6 +13,29 @@ type State =
   | { kind: "failed" };
 
 const MAX_TEXT = 20_000; // the server already cuts at 20k and sets truncated
+
+/**
+ * "Câu đã hỏi: <question> (câu lúc train)" (H-prompt, design): the question the trial really asked, so a good or poor
+ * answer can be read against it. Untrusted text, plain and clamped; nothing for a one-task model (source "fixed").
+ */
+function PromptUsed({ result }: { result: Result }) {
+  const q = result.prompt_used;
+  if (!q || result.prompt_source === "fixed") return null;
+  const lead = tpOptional(["trial", "prompt_used"], { prompt: "\u0000" });
+  if (!lead) return null;
+  const [before, after = ""] = lead.split("\u0000");
+  const source = result.prompt_source
+    ? tpOptional(["trial", "prompt_source", result.prompt_source])
+    : undefined;
+  return (
+    <p className="small trial-prompt">
+      {before}
+      <code className="mono">{untrustedText(q, 300)}</code>
+      {after}
+      {source && <span className="muted"> ({source})</span>}
+    </p>
+  );
+}
 
 /**
  * Output of a "Chạy thử" node after a run (B-7). Everything in result.json is written by a container: text is
@@ -68,6 +91,7 @@ export function TrialResult({
           )}
           {state.result.truncated && <p className="badge">✂ {t("trial.truncated")}</p>}
           <pre className="trial-text">{untrustedText(state.result.text, MAX_TEXT)}</pre>
+          <PromptUsed result={state.result} />
           <p className="muted small">
             {t("trial.meta", {
               engine: untrustedText(state.result.engine_used, 20),

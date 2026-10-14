@@ -24,6 +24,7 @@ import { openInnerStep } from "../lib/openInner";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
 import { runErrorText } from "../lib/runWarning";
+import { untrustedText } from "../lib/safeText";
 import { selfAndDownstream } from "../lib/topo";
 import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
@@ -124,6 +125,7 @@ function ParamField({
   onChange,
   optionMinutes,
   invalidBy,
+  suggestion,
 }: {
   nodeType: string;
   name: string;
@@ -134,6 +136,11 @@ function ParamField({
   optionMinutes?: Record<string, Range | null>;
   /** Ids of this field's error lines (ParamRow): the field is marked invalid and read with them. */
   invalidBy?: string;
+  /**
+   * H-prompt (field_hint MODEL-007): what the server uses when this field stays empty (the trained question), shown
+   * as the empty field's placeholder with its note; never written into the param (no silent workflow change).
+   */
+  suggestion?: string;
 }) {
   // a group's exposed param reads the copy of the inner step that owns it (P4-4)
   const owner = copyOwner(nodeType, name, "param", useWorkflow.getState().specs);
@@ -162,8 +169,23 @@ function ParamField({
           rows={3}
           maxLength={schema.maxLength}
           value={String(current ?? "")}
+          placeholder={suggestion ? untrustedText(suggestion, 300) : undefined}
+          className={suggestion ? "has-suggestion" : undefined}
+          aria-describedby={
+            [invalidBy ?? "", suggestion && !current ? `${id}-suggestion` : ""]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           onChange={(e) => onChange(e.target.value)}
         />
+        {suggestion && !current && tpOptional(["trial", "prefilled_prompt"]) && (
+          <p id={`${id}-suggestion`} className="small field-suggestion">
+            <span className="si si-muted" aria-hidden="true">
+              <Icon name="info" size={14} />
+            </span>{" "}
+            {t("trial.prefilled_prompt")}
+          </p>
+        )}
       </div>
     );
   }
@@ -704,6 +726,12 @@ export function Inspector() {
   const customized = customizedAdvanced(spec, node.params);
   // Measured time of this train step (estimate.duration.per_node): "~1 giờ 37 phút – 1 giờ 52 phút · 300 step".
   const nodeEst = validation?.estimate.duration?.per_node[node.id];
+  // the server's hint for one field of this step (H-prompt: the trained question for an empty prompt)
+  const fieldHint = (param: string) => {
+    const v = validation?.fieldHints?.find((h) => h.node_id === node.id && h.param === param)
+      ?.params.prompt;
+    return typeof v === "string" && v ? v : undefined;
+  };
 
   return (
     <aside className="inspector" aria-label={nodeTitle(spec, node.type)}>
@@ -939,6 +967,7 @@ export function Inspector() {
           value={node.params[name]}
           onChange={(v) => setParam(node.id, name, v)}
           optionMinutes={name === "epochs" ? nodeEst?.by_epochs : undefined}
+          suggestion={fieldHint(name)}
         />
       ))}
       {advanced.length > 0 && mode === "simple" && (
@@ -963,6 +992,7 @@ export function Inspector() {
             value={node.params[name]}
             onChange={(v) => setParam(node.id, name, v)}
             optionMinutes={name === "epochs" ? nodeEst?.by_epochs : undefined}
+            suggestion={fieldHint(name)}
           />
         ))}
       {showAdvanced && props.advanced?.["x-ui"]?.widget === "advanced" && (
