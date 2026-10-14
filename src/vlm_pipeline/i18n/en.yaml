@@ -1533,6 +1533,7 @@ download:
   cancel_confirm: Cancel this download? The partly downloaded files will not be used.
   progress: "{done_gb}/{total_gb} GB · files {file_done_count}/{file_count}"
   verifying: Checking the downloaded files…
+  waiting_memory: Waiting for enough free memory to start (needs about {need_gb} GB, {avail_gb} GB free). The app starts on its own when there is enough; you don't need to do anything.
   installing: Installing into the app's cache…
   completed: Downloaded "{name}" to this machine.
   failed: Could not download "{name}".

@@ -1533,6 +1533,7 @@ download:
   cancel_confirm: Huỷ lần tải này? Phần đã tải dở sẽ không được dùng.
   progress: "{done_gb}/{total_gb} GB · {file_done_count}/{file_count} tệp"
   verifying: Đang kiểm tra tệp vừa tải…
+  waiting_memory: Đang chờ đủ bộ nhớ trống để bắt đầu (cần khoảng {need_gb} GB, đang trống {avail_gb} GB). App tự bắt đầu khi đủ; bạn không cần làm gì.
   installing: Đang cài vào bộ nhớ đệm của app…
   completed: Đã tải "{name}" về máy.
   failed: Chưa tải được "{name}".
