@@ -48,12 +48,20 @@ export function DownloadDialog({
 }) {
   // an unknown licence of a user-added asset: its author's words, from the issue or this machine's added lists
   const added = useUserModels((st) => (target.kind === "model" ? st.models : st.datasets));
-  const needCard = target.license === "unknown" && !target.licenseCard;
+  const needCard =
+    (target.license === "unknown" && !target.licenseCard) ||
+    (target.catalogId.startsWith("user") && !target.licenseClass);
   useEffect(() => {
     if (needCard) void useUserModels.getState().load();
   }, [needCard]);
-  const licenseCard =
-    target.licenseCard ?? added.find((a) => a.id === target.catalogId)?.license_card ?? undefined;
+  const own = added.find((a) => a.id === target.catalogId);
+  const licenseCard = target.licenseCard ?? own?.license_card ?? undefined;
+  // the class and obligations come from the server (catalog option_meta, or the added asset's own record), never
+  // inferred here; a user-added asset without them is "unknown" (fail closed, security)
+  const userAsset = !!own || target.catalogId.startsWith("user");
+  const licenseClass =
+    target.licenseClass ?? own?.license_class ?? (userAsset ? "unknown" : undefined);
+  const obligations = target.obligations ?? own?.obligations;
   const key = downloadKey(target.kind, target.catalogId);
   const entry = useDownloads((s) => s.entries[key]);
   const start = useDownloads((s) => s.start);
@@ -117,11 +125,7 @@ export function DownloadDialog({
         {license && (
           <>
             <p className="small muted">{t("download.license_lead")}</p>
-            <LicenseTerms
-              license={license}
-              licenseClass={target.licenseClass}
-              obligations={target.obligations}
-            />
+            <LicenseTerms license={license} licenseClass={licenseClass} obligations={obligations} />
           </>
         )}
         {license === "unknown" && (

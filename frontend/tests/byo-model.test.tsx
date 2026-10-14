@@ -314,4 +314,49 @@ describe("unknown licence", () => {
       expect(document.querySelector(".license-card")?.textContent).toBe(cardSays("other (acme)")),
     );
   });
+
+  it("a user model's licence class comes from the server; none means unknown, never commercial", async () => {
+    const { api } = await import("../src/api");
+    const { t } = await import("../src/i18n");
+    const base = {
+      id: "user--acme--vlm--1a2b3c4d",
+      name: "vlm",
+      repo: "acme/vlm",
+      revision: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+      family: "Qwen2.5-VL",
+      architecture: "Qwen2_5_VLForConditionalGeneration",
+      params_b: 3.8,
+      size_gb: 7.6,
+      license: "apache-2.0",
+      license_confirmed: false,
+      gated: false,
+      ram_gb_train: 31.5,
+      ram_source: "estimated",
+      verified: false as const,
+    };
+    const list = vi.spyOn(api, "listUserModels").mockResolvedValue({ models: [base] });
+    const { DownloadDialog } = await import("../src/components/DownloadDialog");
+    const target = {
+      kind: "model" as const,
+      catalogId: base.id,
+      name: "vlm",
+      license: "apache-2.0",
+    };
+    const { unmount } = render(<DownloadDialog target={target} onClose={() => {}} />);
+    // no class from the server: the unknown verdict, even for an id that reads like an open licence
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(document.querySelector(".license-verdict")?.textContent).toContain(
+        t("license.badge.unknown"),
+      ),
+    );
+    unmount();
+    list.mockResolvedValue({ models: [{ ...base, license_class: "commercial_ok" }] });
+    render(<DownloadDialog target={target} onClose={() => {}} />);
+    await waitFor(() =>
+      expect(document.querySelector(".license-verdict")?.textContent).toContain(
+        t("license.badge.commercial_ok"),
+      ),
+    );
+  });
 });

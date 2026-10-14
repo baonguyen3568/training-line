@@ -669,6 +669,9 @@ export interface UserModel {
   license: string;
   /** The licence as the author wrote it on the model card (≤ 200 chars, untrusted: plain text only), or null. */
   license_card?: string | null;
+  /** From the server's obligations table (security), like the catalog's option_meta; absent → "unknown". */
+  license_class?: "commercial_ok" | "conditional" | "non_commercial" | "unknown";
+  obligations?: LicenseObligation[];
   license_confirmed: boolean;
   gated: boolean;
   ram_gb_train: number;
@@ -691,6 +694,9 @@ export interface UserDataset {
   license: string;
   /** The licence as the author wrote it (untrusted: plain text only), or null. */
   license_card?: string | null;
+  /** From the server's obligations table (security), like the catalog's option_meta; absent → "unknown". */
+  license_class?: "commercial_ok" | "conditional" | "non_commercial" | "unknown";
+  obligations?: LicenseObligation[];
   license_confirmed: boolean;
   verified: false;
 }
