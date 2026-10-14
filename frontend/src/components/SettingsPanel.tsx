@@ -10,10 +10,13 @@ import type {
   UserAssetLimits,
 } from "../api/types";
 import { getLocale, type Locale, t, tpOptional } from "../i18n";
+import { hubError } from "../lib/hubJob";
 import { switchLocale } from "../lib/localePref";
+import { runErrorText } from "../lib/runWarning";
 import { reloadForSignIn } from "../lib/session";
 import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
+import { FieldError } from "./FieldError";
 import { Icon } from "./Icon";
 import { MODEL_LIMIT_INPUT, toast } from "./QuickFixes";
 import { errorText, SecretRow } from "./SecretRow";
@@ -167,11 +170,7 @@ function SessionSection() {
           )}
         </div>
       </div>
-      {error && (
-        <p className="field-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <FieldError>{error}</FieldError>}
     </section>
   );
 }
@@ -404,34 +403,44 @@ function ModelLimitSection() {
   const [limits, setLimits] = useState<UserAssetLimits | null>(null);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
-  const [bad, setBad] = useState(false);
+  // the server refused: its own code (NET-004 reason quota: above the admin's cap) in the catalog's words, or null
+  // for a plain range refusal (said with the range)
+  const [refused, setRefused] = useState<false | string | null>(false);
   useEffect(() => {
+    let alive = true; // the panel may close before the answer
     api.userAssetLimits().then(
       (l) => {
+        if (!alive) return;
         setLimits(l);
         setValue(String(l.max_model_gb));
       },
       () => undefined, // an older server has no limits: the section stays out
     );
+    return () => {
+      alive = false;
+    };
   }, []);
   if (!limits) return null;
   const [lo, hi] = limits.max_model_gb_range;
   const gb = Number(value);
   const valid = value.trim() !== "" && Number.isFinite(gb) && gb >= lo && gb <= hi;
+  const unchanged = String(limits.max_model_gb) === value.trim();
+  // said while typing, so a disabled "Lưu" always has its reason next to it (design)
+  const bad = refused !== false || (!valid && !unchanged);
   const save = async () => {
-    if (!valid) {
-      setBad(true);
-      return;
-    }
+    if (!valid || unchanged) return;
     setBusy(true);
     try {
       const next = await api.setUserAssetLimits({ max_model_gb: gb });
       setLimits(next);
       setValue(String(next.max_model_gb));
-      setBad(false);
+      setRefused(false);
       toast(t("settings.max_model_gb_saved", { gb: next.max_model_gb }));
-    } catch {
-      setBad(true);
+    } catch (e) {
+      const err = hubError(e);
+      setRefused(
+        err.code === "CFG-005" || err.code === "SYS-000" ? null : runErrorText(err, (x) => x).title,
+      );
     } finally {
       setBusy(false);
     }
@@ -471,7 +480,7 @@ function ModelLimitSection() {
             aria-describedby={bad ? "set-max-model-range" : undefined}
             onChange={(e) => {
               setValue(e.target.value);
-              setBad(false);
+              setRefused(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") void save();
@@ -481,15 +490,15 @@ function ModelLimitSection() {
           <button
             type="button"
             className="btn primary sm"
-            disabled={busy || String(limits.max_model_gb) === value.trim()}
+            disabled={busy || unchanged || !valid}
             onClick={() => void save()}
           >
             {t("settings.save")}
           </button>
           {bad && (
-            <p id="set-max-model-range" className="field-error" role="alert">
-              {t("settings.max_model_gb_range", { min: lo, max: hi })}
-            </p>
+            <FieldError id="set-max-model-range">
+              {refused || t("settings.max_model_gb_range", { min: lo, max: hi })}
+            </FieldError>
           )}
         </div>
       </div>

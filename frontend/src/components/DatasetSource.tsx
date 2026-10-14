@@ -8,6 +8,7 @@ import { runErrorText } from "../lib/runWarning";
 import { untrustedText } from "../lib/safeText";
 import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
+import { FieldError } from "./FieldError";
 import { Icon } from "./Icon";
 
 /** A sample's error code (backend H4) in the user's words; an unknown code reads as "unreadable", never raw. */
@@ -98,14 +99,14 @@ function ColumnMapDialog({
               ))}
             </select>
             {wrong(role) && (
-              <p className="field-error" role="alert">
+              <FieldError>
                 {
                   runErrorText(
                     { code: "DATA-011", params: { column: map[role] ?? "", role } },
                     (x) => x,
                   ).title
                 }
-              </p>
+              </FieldError>
             )}
           </div>
         ))}

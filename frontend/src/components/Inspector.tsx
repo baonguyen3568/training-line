@@ -32,6 +32,7 @@ import { useWorkflow } from "../store/workflow";
 import { AdvancedOptions } from "./AdvancedOptions";
 import { DatasetHubPanel } from "./DatasetSource";
 import { ErrorIcon } from "./ErrorIcon";
+import { FieldError } from "./FieldError";
 import { Icon } from "./Icon";
 import { ImageUpload } from "./ImageUpload";
 import { ModelHubPanel, SourceTabs, setUserModel, USER_MODEL_PARAMS } from "./ModelSource";
@@ -303,12 +304,7 @@ function ParamRow(props: FieldProps & { errors?: string[] }) {
           </div>
         </>
       )}
-      {d4 &&
-        errors.map((e) => (
-          <p key={e} className="field-error" role="alert">
-            {e}
-          </p>
-        ))}
+      {d4 && errors.map((e) => <FieldError key={e}>{e}</FieldError>)}
     </div>
   );
 }

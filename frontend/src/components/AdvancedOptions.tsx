@@ -5,6 +5,7 @@ import { t } from "../i18n";
 import { isModelType, nearestUpstream } from "../lib/graph";
 import { fold } from "../lib/search";
 import { useWorkflow } from "../store/workflow";
+import { FieldError } from "./FieldError";
 import { Icon } from "./Icon";
 
 type Values = Record<string, unknown>;
@@ -163,9 +164,7 @@ export function AdvancedOptions({
     <div className="adv-options">
       {!model && <p className="muted small">{t("advanced_panel.no_model")}</p>}
       {generalErrors.map((e) => (
-        <p key={e.what} className="field-error" role="alert">
-          {e.what}
-        </p>
+        <FieldError key={e.what}>{e.what}</FieldError>
       ))}
       {options.length === 0 ? (
         <p className="muted">{t("advanced_panel.none")}</p>

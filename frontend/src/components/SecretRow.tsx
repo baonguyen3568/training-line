@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import type { SecretField, SecretState } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { formatDateTime } from "../lib/format";
+import { FieldError } from "./FieldError";
 import { Icon } from "./Icon";
 
 // Its own module so the editor (the gated download steps) can use the row without pulling the lazy Settings page.
@@ -162,11 +163,7 @@ export function SecretRow({
             </span>
           )}
         </div>
-        {error && (
-          <p className="field-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <FieldError>{error}</FieldError>}
       </div>
     </div>
   );

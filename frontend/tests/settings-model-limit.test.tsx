@@ -23,17 +23,38 @@ describe("model size cap", () => {
         (b) => b.textContent === t("settings.save"),
       ) as HTMLButtonElement;
     fireEvent.change(input, { target: { value: "2000" } });
-    fireEvent.click(save());
-    expect(await screen.findByRole("alert")).toHaveProperty(
-      "textContent",
-      t("settings.max_model_gb_range", { min: 1, max: 1000 }),
-    );
+    // said while typing, the field marked and pointing at it, "Lưu" off: nothing to click for nothing
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(t("settings.max_model_gb_range", { min: 1, max: 1000 }));
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(alert.id);
+    expect(save().disabled).toBe(true);
+    fireEvent.keyDown(input, { key: "Enter" });
     expect(put).not.toHaveBeenCalled(); // out of range: never sent
     fireEvent.change(input, { target: { value: "60" } });
     fireEvent.click(save());
     await waitFor(() => expect(put).toHaveBeenCalledWith({ max_model_gb: 60 }));
     await waitFor(() => expect(save().disabled).toBe(true)); // saved: nothing left to save
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("above the admin's cap the server's own words are said, not the range", async () => {
+    const { api } = await import("../src/api");
+    const { ApiError } = await import("../src/api/client");
+    const error = { code: "NET-004", params: { size_gb: 600, quota_gb: 500, reason: "quota" } };
+    vi.spyOn(api, "setUserAssetLimits").mockRejectedValue(new ApiError(422, { detail: error }));
+    const { SettingsPanel } = await import("../src/components/SettingsPanel");
+    const { t } = await import("../src/i18n");
+    const { runErrorText } = await import("../src/lib/runWarning");
+    render(<SettingsPanel />);
+    const input = (await screen.findByLabelText(
+      t("settings.row_max_model_gb"),
+    )) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "600" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(runErrorText(error, (x) => x).title);
+    expect(alert.textContent).not.toBe(t("settings.max_model_gb_range", { min: 1, max: 1000 }));
   });
 
   it("NET-004 'raise the limit' opens Settings, as a quick fix and on the hub panel's error card", async () => {
