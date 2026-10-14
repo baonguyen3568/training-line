@@ -1,5 +1,6 @@
 import type { NodeSpec } from "../api/types";
 import type { DownloadTarget } from "../components/DownloadDialog";
+import { useUserModels } from "../store/userModels";
 
 /**
  * The download a NET-002 asks for (catalog_id + kind + size from the server), from a validation issue or a step's
@@ -28,6 +29,10 @@ export function downloadTargetOf(
   // datasets have no option_meta: the server's catalog name / licence in the issue, when it sends them
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
   const license = meta?.license ?? str(p.license);
+  // a user-added asset: the author's own words for an unknown licence, from the issue, else the models list
+  const licenseCard =
+    str(p.license_card) ??
+    str(useUserModels.getState().models.find((m) => m.id === catalogId)?.license_card);
   return {
     kind,
     catalogId,
@@ -44,5 +49,6 @@ export function downloadTargetOf(
     ...(typeof p.est_min === "number" ? { estMin: p.est_min } : {}),
     // already on disk, only the preparation step is left: nothing big to fetch (design d9e43a9)
     ...(p.reason === "not_prepared" ? { prepare: true } : {}),
+    ...(licenseCard ? { licenseCard } : {}),
   };
 }

@@ -254,7 +254,13 @@ describe("unknown licence", () => {
     const { t } = await import("../src/i18n");
     render(
       <DownloadDialog
-        target={{ kind: "model", catalogId: "user--a--b--0f3a9c1e", name: "b", license: "unknown" }}
+        target={{
+          kind: "model",
+          catalogId: "user--a--b--0f3a9c1e",
+          name: "b",
+          license: "unknown",
+          licenseCard: "<b>research only</b>",
+        }}
         onClose={() => {}}
       />,
     );
@@ -262,5 +268,11 @@ describe("unknown licence", () => {
     expect(dialog.textContent).toContain(t("download.license_unknown"));
     expect(dialog.textContent).toContain(t("license.badge.unknown"));
     expect(dialog.textContent).not.toMatch(/\bunknown\b/);
+    // the author's own words, as plain text (untrusted): the tag stays text, never markup; no copy → no line, no key
+    const { cardSays } = await import("../src/lib/licenses");
+    const said = cardSays("<b>research only</b>");
+    if (said) expect(dialog.textContent).toContain(said);
+    expect(dialog.textContent).not.toContain("license.card_says");
+    expect(dialog.querySelector(".license-card b")).toBeNull();
   });
 });

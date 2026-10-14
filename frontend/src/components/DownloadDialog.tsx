@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LicenseObligation } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { formatDuration } from "../lib/format";
+import { cardSays } from "../lib/licenses";
 import { type DownloadKind, downloadKey, downloadPercent, useDownloads } from "../store/downloads";
 import { ErrorIcon } from "./ErrorIcon";
 import { GatedSteps } from "./GatedSteps";
@@ -26,6 +27,8 @@ export interface DownloadTarget {
   obligations?: LicenseObligation[];
   /** NET-002 not_prepared: on disk, the server only runs the preparation step (no size, no estimate shown). */
   prepare?: boolean;
+  /** A user-added asset's licence in its author's words (untrusted), said when the licence is unknown. */
+  licenseCard?: string;
 }
 
 const gb = (bytes?: number) => (bytes === undefined ? "0" : (bytes / 1e9).toFixed(1));
@@ -120,6 +123,9 @@ export function DownloadDialog({
             </span>{" "}
             {t("download.license_unknown")}
           </p>
+        )}
+        {target.license === "unknown" && target.licenseCard && cardSays(target.licenseCard) && (
+          <p className="small license-card">{cardSays(target.licenseCard)}</p>
         )}
         {!busy && entry?.status !== "completed" && entry?.status !== "unverified" && (
           <label className="field check">

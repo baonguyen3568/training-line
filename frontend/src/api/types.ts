@@ -665,8 +665,10 @@ export interface UserModel {
   architecture: string;
   params_b: number;
   size_gb: number;
-  /** A license id, or "unknown" (A1: allowed with a warning; export stays blocked, SEC-005). */
+  /** A license id, or "unknown" (A1: allowed with a warning; export stays blocked, SEC-006). */
   license: string;
+  /** The licence as the author wrote it on the model card (≤ 200 chars, untrusted: plain text only), or null. */
+  license_card?: string | null;
   license_confirmed: boolean;
   gated: boolean;
   ram_gb_train: number;

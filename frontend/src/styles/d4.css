@@ -1610,3 +1610,9 @@ fieldset.seg-radio {
 .set-input input.set-num {
   width: 96px;
 }
+/* the author's own licence words (untrusted text), next to "Chưa rõ" */
+.license-card {
+  font-style: italic;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}

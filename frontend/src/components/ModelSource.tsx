@@ -3,7 +3,7 @@ import { api } from "../api";
 import type { EventError, ModelResolveJob, UserModel } from "../api/types";
 import { t, tpOptional } from "../i18n";
 import { hubError, isRepoId, pollHubJob } from "../lib/hubJob";
-import { licenseName } from "../lib/licenses";
+import { cardSays, licenseName } from "../lib/licenses";
 import { runErrorText } from "../lib/runWarning";
 import { useUserModels } from "../store/userModels";
 import { useWorkflow } from "../store/workflow";
@@ -232,6 +232,9 @@ export function ModelHubPanel({ nodeId }: { nodeId: string }) {
             {" · "}
             <code>{model.revision.slice(0, 12)}</code>
           </p>
+          {model.license === "unknown" && model.license_card && cardSays(model.license_card) && (
+            <p className="small license-card">{cardSays(model.license_card)}</p>
+          )}
           {model.gated && <p className="small">{t("byo.gated")}</p>}
           <p>
             <button type="button" className="primary" onClick={() => setUserModel(nodeId, model)}>

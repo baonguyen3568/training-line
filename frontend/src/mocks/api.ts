@@ -710,6 +710,7 @@ export const mockApi: Api = {
       params_b: 3.8,
       size_gb: 7.6,
       license: job.repo.includes("license") ? "unknown" : "apache-2.0",
+      license_card: job.repo.includes("license") ? "Custom research licence, ask the author" : null,
       license_confirmed: false,
       gated: job.repo.includes("gated"),
       ram_gb_train: 31.5,

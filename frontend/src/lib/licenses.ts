@@ -1,3 +1,5 @@
+import { tpOptional } from "../i18n";
+import { untrustedText } from "./safeText";
 // SPDX-ish licence ids of the catalog and reference pipelines → display names (unknown ids shown as written,
 // never invented). Shared by the pipeline gallery and the download dialog.
 export const LICENSE_NAME: Record<string, string> = {
@@ -8,3 +10,8 @@ export const LICENSE_NAME: Record<string, string> = {
   "openmdw-1.1": "OpenMDW-1.1",
 };
 export const licenseName = (id: string) => LICENSE_NAME[id] ?? id;
+
+/** "Tác giả ghi: “…”": a user-added asset's licence in its author's words (untrusted: plain text, clamped), or
+ * undefined while the copy is missing (the line hides, never a key). */
+export const cardSays = (text: string): string | undefined =>
+  tpOptional(["license", "card_says"], { text: untrustedText(text, 200) });
