@@ -1628,3 +1628,6 @@ fieldset.seg-radio {
   border: 1px solid var(--color-axis);
   background: transparent;
 }
+.trial-chip-wrap .pop {
+  white-space: normal; /* the chip stays on one line, its explanation wraps */
+}
