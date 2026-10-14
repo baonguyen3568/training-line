@@ -18,11 +18,17 @@ done
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "image $IMAGE not found (see docker/IMAGES.lock)" >&2; exit 2; }
 
 GATE_N=0
+GATE_MEM=${VLM_GATE_MEM:-24g}
+[[ $GATE_MEM =~ ^[0-9]+[gGmM]$ ]] || { echo "VLM_GATE_MEM must look like 24g or 16384m, got '$GATE_MEM'" >&2; exit 2; }
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 run() {  # run a command in a throw-away, locked-down container with the repo mounted read-only
   # Named vlm-* like every project container (CLAUDE.md: prefix vlm-), so it is never mistaken for another service's.
+  # Memory = swap: a gate never swaps on the shared host (it held 4.3 GB of swap and queued a GPU job, 2026-10-14).
+  # 24 GB: the full integration shard peaked at ~16 GB (11.3 GiB RAM + 4.3 GB swap) on vlm-automodel:26.08-8.
+  # Not a GPU memory guard: on GB10 (UMA) CUDA allocations may sit outside the cgroup limit; GPU jobs use memguard.
   docker run --rm --name "vlm-gate-$$-$((++GATE_N))" --label project=vlm-training --network none --cap-drop ALL \
-    --security-opt no-new-privileges \
+    --security-opt no-new-privileges --memory "$GATE_MEM" --memory-swap "$GATE_MEM" \
+    --pids-limit 1024 \
     --user "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONPATH=/workspace/src -e VLM_PROJECT_ROOT=/workspace \
     -e HF_HUB_OFFLINE=1 -e HF_HOME=/workspace/.cache/hf -e HF_DATASETS_CACHE=/tmp/hf_datasets \
     -e HF_DATASETS_OFFLINE=1 -e NO_ALBUMENTATIONS_UPDATE=1 -e PYTHONDONTWRITEBYTECODE=1 \
