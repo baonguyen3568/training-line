@@ -1890,7 +1890,7 @@ method:
     when: When the image type is very new to the model and you have many image–caption pairs; train the connector first, then the answers.
   vision_unfrozen:
     title: Unfrozen vision part, high-res images
-    when: When your images look very different from usual ones; trains the vision part too at a low learning rate and needs more data and memory.
+    when: When your images look very different from usual ones; trains the vision part too at a low learning rate, using more memory.
   distill:
     title: Distill from a larger model
     when: When you have few reference answers; a large model writes them and a small model learns from them.
@@ -1900,7 +1900,7 @@ method:
     when: When you have good and bad answers for the same image; teaches the model to prefer the better one and invent fewer details.
   grpo:
     title: Learn from feedback (GRPO)
-    when: When right/wrong can be scored automatically (numbers, JSON); the model tries several answers and learns from the scores; the slowest method.
+    when: When answers can be scored automatically (numbers, JSON); the model tries several and learns from the scores. Slowest method.
   ptq:
     title: Post-training quantization (PTQ)
     when: When you need a smaller model to run; quantize, then re-score, with no extra training.

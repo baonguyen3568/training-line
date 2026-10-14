@@ -1890,7 +1890,7 @@ method:
     when: 'Khi loại ảnh rất mới với model và có nhiều cặp ảnh–chú thích: dạy bộ nối trước, rồi dạy trả lời.'
   vision_unfrozen:
     title: Mở phần nhìn ảnh, ảnh độ phân giải cao
-    when: 'Khi ảnh rất khác ảnh thường gặp: dạy cả phần nhìn ảnh với tốc độ học thấp; cần nhiều dữ liệu và bộ nhớ hơn.'
+    when: 'Khi ảnh rất khác ảnh thường gặp: dạy cả phần nhìn ảnh với tốc độ học thấp; tốn bộ nhớ hơn.'
   distill:
     title: Chưng cất từ model lớn
     when: 'Khi có ít đáp án mẫu: một model lớn viết đáp án, rồi dạy model nhỏ học theo.'
@@ -1900,7 +1900,7 @@ method:
     when: 'Khi có cặp câu trả lời tốt và kém cho cùng ảnh: dạy model chọn câu tốt hơn, bớt bịa chi tiết.'
   grpo:
     title: Học từ phản hồi (GRPO)
-    when: 'Khi đúng/sai chấm tự động được (số, JSON): model tự thử nhiều câu rồi học từ điểm; chạy lâu nhất.'
+    when: 'Khi máy chấm được đúng/sai (số, JSON): model thử nhiều câu và học từ điểm; chạy lâu nhất.'
   ptq:
     title: Nén sau khi train (PTQ)
     when: 'Khi cần model nhỏ hơn để chạy: nén rồi đo lại điểm, không train thêm.'
