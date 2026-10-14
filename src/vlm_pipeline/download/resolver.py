@@ -297,7 +297,16 @@ def user_entry(
         min_pixels=family.min_pixels or 0, max_pixels=family.max_pixels or 0, image_policy=family.image_policy,
         image_max_tokens=0, video=False, video_fps=0, min_answer_tokens=1024, quant_fp8="unsupported",
         serve_engine="hf", task_prompt_fixed=False, gallery_gates=(), min_image=family.min_image or DEFAULT_TRAIN_IMAGE,
+        family=family.id,
     )  # fmt: skip
+
+
+def block_prefixes(entry: CatalogEntry, root: Path | None = None) -> tuple[tuple[str, ...], tuple[str, ...]] | None:
+    """(vision, projector) module prefixes of a model: its explicit lists, else its family's; None if unknown."""
+    if entry.vision_prefixes:
+        return entry.vision_prefixes, entry.projector_prefixes
+    family = next((f for f in load_families(root).families if f.id == entry.family), None) if entry.family else None
+    return (family.vision_prefixes, family.projector_prefixes) if family is not None else None
 
 
 def render_template(family: Family, root: Path | None = None) -> dict[str, Any]:
@@ -331,6 +340,7 @@ __all__ = [
     "ModelFacts",
     "ModelNeedsRemoteCodeError",
     "RepoFilesInvalidError",
+    "block_prefixes",
     "clean_name",
     "load_families",
     "model_facts",

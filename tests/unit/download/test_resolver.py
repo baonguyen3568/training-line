@@ -226,3 +226,51 @@ def test_a_processor_default_family_leaves_pixels_to_the_repo() -> None:
     entry = r.user_entry(repo="o/x", revision=SHA, family=family, params_b=1.0, disk_gb=1.0, license_id="mit",
                          gated=False)  # fmt: skip
     assert (entry.image_policy, entry.min_pixels, entry.min_image) == ("processor_default", 0, "vlm-automodel:26.08-8")
+
+
+# ------------------------------------------------------------------------------------------- module blocks (catalog)
+def test_a_catalog_family_must_exist_and_blocks_resolve_from_it() -> None:
+    known = {f.id for f in r.load_families().families}
+    for entry in load_catalog().models:
+        assert entry.family is None or entry.family in known, entry.id
+        if entry.family is not None:
+            assert r.block_prefixes(entry) is not None
+
+
+@pytest.mark.xfail(strict=True, reason="research fills family / prefixes in models.yaml next (then drop this mark)")
+def test_every_trainable_catalog_model_names_its_blocks() -> None:
+    missing = [e.id for e in load_catalog().models if e.train_node != "none" and r.block_prefixes(e) is None]
+    assert missing == []
+
+
+@pytest.mark.parametrize(
+    ("changes", "ok"),
+    [
+        ({"family": "qwen3_5"}, True),
+        ({"vision_prefixes": ("encoder.model_encoder",), "projector_prefixes": ("encoder.conv1",)}, True),
+        ({"family": "qwen3_5", "vision_prefixes": ("a",), "projector_prefixes": ("b",)}, False),
+        ({"vision_prefixes": ("a",)}, False),
+        ({"vision_prefixes": ("",), "projector_prefixes": ("b",)}, False),
+    ],
+)
+def test_blocks_come_one_way_only(changes: dict[str, Any], ok: bool) -> None:
+    from vlm_pipeline.common.catalog import CatalogEntry
+
+    base = load_catalog().get("qwen3.5-2b")
+    assert base is not None
+    data = {**base.model_dump(), **changes}
+    if ok:
+        entry = CatalogEntry.model_validate(data)
+        expected = ((("model.visual",), ("model.visual.merger",)) if "family" in changes
+                    else (changes["vision_prefixes"], changes["projector_prefixes"]))  # fmt: skip
+        assert r.block_prefixes(entry) == expected
+        return
+    with pytest.raises(ValueError):  # noqa: PT011 - pydantic's ValidationError, several rules
+        CatalogEntry.model_validate(data)
+
+
+def test_a_user_entry_carries_its_family() -> None:
+    entry = r.user_entry(repo="o/x", revision=SHA, family=_family(), params_b=1.0, disk_gb=1.0, license_id="mit",
+                         gated=False)  # fmt: skip
+    assert entry.family == "qwen3_5"
+    assert r.block_prefixes(entry) == (("model.visual",), ("model.visual.merger",))

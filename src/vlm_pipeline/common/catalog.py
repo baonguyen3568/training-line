@@ -106,6 +106,11 @@ class CatalogEntry(BaseModel):
     min_image: str
     notices: Notices = ()
     model_parts: tuple[ModelPart, ...] = ()
+    # Module blocks for train_blocks / vision_lr_scale (research 2026-10-14): a family of configs/catalog/families.yaml
+    # (its vision/projector prefixes), or both prefix lists spelled out (e.g. Nemotron-Parse), never both ways.
+    family: str | None = Field(None, pattern=r"^[a-z0-9_]+$")
+    vision_prefixes: tuple[str, ...] = ()
+    projector_prefixes: tuple[str, ...] = ()
 
     @property
     def sft_trainable_pct(self) -> tuple[float, float] | None:
@@ -126,6 +131,17 @@ class CatalogEntry(BaseModel):
         low, high = self.sft_trainable_pct_min, self.sft_trainable_pct_max
         if (low, high) != (0, 0) and not 0 < low < high <= 100:
             raise ValueError(f"{self.id}: sft_trainable_pct must be 0/0 (unknown) or 0 < min < max <= 100")
+        return self
+
+    @model_validator(mode="after")
+    def _blocks_one_way(self) -> Self:
+        explicit = bool(self.vision_prefixes) or bool(self.projector_prefixes)
+        if self.family is not None and explicit:
+            raise ValueError(f"{self.id}: a family or explicit prefixes, not both")
+        if explicit and not (self.vision_prefixes and self.projector_prefixes):
+            raise ValueError(f"{self.id}: explicit prefixes need both vision_prefixes and projector_prefixes")
+        if not all(p and " " not in p for p in (*self.vision_prefixes, *self.projector_prefixes)):
+            raise ValueError(f"{self.id}: a prefix is an empty or spaced module path")
         return self
 
     @model_validator(mode="after")
