@@ -20,7 +20,7 @@ REFERENCE_PIPELINES = Path("configs") / "reference_pipelines.yaml"
 Method = Literal["full_sft", "lora", "qlora", "two_stage", "vision_unfrozen", "distill", "dpo", "grpo", "ptq", "qat"]
 BlockState = Literal["frozen", "lora", "full", "full_low_lr", "n/a"]
 Quant = Literal["nf4", "fp8", "nvfp4"]
-Extra = Literal["teacher", "reference", "rollout", "reward"]
+Extra = Literal["teacher", "reference", "reference_shared", "rollout", "reward"]  # shared = base, adapter off
 _KEY = r"^reference_pipeline\.[a-z0-9_-]+\.[a-z0-9_]+$"
 
 
@@ -97,7 +97,7 @@ class Pipeline(_Strict):
     method: Method
     title: dict[Literal["vi", "en"], str]
     summary_key: str = Field(pattern=_KEY)
-    when_to_use_key: str = Field(pattern=_KEY)
+    when_to_use_key: str = Field(pattern=r"^method\.[a-z_]+\.when$")  # a method's sentence, not one pipeline's
     kind: Literal["app_template", "candidate", "external"]
     template_id: str | None
     status: Literal["available", "planned", "reference_only"]
@@ -114,9 +114,10 @@ class Pipeline(_Strict):
 
     @model_validator(mode="after")
     def _keys_name_this_pipeline(self) -> Self:
-        for key in (self.summary_key, self.when_to_use_key):
-            if key.split(".")[1] != self.id:
-                raise ValueError(f"{key}: i18n keys are reference_pipeline.{self.id}.*")
+        if self.summary_key.split(".")[1] != self.id:
+            raise ValueError(f"{self.summary_key}: i18n keys are reference_pipeline.{self.id}.*")
+        if self.when_to_use_key != f"method.{self.method}.when":  # design: the sentence belongs to the method
+            raise ValueError(f"{self.when_to_use_key}: the when-to-use key is method.{self.method}.when")
         if self.measured is not None and self.measured_with is None:
             raise ValueError("measured numbers need measured_with (the card says which model and data)")
         return self

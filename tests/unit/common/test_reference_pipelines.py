@@ -17,7 +17,7 @@ def _pipeline(pid: str, method: str, **extra: Any) -> dict[str, Any]:
         "method": method,
         "title": {"vi": "x", "en": "x"},
         "summary_key": f"reference_pipeline.{pid}.summary",
-        "when_to_use_key": f"reference_pipeline.{pid}.when",
+        "when_to_use_key": f"method.{method}.when",
         "kind": "app_template",
         "template_id": "t",
         "status": "available",
@@ -37,7 +37,7 @@ def _file(*pipelines: dict[str, Any]) -> dict[str, Any]:
 DPO = _pipeline(
     "dpo-pref",
     "dpo",
-    train_arch={"vision": "frozen", "projector": "frozen", "lm": "lora", "extras": ["reference"]},
+    train_arch={"vision": "frozen", "projector": "frozen", "lm": "lora", "extras": ["reference_shared"]},
 )
 
 
@@ -45,7 +45,7 @@ def test_a_qlora_and_a_dpo_card_load() -> None:
     loaded = ReferencePipelines.model_validate(_file(_pipeline("qlora-4bit", "qlora"), DPO))
     qlora, dpo = loaded.pipelines
     assert (qlora.train_arch.lm, qlora.train_arch.quant) == ("lora", "nf4")  # LoRA + 4-bit: quant apart from state
-    assert dpo.train_arch.extras == ("reference",)
+    assert dpo.train_arch.extras == ("reference_shared",)  # LoRA: the reference is the base with the adapter off
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,8 @@ def test_a_qlora_and_a_dpo_card_load() -> None:
     [
         (lambda p: p.update(method="rlhf"), "method"),
         (lambda p: p["train_arch"].update(lm="quantized"), "lm"),  # quantization is `quant`, not a state
-        (lambda p: p.update(when_to_use_key="reference_pipeline.other.when"), "i18n keys"),
+        (lambda p: p.update(summary_key="reference_pipeline.other.summary"), "i18n keys"),
+        (lambda p: p.update(when_to_use_key="method.lora.when"), "method.qlora.when"),
         (lambda p: p.update(colour="red"), "colour"),
         (lambda p: p.update(measured={"config": "x", "sources": ["benchmarks/x.json"]}), "measured_with"),
         (lambda p: p["train_arch"].update(quant="fp8_fake"), "quant"),  # QAT is quant + fake_quant
