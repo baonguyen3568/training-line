@@ -95,3 +95,32 @@ Nguồn: chạy NGAY trong image (transformers 5.12.1, `--network none`, không 
 - Chat template: BẮT BUỘC processor/tokenizer của repo có `chat_template`; không có thì từ chối (không tự đoán template).
 - Ảnh: nếu image processor có `min_pixels`/`max_pixels` (họ Qwen) thì đặt 200704/1003520 như catalog; họ khác dùng mặc định của processor (tile/size cố định).
 - Model cần `trust_remote_code` (auto_map trong config) ngoài catalog: CHẶN (ADR-021 §3).
+
+## Quyết định 1.0 (research 2026-10-14, sau kiểm CPU trên CORD + patch 0007/0008)
+`configs/catalog/families.yaml` có 13 họ. Mức hiển thị: A "đã chạy trên GB10" / S "đã smoke" / B, C "chưa thử".
+
+| họ | mức | recipe | image tối thiểu | ghi chú |
+|---|---|---|---|---|
+| qwen3_5 | A | qwen3.5-2b | 26.08-7 | R2/R7/QLoRA đo thật |
+| qwen3_vl, qwen2_5_vl | B | qwen3-vl-2b-instruct (qwen2_5_collate_fn) | 26.08-7 | AutoModel có example |
+| qwen2_vl | C | như trên | 26.08-7 | cùng layout/processor 2.5 |
+| gemma4 | B | gemma-4-e2b-it | 26.08-7 | nhãn đúng trên -7 (kiểm CPU) |
+| internvl (*-hf) | B | family-default | 26.08-7 | nhãn đúng trên -7; bản gốc OpenGVLab cần remote code → chặn |
+| gemma3 | B | family-default (attn eager) | 26.08-8 | |
+| llava_onevision | B | family-llava-onevision | 26.08-8 | trên -7: 0 token nhãn (processor render `assistant \n`) |
+| mistral3 | B | family-default | 26.08-8 | model công khai nhỏ nhất 24B: RAM +20% |
+| idefics3, smolvlm | C | family-default | 26.08-8 | trên -7: 0 token nhãn (template tokenizer không render content chuỗi) |
+| llava, llava_next | C | family-default | 26.08-8 | |
+
+Số token ảnh mặc định (processor_default, 1 ảnh CORD): SmolVLM-256M ~530, InternVL3-1B ~1.7k (12 tile), LLaVA-OV-0.5B ~4.4k (anyres),
+Gemma-4-E2B ~230, Qwen3.5-2B (pixel cap) ~560 (`outputs/research/fam/collate_check.py`).
+
+Không đưa vào 1.0 (ngoài nhóm X ở trên), lý do cụ thể:
+- mllama: chỉ có bản 11B/90B, gated, ảnh đi qua cross-attention layers (không phải token ảnh) — chưa có collate/nhãn kiểm được; xem lại sau 1.0.
+- paligemma: prefix-LM, không có chat template → recipe chat không áp dụng.
+- aria, llama4, ernie4_5_vl_moe, qwen3_vl_moe, qwen3_5_moe, glm4v_moe, minimax_m3_vl: MoE ≥ 25B tổng tham số, vượt RAM an toàn (≤ 80% RAM trống) cho LoRA bf16.
+- qwen2_5_omni_thinker, qwen3_omni_moe_thinker, cosmos3_omni: omni (audio/video) — ngoài phạm vi ảnh–chữ 1.0.
+- glm4v, glm46v, glm_ocr, exaone4_5, paddleocr_vl, deepseek_vl(_hybrid), cohere2_vision, fast_vlm, lfm2_vl, minicpmv4_6,
+  ovis2, got_ocr2, lighton_ocr, qianfan_ocr, video_llama_3, video_llava, vipllava, llava_next_video, idefics2, gemma3n, gemma4_unified:
+  native (mức C) nhưng chưa kiểm nhãn/collate; thêm từng họ khi có 1 lần chạy collate_check + smoke (quy trình: tải bản nhỏ nhất,
+  `collate_check.py`, smoke 20 bước, rồi thêm dòng families.yaml).
