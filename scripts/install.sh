@@ -25,6 +25,8 @@ run() { if (( DRY_RUN )); then say "[dry-run] $*"; else "$@"; fi; }
 
 # ------------------------------------------------------------------------------------------------ host checks
 [[ "$(id -u)" -ne 0 ]] || fail "do not run as root (or with sudo): run as the user who will use the app"
+# The ids reach compose interpolation (mount options of the egress-control tmpfs): digits only.
+[[ "$(id -u)" =~ ^[0-9]+$ && "$(id -g)" =~ ^[0-9]+$ ]] || fail "unexpected user or group id"
 command -v docker >/dev/null || fail "docker is not installed"
 docker compose version >/dev/null 2>&1 || fail "docker compose v2 is missing (package docker-compose-plugin)"
 [[ -S /var/run/docker.sock ]] || fail "/var/run/docker.sock not found: is the docker daemon running?"
@@ -199,6 +201,14 @@ if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && [[ "$ours" != *":$PORT->"
   fail "port $PORT is already used by another program: set another VLM_PORT in .env.local"
 fi
 run "${COMPOSE[@]}" build
+# Upgrade: the proxy's control-socket volume is now a tmpfs owned by the app user. One made by an older install is
+# root's (the proxy cannot bind its socket there): it only ever holds that socket, so it is recreated.
+EGRESS_VOL=ntc-training_egress-control
+if docker volume inspect "$EGRESS_VOL" >/dev/null 2>&1 \
+  && [[ "$(docker volume inspect "$EGRESS_VOL" --format '{{index .Options "type"}}' 2>/dev/null)" != "tmpfs" ]]; then
+  run "${COMPOSE[@]}" rm --stop --force egress-proxy runner
+  run docker volume rm "$EGRESS_VOL"
+fi
 run "${COMPOSE[@]}" up -d
 # A re-render replaces nginx.conf / the certificate files (new inodes): restart so nginx reads them.
 [[ -z "$LAN_BIND" ]] || run "${COMPOSE[@]}" restart nginx

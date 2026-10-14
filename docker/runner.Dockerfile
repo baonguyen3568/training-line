@@ -26,7 +26,8 @@ ARG VLM_GID=1000
 RUN test "${VLM_UID}" -ne 0 && test "${VLM_GID}" -ne 0
 RUN groupadd --gid "${VLM_GID}" runner && useradd --uid "${VLM_UID}" --gid "${VLM_GID}" --no-create-home \
         --shell /usr/sbin/nologin runner \
-    && mkdir -p /var/lib/vlm-runner /run/vlm-runner && chown runner:runner /var/lib/vlm-runner /run/vlm-runner
+    && mkdir -p /var/lib/vlm-runner /run/vlm-runner /run/vlm-egress \
+    && chown runner:runner /var/lib/vlm-runner /run/vlm-runner /run/vlm-egress
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=deps /opt/venv /opt/venv
 # The commit this image was built from (release report, checklist S3): `--build-arg VLM_BUILD_COMMIT=$(git rev-parse HEAD)`.

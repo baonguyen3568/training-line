@@ -144,4 +144,9 @@ networks:
 volumes:
   runner-sock: {}
   runner-state: {}
-  egress-control: {}
+  egress-control:  # the proxy's control socket: tmpfs owned by the app user (a plain volume would be root's)
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "uid=${VLM_UID},gid=${VLM_GID},mode=0770,size=1m"
