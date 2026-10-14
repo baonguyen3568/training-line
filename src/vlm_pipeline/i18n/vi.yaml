@@ -1339,6 +1339,8 @@ run_monitor:
     evicted: Bị dừng để nhường bộ nhớ
     discarded: Đã bỏ
 run:
+  trial_chip: Chạy thử
+  trial_help: Lần chạy thử nhanh chỉ chạy vài bước để kiểm tra model và dữ liệu chạy được. Đây chưa phải kết quả train thật.
   stop: Dừng
   stop_confirm: Dừng lần chạy này? Bước đang chạy sẽ dừng lại; các bước đã xong vẫn được giữ.
   progress: Đang chạy bước {current_step}/{total_count} · {node}

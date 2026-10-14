@@ -1339,6 +1339,8 @@ run_monitor:
     evicted: Stopped to free memory
     discarded: Discarded
 run:
+  trial_chip: Trial run
+  trial_help: A quick trial runs only a few steps to check that the model and data work. It is not a real training result.
   stop: Stop
   stop_confirm: Stop this run? The step in progress will stop; finished steps are kept.
   progress: Running step {current_step}/{total_count} · {node}
