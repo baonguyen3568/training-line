@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import socket
 import subprocess
@@ -430,3 +431,13 @@ def test_the_token_file_is_removed_as_soon_as_the_container_exits(tmp_path: Path
             break
         threading.Event().wait(0.02)
     assert not secret.exists()
+
+
+@pytest.mark.parametrize(("memory_gb", "exempt"), [(4, True), (8, False)])
+def test_the_runner_gives_small_cpu_jobs_no_swap(tmp_path: Path, memory_gb: int, exempt: bool) -> None:
+    """The runner builds the same docker_args from the request's gpu/memory_gb: no protocol field can turn it on."""
+    runner, started = _runner(_project(tmp_path), FakeDocker())
+    assert runner.handle(_submit(memory_gb=memory_gb))["ok"] is True
+    argv = started[0]
+    assert (("--memory-swap", f"{memory_gb}g") in list(itertools.pairwise(argv))) is exempt
+    assert ("--pids-limit" in argv) is exempt

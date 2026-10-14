@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -965,3 +966,49 @@ def test_extra_groups_are_allowed_per_image_only(tmp_path: Path, image: str, gro
     else:
         with pytest.raises(ValueError, match="may not join group"):
             docker_args(job, root)
+
+
+@pytest.mark.parametrize(
+    ("gpu", "memory_gb", "exempt"), [(False, 4, True), (False, 2, True), (False, 5, False), (True, 4, False)]
+)
+@pytest.mark.parametrize("narrow", [False, True])
+def test_swap_exempt_jobs_get_no_swap_and_a_pids_limit(tmp_path: Path, gpu: bool, memory_gb: int, exempt: bool,
+                                                      narrow: bool) -> None:  # fmt: skip
+    """ADR-005 amendment 2026-10-14: the free-swap floor is skipped ONLY for a job that cannot use swap at all."""
+    from vlm_pipeline.common.jobrun import JOB_PIDS_LIMIT, swap_exempt
+
+    root = Path("/repo")
+    if narrow:
+        root, run, _repo, _data = _narrow_project(tmp_path)
+        job = ContainerJob(name="t", image="img", argv=("true",), gpu=gpu, memory_gb=memory_gb, narrow=True,
+                           rw_dirs=(run,))  # fmt: skip
+    else:
+        job = _job(gpu=gpu, memory_gb=memory_gb)
+    args = docker_args(job, root)
+    assert swap_exempt(job) is exempt
+    pairs = list(itertools.pairwise(args))
+    assert ("--memory", f"{memory_gb}g") in pairs
+    assert (("--memory-swap", f"{memory_gb}g") in pairs) is exempt  # the flag that makes the exemption safe
+    assert (("--pids-limit", str(JOB_PIDS_LIMIT)) in pairs) is exempt
+    assert args.count("--memory-swap") == int(exempt)
+
+
+def test_only_the_swap_floor_is_dropped_for_an_exempt_job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from dataclasses import replace
+
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.memguard import DEFAULT_THRESHOLDS
+
+    root, job, manifest = _approved_run(tmp_path, monkeypatch)
+    seen: dict[bool, object] = {}
+    for exempt_job in (False, True):
+        cpu = replace(job, gpu=False, memory_gb=4) if exempt_job else job
+
+        def fake_wait(est: float, *, thresholds: object, _k: bool = exempt_job, **kw: object) -> bool:
+            seen[_k] = thresholds
+            return False  # cancelled: nothing starts
+
+        monkeypatch.setattr("vlm_pipeline.common.preflight.wait_for_memory", fake_wait)
+        jobrun.run_job(cpu, manifest, tmp_path / f"run{exempt_job}", project_root=root, who="t", est_peak_gb=2)  # type: ignore[arg-type]
+    assert seen[False] == DEFAULT_THRESHOLDS
+    assert seen[True] == replace(DEFAULT_THRESHOLDS, min_swap_free_gb=0.0)

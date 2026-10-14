@@ -308,6 +308,40 @@ def narrow_mounts(job: ContainerJob, project_root: Path) -> list[str]:
     return args
 
 
+# ADR-005 amendment (PM 2026-10-14): the host's free-swap floor (min_swap_free_gb) exists so that a job never starts
+# while the shared host is under memory pressure and pushes it into swap. A small CPU-only job (catalog download,
+# extraction) whose cgroup is capped at this size AND gets no swap at all (--memory-swap = --memory) cannot do that:
+# past its cap it is OOM-killed inside its own cgroup. It skips that one floor; MemAvailable / 80% still apply.
+SWAP_EXEMPT_MAX_GB = 4
+JOB_PIDS_LIMIT = 512  # swap-exempt CPU jobs only: a runaway fork cannot hurt the shared host (security 2026-10-14)
+
+
+def swap_exempt(job: ContainerJob) -> bool:
+    """The single rule (fixcode/security 2026-10-14): no GPU and a hard cgroup of at most SWAP_EXEMPT_MAX_GB.
+
+    ``docker_args`` gives exactly these jobs ``--memory-swap`` equal to ``--memory``, so the exemption and the flag
+    that makes it safe come from the same ContainerJob and cannot drift apart.
+    """
+    return not job.gpu and job.memory_gb <= SWAP_EXEMPT_MAX_GB
+
+
+def _memory_args(job: ContainerJob) -> list[str]:
+    """``--memory`` for every job; a swap-exempt job also gets zero swap and a pids limit."""
+    args = ["--memory", f"{job.memory_gb}g"]
+    if swap_exempt(job):
+        args += ["--memory-swap", f"{job.memory_gb}g", "--pids-limit", str(JOB_PIDS_LIMIT)]
+    return args
+
+
+def thresholds_for(job: ContainerJob, thresholds: MemThresholds) -> MemThresholds:
+    """``thresholds`` without the free-swap floor for a swap-exempt job (logged); every other limit unchanged."""
+    if not swap_exempt(job):
+        return thresholds
+    logger.info("job %s is swap-exempt (no GPU, %s GB cgroup, no swap): the free-swap floor does not apply",
+                job.name, job.memory_gb)  # fmt: skip
+    return dataclasses.replace(thresholds, min_swap_free_gb=0.0)
+
+
 def docker_args(
     job: ContainerJob, project_root: Path, *, lock_token: str | None = None, image_id: str | None = None
 ) -> list[str]:
@@ -342,7 +376,7 @@ def docker_args(
         "--network", "none",
         "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
         "--user", f"{job.uid}:{job.gid}", *_group_args(job),
-        "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",
+        *_memory_args(job), "--shm-size", f"{job.shm_gb}g",
         "--ulimit", "memlock=-1", "--ulimit", "stack=67108864",
         "-v", mount, *overlays, "-w", job.workdir,
     ]  # fmt: skip
@@ -435,7 +469,7 @@ def _narrow_docker_args(job: ContainerJob, project_root: Path, *, lock_token: st
         *network,
         "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
         "--user", f"{job.uid}:{job.gid}", *_group_args(job),
-        "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",
+        *_memory_args(job), "--shm-size", f"{job.shm_gb}g",
         "--ulimit", "memlock=-1", "--ulimit", "stack=67108864",
         *mounts, "-w", job.workdir,
     ]  # fmt: skip
@@ -937,7 +971,7 @@ def run_job(
         cancel=cancel,
         on_wait=on_wait,
         timeout_s=memory_wait_s,
-        thresholds=mem_thresholds,
+        thresholds=(mem_thresholds := thresholds_for(job, mem_thresholds)),  # the GPU queue below uses the same
     )
     if waited is not None:  # cancelled while waiting: nothing started, nothing to clean up
         return waited
