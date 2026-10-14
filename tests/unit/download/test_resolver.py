@@ -237,7 +237,6 @@ def test_a_catalog_family_must_exist_and_blocks_resolve_from_it() -> None:
             assert r.block_prefixes(entry) is not None
 
 
-@pytest.mark.xfail(strict=True, reason="research fills family / prefixes in models.yaml next (then drop this mark)")
 def test_every_trainable_catalog_model_names_its_blocks() -> None:
     missing = [e.id for e in load_catalog().models if e.train_node != "none" and r.block_prefixes(e) is None]
     assert missing == []
@@ -258,7 +257,7 @@ def test_blocks_come_one_way_only(changes: dict[str, Any], ok: bool) -> None:
 
     base = load_catalog().get("qwen3.5-2b")
     assert base is not None
-    data = {**base.model_dump(), **changes}
+    data = {**base.model_dump(), "family": None, **changes}  # the catalog entry names its family now
     if ok:
         entry = CatalogEntry.model_validate(data)
         expected = ((("model.visual",), ("model.visual.merger",)) if "family" in changes
@@ -274,3 +273,22 @@ def test_a_user_entry_carries_its_family() -> None:
                          gated=False)  # fmt: skip
     assert entry.family == "qwen3_5"
     assert r.block_prefixes(entry) == (("model.visual",), ("model.visual.merger",))
+
+
+@pytest.mark.parametrize(
+    ("repo", "config", "split", "expected"),
+    [
+        ("lmms-lab/DocVQA", "DocVQA", "validation", "user--ds--lmms-lab--docvqa--aaaaaaaa--docvqa--validation"),
+        ("Org/My_Set", "default", "train", "user--ds--org--my-set--aaaaaaaa--default--train"),
+        ("o/x", "..", "a b", "user--ds--o--x--aaaaaaaa--x--a-b"),
+    ],
+)
+def test_user_dataset_ids_are_lowercase_and_path_safe(repo: str, config: str, split: str, expected: str) -> None:
+    import re
+
+    got = r.user_dataset_id(repo, SHA, config, split)
+    assert got == expected
+    assert got.startswith(r.user_dataset_id_prefix(repo, SHA))
+    assert re.fullmatch(r"user--ds--[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)*", got)
+    assert ".." not in got
+    assert "/" not in got

@@ -51,6 +51,8 @@ models:
     params_b: 0.94
     disk_gb: 3.8
     train_node: train.sft_vlm      # full fine-tune of the decoder, vision + embeddings frozen (upstream recipe)
+    vision_prefixes: [encoder.model_encoder]  # RADIO backbone
+    projector_prefixes: [encoder.conv1, encoder.layer_norm1, encoder.conv2, encoder.layer_norm2, encoder.sum_proj, encoder.layer_norm3]  # RadioWithNeck neck
     ram_gb_train: 20
     ram_source: measured           # P-1b 26.08-3 (freeze fixed, 30.4% trainable): host peak +17.8GB, cold Triton, 5 steps + val 100 + export
     sft_trainable_pct_min: 29.4
@@ -88,6 +90,7 @@ models:
     params_b: 2.4
     disk_gb: 4.9
     train_node: train.lora_vlm
+    family: qwen3_vl  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 14
     ram_source: estimated
     sft_trainable_pct_min: 0
@@ -125,6 +128,7 @@ models:
     params_b: 8.8
     disk_gb: 17.5
     train_node: train.lora_vlm
+    family: qwen3_vl  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 32
     ram_source: estimated
     sft_trainable_pct_min: 0
@@ -162,6 +166,7 @@ models:
     params_b: 2.1
     disk_gb: 4.3
     train_node: train.lora_vlm
+    family: qwen3_vl  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 14
     ram_source: estimated
     sft_trainable_pct_min: 0
@@ -199,6 +204,7 @@ models:
     params_b: 0.9
     disk_gb: 2.0
     train_node: train.lora_vlm
+    family: qwen3_5  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 13
     ram_source: measured           # S-3: steady +6.5GB, peak +12.6GB (host, upper bound)
     sft_trainable_pct_min: 0
@@ -236,6 +242,7 @@ models:
     params_b: 2.3
     disk_gb: 5.0
     train_node: train.lora_vlm
+    family: qwen3_5  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 17
     ram_source: measured           # R2 2026-10-13 (run n4-96d12a932c04f055-a2): LoRA 3 epochs on 720 CORD images, pixel cap on, peak 16.7GB
     sft_trainable_pct_min: 0
@@ -273,6 +280,7 @@ models:
     params_b: 5.0
     disk_gb: 9.3
     train_node: train.lora_vlm
+    family: qwen3_5  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 25
     ram_source: measured           # 2026-10-13 run n4-f9097f984a8f74ca (clean a015390): LoRA 1 epoch, 200 CORD images, pixel cap on, peak 24.4GB
     sft_trainable_pct_min: 0
@@ -310,6 +318,7 @@ models:
     params_b: 10.0
     disk_gb: 19.3
     train_node: train.lora_vlm
+    family: qwen3_5  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 34
     ram_source: measured           # 2026-10-13 run n4-5b8db7ae779edb01 (clean a015390): LoRA 1 epoch, 200 CORD images, pixel cap on, peak 33.1GB
     sft_trainable_pct_min: 0
@@ -347,6 +356,7 @@ models:
     params_b: 5.1
     disk_gb: 10.2
     train_node: train.lora_vlm
+    family: gemma4  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 20
     ram_source: estimated
     sft_trainable_pct_min: 0
@@ -385,6 +395,7 @@ models:
     params_b: 8.0
     disk_gb: 16.0
     train_node: train.lora_vlm
+    family: gemma4  # module blocks (train_blocks, vision_lr_scale) from configs/catalog/families.yaml
     ram_gb_train: 28
     ram_source: estimated
     sft_trainable_pct_min: 0
@@ -424,6 +435,8 @@ models:
     params_b: 0.95
     disk_gb: 3.6
     train_node: train.sft_vlm
+    vision_prefixes: [encoder.model_encoder]  # RADIO backbone
+    projector_prefixes: [encoder.conv1, encoder.layer_norm1, encoder.conv2, encoder.layer_norm2, encoder.sum_proj, encoder.layer_norm3]  # RadioWithNeck neck
     ram_gb_train: 14
     ram_source: estimated
     sft_trainable_pct_min: 26.8
