@@ -1543,6 +1543,8 @@ docs_error:
   actions_lead: "Depending on the situation, the app suggests one of these:"
 pipelines:
   more_steps: "+{step_count} steps"
+  measured_with: 'Measured with: {model}'
+  paper: Paper
   swap_hint: Change the model or data in the source steps to use this pipeline with others; the numbers on the card only hold for the measured setup.
   metric:
     field_f1: Field F1
@@ -1668,24 +1670,36 @@ settings_error:
   settings_body_too_large: The request is too large.
   settings_key_unusable: The key file has the wrong permissions; an admin must fix it.
 reference_pipeline:
+  qat-qwen35:
+    summary: 'Quantizes Qwen3.5, then retrains briefly with simulated quantization to win back score.'
+  dpo-qwen35:
+    summary: 'Teaches Qwen3.5 to prefer the better answer from chosen/rejected pairs.'
+  distill-synthetic-qwen35:
+    summary: 'A large model writes questions and answers for images; a small Qwen3.5 learns from them.'
+  vision-unfrozen-qwen35-2b:
+    summary: 'Trains Qwen3.5-2B''s vision part too, at a low learning rate, on high-res images.'
+  two-stage-qwen35-2b:
+    summary: 'Trains Qwen3.5-2B''s image–text connector first, then teaches answers with LoRA.'
+    stage1: Train the connector
+    stage2: Connector + LoRA
   qlora-4bit-qwen35-2b:
     summary: QLoRA on Qwen3.5-2B, holding the language part in 4-bit to save memory.
   data-cleanup-lora:
     summary: Filter broken images, drop duplicates and images also in the test data, then LoRA-tune.
   invoice-to-json:
-    summary: Teach a model to read receipt images into JSON. Runs right away on the CORD-v2 samples.
+    summary: 'Retrains the whole language part of Nemotron Parse to read CORD-v2 receipts into JSON.'
   invoice-qwen35-2b-lora:
     summary: LoRA-tune Qwen3.5-2B to read receipts into JSON, scored like the receipt template.
   image-video-understanding:
-    summary: Teach a small model to answer questions about your images with LoRA. No video yet.
+    summary: 'LoRA-tunes Qwen3.5-2B, measured on CORD-v2 receipts; swap the data to teach other tasks.'
   quantize-fp8-benchmark:
-    summary: Quantize a model to FP8, then re-score it to see how much quality drops.
+    summary: 'Quantizes Qwen3.5-2B to FP8, then re-scores it under the same conditions as the original.'
   gemma4-e4b-lora:
     summary: LoRA-tune Gemma 4 E4B on CORD-v2 receipts, scored on the receipt template's test set.
   qwen35-4b-lora:
     summary: LoRA-tune Qwen3.5-4B on your data. Bigger than Image understanding; needs more memory.
   grpo-geometry:
-    summary: Teach a model geometry by scoring each answer (GRPO). The app has no GRPO step yet.
+    summary: 'Qwen3.5 solves geometry problems and learns from rewards the app scores itself.'
   dgx-spark-vlm-playbook:
     summary: NVIDIA's guide to fine-tuning an image model on DGX Spark, with before/after results.
   donut-cord:

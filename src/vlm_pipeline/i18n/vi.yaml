@@ -1543,6 +1543,8 @@ docs_error:
   actions_lead: "Tuỳ trường hợp, app sẽ đề xuất một trong các cách sau:"
 pipelines:
   more_steps: "+{step_count} bước"
+  measured_with: 'Đo với: {model}'
+  paper: Bài báo
   swap_hint: Đổi model hoặc dữ liệu ở bước nguồn để dùng pipeline này với model, dữ liệu khác; số đo trên thẻ chỉ đúng với cấu hình đã đo.
   metric:
     field_f1: F1 theo trường
@@ -1668,24 +1670,36 @@ settings_error:
   settings_body_too_large: Nội dung gửi lên quá lớn.
   settings_key_unusable: File khoá có quyền truy cập sai, cần quản trị viên sửa.
 reference_pipeline:
+  qat-qwen35:
+    summary: 'Nén Qwen3.5 rồi học lại ngắn với phép nén giả lập để lấy lại điểm bị mất.'
+  dpo-qwen35:
+    summary: 'Dạy Qwen3.5 chọn câu trả lời tốt hơn từ các cặp câu được chọn và bị loại.'
+  distill-synthetic-qwen35:
+    summary: 'Model lớn viết câu hỏi và đáp án cho ảnh, rồi model Qwen3.5 nhỏ học theo.'
+  vision-unfrozen-qwen35-2b:
+    summary: 'Dạy Qwen3.5-2B cả phần nhìn ảnh với tốc độ học thấp, dùng ảnh độ phân giải cao.'
+  two-stage-qwen35-2b:
+    summary: 'Với Qwen3.5-2B, dạy bộ nối ảnh–chữ trước, rồi dạy cách trả lời bằng LoRA.'
+    stage1: Dạy bộ nối ảnh–chữ
+    stage2: Bộ nối + LoRA
   qlora-4bit-qwen35-2b:
     summary: Dạy nhẹ Qwen3.5-2B bằng QLoRA, nén phần ngôn ngữ xuống 4-bit cho đỡ tốn bộ nhớ.
   data-cleanup-lora:
     summary: Lọc ảnh hỏng, bỏ ảnh trùng và ảnh trùng với dữ liệu kiểm tra, rồi mới dạy nhẹ bằng LoRA.
   invoice-to-json:
-    summary: Dạy model đọc ảnh hoá đơn và trả về JSON. Chạy ngay với bộ hoá đơn mẫu CORD-v2.
+    summary: 'Dạy lại toàn bộ phần ngôn ngữ của Nemotron Parse để đọc hoá đơn CORD-v2 ra JSON.'
   invoice-qwen35-2b-lora:
     summary: Dạy nhẹ Qwen3.5-2B bằng LoRA để đọc hoá đơn ra JSON, chấm cùng bộ với mẫu Đọc hoá đơn.
   image-video-understanding:
-    summary: Dạy model nhỏ trả lời câu hỏi về ảnh của bạn bằng LoRA. Chưa hỗ trợ video.
+    summary: 'Dạy nhẹ Qwen3.5-2B bằng LoRA, đo trên hoá đơn CORD-v2; đổi dữ liệu để dạy việc khác.'
   quantize-fp8-benchmark:
-    summary: Nén model xuống FP8 rồi đo lại điểm, để thấy chất lượng giảm bao nhiêu.
+    summary: 'Nén Qwen3.5-2B xuống FP8 rồi đo lại điểm cùng điều kiện với bản gốc.'
   gemma4-e4b-lora:
     summary: Dạy nhẹ Gemma 4 E4B trên hoá đơn CORD-v2, chấm cùng bộ kiểm tra với mẫu Đọc hoá đơn.
   qwen35-4b-lora:
     summary: Dạy nhẹ Qwen3.5-4B trên dữ liệu của bạn. Lớn hơn mẫu Hiểu ảnh, cần nhiều bộ nhớ hơn.
   grpo-geometry:
-    summary: Dạy model giải hình học bằng cách chấm điểm từng câu trả lời (GRPO). App chưa có bước này.
+    summary: 'Qwen3.5 tự giải bài hình học, học từ điểm thưởng do app tự chấm.'
   dgx-spark-vlm-playbook:
     summary: Hướng dẫn của NVIDIA để fine-tune model ảnh trên DGX Spark, so sánh trước và sau.
   donut-cord:
