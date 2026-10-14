@@ -77,3 +77,14 @@ def test_a_container_that_vanishes_after_it_was_seen_is_an_error(
     ], monkeypatch, tmp_path)  # fmt: skip
     with pytest.raises(RunnerError, match="not_found"):
         launcher.run(_narrow_job(tmp_path), tmp_path, lock_token=None, log_path=tmp_path / "l", image_id=None)  # type: ignore[attr-defined]
+
+
+def test_the_runner_never_drops_extra_groups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import dataclasses
+
+    from vlm_pipeline.common.launcher import RunnerError
+
+    launcher = _launcher_with([], monkeypatch, tmp_path)
+    job = dataclasses.replace(_narrow_job(tmp_path), image="vlm-nemo-rl:0.7.0-1", group_add=(0,))  # type: ignore[type-var]
+    with pytest.raises(RunnerError, match="group_add_not_supported"):
+        launcher.run(job, tmp_path, lock_token=None, log_path=tmp_path / "l", image_id=None)  # type: ignore[attr-defined]

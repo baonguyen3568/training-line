@@ -16,6 +16,26 @@ from vlm_pipeline.common.errors import VlmPipelineError
 DEFAULT_TRAIN_IMAGE = "vlm-automodel:26.08-6"
 
 
+# Extra groups a job may join, PER IMAGE ID (security 2026-10-14): never by tag, since anyone can retag another image
+# locally. vlm-nemo-rl:0.7.0-1 (docker/IMAGES.lock, PROBE ONLY) keeps /opt/nemo-rl 660/770 root:root, so its
+# non-root user needs group 0. Never offered to any other image (a job in group 0 can read root-group files).
+GROUP_ADD_ALLOWED: dict[str, frozenset[int]] = {
+    "sha256:4c740d252ef90651621224005623546b4931582fa2eeb9ce816ba9d7576a4add": frozenset({0}),  # vlm-nemo-rl:0.7.0-1
+}
+
+
+def group_add_problem(image: str, groups: tuple[int, ...]) -> str | None:
+    """Why ``image`` may not run with ``groups`` added, or None (no groups is always fine).
+
+    ``image`` must be the RESOLVED image id run_job runs by (the launcher pins ``job.image`` to it), never a tag.
+    """
+    if not groups:
+        return None
+    allowed = GROUP_ADD_ALLOWED.get(image, frozenset())
+    extra = sorted(set(groups) - allowed)
+    return f"image {image[:19]} may not join group(s) {extra} (allowed by image id only)" if extra else None
+
+
 class ImageMismatchError(VlmPipelineError):
     """The local image tag no longer points at the image id pinned in docker/IMAGES.lock (tag rebuilt/replaced)."""
 

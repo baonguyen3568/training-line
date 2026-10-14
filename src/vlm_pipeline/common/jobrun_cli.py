@@ -41,7 +41,8 @@ def build_job(a: argparse.Namespace, root: Path, run_id: str, run_dir: Path, arg
         logger.warning("unapproved image %s runs with the project mounted READ-WRITE (--unapproved-image-rw)", a.image)
     rw_dirs = (run_dir, *(root / d for d in a.rw_dir)) if read_only else ()
     return ContainerJob(name=run_id, image=a.image, argv=argv_c, gpu=not a.no_gpu,
-                        read_only_project=read_only, rw_dirs=rw_dirs, entrypoint=a.entrypoint)  # fmt: skip
+                        read_only_project=read_only, rw_dirs=rw_dirs, entrypoint=a.entrypoint,
+                        group_add=tuple(a.group_add))  # fmt: skip
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -62,6 +63,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--unapproved-image-rw", action="store_true",
                    help="with --allow-unapproved-image: keep the repo writable (not recommended, logged)")  # fmt: skip
     p.add_argument("--entrypoint", help="override the image ENTRYPOINT (vLLM image: the command's first word)")
+    p.add_argument(
+        "--group-add",
+        action="append",
+        default=[],
+        type=int,
+        metavar="GID",
+        help="extra group for the job; only what images.GROUP_ADD_ALLOWED allows for --image",
+    )
     p.add_argument("cmd", nargs=argparse.REMAINDER, help="-- command ...")
     a = p.parse_args(argv)
     cmd = a.cmd[1:] if a.cmd[:1] == ["--"] else a.cmd

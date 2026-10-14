@@ -151,6 +151,8 @@ class RunnerLauncher:
 
         if not job.narrow or len(job.rw_dirs) != 1:
             raise RunnerError("not_a_narrowed_job")
+        if job.group_add:  # not in the runner protocol: never run without the groups the job needs (host CLI only)
+            raise RunnerError("group_add_not_supported")
         # The runner picks the entrypoint from the job kind; a job naming its own (vLLM: python3) sends it as argv[0].
         argv = (job.entrypoint, *job.argv) if job.entrypoint else tuple(job.argv)
         kind = job_kind(argv)

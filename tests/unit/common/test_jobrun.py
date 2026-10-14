@@ -940,3 +940,28 @@ def test_a_container_that_never_appears_is_a_system_error(tmp_path: Path, monkey
     replies = [{"ok": True, "image_id": "sha256:x"}, *({"ok": False, "error": "not_found"} for _ in range(10_000))]
     with pytest.raises(RunnerError, match="not_found"):  # the download maps this to SYS-000, and install.sh fails
         _race_run(tmp_path, monkeypatch, replies)
+
+
+NEMO_RL_ID = "sha256:4c740d252ef90651621224005623546b4931582fa2eeb9ce816ba9d7576a4add"  # IMAGES.lock, PROBE ONLY
+
+
+@pytest.mark.parametrize(
+    ("image", "groups", "ok"),
+    [
+        (NEMO_RL_ID, (0,), True),  # its /opt/nemo-rl is root-group only (security 2026-10-14)
+        (NEMO_RL_ID, (0, 4), False),  # only the allowed group
+        ("vlm-nemo-rl:0.7.0-1", (0,), False),  # a tag is never trusted (anyone can retag another image)
+        ("sha256:" + "b" * 64, (0,), False),  # another image, whatever its tag says
+        ("vlm-automodel:26.08-6", (), True),  # no extra group: always fine
+    ],
+)
+def test_extra_groups_are_allowed_per_image_only(tmp_path: Path, image: str, groups: tuple[int, ...], ok: bool) -> None:
+    root, run, _repo, data = _narrow_project(tmp_path)
+    job = ContainerJob(name="t", image=image, argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(data,),
+                       group_add=groups)  # fmt: skip
+    if ok:
+        argv = docker_args(job, root)
+        assert argv.count("--group-add") == len(groups)
+    else:
+        with pytest.raises(ValueError, match="may not join group"):
+            docker_args(job, root)

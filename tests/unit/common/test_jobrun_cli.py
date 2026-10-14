@@ -20,6 +20,7 @@ def _args(**kw: object) -> argparse.Namespace:
         "allow_unapproved_image": False,
         "unapproved_image_rw": False,
         "entrypoint": None,
+        "group_add": [],
     }
     return argparse.Namespace(**{**base, **kw})
 
@@ -136,3 +137,14 @@ def test_a_looser_ceiling_is_refused_before_any_run_dir_exists(
         _main(tmp_path, monkeypatch, "--max-free-pct", pct)
     runs = tmp_path / "outputs" / "runs"
     assert not runs.exists() or list(runs.iterdir()) == []  # no orphan run.json stuck in "running"
+
+
+def test_group_add_reaches_the_job_only_for_its_allowed_image(tmp_path: Path) -> None:
+    """research's NeMo-RL probe: --group-add 0 for vlm-nemo-rl only (security 2026-10-14)."""
+    nemo_rl = "sha256:4c740d252ef90651621224005623546b4931582fa2eeb9ce816ba9d7576a4add"  # run_job pins the tag to it
+    _root, _run, argv = _job(tmp_path, image=nemo_rl, group_add=[0])
+    assert argv[argv.index("--group-add") + 1] == "0"
+    with pytest.raises(ValueError, match="may not join group"):
+        _job(tmp_path / "tag", image="vlm-nemo-rl:0.7.0-1", group_add=[0])  # a tag alone is never trusted
+    with pytest.raises(ValueError, match="may not join group"):
+        _job(tmp_path / "other", group_add=[0])  # vlm-vllm: never

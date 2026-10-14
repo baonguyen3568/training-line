@@ -59,6 +59,8 @@ class ContainerJob:
     rw_dirs: tuple[Path, ...] = ()
     # Replaces the image's ENTRYPOINT (e.g. vllm/vllm-openai's ["vllm", "serve"]) so ``argv`` is the whole command.
     entrypoint: str | None = None
+    # Extra supplementary groups, allowed per image only (images.GROUP_ADD_ALLOWED; security 2026-10-14).
+    group_add: tuple[int, ...] = ()
     uid: int = field(default_factory=os.getuid)
     gid: int = field(default_factory=os.getgid)
     # P017 step 6 (narrowed mounts, bao-security): no project mount at all. The job sees src/ + configs/ (ro), the
@@ -339,7 +341,7 @@ def docker_args(
         "--label", "project=vlm-training",
         "--network", "none",
         "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
-        "--user", f"{job.uid}:{job.gid}",
+        "--user", f"{job.uid}:{job.gid}", *_group_args(job),
         "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",
         "--ulimit", "memlock=-1", "--ulimit", "stack=67108864",
         "-v", mount, *overlays, "-w", job.workdir,
@@ -369,6 +371,15 @@ SECRET_TOKEN_PATH = "/run/secrets/hf_token"  # noqa: S105 - a path: the job read
 def _no_egress(job: ContainerJob) -> None:
     if job.egress or job.secret_file is not None:
         raise ValueError("network and token files are for narrowed download jobs only")
+
+
+def _group_args(job: ContainerJob) -> list[str]:
+    """``--group-add`` for the groups ``job`` may join with its image, else ValueError (never silently dropped)."""
+    from vlm_pipeline.common.images import group_add_problem
+
+    if (problem := group_add_problem(job.image, job.group_add)) is not None:
+        raise ValueError(problem)
+    return [arg for gid in sorted(set(job.group_add)) for arg in ("--group-add", str(int(gid)))]
 
 
 OFFLINE_ENV = ("HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE", "TRANSFORMERS_OFFLINE")
@@ -423,7 +434,7 @@ def _narrow_docker_args(job: ContainerJob, project_root: Path, *, lock_token: st
         "--label", "project=vlm-training", "--label", f"vlm.job={job.name}",  # the runner acts only on its own jobs
         *network,
         "--security-opt", "no-new-privileges", "--cap-drop", "ALL",
-        "--user", f"{job.uid}:{job.gid}",
+        "--user", f"{job.uid}:{job.gid}", *_group_args(job),
         "--memory", f"{job.memory_gb}g", "--shm-size", f"{job.shm_gb}g",
         "--ulimit", "memlock=-1", "--ulimit", "stack=67108864",
         *mounts, "-w", job.workdir,
