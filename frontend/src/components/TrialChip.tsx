@@ -3,16 +3,15 @@ import { t } from "../i18n";
 import { Icon } from "./Icon";
 
 /**
- * "Chạy thử" (ADR-021 quick trial, design): a run of a few steps to check the model and data run at all, never a
- * training result. Text ink, hairline, no accent; its "?" says what a trial run is.
+ * "Lần chạy thử" (ADR-021 quick trial, design r2): a run of a few steps to check the model and data run at all, never
+ * a training result. A static tag, never button-like (no icon, no border, no hover: "Chạy thử nhanh" is the play
+ * button elsewhere); its "?" says what a trial run is.
  */
 export function TrialChip() {
   const pop = `trial-${useId().replace(/:/g, "")}`;
   return (
     <span className="trial-chip-wrap">
-      <span className="chip trial-chip">
-        <Icon name="play" size={12} /> {t("run.trial_chip")}
-      </span>
+      <span className="trial-chip">{t("run.trial_chip")}</span>
       <button
         type="button"
         className="help-btn inline"

@@ -1616,17 +1616,22 @@ fieldset.seg-radio {
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
-/* "Chạy thử" (ADR-021 trial run): text ink, hairline, never accent (design) */
+/* "Lần chạy thử" (ADR-021 trial run): a static tag, never button-like (design r2) */
 .trial-chip-wrap {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   white-space: nowrap;
 }
-.chip.trial-chip {
+.trial-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas-placeholder-bg);
   color: var(--color-text-secondary);
-  border: 1px solid var(--color-axis);
-  background: transparent;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: default;
 }
 .trial-chip-wrap .pop {
   white-space: normal; /* the chip stays on one line, its explanation wraps */
