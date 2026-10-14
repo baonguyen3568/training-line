@@ -33,6 +33,8 @@ from vlm_pipeline.quantize.config import QatParams
 from vlm_pipeline.quantize.scope import QuantizeNotSupportedError
 
 NODE_TYPE = "quantize.qat"
+# False until the Q2 GPU smoke passes (ADR-022 #10): every QAT node is refused with ``worker_pending`` meanwhile.
+WORKER_READY = False
 
 
 def _refuse(node_id: str, reason: str, model: CatalogEntry | None = None) -> None:
@@ -44,7 +46,6 @@ def _refuse(node_id: str, reason: str, model: CatalogEntry | None = None) -> Non
 
 def check_support(node_id: str, params: QatParams, model: CatalogEntry | None, inputs: Mapping[str, str]) -> None:
     """Validate-time twin of what the QAT worker refuses: raise ``QuantizeNotSupportedError`` (CFG-011)."""
-    del inputs  # train_data / calib_data kinds: decided with the worker
     if params.format != "fp8":
         _refuse(node_id, "format", model)
     if model is not None:
@@ -52,7 +53,12 @@ def check_support(node_id: str, params: QatParams, model: CatalogEntry | None, i
             _refuse(node_id, "remote_code_model", model)
         if model.quant_fp8 != "official":
             _refuse(node_id, "fp8_not_official", model)
-    _refuse(node_id, "worker_pending", model)
+    if inputs.get("train_data", "dataset:local") != "dataset:local":  # v1: local datasets (unwired = CFG-003's job)
+        _refuse(node_id, "hub_train_data", model)
+    if "calib_data" in inputs:  # v1 calibrates on the first training images
+        _refuse(node_id, "separate_calib_data", model)
+    if not WORKER_READY:
+        _refuse(node_id, "worker_pending", model)
 
 
 # LoRA on the language model only (vision / projector / lm_head stay BF16 and frozen, as the PTQ scope).
@@ -302,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-__all__ = ["NODE_TYPE", "check_support", "lr_at", "optimizer_steps", "read_samples"]
+__all__ = ["NODE_TYPE", "WORKER_READY", "check_support", "lr_at", "optimizer_steps", "read_samples"]
 
 
 if __name__ == "__main__":

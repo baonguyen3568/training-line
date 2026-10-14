@@ -21,6 +21,7 @@ from typing import ClassVar
 from vlm_pipeline.app.bench_worker import run_bench
 from vlm_pipeline.app.data_workers import run_dedupe, run_filter
 from vlm_pipeline.app.export_worker import run_export
+from vlm_pipeline.app.qat_worker import run_qat
 from vlm_pipeline.app.quantize_worker import run_quantize
 from vlm_pipeline.app.trial_worker import run_trial
 from vlm_pipeline.common.catalog import (
@@ -199,6 +200,7 @@ class RealWorker:
             "bench.perf": functools.partial(run_bench, self),  # B-6 (app/bench_worker.py, bao-tester)
             "export.hf_dir": functools.partial(run_export, self),  # B-2: native models (ADR-012)
             "quantize.modelopt_ptq": functools.partial(run_quantize, self),  # B-4 (app/quantize_worker.py, research)
+            "quantize.qat": functools.partial(run_qat, self),  # ADR-022 #10 (app/qat_worker.py, fixcode)
             "serve.vllm": functools.partial(run_trial, self),  # B-7 "Chạy thử" (app/trial_worker.py)
             "data.caption_vlm": self._caption,  # app/caption_worker.py (bao-fixcode)
             "data.filter": functools.partial(run_filter, self),  # app/data_workers.py (local datasets, v1)
