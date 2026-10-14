@@ -1875,7 +1875,6 @@ byo:
     question: Cột câu hỏi (tuỳ chọn)
     answer: Cột câu trả lời
     messages: Cột hội thoại
-    fixed_question: Câu hỏi dùng chung cho mọi ảnh
     suggested: gợi ý
     preview: Xem trước
     apply: Dùng cách ghép này

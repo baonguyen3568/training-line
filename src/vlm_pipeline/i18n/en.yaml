@@ -1875,7 +1875,6 @@ byo:
     question: Question column (optional)
     answer: Answer column
     messages: Conversation column
-    fixed_question: One question for every image
     suggested: suggested
     preview: Preview
     apply: Use this mapping
