@@ -1392,7 +1392,6 @@ settings:
     howto: Chỉ chuyển file chứng chỉ qua kênh bạn tin cậy. Cài xong trên máy kia, mở chi tiết chứng chỉ trên máy đó và so vân tay SHA-256 với dãy ở trên; khớp hết thì mới mở địa chỉ, không khớp nghĩa là file đã bị tráo.
     copy_fingerprint: Sao chép vân tay
     ca_missing: Chưa có chứng chỉ cho truy cập qua LAN. Quản trị viên chạy lại scripts/install.sh bản mới để tạo.
-  section_about: Về app
   about:
     version: "{version} ({commit})"
     copy: Sao chép thông tin phiên bản

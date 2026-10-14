@@ -1392,7 +1392,6 @@ settings:
     howto: Move the certificate file only over a channel you trust. After installing it on the other device, open the certificate details there and compare its SHA-256 fingerprint with the one above; open the address only if they match exactly, because a mismatch means the file was swapped.
     copy_fingerprint: Copy fingerprint
     ca_missing: No certificate for LAN access yet. An admin needs to re-run the latest scripts/install.sh to create it.
-  section_about: About
   about:
     version: "{version} ({commit})"
     copy: Copy version info
