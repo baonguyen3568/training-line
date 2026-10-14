@@ -218,6 +218,33 @@ def set_user_model_lookup(lookup: Callable[[str], CatalogEntry | None] | None) -
     _user_lookup = lookup
 
 
+_user_dataset_status: Callable[[str], dict[str, object] | None] | None = None
+
+
+def set_user_dataset_lookup(lookup: Callable[[str], dict[str, object] | None] | None) -> None:
+    """The app registers what it knows of a user dataset (``user--ds--…``); common never imports app.
+
+    The lookup returns None when the dataset was never added here, else ``{"rows": int | None, "download": {...}
+    | None}``: ``download`` = the NET-002 params when its split is not downloaded and converted yet.
+    """
+    global _user_dataset_status  # noqa: PLW0603 - one process-wide source, set once at app startup
+    _user_dataset_status = lookup
+
+
+def user_dataset_status(dataset_id: str) -> dict[str, object] | None:
+    """What the app knows of a user dataset; None when not added here (or no app to ask)."""
+    if not dataset_id.startswith("user--ds--") or _user_dataset_status is None:
+        return None
+    return _user_dataset_status(dataset_id)
+
+
+def user_dataset_rows(dataset_id: str) -> int | None:
+    """Rows of a converted user dataset, None when unknown (not added, not converted yet, or no app)."""
+    status = user_dataset_status(dataset_id)
+    rows = status.get("rows") if status is not None else None
+    return rows if isinstance(rows, int) and not isinstance(rows, bool) else None
+
+
 def model_entry(model_id: str | None) -> CatalogEntry | None:
     """The one lookup for a model id: the vetted catalog, then a user-added model (ADR-021 §6: one check path)."""
     if not model_id:
