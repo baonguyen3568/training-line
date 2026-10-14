@@ -83,3 +83,18 @@ def test_block_recipe_keeps_the_sub_block_qwen35_projections_bf16() -> None:
 
     assert "*linear_attn.in_proj_a*" in skip_patterns("block")
     assert skip_patterns("per_tensor") == skip_patterns("per_channel") == SKIP_PATTERNS
+
+
+def test_nvfp4_keeps_the_small_linear_attention_projections_bf16() -> None:
+    from vlm_pipeline.quantize.ptq import FORMATS, SKIP_PATTERNS, skip_patterns
+
+    assert "nvfp4" in FORMATS
+    assert skip_patterns("per_tensor", "nvfp4") == skip_patterns("block")
+    assert skip_patterns("per_tensor", "fp8") == SKIP_PATTERNS
+
+
+def test_nvfp4_parity_is_measured_not_judged() -> None:
+    from vlm_pipeline.quantize.ptq import parity_stats
+
+    assert parity_stats([0.5], [0.9], judged=False)["verdict"] == "none"
+    assert parity_stats([0.5], [0.9])["verdict"] == "fail"

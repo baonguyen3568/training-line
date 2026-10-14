@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-FORMATS = ("fp8",)
+FORMATS = ("fp8", "nvfp4")  # nvfp4: research measurement (ADR-022 #9); the node still offers fp8 only
 AUTO_CLASS = "AutoModelForImageTextToText"  # remote-code models (Nemotron Parse) are not supported yet (P-5)
 # Modules kept BF16. Qwen3-VL / Qwen3.5 / Gemma vision towers live under these names; ModelOpt skips conv1d itself.
 SKIP_PATTERNS = ("*lm_head*", "*visual*", "*vision_tower*", "*vision_model*", "*multi_modal_projector*")
@@ -86,13 +86,19 @@ def _answer_logits(model: Any, batch: dict[str, Any], answer: Any) -> Any:
     return logits[prompt_len - 1 : prompt_len - 1 + answer.shape[0]].float().cpu()
 
 
-def parity_stats(agree: list[float], kls: list[float]) -> dict[str, Any]:
-    """Summary of the per-sample parity numbers and the sanity verdict (pure, unit-tested)."""
+def parity_stats(agree: list[float], kls: list[float], *, judged: bool = True) -> dict[str, Any]:
+    """Summary of the per-sample parity numbers and the sanity verdict (pure, unit-tested).
+
+    ``judged=False`` reports the numbers with verdict "none": the thresholds were measured for FP8; NVFP4 (W4A4) is
+    measured first (ADR-022 #9) and gets its own thresholds afterwards.
+    """
     if not agree:
         return {"samples": 0, "verdict": "none"}
     top1, kl = sum(agree) / len(agree), sum(kls) / len(kls)
     verdict: ParityVerdict
-    if top1 < FAIL_TOP1_AGREEMENT or kl > FAIL_KL:
+    if not judged:
+        verdict = "none"
+    elif top1 < FAIL_TOP1_AGREEMENT or kl > FAIL_KL:
         verdict = "fail"
     elif top1 < MIN_TOP1_AGREEMENT or kl > MAX_KL:
         verdict = "warn"
@@ -131,9 +137,14 @@ FP8_SCALINGS: dict[FP8Scaling, str] = {
 }
 
 
-def skip_patterns(scaling: FP8Scaling) -> tuple[str, ...]:
-    """Modules kept BF16 for ``scaling`` (what quant_cfg disables and what report.json records)."""
-    return SKIP_PATTERNS + (BLOCK_EXTRA_SKIP if scaling == "block" else ())
+# NVFP4 = ModelOpt NVFP4_DEFAULT_CFG: FP4 (E2M1) weights and activations, one FP8 scale per 16 elements + a per-tensor
+# FP32 scale. It also keeps in_proj_a / in_proj_b BF16: their few output channels gain nothing and vLLM fuses them.
+NVFP4_CFG = "NVFP4_DEFAULT_CFG"
+
+
+def skip_patterns(scaling: FP8Scaling, fmt: str = "fp8") -> tuple[str, ...]:
+    """Modules kept BF16 for ``fmt`` / ``scaling`` (what quant_cfg disables and what report.json records)."""
+    return SKIP_PATTERNS + (BLOCK_EXTRA_SKIP if fmt == "nvfp4" or scaling == "block" else ())
 
 
 def quant_cfg(fmt: str, scaling: FP8Scaling = "per_tensor") -> dict[str, Any]:
@@ -142,8 +153,8 @@ def quant_cfg(fmt: str, scaling: FP8Scaling = "per_tensor") -> dict[str, Any]:
 
     if fmt not in FORMATS:
         raise ValueError(f"unsupported format {fmt!r}")
-    cfg = copy.deepcopy(getattr(mtq, FP8_SCALINGS[scaling]))
-    for pattern in skip_patterns(scaling):
+    cfg = copy.deepcopy(getattr(mtq, NVFP4_CFG if fmt == "nvfp4" else FP8_SCALINGS[scaling]))
+    for pattern in skip_patterns(scaling, fmt):
         if isinstance(cfg["quant_cfg"], list):
             cfg["quant_cfg"].append({"quantizer_name": pattern, "enable": False})
         else:
@@ -164,8 +175,9 @@ def run(
     import transformers
     from modelopt.torch.export import export_hf_checkpoint
 
-    if not hasattr(mtq, FP8_SCALINGS[scaling]):  # fail before loading the model while holding the GPU lock
-        raise ValueError(f"ModelOpt {modelopt.__version__} has no {FP8_SCALINGS[scaling]}")
+    cfg_name = NVFP4_CFG if fmt == "nvfp4" else FP8_SCALINGS[scaling]
+    if not hasattr(mtq, cfg_name):  # fail before loading the model while holding the GPU lock
+        raise ValueError(f"ModelOpt {modelopt.__version__} has no {cfg_name}")
     t0 = time.time()
     out.mkdir(parents=True, exist_ok=True)
     processor = transformers.AutoProcessor.from_pretrained(model_dir, local_files_only=True)
@@ -176,11 +188,11 @@ def run(
         raise ValueError("no calibration images in the train split")
     held = load_images(data_dir, "validation", PARITY_SAMPLES)
     report: dict[str, Any] = {
-        "format": fmt, "fp8_scaling": scaling,
+        "format": fmt, "fp8_scaling": scaling if fmt == "fp8" else None,
         "modelopt": modelopt.__version__, "transformers": transformers.__version__,
         "model_class": type(model).__name__, "calib_split": "train", "calib_samples": len(calib),
         "parity_split": "validation" if held else None,
-        "skip_patterns": list(skip_patterns(scaling)),
+        "skip_patterns": list(skip_patterns(scaling, fmt)),
     }  # fmt: skip
     with torch.no_grad():
         refs = []
@@ -208,7 +220,7 @@ def run(
                 q.log_softmax(-1), ref.log_softmax(-1), log_target=True, reduction="batchmean"
             )
             kls.append(kl.item())
-    report["parity"] = parity_stats(agree, kls)
+    report["parity"] = parity_stats(agree, kls, judged=fmt == "fp8")
     qdir = out / "quantized"
     export_hf_checkpoint(model, export_dir=str(qdir))
     processor.save_pretrained(qdir)
