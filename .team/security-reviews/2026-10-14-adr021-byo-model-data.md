@@ -103,3 +103,9 @@ Where: a job with `--network none`, archive mounted read-only, rw = its run dir 
 
 Tests the PR must carry: `../x`, `/abs`, `a\b`, symlink, hardlink, device, duplicate names, case-only duplicate, a
 42.zip-style ratio bomb, a gzip bomb, a nested archive, an unknown extension, an over-size image, an encrypted zip.
+
+## 11. After 1.0 (licence backlog)
+- `qwen-research` (Qwen RESEARCH LICENSE AGREEMENT, e.g. Qwen2.5-VL-3B-Instruct): vendor the text, add it to
+  `obligations.yaml` as `non_commercial`, and only then let a card with no `license` but a known `license_name` count.
+  Until then such a card is `unknown` (export blocked by SEC-006) and the UI shows the name from `license_card`.
+  Reason: moving unknown → non_commercial unblocks export, so it needs the text read first (decided 2026-10-14).
