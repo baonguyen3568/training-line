@@ -573,8 +573,7 @@
         "lm": "lora",
         "extras": [
           "rollout",
-          "reward",
-          "reference_shared"
+          "reward"
         ]
       },
       "source": {

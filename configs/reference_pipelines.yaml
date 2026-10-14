@@ -238,7 +238,7 @@ pipelines:
     vision: frozen
     projector: frozen
     lm: lora
-    extras: [rollout, reward, reference_shared]
+    extras: [rollout, reward]  # no KL term in 1.0 (DAPO arXiv 2503.14476, Dr.GRPO arXiv 2503.20783): no reference
   source: {url: 'https://github.com/NVIDIA-NeMo/RL', publisher: NVIDIA, paper_url: 'https://arxiv.org/abs/2402.03300'}
   license: {code: apache-2.0, model: apache-2.0, data: mit}
   steps:
