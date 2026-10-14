@@ -1870,6 +1870,7 @@ byo:
     split: Data split (split)
   map:
     title: Map data columns
+    none: None
     mode_qa: Image + question + answer
     mode_messages: Conversation (messages)
     image: Image column

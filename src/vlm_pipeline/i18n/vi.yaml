@@ -1870,6 +1870,7 @@ byo:
     split: Phần dữ liệu (split)
   map:
     title: Ghép cột dữ liệu
+    none: Không dùng
     mode_qa: Ảnh + câu hỏi + câu trả lời
     mode_messages: Hội thoại (messages)
     image: Cột ảnh
