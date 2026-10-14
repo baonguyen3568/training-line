@@ -1063,9 +1063,6 @@ node:
       max_new_tokens:
         label: Độ dài câu trả lời tối đa (token)
         help: Giới hạn độ dài mỗi câu trả lời model viết (32–1024).
-      kl_coef:
-        label: Mức giữ gần model gốc (KL)
-        help: Càng lớn thì model càng ít đi xa khỏi model gốc. Nên giữ mặc định.
       lora_dim:
         label: Kích thước LoRA (dim)
         help: Lớn hơn thì học được nhiều hơn nhưng tốn RAM hơn (4–64). Nên giữ mặc định.

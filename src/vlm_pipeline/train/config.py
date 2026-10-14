@@ -121,6 +121,9 @@ class GrpoParams(Params):
     The reward compares each generated answer with the record's ``target``. Total reward = format_weight x shape
     bonus + correctness_weight x score; defaults follow the engine's geometry3k example (0.1 / 0.9), confirmed by
     research when the NeMo-RL probe runs.
+    No KL term in 1.0 (DAPO arXiv 2503.14476, Dr.GRPO 2503.20783: a pinned fp32 reference model does not fit next to
+    the policy on GB10; probe #10 passed without it, PM 2026-10-14): the worker must write
+    ``reference_policy_kl_penalty: 0``. KL comes back as a field once a run with it fits.
     """
 
     reward: GrpoReward = Field("exact_match", json_schema_extra=ui(order=0, summary=True, option_keys="grpo_reward"))
@@ -130,7 +133,6 @@ class GrpoParams(Params):
     )
     num_generations: int = Field(4, ge=2, le=8, json_schema_extra=ui(advanced=True))  # answers per prompt
     max_new_tokens: int = Field(256, ge=32, le=1024, json_schema_extra=ui(advanced=True))
-    kl_coef: float = Field(0.01, ge=0.0, le=1.0, json_schema_extra=ui(advanced=True))
     lora_dim: int = Field(8, ge=4, le=64, json_schema_extra=ui(advanced=True))
     format_weight: float = Field(0.1, ge=0.0, le=1.0, json_schema_extra=ui(advanced=True))
     correctness_weight: float = Field(0.9, ge=0.0, le=1.0, json_schema_extra=ui(advanced=True))
