@@ -163,3 +163,94 @@ def test_the_hubs_own_bookkeeping_never_reaches_the_host(tmp_path: Path) -> None
 
 def _git_sha1(data: bytes) -> str:
     return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()  # noqa: S324 - git's id
+
+
+# ------------------------------------------------------------------------------------------- resolve mode (P021 H2)
+class _ResolveHub(_Hub):
+    def __init__(self, siblings: list[Any], contents: dict[str, bytes], *, sha: str = "b" * 40,
+                 refuse: BaseException | None = None) -> None:  # fmt: skip
+        super().__init__(siblings, contents)
+        self.sha, self.refuse = sha, refuse
+        self.asked: list[str] = []
+
+    def model_info(self, repo: str, revision: str, files_metadata: bool) -> Any:
+        self.asked.append(revision)
+        if self.refuse is not None:
+            raise self.refuse
+        return SimpleNamespace(siblings=self.siblings, sha=self.sha, gated=False, card_data={"license": "apache-2.0"})
+
+
+def test_resolve_pins_the_ref_and_fetches_only_the_small_json(tmp_path: Path) -> None:
+    sibs = [_sib("config.json", 10), _sib("tokenizer_config.json", 12), _sib("model.safetensors", 9_000, "f" * 64),
+            _sib("model.safetensors.index.json", 20), _sib("modeling_x.py", 5),
+            _sib("weights.onnx", 50_000)]  # fmt: skip
+    fake = _ResolveHub(sibs, {"config.json": b"{}", "tokenizer_config.json": b"{}",
+                              "model.safetensors.index.json": b"{}"})  # fmt: skip
+    run_dir = _run_dir(tmp_path, revision="main", resolve=True)
+    assert hub.run(run_dir, api=fake, fetch=fake.fetch) == 0
+    meta = json.loads((run_dir / "stage" / "resolve.json").read_text())
+    assert meta["sha"] == "b" * 40
+    assert fake.asked == ["main"]
+    assert "modeling_x.py" in meta["all_files"]  # the host sees it and blocks (MODEL-004)
+    assert "modeling_x.py" not in {f["name"] for f in meta["files"]}  # never planned, never fetched
+    assert "weights.onnx" not in {f["name"] for f in meta["files"]}  # the budget counts what would be fetched only
+    assert meta["total_bytes"] == 10 + 12 + 9_000 + 20
+    assert sorted(fake.fetched) == ["config.json", "model.safetensors.index.json", "tokenizer_config.json"]
+    assert (meta["license"], meta["gated"]) == ("apache-2.0", False)
+    assert not (run_dir / "stage" / "files").exists()  # no weight
+
+
+def test_an_oversized_config_is_reported_never_treated_as_absent(tmp_path: Path) -> None:
+    """security H2 R1: a 2 MiB processor_config.json could hide an auto_map: the host must refuse, not skip it."""
+    sibs = [_sib("config.json", 10), _sib("processor_config.json", hub.META_MAX + 1),
+            _sib("tokenizer_config.json", hub.META_MAX + 1), _sib("model.safetensors", 9, "f" * 64)]  # fmt: skip
+    fake = _ResolveHub(sibs, {"config.json": b"{}", "tokenizer_config.json": b"{}"})
+    run_dir = _run_dir(tmp_path, revision="main", resolve=True)
+    assert hub.run(run_dir, api=fake, fetch=fake.fetch) == 0
+    meta = json.loads((run_dir / "stage" / "resolve.json").read_text())
+    assert meta["unreadable"] == ["processor_config.json"]
+    assert sorted(fake.fetched) == ["config.json", "tokenizer_config.json"]  # tokenizer_config's own cap is 4 MiB
+
+
+class GatedRepoError(Exception):
+    pass
+
+
+class RepositoryNotFoundError(Exception):
+    pass
+
+
+@pytest.mark.parametrize(
+    ("exc", "token", "reason"),
+    [
+        (GatedRepoError(), False, "gated_no_token"),
+        (GatedRepoError(), True, "gated_not_accepted"),
+        (RepositoryNotFoundError(), False, "not_found_or_private"),
+        (RepositoryNotFoundError(), True, "not_found"),
+        (ConnectionError(), False, "network"),
+    ],
+)
+def test_resolve_turns_a_hub_refusal_into_a_reason(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                   exc: BaseException, token: bool, reason: str) -> None:  # fmt: skip
+    if token:
+        path = tmp_path / "tok"
+        path.write_text("hf_dummy")
+        monkeypatch.setenv("HF_TOKEN_PATH", str(path))
+    else:
+        monkeypatch.delenv("HF_TOKEN_PATH", raising=False)
+    fake = _ResolveHub([], {}, refuse=exc)
+    run_dir = _run_dir(tmp_path, revision="main", resolve=True)
+    assert hub.run(run_dir, api=fake, fetch=fake.fetch) == hub.EXIT_HUB
+    assert json.loads((run_dir / "stage" / "error.json").read_text()) == {"reason": reason}
+
+
+@pytest.mark.parametrize("ref", ["../x", "-x", "a" * 129, "a b", "main..x", "refs/pr/3"])
+def test_resolve_refuses_a_strange_ref(tmp_path: Path, ref: str) -> None:
+    fake = _ResolveHub([], {})
+    assert hub.run(_run_dir(tmp_path, revision=ref, resolve=True), api=fake, fetch=fake.fetch) == hub.EXIT_BAD_SPEC
+    assert fake.asked == []
+
+
+def test_a_normal_download_still_needs_a_sha(tmp_path: Path) -> None:
+    fake = _ResolveHub([], {})
+    assert hub.run(_run_dir(tmp_path, revision="main"), api=fake, fetch=fake.fetch) == hub.EXIT_BAD_SPEC

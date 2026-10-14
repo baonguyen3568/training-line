@@ -11,6 +11,12 @@ remote-code files, byte budget) and writes, all inside ``<run_dir>/stage/``:
 * ``manifest.json``: name, size and the sha256 of what landed (the host re-hashes anyway: the job is not trusted).
 
 Never logs the token, headers or request objects. The host decides what is installed (``download.install``).
+
+Resolve mode (``"resolve": true``, ADR-021 / P021 H2, a user-added repo): ``revision`` may be a ref (``main``, a
+branch, a tag); the job pins it to the commit sha, writes ``stage/resolve.json`` (sha, gated, card licence, EVERY file
+name for the remote-code check, the filtered plan and its total) and fetches only the small JSON files the resolver
+reads (``download.resolver.CONFIG_FILES`` + the safetensors index) into ``stage/meta/``, each under its size cap.
+A hub refusal writes ``stage/error.json`` ``{reason}`` (NET-005) and exits ``EXIT_HUB``. No weight is fetched.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -33,13 +40,43 @@ SPEC_NAME = "download_spec.json"
 EXIT_OVER_BUDGET = 3
 EXIT_NO_SAFETENSORS = 4
 EXIT_BAD_SPEC = 5
+EXIT_HUB = 6  # resolve: the hub refused (not found, gated, network): stage/error.json says why
+_REF = re.compile(r"^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")  # a branch / tag / sha the user typed
+META_FILES = (
+    "config.json",
+    "processor_config.json",
+    "preprocessor_config.json",
+    "tokenizer_config.json",
+    "video_preprocessor_config.json",
+    "generation_config.json",
+)  # = download.resolver.CONFIG_FILES (the job image does not import the host-side resolver)
+META_MAX = 1 << 20
+TOKENIZER_CONFIG_MAX = 4 << 20  # added_tokens + chat template: a few hundred KB in real VLM repos
+INDEX_NAME = "model.safetensors.index.json"
+INDEX_MAX = 8 << 20
+
+
+def meta_caps() -> dict[str, int]:
+    """Each small JSON the resolver reads, with its size cap (the host reads them with the same caps)."""
+    return {**dict.fromkeys(META_FILES, META_MAX), "tokenizer_config.json": TOKENIZER_CONFIG_MAX, INDEX_NAME: INDEX_MAX}
+
+
+MAX_REPO_FILES = 2000  # security checklist §3
 
 
 def read_spec(run_dir: Path) -> dict[str, Any]:
     spec = read_small_json(run_dir / SPEC_NAME, max_bytes=64 * 1024)
     if not isinstance(spec, dict) or spec.get("kind") not in ("model", "dataset"):
         raise ValueError("bad spec")
-    check_repo(str(spec.get("repo")), str(spec.get("revision")))
+    if spec.get("resolve") is True:  # a ref the job pins; the repo id rules are the same
+        check_repo(str(spec.get("repo")), "0" * 40)
+        ref = str(spec.get("revision"))
+        if not _REF.fullmatch(ref):
+            raise ValueError("bad ref")
+        if ref.startswith("refs/pr/"):  # anyone can open a hub PR: never pin unmerged code under the repo's name
+            raise ValueError("an unmerged pull request ref is not a revision of the repo")
+    else:
+        check_repo(str(spec.get("repo")), str(spec.get("revision")))
     budget = spec.get("max_bytes")
     if isinstance(budget, bool) or not isinstance(budget, int) or budget <= 0:
         raise ValueError("bad budget")
@@ -87,6 +124,64 @@ def _stop(code: int, why: str) -> int:
     return code
 
 
+def hub_failure_reason(exc: BaseException, *, has_token: bool) -> str:
+    """NET-005 reason of a hub exception, by class name (the host never imports huggingface_hub to classify)."""
+    name = type(exc).__name__
+    if name == "GatedRepoError":
+        return "gated_not_accepted" if has_token else "gated_no_token"
+    if name in ("RepositoryNotFoundError", "RevisionNotFoundError", "EntryNotFoundError"):
+        # Without a token the hub answers 401 for a private repo exactly as for a missing one.
+        return "not_found" if has_token else "not_found_or_private"
+    return "network"
+
+
+def _card_license(info: Any) -> str | None:
+    card = getattr(info, "card_data", None) or getattr(info, "cardData", None)
+    value = card.get("license") if isinstance(card, dict) else getattr(card, "license", None)
+    return value if isinstance(value, str) else None
+
+
+def resolve(run_dir: Path, spec: dict[str, Any], *, api: Any, fetch: Callable[..., str], token: str | None) -> int:
+    """Resolve mode (module docstring): pin the ref, list every file, fetch only the small JSON files."""
+    kind: Kind = spec["kind"]
+    stage = run_dir / "stage"
+    stage.mkdir(parents=True, exist_ok=True)
+    try:
+        info = (api.model_info if kind == "model" else api.dataset_info)(
+            spec["repo"], revision=spec["revision"], files_metadata=True
+        )
+    except Exception as exc:  # noqa: BLE001 - every hub refusal becomes a reason, never a traceback
+        reason = hub_failure_reason(exc, has_token=token is not None)
+        (stage / "error.json").write_text(json.dumps({"reason": reason}), encoding="utf-8")
+        return _stop(EXIT_HUB, f"the hub refused {spec['repo']}: {reason}")
+    sha = getattr(info, "sha", None)
+    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        return _stop(EXIT_BAD_SPEC, "the hub returned no commit sha")
+    siblings = list(info.siblings or ())
+    if len(siblings) > MAX_REPO_FILES:
+        (stage / "error.json").write_text(json.dumps({"reason": "too_many_files"}), encoding="utf-8")
+        return _stop(EXIT_HUB, f"the repo has {len(siblings)} files (over {MAX_REPO_FILES})")
+    names = sorted(str(getattr(sib, "rfilename", "")) for sib in siblings)
+    files = plan_files(siblings, kind, ())  # never a *.py for a user-added repo (security §3)
+    gated = getattr(info, "gated", False)
+    sizes = {f["name"]: f["size"] for f in files}
+    caps = meta_caps() if kind == "model" else {}
+    # A file the resolver must read that is there but too big (or not planned) is NEVER "absent": the host refuses
+    # the repo (security H2: an oversized tokenizer_config.json could hide an auto_map).
+    unreadable = sorted(n for n, cap in caps.items() if n in names and (n not in sizes or sizes[n] > cap))
+    meta = {"sha": sha, "gated": bool(gated), "license": _card_license(info), "all_files": names,
+            "files": files, "total_bytes": sum(f["size"] for f in files), "unreadable": unreadable}  # fmt: skip
+    (stage / "resolve.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    for name in caps:
+        if name not in sizes or name in unreadable:
+            continue
+        fetch(repo_id=spec["repo"], filename=name, revision=sha, repo_type=kind, local_dir=str(stage / "meta"),
+              cache_dir=str(stage / "cache"), token=token)  # fmt: skip
+    shutil.rmtree(stage / "meta" / ".cache" / "huggingface", ignore_errors=True)
+    shutil.rmtree(stage / "cache", ignore_errors=True)
+    return 0
+
+
 def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = None) -> int:
     """The whole job; ``api`` / ``fetch`` are injectable (unit tests never touch the network)."""
     try:
@@ -99,6 +194,8 @@ def run(run_dir: Path, *, api: Any = None, fetch: Callable[..., str] | None = No
         from huggingface_hub import HfApi, hf_hub_download  # type: ignore[import-not-found]  # container-only
 
         api, fetch = HfApi(token=token), hf_hub_download
+    if spec.get("resolve") is True:
+        return resolve(run_dir, spec, api=api, fetch=fetch, token=token)
     info = (api.model_info if kind == "model" else api.dataset_info)(
         spec["repo"], revision=spec["revision"], files_metadata=True
     )
