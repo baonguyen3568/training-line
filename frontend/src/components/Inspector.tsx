@@ -123,6 +123,7 @@ function ParamField({
   value,
   onChange,
   optionMinutes,
+  invalidBy,
 }: {
   nodeType: string;
   name: string;
@@ -131,11 +132,16 @@ function ParamField({
   onChange: (v: unknown) => void;
   /** Measured time per option (estimate per_node.by_epochs), shown next to each option. */
   optionMinutes?: Record<string, Range | null>;
+  /** Ids of this field's error lines (ParamRow): the field is marked invalid and read with them. */
+  invalidBy?: string;
 }) {
   // a group's exposed param reads the copy of the inner step that owns it (P4-4)
   const owner = copyOwner(nodeType, name, "param", useWorkflow.getState().specs);
   const label = tp(["node", owner.typeId, "param", owner.name, "label"]);
   const id = `param-${name}`;
+  const invalid = invalidBy
+    ? ({ "aria-invalid": true, "aria-describedby": invalidBy } as const)
+    : undefined;
   const mode = useUi((s) => s.mode);
   const availGb = useSystem((s) => s.status?.mem_available_gb);
   const current = value ?? schema.default;
@@ -152,6 +158,7 @@ function ParamField({
         <label htmlFor={id}>{label}</label>
         <textarea
           id={id}
+          {...invalid}
           rows={3}
           maxLength={schema.maxLength}
           value={String(current ?? "")}
@@ -163,7 +170,7 @@ function ParamField({
   if (schema.type === "array" && schema.enum) {
     const selected = new Set(Array.isArray(current) ? current : []);
     return (
-      <fieldset className="field">
+      <fieldset className="field" aria-describedby={invalidBy}>
         <legend>{label}</legend>
         {schema.enum.map((opt) => (
           <label key={String(opt)} className="check">
@@ -189,6 +196,7 @@ function ParamField({
         <label htmlFor={id}>{label}</label>
         <select
           id={id}
+          {...invalid}
           value={String(current ?? "")}
           // Map back to the original enum value so integer enums (epochs 1|3|5) stay numbers.
           onChange={(e) =>
@@ -230,7 +238,12 @@ function ParamField({
           type="checkbox"
           checked={Boolean(current)}
           disabled={locked}
-          aria-describedby={off !== undefined ? `${id}-unsupported` : undefined}
+          aria-invalid={invalidBy ? true : undefined}
+          aria-describedby={
+            [off !== undefined ? `${id}-unsupported` : "", invalidBy ?? ""]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           onChange={(e) => onChange(e.target.checked)}
         />
         {label}
@@ -250,6 +263,7 @@ function ParamField({
         <label htmlFor={id}>{label}</label>
         <input
           id={id}
+          {...invalid}
           type="number"
           min={schema.minimum}
           max={schema.maximum}
@@ -265,6 +279,7 @@ function ParamField({
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
+        {...invalid}
         type="text"
         value={String(current ?? "")}
         onChange={(e) => onChange(e.target.value)}
@@ -285,9 +300,14 @@ function ParamRow(props: FieldProps & { errors?: string[] }) {
   const help = tpOptional(["node", helpOwner.typeId, "param", helpOwner.name, "help"]);
   const d4 = useUi((s) => s.skin) === "d4";
   const popId = `help-${props.name}`;
+  const errId = (k: number) => `param-${props.name}-err-${k}`;
+  const shown = d4 ? errors : [];
   return (
     <div className="param-row">
-      <ParamField {...field} />
+      <ParamField
+        {...field}
+        invalidBy={shown.length ? shown.map((_, k) => errId(k)).join(" ") : undefined}
+      />
       {help && !d4 && <p className="help">{help}</p>}
       {help && d4 && (
         <>
@@ -304,7 +324,11 @@ function ParamRow(props: FieldProps & { errors?: string[] }) {
           </div>
         </>
       )}
-      {d4 && errors.map((e) => <FieldError key={e}>{e}</FieldError>)}
+      {shown.map((e, k) => (
+        <FieldError key={e} id={errId(k)}>
+          {e}
+        </FieldError>
+      ))}
     </div>
   );
 }

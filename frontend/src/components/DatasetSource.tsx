@@ -88,6 +88,8 @@ function ColumnMapDialog({
             </p>
             <select
               id={`byo-col-${role}`}
+              aria-invalid={wrong(role) || undefined}
+              aria-describedby={wrong(role) ? `byo-col-${role}-err` : undefined}
               value={map[role] ?? ""}
               onChange={(e) => setMap({ ...map, [role]: e.target.value || undefined })}
             >
@@ -99,7 +101,7 @@ function ColumnMapDialog({
               ))}
             </select>
             {wrong(role) && (
-              <FieldError>
+              <FieldError id={`byo-col-${role}-err`}>
                 {
                   runErrorText(
                     { code: "DATA-011", params: { column: map[role] ?? "", role } },
