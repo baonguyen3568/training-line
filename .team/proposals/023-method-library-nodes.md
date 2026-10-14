@@ -37,12 +37,42 @@ Train nodes describe WHAT is trained with one enum instead of booleans that can 
   so the Eval / Benchmark / Export after a PTQ node work unchanged.
 - Params: `format` (same enum as PTQ, same disabled options), `epochs` 1, `lr_preset` (QAT recipes use a low LR),
   `calib_size`. Shares `quantize/config.py` types with PTQ (one source).
+- fixcode (engine facts, probed 2026-10-14 in `vlm-automodel:26.08-7`, no new deps): ModelOpt 0.44.0 ships
+  `modelopt.torch.quantization.plugins.transformers_trainer.{QATTrainer, QADTrainer}`, `mtq.FP8_DEFAULT_CFG` /
+  `NVFP4_DEFAULT_CFG`, peft 0.18.1, transformers 5.12.1. Recipe (ModelOpt `examples/llm_qat`): calibrate (= the PTQ step,
+  same `SKIP_PATTERNS` scope: vision / projector / lm_head stay BF16) → train the fake-quant model at a LOW LR for a short
+  run → export the same unified HF checkpoint as PTQ. Worker = `vlm_pipeline.quantize.qat` in the train image, own
+  argv in `job_kinds` (`quantize` kind), not AutoModel (AutoModel has no ModelOpt QAT path).
+- Knobs I need on top of the four above (all with safe defaults, Advanced unless noted):
+  - `adapter: lora | full` (main panel, default `lora`): ModelOpt QAT + LoRA keeps a 2B within the GB10 envelope; `full`
+    is refused by check_support above the full-SFT size limit (same rule as `train.*`).
+  - `max_steps` (default 0 = by epochs): QAT needs ~10% of the SFT steps; a cap stops a big dataset from turning QAT
+    into a full training run.
+  - `lr_preset`: `low` = 1e-5 (default), `lower` = 5e-6. No free LR field in 1.0.
+  - Not in 1.0: QAD (distill from the BF16 model = a second copy in memory), INT4/W4A8 formats.
+- `format`: `fp8` enabled; `nvfp4` disabled with the PTQ reason until research's #9 check says GB10 can SERVE NVFP4
+  (fake-quant training itself runs in plain PyTorch, the open question is export + serving).
+- Output report = `quant_report.json` of PTQ plus `qat: {steps, lr, adapter, train_loss_first/last}`, so #10's card
+  compares with #9 on the same eval.
 
 ## 4. Distillation (#6) — a pipeline, at most one new data node
-- Teacher answers = `data.caption_vlm` with a task: add `task: caption | qa` (qa: the teacher writes a question AND its
-  answer per image, two prompts) — or a separate `data.synth_qa` if fixcode's worker differs too much. fixcode decides;
-  either way the generated target keeps `generated_by` (provenance) and is untrusted text (security §B3).
-- Student = the existing LoRA / SFT nodes.
+- **Decision (fixcode): one param on `data.caption_vlm`, no new node.** `task: caption | qa` (default `caption`).
+  Same worker, same vLLM batch job, same GPU lock / memory queue / `--network none`, same provenance and untrusted-text
+  rules. The difference is small:
+  - `qa`: ONE prompt per image asks the teacher for a question and its answer as JSON `{question, answer}`, enforced by
+    vLLM structured output (JSON schema), not two passes (half the GPU time, no question/answer mismatch).
+  - The record gets `prompt = question`, `target = answer`, `generated_by = {model, revision, task}`. Both strings are
+    untrusted (stripped, length-capped, JSON-serialized). A reply that does not parse or is empty drops the record and
+    is counted in `caption_report.json` (`dropped_unparsed`); none left → DATA-006.
+  - `qa_focus` (Advanced, enum `general | text_reading | counting | charts`, default `general`) picks one of our fixed
+    prompt templates. No free prompt for `qa` in 1.0 (the JSON contract depends on the template).
+  - One QA pair per image in 1.0 (records are one-per-image today).
+- Quality filtering = the existing shared filter / dedupe steps (P4-4), not a new node.
+- Teacher = a catalog model in `trial_worker.VLLM_PARITY_MODELS`. Today only qwen3.5-2b; I add qwen3.5-4b (bf16, fits:
+  ~28 GB est.) after tester's parity gate passes, then try qwen3.5-9b FP8 if memory allows. check_support refuses any
+  model outside the parity set (CFG-011, as today); a teacher not bigger than the student is a warning (STD), not a block.
+- Student = the existing LoRA / SFT nodes. Pipeline: source images → caption_vlm(task=qa, teacher 4B) → filter/dedupe →
+  LoRA student 0.8B → eval; card compares with the same student on the original labels.
 
 ## 5. Gallery schema (`configs/reference_pipelines.yaml`, schema_version 2)
 A pydantic model `common/reference_pipelines.py` (strict, loaded by a test and by the frontend exporter) — fields added
@@ -62,5 +92,5 @@ move to templates; research decides which. The exporter validates with the model
 
 ## 6. Open questions
 1. research: engine facts of §1 (a)(b); DPO/MPO in NeMo-RL v0.7.0 for VLM on 1 GPU (shares the GRPO setup).
-2. fixcode: §4 one task param or a new node?
+2. fixcode: §4 one task param or a new node? → **one param** (`task`), see §4.
 3. design/frontend: is `train_arch` (3 blocks × 5 states, optional stages) enough for the diagram?
