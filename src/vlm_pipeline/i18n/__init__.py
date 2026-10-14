@@ -75,8 +75,12 @@ def placeholders(text: str) -> set[str]:
     return {field for _, field, _, _ in string.Formatter().parse(text) if field}
 
 
-def t(key: str, locale: str = DEFAULT_LOCALE, **params: Any) -> str:
-    """Render ``key`` in ``locale``. Unknown key -> the key itself (warning); missing param -> ``{name}`` kept."""
+def t(key: str, locale: str = DEFAULT_LOCALE, /, **params: Any) -> str:
+    """Render ``key`` in ``locale``. Unknown key -> the key itself (warning); missing param -> ``{name}`` kept.
+
+    ``key`` / ``locale`` are positional-only: an error's own params may be named ``key`` or ``locale`` (CFG-005's
+    engine option ``{key}``) and must reach the text, never collide with them (E2E 2026-10-14: validate 500).
+    """
     text = load(locale).get(key)
     if text is None:
         _log.warning("i18n: missing key %r (%s)", key, locale)

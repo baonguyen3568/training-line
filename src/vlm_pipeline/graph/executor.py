@@ -226,11 +226,15 @@ def _write_node_manifest(
 ) -> None:
     """Write ``run.json`` of a node run dir (dashboard + retention).
 
-    A manifest written by the worker itself (container jobs via jobrun) keeps its own status/details; the executor
-    only links it to the graph run.
+    A manifest written by the worker itself during THIS try (container jobs via jobrun) keeps its own status/details;
+    the executor only links it to the graph run. One left by an earlier try is replaced: a host node re-runs in the
+    same dir, and its old "failed" must not outlive a success (E2E 2026-10-14: a pick that failed yesterday still read
+    NET-001 after it succeeded and the export after it completed).
     """
     try:
         manifest = read_manifest(run_dir)
+        if manifest.started_at < started:
+            raise ValueError("run.json left by an earlier try")
         manifest = manifest.model_copy(
             update={"parent_run_id": manifest.parent_run_id or gid, "tags": sorted({*manifest.tags, f"graph:{gid}"})}
         )

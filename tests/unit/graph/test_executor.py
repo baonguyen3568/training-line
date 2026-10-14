@@ -457,6 +457,14 @@ def _load_oom_worker(fail_times: int, **manifest: Any) -> Any:
 
 def test_a_cuda_allocation_failure_at_load_is_retried_once(tmp_path: Path, monkeypatch: Any) -> None:
     monkeypatch.setattr(executor_mod, "ALLOC_RETRY_WAIT_S", 0.0)
+    marked: list[dict[str, Any]] = []  # the failed try's run.json as marked (tests reuse the dir: no workspace)
+    mark = executor_mod._mark_retried
+
+    def record(run_dir: Path, reason: str) -> None:
+        mark(run_dir, reason)
+        marked.append(json.loads((run_dir / "run.json").read_text()))
+
+    monkeypatch.setattr(executor_mod, "_mark_retried", record)
     worker = _load_oom_worker(fail_times=1)
     events: list[dict[str, Any]] = []
     run = Executor(make_test_registry(), worker, tmp_path, on_event=events.append).run(_wf())
@@ -467,8 +475,7 @@ def test_a_cuda_allocation_failure_at_load_is_retried_once(tmp_path: Path, monke
     # frontend: the retried try never reports "failed" (no error card for something the app is handling)
     seen = [e.get("status") or e.get("reason") for e in events if e.get("node_id") == "t" and e["type"] != "warning"]
     assert seen == ["running", executor_mod.ALLOC_RETRY_REASON, "running", "completed"]
-    failed = [json.loads(p.read_text()) for p in (tmp_path / "runs").glob("t-*/run.json")]
-    assert [m["retried_after"] for m in failed if m.get("status") == "failed"] == ["gpu_alloc_transient"]
+    assert [(m["status"], m["retried_after"]) for m in marked] == [("failed", "gpu_alloc_transient")]
 
 
 def test_a_second_allocation_failure_stands(tmp_path: Path, monkeypatch: Any) -> None:
@@ -530,3 +537,58 @@ def test_a_cancel_during_the_pause_ends_the_node(tmp_path: Path, monkeypatch: An
     assert time.time() - started < 10
     assert holder["run"].status["t"] in ("failed", "interrupted", "cancelled")
     assert type(worker).tries == 1
+
+
+def test_a_rerun_host_node_does_not_keep_an_earlier_tries_failure(tmp_path: Path) -> None:
+    """E2E 2026-10-14: model.hf_pick failed yesterday (NET-001), succeeded today in the same dir, still read failed."""
+    from vlm_pipeline.common.runinfo import RunManifest, RunStatus, read_manifest, write_manifest
+    from vlm_pipeline.graph.executor import _write_node_manifest
+    from vlm_pipeline.nodes import REGISTRY
+
+    spec = REGISTRY.get("model.hf_pick")
+    assert spec is not None
+    old = RunManifest(run_id=tmp_path.name, name="m", stage="data", task="model.hf_pick", status=RunStatus.FAILED,
+                      error_code="NET-001", started_at=1000.0, ended_at=1001.0, tags=["graph:g-old"])  # fmt: skip
+    write_manifest(tmp_path, old)
+    _write_node_manifest(tmp_path, node_id="m", spec=spec, gid="g-new", status=RunStatus.COMPLETED, error_code=None,
+                         started=2000.0)  # fmt: skip
+    now = read_manifest(tmp_path)
+    assert (now.status, now.error_code, now.parent_run_id) == (RunStatus.COMPLETED, None, "g-new")
+    assert now.started_at == 2000.0
+    assert "graph:g-old" not in now.tags
+
+    # A manifest the worker wrote during this try (a container job via jobrun) keeps its own details.
+    mine = old.model_copy(update={"started_at": 2001.0, "status": RunStatus.FAILED, "error_code": "MEM-003"})
+    write_manifest(tmp_path, mine)
+    _write_node_manifest(tmp_path, node_id="m", spec=spec, gid="g-new", status=RunStatus.FAILED, error_code="X",
+                         started=2000.0)  # fmt: skip
+    kept = read_manifest(tmp_path)
+    assert (kept.status, kept.error_code) == (RunStatus.FAILED, "MEM-003")
+    assert "graph:g-new" in kept.tags
+
+
+def test_rerunning_a_failed_node_in_its_old_dir_reports_the_new_success(tmp_path: Path) -> None:
+    """PM 2026-10-14: a user who re-runs a node that failed yesterday must not keep seeing yesterday's error."""
+    from vlm_pipeline.common.runinfo import read_manifest
+
+    class FailsOnce(FakeWorker):
+        tries = 0
+
+        def run(self, job: NodeJob) -> NodeResult:
+            if job.node_id == "m":
+                FailsOnce.tries += 1
+                if FailsOnce.tries == 1:
+                    raise RuntimeError("hub unreachable")
+            return super().run(job)
+
+    worker = FailsOnce()
+    first = Executor(make_test_registry(), worker, tmp_path).run(_wf())
+    assert first.status["m"] == "failed"
+    [run_dir] = list((tmp_path / "runs").glob("m-*"))
+    assert read_manifest(run_dir).status.value == "failed"
+    time.sleep(0.01)  # the second try starts strictly later
+    second = Executor(make_test_registry(), worker, tmp_path).run(_wf())
+    assert second.status["m"] == "completed"
+    assert list((tmp_path / "runs").glob("m-*")) == [run_dir]  # the same dir was reused (no workspace claims)
+    now = read_manifest(run_dir)
+    assert (now.status.value, now.error_code) == ("completed", None)
