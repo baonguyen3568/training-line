@@ -170,8 +170,12 @@ native is enough to test the path). Depends on: research `families.yaml` + recip
   4. Before any run (UI prefill): validate adds an info issue `MODEL-007 TRAINED_PROMPT {node, prompt}` on a
      `serve.vllm` step when the question is known statically: the upstream train step's data is a user HF dataset
      (its shared question, or `DEFAULT_PROMPT` when no question / messages column is mapped) or a local folder whose
-     labels.jsonl has a single prompt (bounded read). Not emitted when mixed or unknown. The UI fills the empty
-     prompt with `params.prompt` and shows `trial.prefilled_prompt` while the box still equals it; the issue is a
-     field hint, not a card.
+     labels.jsonl has a single prompt (bounded read). Not emitted when mixed or unknown.
+     **Agreed with frontend 2026-10-14:** (A) the UI NEVER writes it into `params.prompt` (no silent edit, no undo
+     entry, no frozen question): the box stays empty and shows the question as a dimmed placeholder with
+     `trial.prefilled_prompt`; typing replaces it; an empty box runs the trained question (item 3). (B) the issue
+     carries the existing `param: "prompt"`: an INFO issue with a `param` is a field hint, never listed in the
+     CheckBar (no special case on the code). `params.prompt` is untrusted text (from the dataset): plain text, cut
+     at 2000 characters.
 - Unknown licence: SEC-005 `{name, repo, license: "unknown"}` at VALIDATE of an export step (check_support follows
   the step's model lineage) and again at run time; no override.
