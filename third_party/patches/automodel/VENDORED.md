@@ -130,10 +130,10 @@ draft `.team/upstream/automodel-vlm-qlora-tied-lm-head.md`): `AssertionError` in
    streaming). Its skip list was `llm_int8_skip_modules` or `_keep_in_fp32_modules` only; HF's loader always adds
    `get_keys_to_not_convert` (tied weights, output embeddings, last module). Qwen3.5 has `tie_word_embeddings: true`,
    so `lm_head` became `Linear4bit` and `tie_weights()` then gave it the bf16 `embed_tokens.weight`. Fix:
-   `bnb_modules_to_not_convert()` = recipe skips + `_keep_in_fp32_modules` + HF's defaults, always (a tied output
+   `_bnb_modules_to_not_convert()` = recipe skips + `_keep_in_fp32_modules` + HF's defaults, always (a tied output
    embedding can never be 4-bit, whatever the recipe lists).
 2. **`create_bnb_config` dropped `llm_int8_skip_modules`** from the recipe's `quantization:` block, so a VLM could not
-   keep its vision tower / projector in bf16. Fix: passed through for 4-bit and 8-bit (None keeps the defaults).
+   keep its vision tower / projector in bf16. Fix: passed through for 4-bit (None keeps the defaults; 8-bit untouched).
    Our recipes set `llm_int8_skip_modules: [model.visual]` for Qwen3.5 (HF matches a prefix followed by `.`; the
    merger/projector lives under `model.visual`).
 
