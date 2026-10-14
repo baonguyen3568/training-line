@@ -204,3 +204,24 @@ def test_the_resolve_reads_license_name_and_the_record_keeps_the_cards_words(tmp
         "model.safetensors"], "files": files, "total_bytes": 2_000_000_010, "unreadable": []}))  # fmt: skip
     record = user_assets.finish_model(tmp_path, run, "Qwen/x")
     assert (record.entry.license, record.license_card) == ("qwen", "other (qwen)")
+
+
+def test_a_card_with_only_a_license_name_shows_it_but_stays_unknown(tmp_path: Path) -> None:
+    """tester H: Qwen/Qwen2.5-VL-3B-Instruct has license_name qwen-research and no license field."""
+    import json as _json
+
+    from vlm_pipeline.app import user_assets
+
+    run = tmp_path / "run"
+    meta = run / "stage" / "meta"
+    meta.mkdir(parents=True)
+    (meta / "config.json").write_text(_json.dumps({"architectures": ["Qwen3_5ForConditionalGeneration"],
+                                                   "model_type": "qwen3_5"}))  # fmt: skip
+    files = [{"name": "config.json", "size": 10, "sha256": None, "git_sha1": None},
+             {"name": "model.safetensors", "size": 2_000_000_000, "sha256": None, "git_sha1": None}]  # fmt: skip
+    (run / "stage" / "resolve.json").write_text(_json.dumps({
+        "sha": SHA, "gated": False, "license": None, "license_name": "qwen-research", "all_files": ["config.json",
+        "model.safetensors"], "files": files, "total_bytes": 2_000_000_010, "unreadable": []}))  # fmt: skip
+    record = user_assets.finish_model(tmp_path, run, "Qwen/x")
+    assert (record.entry.license, record.license_card) == ("unknown", "qwen-research")
+    assert record.to_api()["license_class"] == "unknown"

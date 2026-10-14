@@ -375,8 +375,11 @@ def finish_model(root: Path, run_dir: Path, repo: str) -> UserModelRecord:
 
 
 def _card_words(license_id: str | None, name: str | None) -> str | None:
-    """What the card says, for the UI: ``other (qwen)`` when it names its licence in license_name."""
-    return f"{license_id} ({name})" if license_id and name else license_id
+    """What the card says, for the UI: ``other (qwen)`` when it names its licence in license_name.
+
+    A card with only ``license_name`` (Qwen2.5-VL-3B: ``qwen-research``, no ``license``) still shows that name.
+    """
+    return f"{license_id} ({name})" if license_id and name else license_id or name
 
 
 def _card_text(value: object) -> str | None:
