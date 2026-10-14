@@ -1378,9 +1378,22 @@ param_unsupported:
   default: chưa hỗ trợ
   worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.
 settings:
+  section_app: Ứng dụng
+  row_language: Ngôn ngữ
+  row_version: Phiên bản
+  lan:
+    section: Truy cập từ máy khác
+    off: Đang tắt. Quản trị viên bật bằng scripts/install.sh.
+    row_address: Địa chỉ
+    copy_address: Sao chép địa chỉ
+    row_cert: Chứng chỉ
+    ca_download: Tải chứng chỉ
+    fingerprint: Vân tay (SHA-256)
+    howto: Trên máy kia, cài chứng chỉ vừa tải làm chứng chỉ tin cậy, rồi so vân tay hiện ra lúc cài với dãy ở trên. Khớp hết thì mới mở địa chỉ.
+    ca_missing: Chưa có chứng chỉ cho truy cập qua LAN. Quản trị viên chạy lại scripts/install.sh bản mới để tạo.
   section_about: Về app
   about:
-    version: Phiên bản {version} ({commit})
+    version: "{version} ({commit})"
     copy: Sao chép thông tin phiên bản
     copied: Đã chép thông tin phiên bản.
   language_reload_confirm: Đổi ngôn ngữ sẽ tải lại trang. Workflow có thay đổi chưa lưu; hãy lưu trước rồi đổi.

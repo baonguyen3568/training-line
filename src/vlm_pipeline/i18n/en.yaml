@@ -1378,9 +1378,22 @@ param_unsupported:
   default: not supported yet
   worker_v1: This option is still being built and the app cannot run it yet. Choose another value.
 settings:
+  section_app: App
+  row_language: Language
+  row_version: Version
+  lan:
+    section: Access from other devices
+    off: Off. An admin turns it on with scripts/install.sh.
+    row_address: Address
+    copy_address: Copy address
+    row_cert: Certificate
+    ca_download: Download certificate
+    fingerprint: Fingerprint (SHA-256)
+    howto: On the other device, install the downloaded certificate as trusted, then compare the fingerprint shown during install with the one above. Open the address only if they match exactly.
+    ca_missing: No certificate for LAN access yet. An admin needs to re-run the latest scripts/install.sh to create it.
   section_about: About
   about:
-    version: Version {version} ({commit})
+    version: "{version} ({commit})"
     copy: Copy version info
     copied: Version info copied.
   language_reload_confirm: Changing the language reloads the page. Your workflow has unsaved changes; save it first, then change the language.
