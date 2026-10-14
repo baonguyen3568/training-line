@@ -288,6 +288,9 @@ error:
   SEC-005:
     title: 'Chưa xác nhận giấy phép'
     what: 'Bạn cần đọc và xác nhận giấy phép ({license}) của "{name}" trước khi app tải về.'
+  SEC-006:
+    title: 'Chưa xuất được vì giấy phép của model chưa rõ'
+    what: 'Model "{name}" chưa ghi rõ giấy phép, nên app chưa cho xuất ra ngoài. Bạn vẫn huấn luyện và thử trong app được; muốn xuất thì dùng model có giấy phép rõ ràng.'
   DATA-009:
     title: 'Bộ dữ liệu này cần chạy mã riêng'
     what:

@@ -288,6 +288,9 @@ error:
   SEC-005:
     title: 'License not confirmed yet'
     what: 'Read and confirm the license ({license}) of "{name}" before the app downloads it.'
+  SEC-006:
+    title: "Can't export yet: the model's license is unclear"
+    what: 'Model "{name}" does not state a clear license, so the app does not let you export it yet. You can still train and try it in the app; to export, use a model with a clear license.'
   DATA-009:
     title: 'This dataset runs its own code'
     what:

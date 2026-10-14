@@ -926,6 +926,22 @@ SEC-005:
   actions:
     - {id: confirm_license, kind: navigate, target: license_dialog, confirm: false}
 
+SEC-006:
+  slug: EXPORT_LICENSE_UNKNOWN
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 A1 (H5c): a user-added model whose licence is unknown can be downloaded, trained and tried in the app, but
+  # never exported. Raised at validate on the export step (support check by model source) and again at run time.
+  # Ticking a licence (SEC-005) does not lift it: the way out is a model with a known licence.
+  params:
+    - {name: node, ref: node}
+    - name
+    - repo
+  match:
+    - {kind: validate, value: "export of a model whose licence is unknown (ADR-021 A1)"}
+  actions:
+    - {id: pick_other_asset, kind: navigate, target: "node:model", confirm: false}
+
 CACHE-001:
   slug: CACHE_ARTIFACT_INVALID
   severity: warn
