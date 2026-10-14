@@ -156,4 +156,40 @@ describe("dataset from Hugging Face", () => {
     );
     expect((screen.getByLabelText(t("byo.revision")) as HTMLInputElement).value).toBe(rev);
   });
+
+  it("a step that names a user dataset re-checks with that config/split (DATA-013 on another machine)", async () => {
+    const { idPart, configSplitOf } = await import("../src/lib/hubJob");
+    // the server's _id_part: lowercase, runs of other characters → "-", no dot/dash at the ends
+    expect(idPart("Default")).toBe("default");
+    expect(idPart("train_2024..v1")).toBe("train-2024.v1");
+    expect(idPart("__")).toBe("x");
+    expect(
+      configSplitOf(
+        "user--ds--a--b--7f0115a4--default--validation",
+        ["default"],
+        ["train", "validation"],
+      ),
+    ).toEqual({ config: "default", split: "validation" });
+    const { useWorkflow } = await import("../src/store/workflow");
+    await useWorkflow.getState().loadCatalog();
+    useWorkflow.getState().newWorkflow();
+    const id = useWorkflow.getState().addNode("data.hf_load", { x: 0, y: 0 }) as string;
+    useWorkflow.getState().setParams(id, {
+      user_dataset: "user--ds--acme--invoices-vi--7f0115a4--default--validation",
+      user_repo: "acme/invoices-vi",
+      user_revision: "7f0115a4b758a71d6473b8d085751692da2fef98",
+    });
+    useWorkflow.getState().select(id);
+    const { api } = await import("../src/api");
+    const inspect = vi.spyOn(api, "inspectDataset");
+    const { Inspector } = await import("../src/components/Inspector");
+    render(<Inspector />);
+    const input = screen.getByPlaceholderText(/naver-clova-ix\/cord-v2/);
+    fireEvent.change(input, { target: { value: "acme/invoices-vi" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await screen.findByRole("dialog", {}, { timeout: 8000 });
+    // first check takes the repo's default split; the step names "validation", so it checks that one
+    expect(inspect).toHaveBeenCalledTimes(2);
+    expect(inspect.mock.calls[1]?.[0]).toMatchObject({ split: "validation" });
+  }, 15000);
 });

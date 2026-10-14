@@ -3,7 +3,14 @@ import { api } from "../api";
 import { appPrefix } from "../api/client";
 import type { DatasetInspection, EventError, HubJob, UserDataset } from "../api/types";
 import { t, tpOptional } from "../i18n";
-import { hubError, isRepoId, pollHubJob, recentRepos, rememberRepo } from "../lib/hubJob";
+import {
+  configSplitOf,
+  hubError,
+  isRepoId,
+  pollHubJob,
+  recentRepos,
+  rememberRepo,
+} from "../lib/hubJob";
 import { runErrorText } from "../lib/runWarning";
 import { untrustedText } from "../lib/safeText";
 import { useUserModels } from "../store/userModels";
@@ -235,9 +242,10 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
   const [revision, setRevision] = useState("");
   const [revisionOpen, setRevisionOpen] = useState(false);
   // the dataset this step uses now (this machine's record), said above the paste box
-  const usedId = useWorkflow(
-    (st) => st.workflow?.nodes.find((n) => n.id === nodeId)?.params.user_dataset ?? "",
-  );
+  const usedId = useWorkflow((st) => {
+    const v = st.workflow?.nodes.find((n) => n.id === nodeId)?.params.user_dataset;
+    return typeof v === "string" ? v : "";
+  });
   const inUse = useUserModels((st) => st.datasets.find((d) => d.id === usedId));
   // DATA-013 "Thêm dataset này": the workflow's repo + pinned revision typed in, never checked for the user
   useEffect(() => {
@@ -250,9 +258,9 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
     void useUserModels.getState().load();
   }, [nodeId]);
 
-  const check = async (value = repo) => {
+  const check = async (value = repo, pick?: { config: string; split: string }) => {
     const r = value.trim();
-    if (!isRepoId(r) || busy) return;
+    if (!isRepoId(r) || (busy && !pick)) return;
     setRepo(r);
     setBusy(true);
     setError(null);
@@ -260,8 +268,8 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
       const { inspect_id } = await api.inspectDataset({
         repo: r,
         ...(revision.trim() ? { revision: revision.trim() } : {}),
-        ...(config ? { config } : {}),
-        ...(split ? { split } : {}),
+        ...((pick?.config ?? config) ? { config: pick?.config ?? config } : {}),
+        ...((pick?.split ?? split) ? { split: pick?.split ?? split } : {}),
       });
       rememberRepo("dataset", r);
       const end = await pollHubJob<HubJob<DatasetInspection>>(
@@ -272,6 +280,18 @@ export function DatasetHubPanel({ nodeId }: { nodeId: string }) {
       if (!alive.current || !end) return;
       if (end.status === "failed" && end.error) setError(end.error);
       else if (end.result) {
+        // the step already names a user dataset (DATA-013, another machine): the same config/split, checked once
+        const same =
+          !pick && usedId ? configSplitOf(usedId, end.result.configs, end.result.splits) : null;
+        if (
+          same &&
+          (same.config !== (end.result.config ?? "default") || same.split !== end.result.split)
+        ) {
+          setConfig(same.config);
+          setSplit(same.split);
+          await check(r, same);
+          return;
+        }
         setFound({ id: inspect_id, result: end.result });
         setMapping(true);
       }

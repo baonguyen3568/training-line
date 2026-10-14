@@ -74,3 +74,28 @@ export function hubError(e: unknown): EventError {
     ? { code: d.code, params: d.params ?? {} }
     : { code: "SYS-000", params: {} };
 }
+
+/** One segment of a user dataset id, as the server builds it (common/catalog.py _id_part). */
+export function idPart(text: string): string {
+  const part = text
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^[.-]+|[.-]+$/g, "");
+  return part || "x";
+}
+
+/**
+ * The config + split a user dataset id names ("…--<config>--<split>"), among those an inspection lists: so a workflow
+ * opened on another machine (DATA-013) re-adds the same split, and its step's id matches again (backend H5 review).
+ */
+export function configSplitOf(
+  datasetId: string,
+  configs: string[],
+  splits: string[],
+): { config: string; split: string } | null {
+  for (const config of configs.length ? configs : ["default"])
+    for (const split of splits)
+      if (datasetId.endsWith(`--${idPart(config)}--${idPart(split)}`)) return { config, split };
+  return null;
+}
