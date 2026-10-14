@@ -191,3 +191,38 @@ def test_the_family_template_trains_like_the_catalog_qwen() -> None:
 def test_architecture_and_model_type_must_both_be_the_familys(config: dict[str, Any]) -> None:
     with pytest.raises(r.ModelArchUnsupportedError):
         r.resolve_family({"config.json": config}, [], repo="o/x", revision=SHA, families=r.load_families())
+
+
+def _family_dict(**changes: Any) -> dict[str, Any]:
+    return {**_family().model_dump(), **changes}
+
+
+@pytest.mark.parametrize(
+    ("changes", "ok"),
+    [
+        ({}, True),
+        ({"image_policy": "processor_default", "min_pixels": None, "max_pixels": None}, True),
+        ({"image_policy": "processor_default"}, False),  # caps of a Qwen recipe on another processor: refused
+        ({"min_pixels": None}, False),
+        ({"min_pixels": 10, "max_pixels": 5}, False),
+        ({"vision_prefixes": ()}, False),
+        ({"min_image": "latest"}, False),
+    ],
+)
+def test_family_fields_follow_the_image_policy(changes: dict[str, Any], ok: bool) -> None:
+    if ok:
+        r.Family.model_validate(_family_dict(**changes))
+        return
+    with pytest.raises(ValueError):  # noqa: PT011 - pydantic's ValidationError, several rules
+        r.Family.model_validate(_family_dict(**changes))
+
+
+def test_a_processor_default_family_leaves_pixels_to_the_repo() -> None:
+    family = r.Family.model_validate(_family_dict(image_policy="processor_default", min_pixels=None,
+                                                  max_pixels=None, min_image="vlm-automodel:26.08-8"))  # fmt: skip
+    template = r.render_template(family)
+    assert "min_pixels" not in template["processor"]
+    assert "max_pixels" not in template["processor"]
+    entry = r.user_entry(repo="o/x", revision=SHA, family=family, params_b=1.0, disk_gb=1.0, license_id="mit",
+                         gated=False)  # fmt: skip
+    assert (entry.image_policy, entry.min_pixels, entry.min_image) == ("processor_default", 0, "vlm-automodel:26.08-8")

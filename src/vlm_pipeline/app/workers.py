@@ -23,7 +23,7 @@ from vlm_pipeline.app.data_workers import run_dedupe, run_filter
 from vlm_pipeline.app.export_worker import run_export
 from vlm_pipeline.app.quantize_worker import run_quantize
 from vlm_pipeline.app.trial_worker import run_trial
-from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog
+from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog, model_entry
 from vlm_pipeline.common.dataset_ref import DatasetRef, read_dataset_ref, write_dataset_ref
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.heldout_data import HeldoutDataInTrainingError, is_heldout_folder
@@ -55,17 +55,11 @@ from vlm_pipeline.graph.worker import (
     checkpoint_dirs,
     port_of,
 )
+from vlm_pipeline.nodes.source import picked_model_id
 from vlm_pipeline.nodes.spec import NodeSpec, is_compatible, model_kind
 from vlm_pipeline.train.advanced import AdvancedNotForModelError, keys_not_for
 from vlm_pipeline.train.config import FullFinetuneParams, LoraParams
-from vlm_pipeline.train.recipe import (
-    build_recipe,
-    load_template,
-    qlora_models,
-    render_recipe,
-    template_path,
-    templates_digest,
-)
+from vlm_pipeline.train.recipe import build_recipe, qlora_models, render_recipe, templates_digest
 
 logger = logging.getLogger(__name__)
 # Models whose AutoModel checkpoints cannot be resumed: a resume starts over instead of failing on every retry.
@@ -234,8 +228,8 @@ class RealWorker:
             check(query)
 
     def _model_pick(self, job: NodeJob) -> NodeResult:
-        model_id = str(getattr(job.params, "model"))  # noqa: B009 - dynamic params model (catalog Literal)
-        entry = self.catalog.get(model_id)
+        model_id = picked_model_id(job.params)
+        entry = model_entry(model_id) if model_id.startswith("user--") else self.catalog.get(model_id)
         if entry is None:
             raise UnknownModelError("unknown catalog model", params={"model": model_id})
         path = self._catalog_model_path(entry).resolve()
@@ -442,7 +436,9 @@ class RealWorker:
                 raise HeldoutDataInTrainingError(
                     "train data under data/eval", params={"node": job.node_id, "target_node": job.node_id}
                 )
-        template = load_template(template_path(self.root, entry))
+        from vlm_pipeline.app.user_assets import training_template
+
+        template = training_template(self.root, entry)  # a user model's: only with its recorded sha256
         if val is not None and "validation_dataset" not in template:
             logger.warning("%s: template has no validation_dataset; the wired val_data is not used", entry.id)
         source = next((d for d in load_dataset_catalog().datasets if train.repo and d.repo == train.repo), None)

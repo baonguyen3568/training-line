@@ -709,6 +709,15 @@ node:
       model:
         label: Base model
         help: Smaller models run faster; larger ones answer better but need more memory.
+      user_model:
+        label: A model you added
+        help: A model you added from Hugging Face (not verified by the team). When set, it replaces the base model above.
+      user_repo:
+        label: Repository of the added model
+        help: The Hugging Face repository of the model you added. Filled in by the app.
+      user_revision:
+        label: Revision of the added model
+        help: The commit of the model you added. Filled in by the app so anyone who opens the workflow uses this exact one.
     port:
       model: Model
   data.hf_load:

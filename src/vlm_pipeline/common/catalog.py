@@ -7,6 +7,7 @@ catalog edit cannot silently change a per-model default. Host-side (pydantic + p
 from __future__ import annotations
 
 import functools
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
@@ -92,7 +93,8 @@ class CatalogEntry(BaseModel):
     min_pixels: int = Field(ge=0)
     max_pixels: int = Field(ge=0)
     fixed_image_hw: Annotated[tuple[int, int] | None, BeforeValidator(_empty_as_none)] = None
-    image_policy: Literal["fixed", "qwen_pixels", "token_budget"]
+    # processor_default: a user-added model whose own processor sizes images (ADR-021; never in the catalog file)
+    image_policy: Literal["fixed", "qwen_pixels", "token_budget", "processor_default"]
     image_max_tokens: int = Field(ge=0)
     video: bool
     video_fps: float = Field(ge=0)
@@ -143,6 +145,8 @@ class CatalogEntry(BaseModel):
             ok = self.fixed_image_hw is not None and pixels == (0, 0) and self.image_max_tokens == 0
         elif self.image_policy == "qwen_pixels":
             ok = 0 < self.min_pixels < self.max_pixels and self.fixed_image_hw is None and self.image_max_tokens == 0
+        elif self.image_policy == "processor_default":
+            ok = pixels == (0, 0) and self.fixed_image_hw is None and self.image_max_tokens == 0
         else:
             ok = self.image_max_tokens > 0 and pixels == (0, 0) and self.fixed_image_hw is None
         if not ok:
@@ -185,6 +189,27 @@ class Catalog(BaseModel):
     def selectable(self) -> tuple[CatalogEntry, ...]:
         """Models a user may pick (security did not reject them). Tier-based Simple/Advanced filtering is UI-side."""
         return tuple(m for m in self.models if m.security != "rejected")
+
+
+# User-added models (ADR-021): records and rendered templates under the data root, never in configs/.
+USER_MODELS_REL = Path(".cache") / "user_assets" / "models"
+_user_lookup: Callable[[str], CatalogEntry | None] | None = None
+
+
+def set_user_model_lookup(lookup: Callable[[str], CatalogEntry | None] | None) -> None:
+    """The app registers how a ``user--…`` id becomes an entry (its validated record); common never imports app."""
+    global _user_lookup  # noqa: PLW0603 - one process-wide source, set once at app startup
+    _user_lookup = lookup
+
+
+def model_entry(model_id: str | None) -> CatalogEntry | None:
+    """The one lookup for a model id: the vetted catalog, then a user-added model (ADR-021 §6: one check path)."""
+    if not model_id:
+        return None
+    entry = load_catalog().get(model_id)
+    if entry is None and model_id.startswith("user--") and _user_lookup is not None:
+        entry = _user_lookup(model_id)
+    return entry
 
 
 def load_catalog_file(path: Path) -> Catalog:

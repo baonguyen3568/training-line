@@ -680,6 +680,36 @@
               "order": 0,
               "summary": true
             }
+          },
+          "user_model": {
+            "default": "",
+            "maxLength": 206,
+            "pattern": "^(user--[a-z0-9][a-z0-9-]*(\\.[a-z0-9-]+)*)?$",
+            "title": "User Model",
+            "type": "string",
+            "x-ui": {
+              "order": 1,
+              "widget": "user_model"
+            }
+          },
+          "user_repo": {
+            "default": "",
+            "maxLength": 193,
+            "pattern": "^([A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*)?$",
+            "title": "User Repo",
+            "type": "string",
+            "x-ui": {
+              "widget": "hidden"
+            }
+          },
+          "user_revision": {
+            "default": "",
+            "pattern": "^([0-9a-f]{40})?$",
+            "title": "User Revision",
+            "type": "string",
+            "x-ui": {
+              "widget": "hidden"
+            }
           }
         },
         "title": "ModelPickParams",

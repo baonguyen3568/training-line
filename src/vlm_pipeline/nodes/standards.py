@@ -19,7 +19,7 @@ from typing import Annotated, Any, ClassVar, Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from vlm_pipeline.common.catalog import CatalogEntry, DatasetEntry, load_catalog, load_dataset_catalog
+from vlm_pipeline.common.catalog import CatalogEntry, DatasetEntry, load_dataset_catalog, model_entry
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.rules import origin_model_id
 from vlm_pipeline.nodes.source import DATA_HF_LOAD, DATA_LOCAL_FOLDER
@@ -405,7 +405,7 @@ def _model_entry(view: GraphView, node_id: str) -> CatalogEntry | None:
     spec = view.specs[node_id]
     port = next((n for n, p in spec.inputs.items() if p.type in {"Model", "Checkpoint", "QuantizedModel"}), None)
     model_id = origin_model_id(view, node_id, port) if port else None
-    return load_catalog().get(model_id) if model_id else None
+    return model_entry(model_id)
 
 
 def _violation(rule: Rule, view: GraphView, node_id: str) -> Result:

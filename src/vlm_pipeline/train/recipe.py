@@ -41,6 +41,8 @@ def templates_digest(project_root: Path) -> str:
 
 
 def template_path(project_root: Path, entry: CatalogEntry) -> Path:
+    if entry.tier == "user":  # ADR-021: never a bare path: app.user_assets.training_template checks its sha256
+        raise RecipeError(f"model {entry.id!r}: a user model's template is read through its verified loader")
     path = configs_root(project_root) / TEMPLATE_DIR / f"{entry.id}.yaml"
     if not path.is_file():
         raise RecipeError(f"no training template for model {entry.id!r}")
@@ -241,9 +243,15 @@ def render_recipe(recipe: Mapping[str, Any]) -> str:
 
 
 def load_template(path: Path) -> dict[str, Any]:
+    return template_from_bytes(path.read_bytes(), path.name)
+
+
+def template_from_bytes(raw: bytes, name: str) -> dict[str, Any]:
+    """A template parsed from its bytes (the verified loader of user templates hashes these same bytes)."""
     import yaml
 
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    path = Path(name)
+    data = yaml.safe_load(raw.decode("utf-8"))
     if not isinstance(data, dict):
         raise RecipeError(f"template {path.name} is not a mapping")
     try:

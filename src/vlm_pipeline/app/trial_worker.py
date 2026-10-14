@@ -98,28 +98,30 @@ def _pixels(worker: RealWorker, entry: CatalogEntry, ref: ArtifactRef) -> tuple[
         (p / "config.yaml" for p in _parents_in(worker.root, model_path) if (p / "config.yaml").is_file()), None
     )
     if run_cfg is None:
-        from vlm_pipeline.train.recipe import RecipeError, template_path
+        from vlm_pipeline.app.user_assets import training_template
+        from vlm_pipeline.train.recipe import RecipeError
 
         try:
-            run_cfg = template_path(worker.root, entry)
+            config: Any = training_template(worker.root, entry)
         except RecipeError:  # no template: the processor's own defaults (Parse: fixed size)
             return 0, 0
-    processor = (yaml.safe_load(run_cfg.read_text(encoding="utf-8")) or {}).get("processor") or {}
+    else:
+        config = yaml.safe_load(run_cfg.read_text(encoding="utf-8")) or {}
+    processor = config.get("processor") or {}
     return int(processor.get("min_pixels") or 0), int(processor.get("max_pixels") or 0)
 
 
 def template_overrides(worker: RealWorker, entry: CatalogEntry) -> dict[str, Any]:
     """The training template's decode_overrides (001a §10.7), the same source eval uses; {} without a template."""
-    import yaml
-
+    from vlm_pipeline.app.user_assets import training_template
     from vlm_pipeline.common.decoding import decode_overrides_of
-    from vlm_pipeline.train.recipe import RecipeError, template_path
+    from vlm_pipeline.train.recipe import RecipeError
 
     try:
-        path = template_path(worker.root, entry)
+        template = training_template(worker.root, entry)
     except RecipeError:  # no template for this model: keep the base decoding
         return {}
-    return decode_overrides_of(yaml.safe_load(path.read_text(encoding="utf-8")) or {}).as_dict()
+    return decode_overrides_of(template).as_dict()
 
 
 def request_inputs(worker: RealWorker, request: TrialRequest, *extra: str) -> tuple[Path, ...]:

@@ -709,6 +709,15 @@ node:
       model:
         label: Model gốc
         help: Model nhỏ chạy nhanh hơn; model lớn trả lời tốt hơn nhưng cần nhiều bộ nhớ hơn.
+      user_model:
+        label: Model bạn đã thêm
+        help: Một model bạn tự thêm từ Hugging Face (chưa được đội kiểm chứng). Khi chọn, nó thay cho model gốc ở trên.
+      user_repo:
+        label: Kho của model đã thêm
+        help: Tên kho trên Hugging Face của model bạn đã thêm. App tự điền.
+      user_revision:
+        label: Phiên bản của model đã thêm
+        help: Mã phiên bản (commit) của model bạn đã thêm. App tự điền để ai mở workflow cũng dùng đúng bản này.
     port:
       model: Model
   data.hf_load:

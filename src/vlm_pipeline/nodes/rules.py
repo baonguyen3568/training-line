@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from vlm_pipeline.common.catalog import load_catalog, load_dataset_catalog
+from vlm_pipeline.common.catalog import load_dataset_catalog, model_entry
 from vlm_pipeline.common.heldout_data import is_heldout_folder
 from vlm_pipeline.common.local_cache import dataset_missing, model_missing
 from vlm_pipeline.data.local_folder import preview_folder
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ
-from vlm_pipeline.nodes.source import MODEL_HF_PICK
+from vlm_pipeline.nodes.source import MODEL_HF_PICK, picked_model_id
 from vlm_pipeline.nodes.spec import GraphView, Issue, is_compatible, model_kind
 from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM
 
@@ -29,8 +29,7 @@ def origin_model_id(view: GraphView, node_id: str, port: str) -> str | None:
     while current is not None and current not in seen:
         seen.add(current)
         if view.specs[current].type_id == MODEL_HF_PICK.type_id:
-            picked = view.params.get(current)
-            return getattr(picked, "model", None)
+            return picked_model_id(view.params.get(current)) or None
         upstream = _model_input(view, current)
         current = view.source(current, upstream) if upstream else None
     return None
@@ -87,11 +86,10 @@ def model_input(view: GraphView, node_id: str) -> str | None:
 
 def train_node_matches_model(view: GraphView) -> Iterator[Issue]:
     """CFG-010: a fine-tune node the catalog has not vetted for the picked model (e.g. LoRA on Nemotron-Parse)."""
-    catalog = load_catalog()
     for node_id, spec in view.specs.items():
         if spec.type_id not in _TRAIN_TYPES:
             continue
-        entry = catalog.get(origin_model_id(view, node_id, "base_model") or "")
+        entry = model_entry(origin_model_id(view, node_id, "base_model"))
         if entry is None or entry.supports_train_node(spec.type_id):
             continue
         params = {"node": node_id, "model": entry.display_name, "supported": entry.train_node}
@@ -103,11 +101,10 @@ def export_needs_portable_model(view: GraphView) -> Iterator[Issue]:
 
     The export worker re-checks the folder's real content (``export.portable``); this rule reports it on the canvas.
     """
-    catalog = load_catalog()
     for node_id, spec in view.specs.items():
         if spec.type_id != EXPORT_HF_DIR.type_id:
             continue
-        entry = catalog.get(origin_model_id(view, node_id, "model") or "")
+        entry = model_entry(origin_model_id(view, node_id, "model"))
         if entry is not None and entry.remote_code != "none":
             yield Issue("EXP-002", node_id=node_id, port="model", params={"node": node_id, "model": entry.display_name})
 
@@ -203,7 +200,13 @@ def catalog_assets_on_this_machine(view: GraphView) -> Iterator[Issue]:
         params = view.params.get(node_id)
         missing: dict[str, object] | None = None
         if spec.type_id == MODEL_HF_PICK.type_id:
-            entry = load_catalog().get(str(getattr(params, "model", "")))
+            entry = model_entry(picked_model_id(params))
+            user_id = str(getattr(params, "user_model", "") or "")
+            if user_id and entry is None:  # opened on a machine where that model was never added (PM: offer to add it)
+                yield Issue("MODEL-006", node_id=node_id, param="user_model", params={
+                    "node": node_id, "repo": getattr(params, "user_repo", ""),
+                    "revision": getattr(params, "user_revision", "")})  # fmt: skip
+                continue
             missing = model_missing(root, entry) if entry is not None else None
             param = "model"
         elif spec.type_id == "data.hf_load":

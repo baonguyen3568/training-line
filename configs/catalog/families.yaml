@@ -42,6 +42,8 @@ families:
     image_policy: qwen_pixels
     min_pixels: 200704
     max_pixels: 1003520
+    vision_prefixes: [model.visual]
+    projector_prefixes: [model.visual.merger]
     ram_gb_train: {a: 1.8, b: 25.0, valid_up_to_params_b: 10.0}
   - id: qwen3_vl
     model_types: [qwen3_vl]
@@ -58,6 +60,8 @@ families:
     image_policy: qwen_pixels
     min_pixels: 200704
     max_pixels: 1003520
+    vision_prefixes: [model.visual]
+    projector_prefixes: [model.visual.merger]
     ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
   - id: qwen2_5_vl
     model_types: [qwen2_5_vl]
@@ -74,6 +78,8 @@ families:
     image_policy: qwen_pixels
     min_pixels: 200704
     max_pixels: 1003520
+    vision_prefixes: [model.visual]
+    projector_prefixes: [model.visual.merger]
     ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}
   - id: qwen2_vl
     model_types: [qwen2_vl]
@@ -90,4 +96,6 @@ families:
     image_policy: qwen_pixels
     min_pixels: 200704
     max_pixels: 1003520
+    vision_prefixes: [model.visual]
+    projector_prefixes: [model.visual.merger]
     ram_gb_train: {a: 2.2, b: 30.0, valid_up_to_params_b: 10.0}

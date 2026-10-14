@@ -265,15 +265,14 @@ def _validate(
 
 
 def _support_issues(view: GraphView, support: Support, *, already: set[tuple[str, str | None]]) -> list[Issue]:
-    from vlm_pipeline.common.catalog import load_catalog
+    from vlm_pipeline.common.catalog import model_entry
     from vlm_pipeline.graph.worker import SupportQuery
     from vlm_pipeline.nodes.rules import input_kinds, model_input, origin_model_id
 
-    catalog = load_catalog()
     out: list[Issue] = []
     for node_id, params in view.params.items():
         port = model_input(view, node_id)
-        model = catalog.get(origin_model_id(view, node_id, port) or "") if port else None
+        model = model_entry(origin_model_id(view, node_id, port)) if port else None
         query = SupportQuery(node_id, view.specs[node_id], params, model, input_kinds(view, node_id))
         problem = support(query)
         if problem is not None and (problem.code, node_id) not in already:  # e.g. CFG-010 also comes from a rule

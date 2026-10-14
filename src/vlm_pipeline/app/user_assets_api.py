@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from vlm_pipeline.app import user_assets
-from vlm_pipeline.common.catalog import REPO_ID_PATTERN
+from vlm_pipeline.common.catalog import REPO_ID_PATTERN, set_user_model_lookup
 
 # A branch, tag or commit; never an unmerged hub pull request (security H2 R2). The job checks it again.
 REF_PATTERN = r"^(?!.*\.\.)(?!refs/pr/)[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$"
@@ -59,6 +59,12 @@ def register_user_asset_routes(app: FastAPI) -> None:
         return
     root = service.root
 
+    def lookup(model_id: str) -> Any:
+        record = user_assets.load(root, model_id)
+        return record.entry if record is not None else None
+
+    set_user_model_lookup(lookup)  # common.catalog.model_entry finds user-added models from now on
+
     @app.post("/api/user-assets/models", status_code=202)
     def add_model(body: AddModelRequest) -> dict[str, Any]:
         from vlm_pipeline.common.errors import VlmPipelineError
@@ -71,7 +77,10 @@ def register_user_asset_routes(app: FastAPI) -> None:
             if kept is not None:
                 record = record.model_copy(update={"license_confirmed": kept.license_confirmed,
                                                    "license_confirmed_at": kept.license_confirmed_at,
+                                                   "license_confirmed_sha": kept.license_confirmed_sha,
                                                    "trial_run_id": kept.trial_run_id})  # fmt: skip
+            sha = user_assets.save_template(root, record)
+            record = record.model_copy(update={"template_sha256": sha})
             user_assets.save(root, record)
             return record.to_api()
 

@@ -137,6 +137,15 @@ def test_only_user_ids_are_looked_up(tmp_path: Path, model_id: str) -> None:
 
 
 # ------------------------------------------------------------------------------------------- the service + API
+@pytest.fixture(autouse=True)
+def _no_leaked_lookup() -> Any:
+    """register_user_asset_routes sets a process-wide lookup: never let it reach another test."""
+    from vlm_pipeline.common.catalog import set_user_model_lookup
+
+    yield
+    set_user_model_lookup(None)
+
+
 @pytest.fixture
 def service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> DownloadService:
     monkeypatch.setattr(downloads, "read_policy", lambda: None)
@@ -264,3 +273,88 @@ def test_the_store_never_writes_through_a_symlink(tmp_path: Path) -> None:
     (tmp_path / ".cache" / "user_assets").symlink_to(outside)
     with pytest.raises(OSError, match="symlink"):
         user_assets.save(tmp_path, record)
+
+
+# ------------------------------------------------------------------------------------------- H3: download + lookups
+def _added(service: DownloadService, monkeypatch: pytest.MonkeyPatch, *, confirm: bool) -> str:
+    _fake_resolve_job(monkeypatch, {})
+    client = _client(service)
+    resolve_id = client.post("/api/user-assets/models", json={"repo": "o/x"}).json()["resolve_id"]
+    model_id = _done(service, resolve_id).result["id"]
+    if confirm:
+        client.post(f"/api/user-assets/models/{model_id}/confirm-license", json={"accept": True})
+    return str(model_id)
+
+
+def test_no_weight_before_the_licence_is_confirmed(service: DownloadService, monkeypatch: pytest.MonkeyPatch) -> None:
+    model_id = _added(service, monkeypatch, confirm=False)
+    with pytest.raises(user_assets.LicenseNotConfirmedError) as info:
+        service.start("model", model_id)
+    assert info.value.code == "SEC-005"
+    assert info.value.params == {"name": "x", "repo": "o/x", "license": "apache-2.0", "catalog_id": model_id,
+                                 "kind": "model"}  # fmt: skip
+
+
+def test_a_confirmation_for_another_revision_does_not_count(service: DownloadService,
+                                                            monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
+    model_id = _added(service, monkeypatch, confirm=True)
+    record = user_assets.load(service.root, model_id)
+    assert record is not None
+    user_assets.save(service.root, record.model_copy(update={"license_confirmed_sha": "c" * 40}))
+    with pytest.raises(user_assets.LicenseNotConfirmedError):
+        service.start("model", model_id)
+
+
+def test_a_confirmed_user_model_downloads_its_pinned_revision(service: DownloadService,
+                                                              monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
+    model_id = _added(service, monkeypatch, confirm=True)
+    launched: list[Any] = []
+    monkeypatch.setattr(service, "_launch", lambda asset, planned, plan_only: launched.append(asset) or {})
+    service.start("model", model_id, confirm=True)
+    [asset] = launched
+    assert (asset.repo, asset.revision, asset.catalog_id) == ("o/x", SHA, model_id)
+
+
+def test_the_one_model_lookup_finds_user_models_and_their_template(
+    service: DownloadService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vlm_pipeline.common.catalog import model_entry, set_user_model_lookup
+    from vlm_pipeline.train.config import LoraParams
+    from vlm_pipeline.train.recipe import build_recipe
+
+    model_id = _added(service, monkeypatch, confirm=False)
+    try:
+        entry = model_entry(model_id)
+        assert entry is not None
+        assert entry.tier == "user"
+        assert model_entry("qwen3.5-2b") is not None  # the catalog first, unchanged
+        assert model_entry("user--not--added--00000000") is None
+        template = user_assets.training_template(service.root, entry)
+        recipe = build_recipe(template, LoraParams(quantize_base="nf4"), model_dir="m", dataset_dir="d", run_dir="r")
+        assert recipe["quantization"]["llm_int8_skip_modules"] == ["model.visual"]
+        assert user_assets.delete(service.root, model_id)
+        assert not (service.root / user_assets.STORE_REL / f"{model_id}.train.yaml").exists()
+    finally:
+        set_user_model_lookup(None)
+    assert model_entry(model_id) is None  # no app, no user models
+
+
+def test_a_user_template_edited_on_disk_never_trains(service: DownloadService, monkeypatch: pytest.MonkeyPatch) -> None:
+    """security H3: a recipe can name Python callables (_target_): only the bytes recorded at add time are used."""
+    from vlm_pipeline.common.catalog import model_entry
+    from vlm_pipeline.train.recipe import RecipeError, template_path
+
+    model_id = _added(service, monkeypatch, confirm=False)
+    entry = model_entry(model_id)
+    assert entry is not None
+    assert user_assets.training_template(service.root, entry)  # as added: fine
+    with pytest.raises(RecipeError, match="verified loader"):
+        template_path(service.root, entry)  # no bare path for a user model
+    path = service.root / user_assets.STORE_REL / f"{model_id}.train.yaml"
+    path.write_bytes(path.read_bytes() + b"\nmodel: {_target_: os.system}\n")
+    with pytest.raises(RecipeError, match="changed on disk"):
+        user_assets.training_template(service.root, entry)
+    path.unlink()
+    path.symlink_to(service.root / "elsewhere.yaml")
+    with pytest.raises(RecipeError):
+        user_assets.training_template(service.root, entry)

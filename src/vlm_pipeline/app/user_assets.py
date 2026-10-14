@@ -8,18 +8,22 @@ closed). Writes are atomic (temp file + rename in the same directory).
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
+import stat
 import tempfile
 import time
 from pathlib import Path
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
+import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from vlm_pipeline.common.catalog import CatalogEntry
+from vlm_pipeline.common.catalog import USER_MODELS_REL, CatalogEntry
 from vlm_pipeline.common.download_rules import name_ok
+from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.paths import GIB
 from vlm_pipeline.common.runinfo import read_small_json
 from vlm_pipeline.download import resolver
@@ -27,11 +31,19 @@ from vlm_pipeline.download.hub import INDEX_NAME, meta_caps
 
 logger = logging.getLogger(__name__)
 
-STORE_REL = Path(".cache") / "user_assets" / "models"
+STORE_REL = USER_MODELS_REL
 RECORD_MAX = 64 * 1024
+TEMPLATE_MAX = 256 * 1024
 RESOLVE_MAX = 4 << 20  # resolve.json: up to 2 000 file names
-USER_ID = re.compile(r"^user--[a-z0-9.-]{1,200}$")
+MAX_ID = 206
+USER_ID = re.compile(r"^user--[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)*$")  # = nodes.source.USER_MODEL_PATTERN, never ".."
 DEFAULT_MAX_MODEL_GB = 40.0  # ADR-021 A1: per user-added model; Settings raises it (H5c)
+
+
+class LicenseNotConfirmedError(VlmPipelineError):
+    """No weight of a user-added model before its licence is confirmed for THIS revision (SEC-005, security §7)."""
+
+    code: ClassVar[str] = "SEC-005"
 
 
 class UserModelTooLargeError(ValueError):
@@ -52,6 +64,10 @@ class UserModelRecord(BaseModel):
     added_at: float
     license_confirmed: bool = False
     license_confirmed_at: float | None = None
+    license_confirmed_sha: str | None = Field(None, pattern=r"^[0-9a-f]{40}$")  # the revision the user agreed to
+    # sha256 of <id>.train.yaml as rendered at add time: a recipe can name Python callables (_target_), so a template
+    # edited on disk must never train (security H3); the record itself is validated on every read.
+    template_sha256: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
     trial_run_id: str | None = Field(None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
     @model_validator(mode="after")
@@ -94,7 +110,7 @@ def save(root: Path, record: UserModelRecord) -> None:
 
 def load(root: Path, model_id: str) -> UserModelRecord | None:
     """The record, or None when absent or not valid (a hand-edited file never becomes a model)."""
-    if not USER_ID.fullmatch(model_id):
+    if len(model_id) > MAX_ID or not USER_ID.fullmatch(model_id):
         return None
     try:
         return UserModelRecord.model_validate(read_small_json(_store(root) / f"{model_id}.json", RECORD_MAX))
@@ -112,11 +128,12 @@ def list_all(root: Path) -> list[UserModelRecord]:
 
 
 def delete(root: Path, model_id: str) -> bool:
-    if not USER_ID.fullmatch(model_id):
+    if len(model_id) > MAX_ID or not USER_ID.fullmatch(model_id):
         return False
     path = _store(root) / f"{model_id}.json"
     existed = path.is_file()
     path.unlink(missing_ok=True)
+    (_store(root) / f"{model_id}.train.yaml").unlink(missing_ok=True)
     return existed
 
 
@@ -124,9 +141,76 @@ def confirm_license(root: Path, model_id: str) -> UserModelRecord | None:
     record = load(root, model_id)
     if record is None:
         return None
-    confirmed = record.model_copy(update={"license_confirmed": True, "license_confirmed_at": time.time()})
+    confirmed = record.model_copy(update={"license_confirmed": True, "license_confirmed_at": time.time(),
+                                          "license_confirmed_sha": record.entry.revision})  # fmt: skip
     save(root, confirmed)
     return confirmed
+
+
+def downloadable_entry(root: Path, model_id: str) -> CatalogEntry:
+    """The entry whose weights may be fetched: its licence confirmed for exactly its pinned revision (SEC-005)."""
+    record = load(root, model_id)
+    if record is None:
+        from vlm_pipeline.app.downloads import DownloadUnknownError
+
+        raise DownloadUnknownError("not an added model", params={})
+    e = record.entry
+    if not record.license_confirmed or record.license_confirmed_sha != e.revision:
+        raise LicenseNotConfirmedError(
+            "licence not confirmed for this revision",
+            params={"name": e.display_name, "repo": e.repo, "license": e.license, "catalog_id": e.id, "kind": "model"},
+        )
+    return e
+
+
+def save_template(root: Path, record: UserModelRecord) -> str:
+    """Write the training template rendered from the record's family; its sha256 (kept in the record)."""
+    family = next((f for f in resolver.load_families().families if f.id == record.family), None)
+    if family is None:
+        raise resolver.ModelArchUnsupportedError("family no longer offered", params={
+            "repo": record.entry.repo, "revision": record.entry.revision[:12], "architecture": record.architecture,
+            "model_type": "unknown"})  # fmt: skip
+    folder = _store(root)
+    folder.mkdir(parents=True, exist_ok=True)
+    if any(p.is_symlink() for p in (folder.parent, folder)):
+        raise OSError("the user asset store must not be a symlink")
+    data = yaml.safe_dump(resolver.render_template(family), sort_keys=False).encode("utf-8")
+    fd, tmp = tempfile.mkstemp(dir=folder, prefix=".tmp-", suffix=".yaml")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        Path(tmp).replace(folder / f"{record.entry.id}.train.yaml")
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+    return hashlib.sha256(data).hexdigest()
+
+
+def training_template(root: Path, entry: CatalogEntry) -> dict[str, object]:
+    """The training template of any model: the catalog's file, or a user model's after its sha256 check.
+
+    The one way the app reads a template (train, trial pixels/decoding). A user template is read once (no-follow,
+    regular file, size cap), hashed and parsed from the same bytes: nothing can swap it between check and use.
+    """
+    from vlm_pipeline.train.recipe import RecipeError, load_template, template_from_bytes, template_path
+
+    if entry.tier != "user":
+        return load_template(template_path(root, entry))
+    record = load(root, entry.id)
+    path = _store(root) / f"{entry.id}.train.yaml"
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+        with os.fdopen(fd, "rb") as fh:
+            if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+                raise OSError("not a regular file")
+            data = fh.read(TEMPLATE_MAX + 1)
+    except OSError:
+        raise RecipeError(f"no training template for model {entry.id!r}") from None
+    if record is None or record.template_sha256 is None or len(data) > TEMPLATE_MAX:
+        raise RecipeError(f"no verified training template for model {entry.id!r}")
+    if hashlib.sha256(data).hexdigest() != record.template_sha256:
+        raise RecipeError("the training template of this model changed on disk: add the model again")
+    return template_from_bytes(data, path.name)
 
 
 def max_model_gb(root: Path) -> float:
@@ -217,15 +301,19 @@ def finish_model(root: Path, run_dir: Path, repo: str) -> UserModelRecord:
 
 __all__ = [
     "DEFAULT_MAX_MODEL_GB",
+    "LicenseNotConfirmedError",
     "ResolveMeta",
     "UserModelRecord",
     "UserModelTooLargeError",
     "confirm_license",
     "delete",
+    "downloadable_entry",
     "finish_model",
     "list_all",
     "load",
     "max_model_gb",
     "read_resolve",
     "save",
+    "save_template",
+    "training_template",
 ]

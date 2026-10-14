@@ -15,8 +15,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, get_args
 
-from vlm_pipeline.common.catalog import CatalogEntry, load_catalog, load_dataset_catalog
+from vlm_pipeline.common.catalog import CatalogEntry, load_dataset_catalog, model_entry
 from vlm_pipeline.nodes import REGISTRY
+from vlm_pipeline.nodes.source import picked_model_id
 from vlm_pipeline.train.config import Epochs
 from vlm_pipeline.train.estimate import estimate_train, measured_timings, train_steps
 
@@ -70,7 +71,7 @@ def _base_model(workflow: Mapping[str, Any], train_id: str) -> CatalogEntry | No
     if node is None or node.get("type") != "model.hf_pick":
         return None
     params = _params(node)
-    return load_catalog().get(str(getattr(params, "model", ""))) if params is not None else None
+    return model_entry(picked_model_id(params)) if params is not None else None
 
 
 def train_node_estimate(root: Path, workflow: Mapping[str, Any], node: Mapping[str, Any], image: str) -> dict[str, Any]:

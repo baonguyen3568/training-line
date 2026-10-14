@@ -182,7 +182,8 @@ class DownloadService:
     # ------------------------------------------------------------------------------------------ start
     def start(self, kind: Kind, catalog_id: str, *, confirm: bool = False, check: bool = False) -> dict[str, Any]:
         """Download ``catalog_id``, or with ``check`` verify a snapshot already there (plan only, no blob)."""
-        asset = resolve(kind, catalog_id)
+        asset = self._user_asset(catalog_id) if kind == "model" and catalog_id.startswith("user--") else None
+        asset = asset or resolve(kind, catalog_id)
         if self.installed(asset):
             if verified(self.root, asset.kind, asset.repo, asset.revision):
                 return {**asset.to_api(), "status": "completed", "verified": True, "download_id": None}
@@ -196,6 +197,13 @@ class DownloadService:
         if planned > CONFIRM_GB * GIB and not confirm:
             return {**total.to_api(), "needs_confirm": True, "threshold_gb": CONFIRM_GB}
         return self._launch(asset, planned, plan_only=False)
+
+    def _user_asset(self, model_id: str) -> Asset:
+        """A user-added model (ADR-021): only with its licence confirmed for its pinned revision (SEC-005)."""
+        from vlm_pipeline.app.user_assets import downloadable_entry
+
+        e = downloadable_entry(self.root, model_id)
+        return Asset("model", e.id, e.repo, e.revision, e.display_name, e.disk_gb, e.license, e.gated)
 
     def _launch(self, asset: Asset, planned: int, *, plan_only: bool) -> dict[str, Any]:
         stamp = time.strftime("%Y%m%d-%H%M")

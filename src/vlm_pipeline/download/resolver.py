@@ -86,17 +86,31 @@ class Family(BaseModel):
     architectures: tuple[str, ...] = Field(min_length=1)
     auto_class: Literal["AutoModelForImageTextToText"]  # native only: AutoModel means remote code
     attn: Literal["eager", "sdpa"]
-    verified: Literal["A", "B", "C"]
+    # A = trained on GB10, S = smoke-run on GB10, B = AutoModel ships a recipe, C = native only (UI: B+C "not tried")
+    verified: Literal["A", "S", "B", "C"]
     train_node: Literal["train.lora_vlm"]
     recipe: str = Field(pattern=r"^configs/train/templates/[a-z0-9][a-z0-9.\-]*\.yaml$")
     freeze_vision_tower: bool
     lora_exclude: tuple[str, ...] = Field(min_length=1)
     qlora_skip_modules: tuple[str, ...] = ()
     loss: Literal["masked_ce"]
-    image_policy: Literal["qwen_pixels"]  # processor_default joins when its CatalogEntry policy exists
-    min_pixels: int = Field(gt=0)
-    max_pixels: int = Field(gt=0)
+    image_policy: Literal["qwen_pixels", "processor_default"]
+    min_pixels: int | None = Field(None, gt=0)  # qwen_pixels only
+    max_pixels: int | None = Field(None, gt=0)
+    vision_prefixes: tuple[str, ...] = Field(min_length=1)  # module prefixes (freeze / train blocks, param groups)
+    projector_prefixes: tuple[str, ...] = Field(min_length=1)
+    min_image: str | None = Field(None, pattern=r"^vlm-automodel:[0-9]{2}\.[0-9]{2}-[0-9]+$")  # newer than default?
     ram_gb_train: RamFormula
+
+    @model_validator(mode="after")
+    def _pixels_follow_the_policy(self) -> Self:
+        pixels = (self.min_pixels, self.max_pixels)
+        if self.image_policy == "qwen_pixels":
+            if None in pixels or not self.min_pixels < self.max_pixels:  # type: ignore[operator]
+                raise ValueError(f"{self.id}: qwen_pixels needs 0 < min_pixels < max_pixels")
+        elif pixels != (None, None):
+            raise ValueError(f"{self.id}: processor_default takes no pixel caps (the repo's processor decides)")
+        return self
 
 
 class Families(BaseModel):
@@ -280,9 +294,9 @@ def user_entry(
         params_b=params_b, disk_gb=max(0.01, math.ceil(disk_gb * 100) / 100), train_node=family.train_node,
         ram_gb_train=ram_upper_bound(family, params_b), ram_source="estimated", sft_trainable_pct_min=0,
         sft_trainable_pct_max=0, attn=family.attn, loss=family.loss, freeze_vision_tower=family.freeze_vision_tower,
-        min_pixels=family.min_pixels, max_pixels=family.max_pixels, image_policy=family.image_policy,
+        min_pixels=family.min_pixels or 0, max_pixels=family.max_pixels or 0, image_policy=family.image_policy,
         image_max_tokens=0, video=False, video_fps=0, min_answer_tokens=1024, quant_fp8="unsupported",
-        serve_engine="hf", task_prompt_fixed=False, gallery_gates=(), min_image=DEFAULT_TRAIN_IMAGE,
+        serve_engine="hf", task_prompt_fixed=False, gallery_gates=(), min_image=family.min_image or DEFAULT_TRAIN_IMAGE,
     )  # fmt: skip
 
 
@@ -295,7 +309,11 @@ def render_template(family: Family, root: Path | None = None) -> dict[str, Any]:
         yaml.safe_load((configs_root(root) / family.recipe).read_text(encoding="utf-8"))
     )
     processor = template.setdefault("processor", {})
-    processor.update(min_pixels=family.min_pixels, max_pixels=family.max_pixels)
+    if family.image_policy == "qwen_pixels":
+        processor.update(min_pixels=family.min_pixels, max_pixels=family.max_pixels)
+    else:  # the repo's own processor config decides (a Qwen recipe's caps would be wrong here)
+        processor.pop("min_pixels", None)
+        processor.pop("max_pixels", None)
     template.setdefault("peft", {})["exclude_modules"] = list(family.lora_exclude)
     template.setdefault("freeze_config", {})["freeze_vision_tower"] = family.freeze_vision_tower
     if family.qlora_skip_modules:
