@@ -40,7 +40,7 @@ Ghi chú về từ ngữ: UI gọi là **"nhóm"**; "subgraph" chỉ dùng trong
   - Breadcrumb hiện icon `lock`, tooltip `canvas.group.readonly`.
   - Không kéo thêm bước, không nối hay gỡ dây.
   - Inspector của bước con vẫn mở được để xem. Tham số nào được expose thì hiện ghi chú `canvas.group.param_exposed` và một link quay về nhóm để sửa ở đó.
-- **Nhóm tự tạo (`user.*`)** sửa được bên trong như canvas thường.
+- **Nhóm tự tạo (`user.*`)**: ở 1.0 cũng chỉ xem được (PM dời Gộp/Tách sang 1.1, nên sửa bên trong nhóm cũng sang 1.1). Breadcrumb có khoá, tooltip `canvas.group.readonly_user`.
 - Chuyển cảnh khi vào/ra: scale từ vị trí node nhóm, 180 ms, ease-out. Có `prefers-reduced-motion` thì cắt thẳng, không animation.
 - **Focus:**
   - Khi vào nhóm, focus đặt vào bước con đầu tiên.
@@ -53,7 +53,7 @@ Ghi chú về từ ngữ: UI gọi là **"nhóm"**; "subgraph" chỉ dùng trong
 - Inspector của nhóm có khối lỗi: dòng đầu là `canvas.group.inner_errors`, sau đó mỗi lỗi một dòng gồm đường dẫn, tiêu đề lỗi và nút `action.open_inner_step`.
 - Ở canvas cha, dây nối vào cổng của nhóm hiện lỗi kiểu như với node thường. Ánh xạ cổng do `graph.expand` lo.
 
-## 4. Tạo và tách nhóm (D2b: làm nếu còn thời gian trong 1.0)
+## 4. Tạo và tách nhóm (D2b: PM dời sang 1.1)
 - Chọn ≥2 bước → nút toolbar **Gộp thành nhóm** (icon `group`, `Ctrl+G`). App tạo `user.<slug>`, tự expose các cổng có dây đi ra ngoài vùng chọn, và đặt tiêu đề mặc định `canvas.group.default_title`.
 - **Tách nhóm** (icon `ungroup`, `Ctrl+Shift+G`) chỉ áp cho nhóm `user.*`. Thao tác này đặt các bước con trở lại canvas cha.
 - Tiêu đề do người dùng đặt là text không tin cậy: render dạng text thuần, giới hạn độ dài theo P016.
@@ -72,6 +72,8 @@ Ghi chú về từ ngữ: UI gọi là **"nhóm"**; "subgraph" chỉ dùng trong
 | canvas.group.boundary_in | Đầu vào nhóm | Group inputs |
 | canvas.group.boundary_out | Đầu ra nhóm | Group outputs |
 | canvas.group.readonly | Nhóm dựng sẵn chỉ xem được. Chỉnh thiết lập ở bước nhóm bên ngoài. | Built-in group: view only. Change its settings on the group step outside. |
+| canvas.group.readonly_user | Bản này chưa sửa được bên trong nhóm. Chỉnh thiết lập ở bước nhóm bên ngoài. | This version can't edit inside a group yet. Change its settings on the group step outside. |
+| canvas.group.inner_errors_one | 1 lỗi bên trong nhóm | 1 error inside this group |
 | canvas.group.param_exposed | Chỉnh ở bước nhóm | Set on the group step |
 | canvas.group.breadcrumb_label | Vị trí trong workflow | Location in workflow |
 | canvas.group.root | Workflow | Workflow |
@@ -81,7 +83,7 @@ Ghi chú về từ ngữ: UI gọi là **"nhóm"**; "subgraph" chỉ dùng trong
 | canvas.group.default_title | Nhóm mới | New group |
 | action.open_inner_step | Mở bước bị lỗi | Open the failing step |
 
-`inner_errors` hiện cả khi chỉ có 1 lỗi: tiếng Việt không chia số nhiều. Bản EN dùng biến thể `inner_errors_one` = "1 error inside this group" khi `error_count` = 1.
+`inner_errors` hiện cả khi chỉ có 1 lỗi: tiếng Việt không chia số nhiều. Bản EN dùng biến thể `inner_errors_one` = "1 error inside this group" khi `error_count` = 1. Gate i18n bắt vi/en cùng bộ key, nên vi cũng có `inner_errors_one` = "1 lỗi bên trong nhóm".
 
 ## 7. Nghiệm thu (design review)
 Ảnh chụp 7878 (dark), mỗi ảnh là một màn:
