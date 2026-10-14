@@ -1762,7 +1762,7 @@ reference_pipeline:
   quantize-fp8-benchmark:
     summary: 'Quantizes Qwen3.5-2B to FP8, then re-scores it under the same conditions as the original.'
   grpo-geometry:
-    summary: 'Qwen3.5 solves geometry problems and learns from rewards the app scores itself.'
+    summary: 'Qwen3.5 solves geometry problems and learns from self-scored rewards, with no KL term, as in DAPO and Dr.GRPO.'
 bug_report:
   title: Send a bug report
   intro: The app copies the details below and opens the project's issue page on GitHub. Paste them into the description and add what you were doing. The app sends nothing by itself.
@@ -1943,6 +1943,7 @@ method:
   grpo:
     title: Learn from feedback (GRPO)
     when: When answers can be scored automatically (numbers, JSON); the model tries several and learns from the scores. Slowest method.
+    note: "This version drops the keep-close-to-the-base term (KL), as DAPO and Dr.GRPO do, to fit the machine's memory. Watch the validation score so the model does not drift too far."
   ptq:
     title: Post-training quantization (PTQ)
     when: When you need a smaller model to run; quantize, then re-score, with no extra training.

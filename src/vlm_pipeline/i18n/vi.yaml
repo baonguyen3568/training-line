@@ -1762,7 +1762,7 @@ reference_pipeline:
   quantize-fp8-benchmark:
     summary: 'Nén Qwen3.5-2B xuống FP8 rồi đo lại điểm cùng điều kiện với bản gốc.'
   grpo-geometry:
-    summary: 'Qwen3.5 tự giải bài hình học, học từ điểm thưởng do app tự chấm.'
+    summary: 'Qwen3.5 tự giải bài hình học, học từ điểm thưởng tự chấm; không dùng KL, như DAPO và Dr.GRPO.'
 bug_report:
   title: Gửi báo cáo lỗi
   intro: App sẽ chép nội dung dưới đây rồi mở trang báo lỗi của dự án trên GitHub. Bạn dán vào ô mô tả và kể thêm bạn đang làm gì. App không tự gửi gì.
@@ -1943,6 +1943,7 @@ method:
   grpo:
     title: Học từ phản hồi (GRPO)
     when: 'Khi máy chấm được đúng/sai (số, JSON): model thử nhiều câu và học từ điểm; chạy lâu nhất.'
+    note: 'Bản này bỏ phần giữ model gần bản gốc (KL), giống DAPO và Dr.GRPO, để vừa bộ nhớ của máy. Nên theo dõi điểm trên dữ liệu kiểm tra để model không đi quá xa.'
   ptq:
     title: Nén sau khi train (PTQ)
     when: 'Khi cần model nhỏ hơn để chạy: nén rồi đo lại điểm, không train thêm.'
