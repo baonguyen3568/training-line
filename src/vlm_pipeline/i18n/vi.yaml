@@ -1700,8 +1700,6 @@ reference_pipeline:
     stage2: Bộ nối + LoRA
   qlora-4bit-qwen35-2b:
     summary: Dạy nhẹ Qwen3.5-2B bằng QLoRA, nén phần ngôn ngữ xuống 4-bit cho đỡ tốn bộ nhớ.
-  data-cleanup-lora:
-    summary: Lọc ảnh hỏng, bỏ ảnh trùng và ảnh trùng với dữ liệu kiểm tra, rồi mới dạy nhẹ bằng LoRA.
   invoice-to-json:
     summary: 'Dạy lại bộ nối và phần ngôn ngữ của Nemotron Parse để đọc hoá đơn CORD-v2 ra JSON.'
   invoice-qwen35-2b-lora:
@@ -1710,20 +1708,8 @@ reference_pipeline:
     summary: 'Dạy nhẹ Qwen3.5-2B bằng LoRA, đo trên hoá đơn CORD-v2; đổi dữ liệu để dạy việc khác.'
   quantize-fp8-benchmark:
     summary: 'Nén Qwen3.5-2B xuống FP8 rồi đo lại điểm cùng điều kiện với bản gốc.'
-  gemma4-e4b-lora:
-    summary: Dạy nhẹ Gemma 4 E4B trên hoá đơn CORD-v2, chấm cùng bộ kiểm tra với mẫu Đọc hoá đơn.
-  qwen35-4b-lora:
-    summary: Dạy nhẹ Qwen3.5-4B trên dữ liệu của bạn. Lớn hơn mẫu Hiểu ảnh, cần nhiều bộ nhớ hơn.
   grpo-geometry:
     summary: 'Qwen3.5 tự giải bài hình học, học từ điểm thưởng do app tự chấm.'
-  dgx-spark-vlm-playbook:
-    summary: Hướng dẫn của NVIDIA để fine-tune model ảnh trên DGX Spark, so sánh trước và sau.
-  donut-cord:
-    summary: Model Donut đọc hoá đơn CORD, làm mốc so sánh. Chạy bằng công cụ khác, không trong app.
-  curator-image-curation:
-    summary: Lọc ảnh kém và bỏ ảnh trùng bằng model. Bản này dùng bước lọc chạy bằng CPU của app.
-  cosmos-reason2-lora:
-    summary: Dạy nhẹ Cosmos Reason2 2B trên dữ liệu của bạn. Cần tài khoản Hugging Face.
 bug_report:
   title: Gửi báo cáo lỗi
   intro: App sẽ chép nội dung dưới đây rồi mở trang báo lỗi của dự án trên GitHub. Bạn dán vào ô mô tả và kể thêm bạn đang làm gì. App không tự gửi gì.
