@@ -771,9 +771,39 @@
             "x-ui": {
               "advanced": true
             }
+          },
+          "user_dataset": {
+            "default": "",
+            "maxLength": 300,
+            "pattern": "^(user--ds--[a-z0-9][a-z0-9-]*(\\.[a-z0-9-]+)*)?$",
+            "title": "User Dataset",
+            "type": "string",
+            "x-ui": {
+              "order": 1,
+              "widget": "user_dataset"
+            }
+          },
+          "user_repo": {
+            "default": "",
+            "maxLength": 193,
+            "pattern": "^([A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*)?$",
+            "title": "User Repo",
+            "type": "string",
+            "x-ui": {
+              "widget": "hidden"
+            }
+          },
+          "user_revision": {
+            "default": "",
+            "pattern": "^([0-9a-f]{40})?$",
+            "title": "User Revision",
+            "type": "string",
+            "x-ui": {
+              "widget": "hidden"
+            }
           }
         },
-        "title": "HubDatasetParams",
+        "title": "HubLoadParams",
         "type": "object"
       },
       "permissions": [],

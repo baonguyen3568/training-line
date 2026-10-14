@@ -740,6 +740,15 @@ node:
       repo:
         label: Dataset
         help: A dataset on Hugging Face that has been license-checked.
+      user_dataset:
+        label: Dataset you added
+        help: A dataset you added from Hugging Face yourself (not vetted by the team), converted to images + answers. When chosen it replaces the dataset above.
+      user_repo:
+        label: Repository of the added dataset
+        help: The Hugging Face repository of the dataset you added. Filled in by the app.
+      user_revision:
+        label: Version of the added dataset
+        help: The version (commit) of the dataset you added. Filled in by the app so everyone opening the workflow uses exactly this one.
       max_samples:
         label: Sample limit
         help: Use fewer samples for a quick test; choose "All" for the real run.

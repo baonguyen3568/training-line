@@ -740,6 +740,15 @@ node:
       repo:
         label: Bộ dữ liệu
         help: Bộ dữ liệu có sẵn trên Hugging Face, đã được kiểm tra giấy phép.
+      user_dataset:
+        label: Bộ dữ liệu bạn đã thêm
+        help: Một bộ dữ liệu bạn tự thêm từ Hugging Face (chưa kiểm chứng), đã chuyển về dạng ảnh + câu trả lời. Khi chọn, nó thay cho bộ dữ liệu ở trên.
+      user_repo:
+        label: Repo của bộ dữ liệu đã thêm
+        help: Tên kho trên Hugging Face của bộ dữ liệu bạn đã thêm. App tự điền.
+      user_revision:
+        label: Phiên bản của bộ dữ liệu đã thêm
+        help: Mã phiên bản (commit) của bộ dữ liệu bạn đã thêm. App tự điền để ai mở workflow cũng dùng đúng bản này.
       max_samples:
         label: Giới hạn số mẫu
         help: Dùng ít mẫu để chạy thử nhanh; chọn "Tất cả" khi chạy thật.

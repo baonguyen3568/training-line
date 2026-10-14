@@ -19,10 +19,10 @@ from typing import Annotated, Any, ClassVar, Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from vlm_pipeline.common.catalog import CatalogEntry, DatasetEntry, load_dataset_catalog, model_entry
+from vlm_pipeline.common.catalog import CatalogEntry, DatasetEntry, load_dataset_catalog, model_entry, user_dataset_rows
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.rules import origin_model_id
-from vlm_pipeline.nodes.source import DATA_HF_LOAD, DATA_LOCAL_FOLDER
+from vlm_pipeline.nodes.source import DATA_HF_LOAD, DATA_LOCAL_FOLDER, is_user_dataset
 from vlm_pipeline.nodes.spec import GraphRule, GraphView, Issue, NodeSpec
 
 STANDARDS_DIR = Path("configs") / "standards"
@@ -373,11 +373,17 @@ def _dataset_upstream(view: GraphView, node_id: str, port: str) -> tuple[str, An
 def _catalog_dataset(upstream: tuple[str, Any] | None) -> DatasetEntry | None:
     if upstream is None or upstream[0] != DATA_HF_LOAD.type_id or upstream[1] is None:
         return None
+    if is_user_dataset(upstream[1]):  # H5: ``repo`` keeps its default then; the catalog facts are not this data's
+        return None
     repo = getattr(upstream[1], "repo", None)
     return next((d for d in load_dataset_catalog().datasets if d.repo == repo), None)
 
 
 def _sample_count(upstream: tuple[str, Any] | None) -> int | None:
+    if upstream is not None and upstream[0] == DATA_HF_LOAD.type_id and is_user_dataset(upstream[1]):
+        rows = user_dataset_rows(str(getattr(upstream[1], "user_dataset", "")))  # converted rows, None until then
+        limit = int(getattr(upstream[1], "max_samples", 0) or 0)
+        return None if rows is None else (min(rows, limit) if limit else rows)
     entry = _catalog_dataset(upstream)
     if entry is None:
         return None  # local folder / unknown: the data profile knows

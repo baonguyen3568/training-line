@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from vlm_pipeline.common.catalog import load_dataset_catalog, model_entry
+from vlm_pipeline.common.catalog import load_dataset_catalog, model_entry, user_dataset_status
 from vlm_pipeline.common.heldout_data import is_heldout_folder
 from vlm_pipeline.common.local_cache import dataset_missing, model_missing
 from vlm_pipeline.data.local_folder import preview_folder
 from vlm_pipeline.nodes.data import DATA_SPLIT, PASS_THROUGH
 from vlm_pipeline.nodes.model_ops import EXPORT_HF_DIR, QUANTIZE_MODELOPT_PTQ
-from vlm_pipeline.nodes.source import MODEL_HF_PICK, picked_model_id
+from vlm_pipeline.nodes.source import MODEL_HF_PICK, is_user_dataset, picked_model_id
 from vlm_pipeline.nodes.spec import GraphView, Issue, is_compatible, model_kind
 from vlm_pipeline.nodes.train import TRAIN_LORA_VLM, TRAIN_SFT_VLM
 
@@ -76,6 +76,8 @@ def _data_kind(view: GraphView, src: str | None, seen: set[str]) -> str:
         seen.add(src)
         parts = {_data_kind(view, view.source(src, p), seen) for p in view.specs[src].inputs if view.source(src, p)}
         return "dataset:local" if parts == {"dataset:local"} else "other"
+    if view.specs[src].type_id == "data.hf_load" and is_user_dataset(view.params.get(src)):
+        return "dataset:local"  # H5: a user dataset is converted to a local folder (backend worker)
     return _SOURCE_KINDS.get(view.specs[src].type_id, "other")
 
 
@@ -209,6 +211,17 @@ def catalog_assets_on_this_machine(view: GraphView) -> Iterator[Issue]:
                 continue
             missing = model_missing(root, entry) if entry is not None else None
             param = "model"
+        elif spec.type_id == "data.hf_load" and is_user_dataset(params):
+            dataset_id = str(getattr(params, "user_dataset", ""))
+            status = user_dataset_status(dataset_id)
+            if status is None:  # never added on this machine: the UI offers "add this dataset" (same as MODEL-006)
+                yield Issue("DATA-013", node_id=node_id, param="user_dataset", params={
+                    "node": node_id, "repo": getattr(params, "user_repo", ""),
+                    "revision": getattr(params, "user_revision", "")})  # fmt: skip
+                continue
+            download = status.get("download")
+            missing = dict(download) if isinstance(download, dict) else None
+            param = "user_dataset"
         elif spec.type_id == "data.hf_load":
             repo = getattr(params, "repo", None)
             dataset = next((d for d in load_dataset_catalog().datasets if d.repo == repo), None)

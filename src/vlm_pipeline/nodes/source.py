@@ -93,13 +93,43 @@ MODEL_HF_PICK = NodeSpec(
     runner="host",
 )
 
+# ADR-021 H5: a Hugging Face dataset the user added (converted to images + labels.jsonl by the app; config, split and
+# column mapping live in its record, not here, so the id is stable for the cache). It wins over ``repo`` when set.
+USER_DATASET_PATTERN = r"^(user--ds--[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)*)?$"
+
+
+class HubLoadParams(HubDatasetParams):
+    user_dataset: str = Field(
+        "", max_length=300, pattern=USER_DATASET_PATTERN, json_schema_extra=ui(order=1, widget="user_dataset")
+    )
+    user_repo: str = Field("", max_length=193, pattern=USER_REPO_PATTERN, json_schema_extra=ui(widget="hidden"))
+    user_revision: str = Field("", pattern=r"^([0-9a-f]{40})?$", json_schema_extra=ui(widget="hidden"))
+
+    @model_validator(mode="after")
+    def _user_dataset_matches(self) -> HubLoadParams:
+        """The id must come from the hidden repo + revision (another machine offers "add this dataset" from them)."""
+        from vlm_pipeline.download.resolver import user_dataset_id_prefix
+
+        ids = (self.user_dataset, self.user_repo, self.user_revision)
+        if not any(ids):
+            return self
+        if not all(ids) or not self.user_dataset.startswith(user_dataset_id_prefix(self.user_repo, self.user_revision)):
+            raise ValueError("user_dataset must be an id of user_repo at user_revision")
+        return self
+
+
+def is_user_dataset(params: object) -> bool:
+    """Whether a ``data.hf_load`` reads a user-added dataset (local after conversion), not the catalog repo."""
+    return bool(getattr(params, "user_dataset", ""))
+
+
 DATA_HF_LOAD = NodeSpec(
     type_id="data.hf_load",
     version="1.0.0",
     category="source",
     icon="dataset",
     outputs={"dataset": PortSpec(type="Dataset")},
-    params_model=HubDatasetParams,
+    params_model=HubLoadParams,
     runner="host",
 )
 
