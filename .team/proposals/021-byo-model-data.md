@@ -91,8 +91,11 @@ Params: `repo` (pattern = HF repo id), `revision?` (pinned at add time like mode
 
 - `option_meta.verified` and `GET /api/node-types` carry it for models and datasets.
 - Estimates for unverified models are research's upper bound; memguard + 80 % rule unchanged (ADR-005).
-- "Chạy thử nhanh": the existing train node with `max_steps: 5` and `val_every_steps` off, as a template action on
-  the node (no new node). The first real run of an unverified model records `peak_mem_gb`; research may later
+- "Chạy thử nhanh" (agreed with frontend 2026-10-14): a server-side trial run, the user's params untouched:
+  `POST /api/runs {workflow, trial: {node}}` runs that node's ancestors and the node with `max_steps: 5`, validation
+  off, nothing downstream; its own cache key (max_steps differs); `trial: true` on the run. A completed trial writes
+  `trial_run_id` on the user model record. Until then validate emits MODEL-005 (info) with the action `run_smoke`
+  (kind `trial`). The first real run of an unverified model records `peak_mem_gb`; research may later
   promote it to the catalog with measured numbers.
 
 ## 5. Security points to review (security)
