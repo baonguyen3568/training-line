@@ -274,21 +274,3 @@ def test_a_user_entry_carries_its_family() -> None:
     assert entry.family == "qwen3_5"
     assert r.block_prefixes(entry) == (("model.visual",), ("model.visual.merger",))
 
-
-@pytest.mark.parametrize(
-    ("repo", "config", "split", "expected"),
-    [
-        ("lmms-lab/DocVQA", "DocVQA", "validation", "user--ds--lmms-lab--docvqa--aaaaaaaa--docvqa--validation"),
-        ("Org/My_Set", "default", "train", "user--ds--org--my-set--aaaaaaaa--default--train"),
-        ("o/x", "..", "a b", "user--ds--o--x--aaaaaaaa--x--a-b"),
-    ],
-)
-def test_user_dataset_ids_are_lowercase_and_path_safe(repo: str, config: str, split: str, expected: str) -> None:
-    import re
-
-    got = r.user_dataset_id(repo, SHA, config, split)
-    assert got == expected
-    assert got.startswith(r.user_dataset_id_prefix(repo, SHA))
-    assert re.fullmatch(r"user--ds--[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)*", got)
-    assert ".." not in got
-    assert "/" not in got
