@@ -46,6 +46,10 @@ App nhớ kết quả của từng bước. Khi bạn chỉ đổi bước cuố
 
 Chế độ Đơn giản là mặc định: mỗi bước chỉ hiện vài thiết lập quan trọng, có sẵn mức chọn như Chậm, Vừa, Nhanh. Chế độ Nâng cao hiện thêm tham số chi tiết, kể cả tuỳ chọn gốc của engine dạy model, theo đúng tên của chúng. App vẫn kiểm tra từng giá trị trước khi chạy.
 
+## Tải model và dữ liệu ngay trong app
+
+Bước nào cần model hay bộ dữ liệu chưa có trên máy sẽ hiện nút **Tải về máy**. App cho bạn xem giấy phép và các điều kiện kèm theo trước khi tải, rồi hiện tiến trình và kiểm tra tệp sau khi tải. <Hint title="Vì sao phải tải trước khi chạy">Các bước chạy không dùng mạng, nên model và dữ liệu phải có sẵn trên máy. Model nào yêu cầu bạn đồng ý điều khoản trên Hugging Face thì app hướng dẫn từng bước để mở quyền tải.</Hint>
+
 ## Xử lý dữ liệu trước khi dạy
 
 Thư viện có các bước lọc ảnh quá nhỏ hay hỏng, bỏ mẫu trùng (kể cả mẫu trùng với dữ liệu kiểm tra), trộn nhiều bộ dữ liệu, và tạo mô tả ảnh bằng một model. <Hint title="Vì sao phải bỏ mẫu trùng với dữ liệu kiểm tra">Nếu ảnh dùng để dạy cũng nằm trong dữ liệu kiểm tra, model được chấm trên chính ảnh nó đã học và điểm sẽ cao hơn thực tế.</Hint>
@@ -68,7 +72,6 @@ Giao diện mặc định là tiếng Việt có dấu đầy đủ, và chuyể
 
 Các phần sau đang được làm. Trang này sẽ cập nhật khi chúng chạy được:
 
-- Tải model và dữ liệu ngay trong app, có xem giấy phép trước khi tải.
 - Bung một bước lớn thành các bước nhỏ bên trong.
 - Dạy model bằng QLoRA, DPO và GRPO.
 - Cài node do bên thứ ba viết, chạy trong vùng cách ly và có khai báo quyền.

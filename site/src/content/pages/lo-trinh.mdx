@@ -21,6 +21,7 @@ Trang này chỉ ghi việc đã có trong bảng công việc của dự án. K
 - **Mẫu Đọc hoá đơn → JSON** chạy thật trên DGX Spark, từ dữ liệu mẫu tới model đã dạy.
 - **Mẫu Nén model & đo lại điểm** chạy thật: nén FP8 rồi đo lại điểm cùng điều kiện với bản gốc.
 - **Chạy thử và xuất model:** hỏi thử model ngay trong app, xuất model ra thư mục định dạng Hugging Face kèm giấy phép cần thiết.
+- **Tải model và dữ liệu ngay trong app**, có xem giấy phép trước khi tải; model cần đồng ý điều khoản thì app hướng dẫn từng bước.
 - **Bước xử lý dữ liệu:** lọc, bỏ trùng, trộn nhiều bộ dữ liệu, tạo mô tả ảnh bằng model.
 - **Tuỳ chọn engine trong chế độ Nâng cao**, được kiểm tra trước khi chạy.
 - **Nút Sửa nhanh** trên thẻ lỗi, **Đặt lại bước** để chạy lại một bước từ đầu, và nút **Gửi báo cáo lỗi**.
@@ -28,7 +29,6 @@ Trang này chỉ ghi việc đã có trong bảng công việc của dự án. K
 
 ## Đang làm
 
-- **Tải model và dữ liệu ngay trong app**, có xem giấy phép trước khi tải.
 - **Bung bước lớn thành các bước nhỏ** bên trong, cho người cần chỉnh sâu.
 - **Thêm cách dạy model:** QLoRA, DPO, GRPO. <Hint title="Các cách dạy này khác gì nhau">QLoRA giống LoRA nhưng nén model gốc để tốn ít bộ nhớ hơn. DPO và GRPO dạy model chọn câu trả lời tốt hơn dựa trên so sánh hoặc chấm điểm, thay vì chỉ học theo đáp án mẫu.</Hint>
 - **Cách chấm điểm cho DPO và GRPO:** bản này có sẵn các cách chấm phổ biến: đúng đáp án, đúng định dạng, đúng mẫu câu, khung đánh dấu trên ảnh khớp đáp án, JSON hợp lệ. <Hint title="Vì sao chưa tự viết cách chấm được">Cách chấm tự viết là mã chạy trên máy của bạn. Muốn chạy an toàn, mã đó cần một vùng cách ly riêng: không có mạng, không đọc được dữ liệu khác, bị giới hạn thời gian và bộ nhớ. Phần này sẽ có ở bản sau.</Hint>
