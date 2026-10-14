@@ -16,6 +16,8 @@
      user xác nhận license trước khi tải; repo gated → cần token user lưu trong Cài đặt;
    - nhãn **"Chưa kiểm chứng"**: RAM/thời gian là ước lượng theo số tham số (cận trên), có "Chạy thử nhanh" (vài bước) trước
      khi train thật; mọi giới hạn ≤ 80% RAM trống (ADR-005 A1) vẫn áp dụng.
+   - MODEL-005 / `trial_run_id` (chạy thử nhanh) là **gợi ý tiết kiệm công, KHÔNG phải xác nhận model an toàn**; mọi run đều chạy
+     trong sandbox như nhau (yêu cầu security, 2026-10-14).
 3. **Model cần `trust_remote_code`: CHẶN** khi user tự thêm (user chọn). Chỉ model trong catalog (team kiểm + ghim hash từng
    file `.py`) mới được chạy remote code. Thông báo dễ hiểu: vì sao chặn, có thể đề nghị đưa vào catalog.
 4. **Dataset bất kỳ từ Hugging Face**: user dán repo id (+ config/split). App đọc schema/cột (không chạy loading script;
