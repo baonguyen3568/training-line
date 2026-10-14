@@ -2,17 +2,23 @@
 // E2E_TIER=mock (default): static build with the in-browser mock API.
 // E2E_TIER=app: real FastAPI + executor + FakeWorker (scripts/qa/e2e_app.py) serving a separate build.
 // Both serve a STATIC build (no HMR): other agents editing src/ in the shared tree cannot reload the page.
-// E2E_TIER=external: an app already running (the compose stack), E2E_BASE_URL = http://127.0.0.1:<port>; only
-// compose.e2e.ts runs (the other specs press Run, which there starts REAL jobs). No trace (the login token is in a
-// URL), no web server.
+// E2E_TIER=external: an app already running (the compose stack), E2E_BASE_URL = http://127.0.0.1:<port>, or the LAN
+// edge https://<E2E_LAN_IP>:<port> (ADR-019: the stack listens on the LAN IP only); only compose.e2e.ts runs (the other
+// specs press Run, which there starts REAL jobs). No trace (the login token is in a URL), no web server.
 import { defineConfig } from "@playwright/test";
+import { isPrivateIPv4, isSpkiHash } from "./lan";
 
 const PORT = Number(process.env.E2E_PORT ?? 4013); // project range 4000–4050 (D-8): dev servers 4010–4019
 const TIER = process.env.E2E_TIER ?? "mock";
 const EXTERNAL = TIER === "external";
 const BASE_URL = EXTERNAL ? (process.env.E2E_BASE_URL ?? "") : `http://127.0.0.1:${PORT}`;
-if (EXTERNAL && !/^http:\/\/127\.0\.0\.1:\d+$/.test(BASE_URL))
-  throw new Error("E2E_BASE_URL must be http://127.0.0.1:<port> (loopback only)");
+const LAN_IP = process.env.E2E_LAN_IP ?? "";
+const LAN_SPKI = process.env.E2E_LAN_SPKI ?? "";
+const LAN = EXTERNAL && isPrivateIPv4(LAN_IP) && BASE_URL.startsWith(`https://${LAN_IP}:`);
+if (LAN && !isSpkiHash(LAN_SPKI))
+  throw new Error("E2E_LAN_SPKI (the edge certificate's SPKI hash) is required");
+if (EXTERNAL && !LAN && !/^http:\/\/127\.0\.0\.1:\d+$/.test(BASE_URL))
+  throw new Error("E2E_BASE_URL must be http://127.0.0.1:<port> or https://<E2E_LAN_IP>:<port>");
 // never frontend/dist (served by the developer app); one per port, so two runs side by side never rebuild each
 // other's files mid-run (2026-10-13: a second run wiped the dist a x100 run was serving)
 const DIST = `../.cache/e2e-dist-${TIER}-${PORT}`;
@@ -42,8 +48,15 @@ export default defineConfig({
     headless: true,
     // chromiumSandbox: false — host has kernel.apparmor_restrict_unprivileged_userns=1; accepted by bao-security
     // (P003, 2026-10-12) with request allowlist + scrubbed env (see fixtures.ts and scripts/qa/e2e.sh).
-    launchOptions: { chromiumSandbox: false },
+    // LAN edge (ADR-019): its certificate chains to the install's own CA. The browser accepts exactly that key
+    // (SPKI pin, from the public server.crt); the Node side of page.request trusts ca.crt (NODE_EXTRA_CA_CERTS, e2e.sh).
+    // Any other certificate still fails. TLS details are also checked by scripts/qa/lan_gate.sh (bao-security).
+    launchOptions: {
+      chromiumSandbox: false,
+      args: LAN ? [`--ignore-certificate-errors-spki-list=${LAN_SPKI}`] : [],
+    },
     serviceWorkers: "block", // a service worker could fetch around context.route
+
     // only failed tests keep one; app-tier token is a per-run test token (e2e.sh). External: never (a real token).
     trace: EXTERNAL ? "off" : "retain-on-failure",
     video: "off",
@@ -52,13 +65,21 @@ export default defineConfig({
   // Editing is supported from 1280 px wide (P010): edit journeys run at the minimum and a wide size; below that
   // the app is view-only, so 1024 px only gets a smoke test tagged @narrow.
   projects: [
-    { name: "desktop-min", use: { viewport: { width: 1280, height: 720 } }, grepInvert: /@narrow/ },
+    {
+      name: "desktop-min",
+      use: { viewport: { width: 1280, height: 720 } },
+      grepInvert: /@narrow/,
+    },
     {
       name: "desktop-wide",
       use: { viewport: { width: 1920, height: 1080 } },
       grepInvert: /@narrow/,
     },
-    { name: "narrow-view", use: { viewport: { width: 1024, height: 768 } }, grep: /@narrow/ },
+    {
+      name: "narrow-view",
+      use: { viewport: { width: 1024, height: 768 } },
+      grep: /@narrow/,
+    },
   ],
   webServer: EXTERNAL
     ? undefined

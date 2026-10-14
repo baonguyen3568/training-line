@@ -38,15 +38,27 @@ export const test = base.extend<{ blockedRequests: string[] }>({
           return ws.close();
         },
       );
-      // App tier: bootstrap the session exactly like a user opening the printed URL (D13: ?token= -> cookie).
+      // Sign in like a user opening the printed link. App tier (local Host): GET /?token= -> cookie (D13). External
+      // (compose / LAN edge, ADR-019): the link is /#t=<token>; the login page POSTs it to /api/session, so wait until
+      // the session answers 200. The token must never reach a log or report: failures are thrown without the URL.
       const token = process.env.E2E_TOKEN;
       if (token) {
         const page = await context.newPage();
-        // The token must never reach a log or report: a failure here is rethrown without the URL.
-        const ok = await page
-          .goto(`/?token=${token}`)
+        const external = process.env.E2E_TIER === "external";
+        let ok = await page
+          .goto(external ? `/#t=${token}` : `/?token=${token}`)
           .then((r) => r !== null && r.status() < 400)
           .catch(() => false);
+        if (external) {
+          ok = false;
+          for (let i = 0; i < 20 && !ok; i++) {
+            const res = await page.request.get("/api/session", {
+              headers: { Accept: "application/json" },
+            });
+            ok = res.status() === 200;
+            if (!ok) await page.waitForTimeout(500);
+          }
+        }
         await page.close();
         if (!ok) throw new Error("login with E2E_TOKEN failed (URL withheld)");
       }

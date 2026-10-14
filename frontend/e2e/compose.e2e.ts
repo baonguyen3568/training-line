@@ -20,7 +20,10 @@ test("the running app answers with the expected build, signed in", async ({ page
   expect(health.dirty).toBe(false);
   const expected = process.env.E2E_EXPECT_COMMIT;
   if (expected) expect(health.commit ?? "").toMatch(new RegExp(`^${expected}`));
-  test.info().annotations.push({ type: "build", description: `commit ${health.commit}` });
+  test.info().annotations.push({
+    type: "build",
+    description: `commit ${health.commit}`,
+  });
 });
 
 test("the gallery lists the templates and opens one without running it", async ({ page }) => {
@@ -32,14 +35,81 @@ test("the gallery lists the templates and opens one without running it", async (
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
 });
 
+test("G-5: a catalog model downloads through the app (egress proxy), then is checked", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-wide", "one download is enough (runs once)");
+  test.setTimeout(45 * 60_000);
+  const session = await page.request.get("/api/session", {
+    headers: { Accept: "application/json" },
+  });
+  expect(session.status()).toBe(200);
+  const { csrf_token: csrf } = (await session.json()) as { csrf_token: string };
+  const origin = new URL(process.env.E2E_BASE_URL ?? "").origin; // the server checks Origin on writes
+  const headers = {
+    "x-vlm-csrf": csrf,
+    Origin: origin,
+    "Content-Type": "application/json",
+  };
+  const body = { kind: "model", catalog_id: "qwen3.5-0.8b" };
+  let started = await page.request.post("/api/downloads", {
+    data: body,
+    headers,
+  });
+  expect(started.status(), await started.text()).toBe(202);
+  let reply = (await started.json()) as {
+    download_id: string | null;
+    status?: string;
+    verified?: boolean;
+    needs_confirm?: boolean;
+  };
+  if (reply.needs_confirm) {
+    started = await page.request.post("/api/downloads", {
+      data: { ...body, confirm: true },
+      headers,
+    });
+    reply = (await started.json()) as typeof reply;
+  }
+  if (reply.status === "completed" && reply.download_id === null && reply.verified !== true) {
+    // already in the cache but never checked by the app: "Kiểm tra" re-sends with check
+    started = await page.request.post("/api/downloads", {
+      data: { ...body, check: true },
+      headers,
+    });
+    reply = (await started.json()) as typeof reply;
+  }
+  test.info().annotations.push({ type: "download", description: JSON.stringify(reply) });
+  if (reply.download_id === null) {
+    expect(reply.status).toBe("completed");
+    return;
+  }
+  const id = reply.download_id;
+  const state = async (): Promise<string> => {
+    const list = await page.request.get("/api/downloads", {
+      headers: { Accept: "application/json" },
+    });
+    const rows = (await list.json()) as {
+      download_id: string;
+      status: string;
+      error?: unknown;
+    }[];
+    const row = rows.find((r) => r.download_id === id);
+    return row ? `${row.status}${row.error ? ` ${JSON.stringify(row.error)}` : ""}` : "missing";
+  };
+  await expect
+    .poll(state, { intervals: [5_000], timeout: 44 * 60_000 })
+    .toMatch(/^(completed|failed|cancelled)/);
+  expect(await state()).toBe("completed");
+});
+
 test("a CPU job runs end to end through the real worker: pick a model, export it", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-wide", "one export is enough (runs once)");
   const dataRoot = process.env.E2E_DATA_ROOT;
   test.skip(!dataRoot, "set E2E_DATA_ROOT to check the export on disk");
-  // Needs Qwen3.5-0.8B in the stack's cache (G-5 download, or install.sh prefetch): otherwise the pick node fails
-  // NET-001, which this test then reports as the failure it is.
+  // Needs Qwen3.5-0.8B in the stack's cache: the G-5 test above downloads it (or install.sh prefetch); otherwise the
+  // pick node fails NET-001, which this test then reports as the failure it is.
   test.setTimeout(15 * 60_000);
   const dest = `outputs/e2e-compose/export-${Date.now()}`;
   const session = await page.request.get("/api/session", {
@@ -52,7 +122,12 @@ test("a CPU job runs end to end through the real worker: pick a model, export it
     schema_version: 1,
     name: "e2e-compose-export",
     nodes: [
-      { id: "m", type: "model.hf_pick", version: "1.0.0", params: { model: "qwen3.5-0.8b" } },
+      {
+        id: "m",
+        type: "model.hf_pick",
+        version: "1.0.0",
+        params: { model: "qwen3.5-0.8b" },
+      },
       { id: "x", type: "export.hf_dir", version: "1.0.0", params: { dest } },
     ],
     edges: [{ from: ["m", "model"], to: ["x", "model"] }],
@@ -60,7 +135,11 @@ test("a CPU job runs end to end through the real worker: pick a model, export it
   const origin = new URL(process.env.E2E_BASE_URL ?? "").origin; // the server checks Origin on writes
   const started = await page.request.post("/api/runs", {
     data: workflow,
-    headers: { "x-vlm-csrf": csrf, Origin: origin, "Content-Type": "application/json" },
+    headers: {
+      "x-vlm-csrf": csrf,
+      Origin: origin,
+      "Content-Type": "application/json",
+    },
   });
   expect(started.status(), await started.text()).toBe(202);
 
