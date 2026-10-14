@@ -133,3 +133,20 @@ native is enough to test the path). Depends on: research `families.yaml` + recip
 2. research: RAM upper bound formula per family (params_b × bytes + activations at the default pixel cap)?
 3. security: should a user-added dataset's images also go through the existing image decode limits (DATA-V
    max pixels) before any thumbnail is written? (proposed: yes, same limits.)
+
+## 8. API shapes (agreed with frontend 2026-10-14; async: a plan job may wait for the download slot or memory)
+
+- `POST /api/user-assets/models {repo, revision?}` → 202 `{resolve_id}`; `GET /api/user-assets/resolves/{id}` →
+  `{status: queued|running|done|failed, waiting_for?: download_slot|memory|swap, model?, error?: {code, params}}`.
+  `model` = `{id, name, repo, revision, family, architecture, params_b, size_gb, license: <id>|"unknown",
+  license_confirmed, gated, ram_gb_train, ram_source: "estimated", verified: false}`. A malformed repo id → 400 at once.
+- `POST /api/user-assets/models/{id}/confirm-license {accept: true}` → 200 `{model}`; `GET /api/user-assets/models`
+  → `{models: [...]}`; `DELETE /api/user-assets/models/{id}` removes the record only (files: cleanup).
+- `model.hf_pick` 1.1.0: `user_model: <id>` (default ""); its `option_meta` has `verified: false`.
+- `POST /api/user-assets/datasets/inspect {repo, revision?, config?, split?}` → 202 `{inspect_id}`;
+  `GET /api/user-assets/inspections/{id}` → `{status, error?, result?: {repo, revision, configs, splits, config, split,
+  format: parquet|json|imagefolder|webdataset, columns: [{name, kind: image|text|messages|other}], suggested: {image?,
+  question?, answer?, messages?}, samples: [{thumb_url?, question?, answer?, error?}], rows_estimate?}}`; thumbnails at
+  `/api/user-assets/inspections/{id}/thumbs/{n}.png` (relative URL). Sample text is untrusted: plain text only.
+- Unknown licence: SEC-005 `{name, repo, license: "unknown"}` at VALIDATE of an export step (check_support follows
+  the step's model lineage) and again at run time; no override.
