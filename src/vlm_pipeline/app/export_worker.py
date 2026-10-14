@@ -21,11 +21,12 @@ import secrets
 import shutil
 import stat
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from vlm_pipeline import i18n
-from vlm_pipeline.common.catalog import load_dataset_catalog
+from vlm_pipeline.common.catalog import LICENSE_UNKNOWN, load_dataset_catalog, normalize_license
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.secret_scan import scan_files, walk
 from vlm_pipeline.export import notices, portable
@@ -174,12 +175,20 @@ def _destination(worker: RealWorker, job: NodeJob, raw: str) -> Path:
     return dest
 
 
+def refuse_unclear_licences(components: Iterable[Any], node_id: str) -> None:
+    """ADR-021 A1 / H5d: a user model or HF dataset whose licence is unknown never leaves the app (SEC-006)."""
+    unclear = next((c for c in components if c.license == LICENSE_UNKNOWN), None)
+    if unclear is not None:
+        raise ExportLicenseUnknownError("a component has no known licence", params={
+            "node": node_id, "name": unclear.name, "repo": unclear.repo or ""})  # fmt: skip
+
+
 def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
     model = job.inputs["model"]
     entry = worker.base_of(model)
     src = worker.model_dir(model)
     unsupported = {"node": job.node_id, "model": entry.display_name}
-    if entry.tier == "user" and entry.license == "unknown":  # ADR-021 A1: trains, never leaves the app
+    if entry.tier == "user" and normalize_license(entry.license) == LICENSE_UNKNOWN:  # A1: trains, never exported
         raise ExportLicenseUnknownError("no licence named for this model", params={
             "node": job.node_id, "name": entry.display_name, "repo": entry.repo})  # fmt: skip
     if entry.remote_code != "none" or portable.remote_code_findings(src):
@@ -200,6 +209,7 @@ def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
         components, mods, gaps = notices.lineage(
             src, root=worker.root, catalog=worker.catalog, datasets=load_dataset_catalog(), base_ref=base_ref
         )
+        refuse_unclear_licences(components, job.node_id)
         components = notices.fill_notices(components, tool=i18n.t("app.name", "en"), date=time.strftime("%Y-%m-%d"))
         try:
             attribution = notices.write_notices(

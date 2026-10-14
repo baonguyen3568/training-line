@@ -156,7 +156,7 @@ class DownloadService:
         cap = (policy or {}).get("download", {}).get("max_gb") if isinstance(policy, dict) else None
         if isinstance(cap, int | float) and not isinstance(cap, bool) and planned > cap * GIB:
             raise DownloadQuotaError("over the admin download cap", params={
-                "size_gb": round(planned / GIB, 1), "quota_gb": round(float(cap), 1)})  # fmt: skip
+                "size_gb": round(planned / GIB, 1), "quota_gb": round(float(cap), 1), "reason": "quota"})  # fmt: skip
         disk = read_disk(self.root)
         shared = effective_profile(os.environ.get("VLM_PROFILE"), policy) == "shared_dev"
         reserve = max(50.0, 0.10 * disk.total_gb) if shared else 20.0

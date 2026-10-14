@@ -83,7 +83,7 @@ def test_over_the_cap_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(user_assets, "max_model_gb", lambda root: 1.0)
     with pytest.raises(user_assets.UserModelTooLargeError) as info:
         user_assets.finish_model(tmp_path, _stage(tmp_path / "run"), "o/x")
-    assert info.value.params == {"size_gb": 3.7, "quota_gb": 1.0}
+    assert info.value.params == {"size_gb": 3.7, "quota_gb": 1.0, "reason": "model_cap"}
 
 
 @pytest.mark.parametrize(
@@ -418,7 +418,7 @@ def test_the_admin_download_cap_bounds_the_setting(service: DownloadService, mon
     assert client.get("/api/user-assets/limits").json()["admin_cap_gb"] == 60.0
     refused = client.put("/api/user-assets/limits", json={"max_model_gb": 100})
     assert (refused.status_code, refused.json()["detail"]) == (422, {"code": "NET-004", "params": {
-        "size_gb": 100.0, "quota_gb": 60.0}})  # fmt: skip
+        "size_gb": 100.0, "quota_gb": 60.0, "reason": "quota"}})  # fmt: skip
     assert client.put("/api/user-assets/limits", json={"max_model_gb": 50}).status_code == 200
     user_assets.save_limits(service.root, user_assets.UserLimits(max_model_gb=500))  # saved before a stricter policy
     assert user_assets.max_model_gb(service.root) == 60.0

@@ -19,6 +19,8 @@ from typing import Any, ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from vlm_pipeline.app.user_assets import _card_text
+from vlm_pipeline.common.catalog import normalize_license
 from vlm_pipeline.common.download_rules import name_ok
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.runinfo import read_small_json
@@ -206,7 +208,8 @@ class UserDatasetRecord(BaseModel):
     split: str = Field(pattern=_NAME)
     format: Literal["parquet", "arrow", "jsonl", "json", "csv", "imagefolder", "webdataset"]
     files: tuple[_SplitFile, ...] = Field(min_length=1, max_length=2000)
-    license: str = Field(max_length=80)
+    license: str = Field(max_length=80)  # normalized (common.catalog.normalize_license)
+    license_card: str | None = Field(None, max_length=200)  # the card's own words, for the UI
     gated: bool
     columns: ColumnMap
     added_at: float
@@ -229,7 +232,8 @@ class UserDatasetRecord(BaseModel):
     def to_api(self) -> dict[str, object]:
         return {"id": self.id, "name": f"{self.repo.split('/', 1)[1]} ({self.config}/{self.split})",
                 "repo": self.repo, "revision": self.revision, "config": self.config, "split": self.split,
-                "format": self.format, "size_gb": round(self.size_bytes / (1 << 30), 2), "license": self.license,
+                "format": self.format, "size_gb": round(self.size_bytes / (1 << 30), 2),
+                "license": normalize_license(self.license), "license_card": self.license_card,
                 "license_confirmed": self.license_confirmed, "gated": self.gated, "columns": self.columns.roles(),
                 "rows": self.rows, "verified": False}  # fmt: skip
 
@@ -323,7 +327,8 @@ def from_inspection(run_dir: Path, repo: str, columns: ColumnMap, available: lis
     return UserDatasetRecord(
         id=user_dataset_id(repo, meta.sha, block.config, block.split), repo=repo, revision=meta.sha,
         config=block.config, split=block.split, format=block.format, files=files,
-        license=(meta.license or "unknown")[:80], gated=meta.gated, columns=columns, added_at=time.time(),
+        license=normalize_license(meta.license), license_card=_card_text(meta.license), gated=meta.gated,
+        columns=columns, added_at=time.time(),
     )  # fmt: skip
 
 

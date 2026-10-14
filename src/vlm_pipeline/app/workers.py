@@ -23,7 +23,15 @@ from vlm_pipeline.app.data_workers import run_dedupe, run_filter
 from vlm_pipeline.app.export_worker import run_export
 from vlm_pipeline.app.quantize_worker import run_quantize
 from vlm_pipeline.app.trial_worker import run_trial
-from vlm_pipeline.common.catalog import Catalog, CatalogEntry, load_catalog, load_dataset_catalog, model_entry
+from vlm_pipeline.common.catalog import (
+    LICENSE_UNKNOWN,
+    Catalog,
+    CatalogEntry,
+    load_catalog,
+    load_dataset_catalog,
+    model_entry,
+    normalize_license,
+)
 from vlm_pipeline.common.dataset_ref import DatasetRef, read_dataset_ref, write_dataset_ref
 from vlm_pipeline.common.errors import InsufficientMemoryError, VlmPipelineError
 from vlm_pipeline.common.heldout_data import HeldoutDataInTrainingError, is_heldout_folder
@@ -391,9 +399,9 @@ class RealWorker:
             params = {"name": record.to_api()["name"], "kind": "dataset", "catalog_id": record.id,
                       "size_gb": record.to_api()["size_gb"], "reason": "not_cached"}  # fmt: skip
             raise NotCachedError("user dataset not downloaded", params=params)
-        return self._folder_dataset(job, folder.resolve())
+        return self._folder_dataset(job, folder.resolve(), origins=(dataset_id,))  # its licence follows (H5d)
 
-    def _folder_dataset(self, job: NodeJob, folder: Path) -> NodeResult:
+    def _folder_dataset(self, job: NodeJob, folder: Path, origins: tuple[str, ...] = ()) -> NodeResult:
         """A folder of images + labels.jsonl -> checked, normalized records, the local dataset artifact."""
         from vlm_pipeline.common.local_records import write_records
         from vlm_pipeline.data.local_folder import scan_folder
@@ -414,7 +422,7 @@ class RealWorker:
         sha = write_records(records, scan.records)
         ref = DatasetRef(
             path=self.container_path(folder), split="all", records=self.container_path(records), records_sha256=sha,
-            seed=int(getattr(params, "seed", 0)),
+            seed=int(getattr(params, "seed", 0)), origins=origins,
         )  # fmt: skip
         return NodeResult(outputs={"dataset": self.dataset_artifact(job.run_dir / "dataset.json", ref)})
 
@@ -776,7 +784,7 @@ def _check_export(q: SupportQuery) -> None:
         raise ExportUnsupportedError(
             "model runs its own code", params={"node": q.node_id, "model": q.model.display_name}
         )
-    if q.model is not None and q.model.tier == "user" and q.model.license == "unknown":  # ADR-021 A1
+    if q.model is not None and q.model.tier == "user" and normalize_license(q.model.license) == LICENSE_UNKNOWN:
         raise ExportLicenseUnknownError(
             "no licence named for this model", params={"node": q.node_id, "name": q.model.display_name,
                                                        "repo": q.model.repo})  # fmt: skip

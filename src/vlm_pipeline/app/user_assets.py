@@ -21,7 +21,7 @@ from typing import ClassVar, Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from vlm_pipeline.common.catalog import USER_MODELS_REL, CatalogEntry
+from vlm_pipeline.common.catalog import USER_MODELS_REL, CatalogEntry, normalize_license
 from vlm_pipeline.common.download_rules import name_ok
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.paths import GIB
@@ -51,7 +51,7 @@ class UserModelTooLargeError(ValueError):
 
     def __init__(self, size_gb: float, cap_gb: float) -> None:
         super().__init__("over the user model cap")
-        self.params = {"size_gb": round(size_gb, 1), "quota_gb": round(cap_gb, 1)}
+        self.params = {"size_gb": round(size_gb, 1), "quota_gb": round(cap_gb, 1), "reason": "model_cap"}
 
 
 class UserModelRecord(BaseModel):
@@ -68,6 +68,7 @@ class UserModelRecord(BaseModel):
     # sha256 of <id>.train.yaml as rendered at add time: a recipe can name Python callables (_target_), so a template
     # edited on disk must never train (security H3); the record itself is validated on every read.
     template_sha256: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
+    license_card: str | None = Field(None, max_length=200)  # the card's own words (entry.license is normalized)
     trial_run_id: str | None = Field(None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
     @model_validator(mode="after")
@@ -83,7 +84,8 @@ class UserModelRecord(BaseModel):
         e = self.entry
         return {"id": e.id, "name": e.display_name, "repo": e.repo, "revision": e.revision, "family": self.family,
                 "architecture": self.architecture, "params_b": e.params_b, "size_gb": e.disk_gb,
-                "license": e.license, "license_confirmed": self.license_confirmed, "gated": e.gated,
+                "license": normalize_license(e.license), "license_card": self.license_card,
+                "license_confirmed": self.license_confirmed, "gated": e.gated,
                 "ram_gb_train": e.ram_gb_train, "ram_source": e.ram_source, "verified": False,
                 "trial_run_id": self.trial_run_id}  # fmt: skip
 
@@ -343,7 +345,15 @@ def finish_model(root: Path, run_dir: Path, repo: str) -> UserModelRecord:
         raise UserModelTooLargeError(size_gb, cap)
     entry = resolver.user_entry(repo=repo, revision=meta.sha, family=family, params_b=params_b, disk_gb=size_gb,
                                 license_id=meta.license or "unknown", gated=meta.gated)  # fmt: skip
-    return UserModelRecord(entry=entry, family=family.id, architecture=facts.architecture, added_at=time.time())
+    return UserModelRecord(entry=entry, family=family.id, architecture=facts.architecture, added_at=time.time(),
+                           license_card=_card_text(meta.license))  # fmt: skip
+
+
+def _card_text(value: object) -> str | None:
+    """The licence words of a card for the UI: plain text, control characters dropped, capped (untrusted)."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return re.sub(r"[\x00-\x1f\x7f]", "", value).strip()[:200] or None
 
 
 __all__ = [

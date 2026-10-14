@@ -72,7 +72,7 @@ def _publish(
         raise LocalDatasetInvalidError("no sample left", params=empty)
     sha = write_records(run_dir / "records.jsonl", kept)
     dataset = DatasetRef(path=src.path, split="all", records=worker.container_path(run_dir / "records.jsonl"),
-                         records_sha256=sha, seed=src.seed)  # fmt: skip
+                         records_sha256=sha, seed=src.seed, origins=src.origins)  # fmt: skip
     return NodeResult(outputs={"dataset": worker.dataset_artifact(run_dir / "dataset.json", dataset)})
 
 

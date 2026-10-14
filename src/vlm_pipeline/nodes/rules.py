@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from vlm_pipeline.common.catalog import load_dataset_catalog, model_entry, user_dataset_status
+from vlm_pipeline.common.catalog import (
+    LICENSE_UNKNOWN,
+    load_dataset_catalog,
+    model_entry,
+    normalize_license,
+    user_dataset_status,
+)
 from vlm_pipeline.common.heldout_data import is_heldout_folder
 from vlm_pipeline.common.local_cache import dataset_missing, model_missing
 from vlm_pipeline.data.local_folder import preview_folder
@@ -112,10 +118,13 @@ def export_needs_portable_model(view: GraphView) -> Iterator[Issue]:
 
 
 # Inputs whose data shapes the model (trained or calibrated on); standards treat hub eval_only data the same way.
-_SHAPING_PORTS = {
+_SHAPING_PORTS = {  # the data a node's output weights learn from (cleancode: GRPO / DPO / QAT joined, ADR-022)
     TRAIN_LORA_VLM.type_id: ("train_data", "val_data"),
     TRAIN_SFT_VLM.type_id: ("train_data", "val_data"),
+    "train.grpo_vlm": ("train_data", "val_data"),
+    "train.dpo_vlm": ("train_data", "val_data"),
     QUANTIZE_MODELOPT_PTQ.type_id: ("calib_data",),
+    "quantize.qat": ("train_data", "calib_data"),
 }
 _REFERENCE_ONLY_PORTS = frozenset({"heldout"})  # data.dedupe compares against it; it never reaches the output
 
@@ -231,11 +240,54 @@ def catalog_assets_on_this_machine(view: GraphView) -> Iterator[Issue]:
             yield Issue("NET-002", severity="warn", node_id=node_id, param=param, params=missing)
 
 
+def _training_data_of(view: GraphView, node_id: str) -> set[str]:
+    """Data nodes whose samples shaped the weights reaching ``node_id``.
+
+    Every shaping node up its model wires (Model / Adapter / Checkpoint inputs), then the data reaching their shaping
+    ports (``_data_origins``): a reference-only input (dedupe's ``heldout``) never counts.
+    """
+    data: set[str] = set()
+    seen: set[str] = set()
+    stack = [node_id]
+    while stack:
+        current = stack.pop()
+        if current in seen or current not in view.specs:
+            continue
+        seen.add(current)
+        for port in _SHAPING_PORTS.get(view.specs[current].type_id, ()):
+            data |= _data_origins(view, current, port)
+        for name, pspec in view.specs[current].inputs.items():
+            if not is_compatible(pspec.type, "Dataset"):  # the weights' own lineage, never a reference input
+                stack.extend(view.sources.get((current, name), ()))
+    return data
+
+
+def export_needs_known_dataset_licences(view: GraphView) -> Iterator[Issue]:
+    """SEC-006 (ADR-021 A1, H5d): an export whose weights saw a user-added HF dataset with no known licence.
+
+    The export worker re-checks the run lineage; this tells the user on the canvas. A dataset never added here is
+    DATA-013 (catalog_assets_on_this_machine), not this rule.
+    """
+    for node_id, spec in view.specs.items():
+        if spec.type_id != EXPORT_HF_DIR.type_id:
+            continue
+        for upstream in sorted(_training_data_of(view, node_id)):
+            params = view.params.get(upstream)
+            if view.specs[upstream].type_id != "data.hf_load" or not is_user_dataset(params):
+                continue
+            status = user_dataset_status(str(getattr(params, "user_dataset", "")))
+            if status is not None and normalize_license(status.get("license")) == LICENSE_UNKNOWN:  # fail closed
+                name, repo = str(status.get("name") or ""), str(status.get("repo") or "")
+                yield Issue("SEC-006", node_id=node_id, params={"node": node_id, "name": name, "repo": repo})
+                break
+
+
 RULES = (
     train_node_matches_model,
     export_needs_portable_model,
     heldout_data_never_trains,
     local_folder_preview,
     catalog_assets_on_this_machine,
+    export_needs_known_dataset_licences,
 )
 __all__ = ["RULES", "input_kinds", "model_input", "origin_model_id"]

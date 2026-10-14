@@ -28,6 +28,9 @@ class DatasetRef(BaseModel):
     records_sha256: str | None = None  # identity of the content: same records = same data, whatever the path
     val_fraction: float | None = None
     seed: int | None = None
+    # User-added HF datasets these records come from (ADR-021 H5d): local records, yet their licence must reach an
+    # export. Carried through split / filter / dedupe / caption; part of the identity.
+    origins: tuple[str, ...] = ()
 
     @property
     def hash(self) -> str:
@@ -38,8 +41,10 @@ class DatasetRef(BaseModel):
         """
         if self.records_sha256:  # local data: content, split rule and size
             rule = "" if self.split == "all" else f"#val={self.val_fraction}#seed={self.seed}"
-            return f"local:{self.records_sha256}#split={self.split}{rule}" + (
-                f"#limit={self.limit}" if self.limit else ""
+            return (
+                f"local:{self.records_sha256}#split={self.split}{rule}"
+                + (f"#limit={self.limit}" if self.limit else "")
+                + (f"#origin={'+'.join(sorted(self.origins))}" if self.origins else "")
             )
         origin = f"{self.repo}@{self.revision}" if self.repo else self.path
         return (

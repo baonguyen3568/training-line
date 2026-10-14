@@ -139,6 +139,26 @@ def public_dataset_ref(ref: str | None) -> str | None:
     return f"local data '{Path(ref.split('#', 1)[0]).name}' (path not recorded)"
 
 
+def _user_dataset_components(ref: str) -> list[Component]:
+    """The user-added HF datasets local records came from (``#origin=a+b``, H5d), each with its licence."""
+    from vlm_pipeline.common.catalog import user_dataset_status
+
+    tags = dict(part.split("=", 1) for part in ref.split("#")[1:] if "=" in part)
+    out = []
+    for dataset_id in filter(None, tags.get("origin", "").split("+")):
+        status = user_dataset_status(dataset_id) or {}
+        from vlm_pipeline.common.catalog import normalize_license
+
+        license_id = normalize_license(status.get("license"))  # "other", empty, missing: unknown (H5d)
+        out.append(Component(
+            role="training_data", name=str(status.get("name") or dataset_id),
+            repo=str(status["repo"]) if status.get("repo") else None,
+            revision=str(status["revision"]) if status.get("revision") else None,
+            license=license_id,  # not added here: no status, so unknown too (never presumed fine)
+        ))  # fmt: skip
+    return out
+
+
 def _dataset_component(ref: str, datasets: DatasetCatalog) -> Component:
     if ref.startswith("local:"):  # DatasetRef of a user folder: content hash only, no path (privacy)
         return Component(role="training_data", name=LOCAL_DATA_LABEL, repo=None, revision=None,
@@ -155,6 +175,18 @@ def _dataset_component(ref: str, datasets: DatasetCatalog) -> Component:
         license=entry.license, commercial=entry.commercial, attribution=entry.attribution,
         notices=entry.notices,
     )  # fmt: skip
+
+
+def _base_entry(catalog: Catalog, repo: str, rev: str | None) -> CatalogEntry | None:
+    """The base model's entry: the catalog's, else a user-added model's record (ADR-021), with its licence."""
+    entry = next((m for m in catalog.models if m.repo == repo and m.revision == rev), None)
+    if entry is None and rev and "/" in repo:
+        from vlm_pipeline.common.catalog import model_entry, normalize_license, user_model_id
+
+        entry = model_entry(user_model_id(repo, rev))
+        if entry is not None:  # a record saved before normalizing: judged by today's rule
+            entry = entry.model_copy(update={"license": normalize_license(entry.license)})
+    return entry
 
 
 def lineage(
@@ -189,7 +221,8 @@ def lineage(
             )
         )
         if manifest.dataset:
-            components.append(_dataset_component(manifest.dataset, datasets))
+            origins = _user_dataset_components(manifest.dataset) if manifest.dataset.startswith("local:") else []
+            components += origins or [_dataset_component(manifest.dataset, datasets)]
         if manifest.base_model:
             base = f"{manifest.base_model}@{manifest.base_model_revision or ''}"
         parent_id = manifest.parent_run_id
@@ -208,7 +241,7 @@ def lineage(
         gaps.append(f"{artifact}: no run manifest and no base model reference")
     else:
         repo, rev = _repo_rev(base)
-        entry = next((m for m in catalog.models if m.repo == repo and m.revision == rev), None)
+        entry = _base_entry(catalog, repo, rev)
         if rev is None:
             gaps.append(f"base model {repo}: revision not recorded")
         elif entry is None:

@@ -7,6 +7,7 @@ catalog edit cannot silently change a per-model default. Host-side (pydantic + p
 from __future__ import annotations
 
 import functools
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal, Self
@@ -225,7 +226,8 @@ def set_user_dataset_lookup(lookup: Callable[[str], dict[str, object] | None] | 
     """The app registers what it knows of a user dataset (``user--ds--…``); common never imports app.
 
     The lookup returns None when the dataset was never added here, else ``{"rows": int | None, "download": {...}
-    | None}``: ``download`` = the NET-002 params when its split is not downloaded and converted yet.
+    | None, "name", "repo", "revision", "license"}``: ``download`` = the NET-002 params when its split is not
+    downloaded and converted yet; ``license`` is "unknown" when its card names none (export refuses it, H5d).
     """
     global _user_dataset_status  # noqa: PLW0603 - one process-wide source, set once at app startup
     _user_dataset_status = lookup
@@ -253,6 +255,65 @@ def model_entry(model_id: str | None) -> CatalogEntry | None:
     if entry is None and model_id.startswith("user--") and _user_lookup is not None:
         entry = _user_lookup(model_id)
     return entry
+
+
+# Licence of a user-added asset (ADR-021 A1, security H5d): a model card's free text is only "known" when it is one
+# of these ids (lowercase); "other", empty, a custom tag or anything else is "unknown": downloadable and trainable,
+# never exported. The card's own text is kept beside it for the user to read (license_card).
+LICENSE_UNKNOWN = "unknown"
+_SPDX_KNOWN = frozenset({
+    "apache-2.0", "mit", "bsd-2-clause", "bsd-3-clause", "cc0-1.0", "cc-by-4.0", "cc-by-sa-4.0", "cc-by-nc-4.0",
+    "cc-by-nc-sa-4.0", "cc-by-nd-4.0", "mpl-2.0", "gpl-3.0", "lgpl-3.0", "agpl-3.0",
+})  # fmt: skip
+
+
+@functools.cache
+def _known_licences() -> frozenset[str]:
+    """The SPDX allowlist plus every licence configs/licenses/obligations.yaml describes (its obligations exist)."""
+    path = configs_root() / "configs" / "licenses" / "obligations.yaml"
+    try:
+        listed = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("licences", {})
+    except (OSError, yaml.YAMLError):
+        listed = {}
+    return _SPDX_KNOWN | {str(k).lower() for k in listed if str(k) != "mixed-unverified"}
+
+
+def normalize_license(card: object) -> str:
+    """The licence id a user-added asset is treated under: a known id, else ``unknown`` (fail closed)."""
+    text = card.strip().lower() if isinstance(card, str) else ""
+    return text if text in _known_licences() else LICENSE_UNKNOWN
+
+
+# Ids of user-added assets (ADR-021): here, below export and download alike (export lineage reads them too).
+_ID_PART = re.compile(r"[^a-z0-9.]+")
+
+
+def user_model_id(repo: str, revision: str) -> str:
+    """``user--<org>--<name>--<sha8>``: stable, lowercase, never a catalog id (those have no ``--``)."""
+    org, name = repo.split("/", 1)
+    parts = [_ID_PART.sub("-", p.lower()).strip("-") or "x" for p in (org, name)]
+    return f"user--{parts[0]}--{parts[1]}--{revision[:8]}"
+
+
+def _id_part(text: str) -> str:
+    """One id segment: lowercase [a-z0-9.-], never two dots in a row, no dot or dash at either end."""
+    part = re.sub(r"\.{2,}", ".", _ID_PART.sub("-", text.lower()))
+    return part.strip(".-") or "x"
+
+
+def user_dataset_id_prefix(repo: str, revision: str) -> str:
+    """``user--ds--<org>--<name>--<sha8>--``: what every user dataset id of that repo revision starts with."""
+    org, name = repo.split("/", 1)
+    return f"user--ds--{_id_part(org)}--{_id_part(name)}--{revision[:8]}--"
+
+
+def user_dataset_id(repo: str, revision: str, config: str, split: str) -> str:
+    """A user dataset (one config + split of a pinned repo revision): lowercase, path-safe, never a catalog id.
+
+    The segments lose information (``a_b`` and ``a-b`` both read ``a-b``); the commit's sha8 keeps two repos apart,
+    so never drop it from the id (cleancode review).
+    """
+    return f"{user_dataset_id_prefix(repo, revision)}{_id_part(config)}--{_id_part(split)}"
 
 
 def load_catalog_file(path: Path) -> Catalog:

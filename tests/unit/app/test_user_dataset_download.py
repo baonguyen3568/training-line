@@ -142,7 +142,9 @@ def test_add_confirm_download_convert_then_read_like_a_local_folder(
     record = user_datasets.load(service.root, DS_ID)
     assert record is not None
     assert record.rows == 3
-    assert user_dataset_status(DS_ID) == {"rows": 3, "download": None}
+    status = user_dataset_status(DS_ID)
+    assert status is not None
+    assert (status["rows"], status["download"], status["license"]) == (3, None, "cc-by-4.0")
     assert service.start("dataset", DS_ID)["status"] == "completed"  # converted: nothing to fetch again
 
     from vlm_pipeline.app.workers import RealWorker  # the node: the very checks of data.local_folder

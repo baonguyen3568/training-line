@@ -22,7 +22,15 @@ from typing import Any, ClassVar, Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from vlm_pipeline.common.catalog import REPO_ID_PATTERN, REVISION_PATTERN, CatalogEntry
+from vlm_pipeline.common.catalog import (
+    REPO_ID_PATTERN,
+    REVISION_PATTERN,
+    CatalogEntry,
+    normalize_license,
+    user_dataset_id,
+    user_dataset_id_prefix,
+    user_model_id,
+)
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.images import DEFAULT_TRAIN_IMAGE
 from vlm_pipeline.common.paths import configs_root
@@ -46,7 +54,6 @@ CONFIG_FILES = (
 )
 _CODE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9._-]+--[A-Za-z0-9_.]+$")  # "org/repo--module.Class"
 _UNSAFE_NAME = re.compile(r"[^A-Za-z0-9_.-]")
-_ID_PART = re.compile(r"[^a-z0-9.]+")
 _PYTHON_SUFFIXES = (".py", ".pyc", ".pyo", ".pyw")  # any file Python can load, any case (security H1)
 _DTYPE_BYTES = {"bfloat16": 2, "float16": 2, "float32": 4}
 
@@ -240,34 +247,6 @@ def params_b_from_index(index: object, torch_dtype: str) -> float | None:
     return round(total / _DTYPE_BYTES.get(torch_dtype, 2) / 1e9, 2)
 
 
-def user_model_id(repo: str, revision: str) -> str:
-    """``user--<org>--<name>--<sha8>``: stable, lowercase, never a catalog id (those have no ``--``)."""
-    org, name = repo.split("/", 1)
-    parts = [_ID_PART.sub("-", p.lower()).strip("-") or "x" for p in (org, name)]
-    return f"user--{parts[0]}--{parts[1]}--{revision[:8]}"
-
-
-def _id_part(text: str) -> str:
-    """One id segment: lowercase [a-z0-9.-], never two dots in a row, no dot or dash at either end."""
-    part = re.sub(r"\.{2,}", ".", _ID_PART.sub("-", text.lower()))
-    return part.strip(".-") or "x"
-
-
-def user_dataset_id_prefix(repo: str, revision: str) -> str:
-    """``user--ds--<org>--<name>--<sha8>--``: what every user dataset id of that repo revision starts with."""
-    org, name = repo.split("/", 1)
-    return f"user--ds--{_id_part(org)}--{_id_part(name)}--{revision[:8]}--"
-
-
-def user_dataset_id(repo: str, revision: str, config: str, split: str) -> str:
-    """A user dataset (one config + split of a pinned repo revision): lowercase, path-safe, never a catalog id.
-
-    The segments lose information (``a_b`` and ``a-b`` both read ``a-b``); the commit's sha8 keeps two repos apart,
-    so never drop it from the id (cleancode review).
-    """
-    return f"{user_dataset_id_prefix(repo, revision)}{_id_part(config)}--{_id_part(split)}"
-
-
 def ram_upper_bound(family: Family, params_b: float) -> float:
     """The family's RAM bound from research (LoRA bf16, bs 1, pixel cap); +20 % past the sizes it was fitted on."""
     ram = family.ram_gb_train
@@ -311,7 +290,7 @@ def user_entry(
     return CatalogEntry(
         id=user_model_id(repo, revision), repo=repo, revision=revision, display_name=repo.split("/", 1)[1],
         vendor="user", tier="user", gated=gated, remote_code="none", auto_class=family.auto_class,
-        license=clean_name(license_id), commercial="conditional", attribution="", security="unreviewed",
+        license=normalize_license(license_id), commercial="conditional", attribution="", security="unreviewed",
         params_b=params_b, disk_gb=max(0.01, math.ceil(disk_gb * 100) / 100), train_node=family.train_node,
         ram_gb_train=ram_upper_bound(family, params_b), ram_source="estimated", sft_trainable_pct_min=0,
         sft_trainable_pct_max=0, attn=family.attn, loss=family.loss, freeze_vision_tower=family.freeze_vision_tower,

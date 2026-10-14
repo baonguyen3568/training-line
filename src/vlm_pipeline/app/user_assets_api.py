@@ -81,7 +81,8 @@ def _dataset_status(root: Path) -> Any:
         api = record.to_api()
         download = None if ready else {"name": api["name"], "kind": "dataset", "catalog_id": record.id,
                                        "size_gb": api["size_gb"], "reason": "not_cached"}  # fmt: skip
-        return {"rows": record.rows if ready else None, "download": download}
+        return {"rows": record.rows if ready else None, "download": download, "name": api["name"],
+                "repo": record.repo, "revision": record.revision, "license": record.license}  # fmt: skip
 
     return status
 
@@ -151,7 +152,7 @@ def register_user_asset_routes(app: FastAPI) -> None:
     def put_limits(body: user_assets.UserLimits) -> dict[str, Any]:
         cap = user_assets.admin_cap_gb()
         if cap is not None and body.max_model_gb > cap:  # the admin policy wins: Settings only tighten
-            params = {"size_gb": round(body.max_model_gb, 1), "quota_gb": round(cap, 1)}
+            params = {"size_gb": round(body.max_model_gb, 1), "quota_gb": round(cap, 1), "reason": "quota"}
             raise HTTPException(status_code=422, detail={"code": "NET-004", "params": params})
         user_assets.save_limits(root, body)
         return body.model_dump()
