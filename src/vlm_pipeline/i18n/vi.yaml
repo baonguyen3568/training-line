@@ -1378,6 +1378,12 @@ param_unsupported:
   default: chưa hỗ trợ
   worker_v1: Tuỳ chọn này đang được làm, app chưa chạy được. Hãy để giá trị khác.
 settings:
+  section_about: Về app
+  about:
+    version: Phiên bản {version} ({commit})
+    copy: Sao chép thông tin phiên bản
+    copied: Đã chép thông tin phiên bản.
+  language_reload_confirm: Đổi ngôn ngữ sẽ tải lại trang. Workflow có thay đổi chưa lưu; hãy lưu trước rồi đổi.
   no_password_manager: Nếu trình duyệt hỏi có lưu mật khẩu không, hãy chọn "Không bao giờ". Token chỉ nên lưu trong app.
   policy_warning:
     APPROVAL_OFF_SHARED: "Máy này dùng chung nhưng không cần duyệt khi xoá nhiều: ai dùng app trên máy cũng xoá được lượng lớn dữ liệu mà không cần quản trị viên đồng ý."
