@@ -2,7 +2,7 @@
 // Never presses Run on a template (that would start real GPU jobs): it checks the session, the build commit, the
 // gallery, and one CPU-only job through the real worker path (model.hf_pick -> export.hf_dir), whose output is
 // checked on disk (E2E_DATA_ROOT) the way a user would receive it.
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, tr } from "./fixtures";
 
@@ -142,34 +142,49 @@ test("a CPU job runs end to end through the real worker: pick a model, export it
     },
   });
   expect(started.status(), await started.text()).toBe(202);
+  const { graph_run_id: runId } = (await started.json()) as { graph_run_id: string };
 
-  // Status of the export node from its run.json (node runs live in outputs/graph/runs/<node>-<key>[-aN]): fail fast
-  // with the error code when the node fails, and check the folder only once the node says completed.
-  const graphRuns = join(dataRoot as string, "outputs", "graph", "runs");
-  const since = Date.now() - 5_000;
-  // Node run dirs written since the POST: "m-" (pick) and "x-" (export). A failed pick skips the export, so any
-  // failed node ends the wait at once.
-  const nodeStatus = (prefix: string): { status: string; error_code?: string | null } | null => {
-    if (!existsSync(graphRuns)) return null;
-    const dirs = readdirSync(graphRuns)
-      .filter((d) => d.startsWith(prefix) && statSync(join(graphRuns, d)).mtimeMs >= since)
-      .filter((d) => existsSync(join(graphRuns, d, "run.json")))
-      .sort((a, b) => statSync(join(graphRuns, b)).mtimeMs - statSync(join(graphRuns, a)).mtimeMs);
-    return dirs.length
-      ? JSON.parse(readFileSync(join(graphRuns, dirs[0], "run.json"), "utf-8"))
-      : null;
-  };
-  const ended = (): string => {
-    const pick = nodeStatus("m-");
-    if (pick && pick.status !== "completed" && pick.status !== "running")
-      return `pick ${pick.status} (${pick.error_code ?? "no code"})`;
-    const exp = nodeStatus("x-");
-    if (exp && exp.status !== "running")
-      return `export ${exp.status} (${exp.error_code ?? "no code"})`;
-    return "pending";
-  };
-  await expect.poll(ended, { intervals: [3_000], timeout: 14 * 60_000 }).not.toBe("pending");
-  expect(ended()).toBe("export completed (no code)");
+  // Node statuses from the graph run's own events (the API the canvas uses), not from run.json files: a host node
+  // re-run in the same run dir keeps an old run.json status while its mtime moves (backend, E2E @e75f1b9).
+  // Socket auth like the app: cookie + Origin at the handshake, then {"type": "auth", csrf_token} first.
+  await page.goto("/");
+  const final = await page.evaluate(
+    ({ id, token }) =>
+      new Promise<Record<string, string>>((resolve, reject) => {
+        const nodes: Record<string, string> = {};
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        const ws = new WebSocket(
+          `${proto}//${location.host}/api/runs/${encodeURIComponent(id)}/events`,
+        );
+        ws.onopen = () => ws.send(JSON.stringify({ type: "auth", csrf_token: token }));
+        ws.onmessage = (msg) => {
+          const ev = JSON.parse(String(msg.data)) as {
+            type: string;
+            node_id?: string;
+            status?: string;
+            error?: { code?: string };
+          };
+          if (ev.type === "node_status" && ev.node_id)
+            nodes[ev.node_id] = `${ev.status}${ev.error?.code ? ` (${ev.error.code})` : ""}`;
+          if (ev.type === "run_not_found") reject(new Error("run_not_found"));
+          if (ev.type === "run_status" && ev.status !== "running") {
+            nodes.run = String(ev.status);
+            ws.close();
+            resolve(nodes);
+          }
+        };
+        ws.onclose = (e) => {
+          if (!("run" in nodes)) reject(new Error(`socket closed ${e.code} before the run ended`));
+        };
+      }),
+    { id: runId, token: csrf },
+  );
+  test.info().annotations.push({ type: "nodes", description: JSON.stringify(final) });
+  expect(final).toEqual({
+    m: expect.stringMatching(/^(completed|cached)$/),
+    x: "completed",
+    run: "completed",
+  });
   const folder = join(dataRoot as string, dest);
   const files = readdirSync(folder);
   expect(files).toContain("config.json");
