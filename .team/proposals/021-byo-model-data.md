@@ -151,5 +151,14 @@ native is enough to test the path). Depends on: research `families.yaml` + recip
   format: parquet|json|imagefolder|webdataset, columns: [{name, kind: image|text|messages|other}], suggested: {image?,
   question?, answer?, messages?}, samples: [{thumb_url?, question?, answer?, error?}], rows_estimate?}}`; thumbnails at
   `/api/user-assets/inspections/{id}/thumbs/{n}.png` (relative URL). Sample text is untrusted: plain text only.
+  The result also has `default_question` (the trainer's `DEFAULT_PROMPT`, "Describe this image."; 91ac5b5).
+- **Shared question (design 2026-10-14, before 1.0):** `POST /api/user-assets/datasets {inspect_id, columns: {image,
+  question? , answer? | messages, prompt?}}`. `columns.prompt` is TEXT, not a column: the question a sample is asked
+  when it has none (no question column, an empty cell, a conversation without a user turn); a row's own question
+  always wins, so it may go with a question column. ≤ 2000 characters (more → 400 `CFG-005 {param: prompt, rule:
+  range}`); control characters dropped and trimmed; blank or absent = `DEFAULT_PROMPT` (no error). The UI pre-fills
+  the inspection's `default_question`. The record's `{dataset}` returns `prompt` (null = default). The convert job
+  writes it into labels.jsonl, so another prompt (or mapping) drops the converted folder and the next download
+  converts again (a new dataset hash for the cache).
 - Unknown licence: SEC-005 `{name, repo, license: "unknown"}` at VALIDATE of an export step (check_support follows
   the step's model lineage) and again at run time; no override.
