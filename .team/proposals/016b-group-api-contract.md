@@ -23,7 +23,7 @@ mind on the server needs no frontend change.
 | `cacheable` / `runner` | display only (a group never runs itself): cacheable = all inner cacheable; runner = "container" if any inner container step |
 | `permissions` | union of the inner steps (same shape as nodes) |
 | `origin` | `{kind: "first_party", trust_min}`: lowest trust of the inner steps; a group never raises trust |
-| `available`, `unavailable_reason` | false + the first blocked inner step's reason (with `inner_type`) when any inner step has no worker |
+| `available`, `unavailable_reason` | false + the first blocked inner step's reason (with `inner_type`) when any inner step has no worker ; it reflects worker support only, NOT param/model refusals of check_support (e.g. GRPO single-GPU): those come from validate, so `available: true` does not promise a clean run |
 | `policy_block` | the first blocked inner step's, else null |
 | `body` | `{nodes, edges, inputs, outputs, params}`: exactly the GroupDefinition body, for the read-only inside view (first-party groups are always read-only) |
 
