@@ -19,17 +19,20 @@ Trang này chỉ ghi việc đã có trong bảng công việc của dự án. K
 - **Chế độ Đơn giản và Nâng cao.**
 - **Bảng Dung lượng:** xem mỗi lần chạy chiếm bao nhiêu chỗ, mục nào xoá được và vì sao.
 - **Mẫu Đọc hoá đơn → JSON** chạy thật trên DGX Spark, từ dữ liệu mẫu tới model đã dạy.
+- **Mẫu Nén model & đo lại điểm** chạy thật: nén FP8 rồi đo lại điểm cùng điều kiện với bản gốc.
+- **Chạy thử và xuất model:** hỏi thử model ngay trong app, xuất model ra thư mục định dạng Hugging Face kèm giấy phép cần thiết.
+- **Bước xử lý dữ liệu:** lọc, bỏ trùng, trộn nhiều bộ dữ liệu, tạo mô tả ảnh bằng model.
+- **Tuỳ chọn engine trong chế độ Nâng cao**, được kiểm tra trước khi chạy.
+- **Nút Sửa nhanh** trên thẻ lỗi, **Đặt lại bước** để chạy lại một bước từ đầu, và nút **Gửi báo cáo lỗi**.
+- **Cài đặt bằng một lệnh** (`scripts/install.sh`, chạy bằng Docker Compose) trên máy ARM64. <Hint title="Đã thử trên máy nào">Bản ARM64 được thử trên DGX Spark. Bản x86-64 build được nhưng chưa được thử với GPU thật; trang này sẽ ghi rõ khi đã thử.</Hint>
 
 ## Đang làm
 
-- **Mọi bước đều chạy thật:** nén model, đo điểm, chạy thử và xuất model đã chạy được từng bước riêng, đang được ghép vào các mẫu.
+- **Tải model và dữ liệu ngay trong app**, có xem giấy phép trước khi tải.
 - **Bung bước lớn thành các bước nhỏ** bên trong, cho người cần chỉnh sâu.
-- **Thêm bước xử lý dữ liệu:** lọc, bỏ trùng, đổi kích thước ảnh, đổi định dạng, trộn nhiều bộ dữ liệu, tạo chú thích ảnh bằng model.
 - **Thêm cách dạy model:** QLoRA, DPO, GRPO. <Hint title="Các cách dạy này khác gì nhau">QLoRA giống LoRA nhưng nén model gốc để tốn ít bộ nhớ hơn. DPO và GRPO dạy model chọn câu trả lời tốt hơn dựa trên so sánh hoặc chấm điểm, thay vì chỉ học theo đáp án mẫu.</Hint>
 - **Cách chấm điểm cho DPO và GRPO:** bản này có sẵn các cách chấm phổ biến: đúng đáp án, đúng định dạng, đúng mẫu câu, khung đánh dấu trên ảnh khớp đáp án, JSON hợp lệ. <Hint title="Vì sao chưa tự viết cách chấm được">Cách chấm tự viết là mã chạy trên máy của bạn. Muốn chạy an toàn, mã đó cần một vùng cách ly riêng: không có mạng, không đọc được dữ liệu khác, bị giới hạn thời gian và bộ nhớ. Phần này sẽ có ở bản sau.</Hint>
-- **Thư viện pipeline tham chiếu:** dựng lại các pipeline đã công bố của NVIDIA, Qwen, Hugging Face và cộng đồng bằng chính các bước trong app, có ghi nguồn và giấy phép.
-- **Nút Sửa nhanh** ngay trên thẻ lỗi, và **Đặt lại bước** để chạy lại một bước từ đầu.
-- **Cài đặt bằng Docker Compose** trên máy ARM64 và x86-64. <Hint title="Đã thử trên máy nào">Bản ARM64 được thử trên DGX Spark. Bản x86-64 build được nhưng chưa được thử với GPU thật; trang này sẽ ghi rõ khi đã thử.</Hint>
+- **Thư viện pipeline tham chiếu:** dựng lại thêm các pipeline đã công bố của NVIDIA, Qwen, Hugging Face và cộng đồng bằng chính các bước trong app, có ghi nguồn và giấy phép.
 
 ## Sau đó
 

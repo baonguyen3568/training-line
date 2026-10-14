@@ -31,17 +31,27 @@ Mọi ước lượng đều ghi rõ nguồn: đã đo trên máy, tính theo c�
 
 Không có stack trace. Mỗi lỗi có một mã, kèm câu nói chuyện gì đã xảy ra và bạn có thể làm gì tiếp. Ví dụ: máy đang bận nên không đủ bộ nhớ thì app nói rõ đó không phải lỗi của bạn, và cho xếp hàng để tự chạy khi máy rảnh.
 
+Nhiều lỗi có nút **Sửa nhanh**: bấm là app đổi đúng thiết lập cần đổi, và bạn hoàn tác được bằng Ctrl+Z. Lỗi do chính app thì có nút **Gửi báo cáo lỗi**: app chép mã lỗi và phiên bản để bạn dán vào trang báo lỗi, không tự gửi gì. <Hint title="Báo cáo lỗi chép những gì">Chỉ chép mã lỗi, tên lỗi, phiên bản app, tên GPU và một mã tham chiếu ngắn. Không chép nhật ký, đường dẫn thư mục, token hay dữ liệu của bạn, và bạn xem trước toàn bộ nội dung.</Hint>
+
 ## Chỉ chạy lại phần đã thay đổi
 
 App nhớ kết quả của từng bước. Khi bạn chỉ đổi bước cuối, các bước trước không thay đổi sẽ dùng lại kết quả cũ thay vì chạy lại từ đầu. <Hint title="Khi nào bước bị chạy lại">Một bước chạy lại khi đầu vào hoặc thiết lập của nó thay đổi, hoặc khi kết quả đã lưu bị hỏng. Trường hợp kết quả hỏng, app báo rõ trước khi chạy lại.</Hint>
 
 ## Đơn giản và Nâng cao
 
-Chế độ Đơn giản là mặc định: mỗi bước chỉ hiện vài thiết lập quan trọng, có sẵn mức chọn như Chậm, Vừa, Nhanh. Chế độ Nâng cao hiện thêm tham số chi tiết cho người cần chỉnh sâu.
+Chế độ Đơn giản là mặc định: mỗi bước chỉ hiện vài thiết lập quan trọng, có sẵn mức chọn như Chậm, Vừa, Nhanh. Chế độ Nâng cao hiện thêm tham số chi tiết, kể cả tuỳ chọn gốc của engine dạy model, theo đúng tên của chúng. App vẫn kiểm tra từng giá trị trước khi chạy.
+
+## Xử lý dữ liệu trước khi dạy
+
+Thư viện có các bước lọc ảnh quá nhỏ hay hỏng, bỏ mẫu trùng (kể cả mẫu trùng với dữ liệu kiểm tra), trộn nhiều bộ dữ liệu, và tạo mô tả ảnh bằng một model. <Hint title="Vì sao phải bỏ mẫu trùng với dữ liệu kiểm tra">Nếu ảnh dùng để dạy cũng nằm trong dữ liệu kiểm tra, model được chấm trên chính ảnh nó đã học và điểm sẽ cao hơn thực tế.</Hint>
+
+## Chạy thử và xuất model
+
+Sau khi dạy, bạn hỏi thử model ngay trong app. Khi hài lòng, xuất model ra một thư mục theo định dạng Hugging Face, kèm văn bản giấy phép cần thiết, để dùng ở máy khác.
 
 ## Quản lý dung lượng
 
-Bảng Dung lượng cho biết mỗi lần chạy đang chiếm bao nhiêu chỗ trên ổ đĩa, mục nào được giữ lại và vì sao, mục nào xoá được. Xoá một model đã train phải gõ đúng tên để xác nhận.
+Bảng Dung lượng cho biết mỗi lần chạy đang chiếm bao nhiêu chỗ trên ổ đĩa, mục nào được giữ lại và vì sao, mục nào xoá được. Xoá một model đã train phải gõ đúng tên để xác nhận. Nút **Đặt lại bước** xoá mọi lần chạy của một bước để chạy lại từ đầu.
 
 ## Tiếng Việt và tiếng Anh
 
@@ -51,8 +61,7 @@ Giao diện mặc định là tiếng Việt có dấu đầy đủ, và chuyể
 
 Các phần sau đang được làm. Trang này sẽ cập nhật khi chúng chạy được:
 
-- Nén model và đo tốc độ, độ chính xác sau khi nén.
-- Xuất model đã train ra thư mục để dùng ở máy khác.
-- Bung một bước lớn thành các bước nhỏ bên trong, và thư viện pipeline tham chiếu từ các dự án lớn.
+- Tải model và dữ liệu ngay trong app, có xem giấy phép trước khi tải.
+- Bung một bước lớn thành các bước nhỏ bên trong.
+- Dạy model bằng QLoRA, DPO và GRPO.
 - Cài node do bên thứ ba viết, chạy trong vùng cách ly và có khai báo quyền.
-- Nút sửa nhanh ngay trên thẻ lỗi.
