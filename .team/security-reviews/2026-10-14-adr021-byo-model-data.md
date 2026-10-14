@@ -79,3 +79,27 @@ Refuse with a clear catalog error ("this model needs its own code; only reviewed
 2. Default size cap for a user-added model (separate from the global quota), e.g. 40 GB unless the user raises it in
    Settings?
 3. Datasets as tar/zip (webdataset) from any repo: keep out of 1.0 (my default)?
+
+## 10. Archives (WebDataset tar/zip), user decision A1 (2026-10-14): thresholds
+Principle: **do not extract when you can stream.** WebDataset shards are read sequentially; the conversion job
+reads each member, applies the rules below and writes OUR records (+ images re-encoded by `common.image_rules`) into
+its run dir. Nothing from the archive is written under its own name. If a real extraction is ever needed, the same
+rules apply and every file is created through a dir fd with `O_CREAT|O_EXCL|O_NOFOLLOW` in a fresh dir.
+Where: a job with `--network none`, archive mounted read-only, rw = its run dir only, swap-exempt CPU job
+(≤ 4 GB, `--memory-swap = --memory`, `--pids-limit`), wall-clock timeout.
+
+| Rule | Threshold / behaviour |
+|---|---|
+| Container formats | `.tar` (preferred), `.tar.gz`/`.tgz`, `.zip` (stored or deflate). Anything else (7z, rar, xz, zstd, bz2, nested archives) → refuse. An archive inside an archive is never opened (skipped, counted). |
+| Member types | Regular files only (tar REGTYPE/AREGTYPE; zip entries whose mode is not S_IFLNK/S_IFCHR/S_IFBLK/S_IFIFO). Directories are ignored. Symlink, hardlink, device, FIFO, GNU sparse, tar "contiguous" → **refuse the whole shard**. |
+| Names | Relative POSIX only: no leading `/`, no `..` component, no `\`, no drive letter (`C:`), no NUL/control chars, each component ≤ 255 bytes, full path ≤ 512; NFC-normalised; duplicates (also case-insensitive after NFC) in one shard → refuse. Tar PAX/GNU long-name headers are fine; the resolved name is what is checked. |
+| Extensions kept | Images `.jpg .jpeg .png .webp`; text/labels `.txt .json .jsonl .cls .caption .text`. Any other extension is skipped (counted in the report), never written. |
+| Per member | ≤ 20 MiB image (same as uploads), ≤ 16 MiB json/jsonl, ≤ 1 MiB other text. Images must open under `image_rules` (40 MP, bomb = error) or the sample is dropped. |
+| Per shard | ≤ 200 000 members, uncompressed ≤ 8 GiB. |
+| Whole dataset | ≤ 2 000 000 samples; uncompressed total ≤ the download budget × 3 and ≤ quota/free-disk rules of G-5 (checked before writing, re-checked while streaming). |
+| Compression ratio | zip: per member `file_size / compress_size` ≤ 100, archive total ≤ 20; gzip tar: bytes out / bytes in ≤ 20, tracked while reading, abort at the limit (bomb). |
+| Zip specifics | Reject encrypted entries, multi-disk, and archives whose central directory disagrees with local headers (sizes/names) or that overlap (zip-in-zip "quines"). Use `zipfile` only through the per-member checks, never `extractall`. |
+| Errors | Any refusal → the shard is rejected with a reason code, nothing of that shard is kept; the report lists shard + reason, never file contents. |
+
+Tests the PR must carry: `../x`, `/abs`, `a\b`, symlink, hardlink, device, duplicate names, case-only duplicate, a
+42.zip-style ratio bomb, a gzip bomb, a nested archive, an unknown extension, an over-size image, an encrypted zip.
