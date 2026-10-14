@@ -1,0 +1,231 @@
+"""Models the user added from Hugging Face (ADR-021, P021 H2): the record store and the host side of a resolve.
+
+A record holds the ``CatalogEntry`` the resolver built (tier user, security unreviewed), the licence confirmation and
+the quick-trial run id. Records live under the data root (``.cache/user_assets/models/<id>.json``), never in
+``configs/``: nobody reviews them, so every read validates them again and a bad file reads as "not added" (fail
+closed). Writes are atomic (temp file + rename in the same directory).
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import re
+import tempfile
+import time
+from pathlib import Path
+from typing import Literal, Self
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
+from vlm_pipeline.common.catalog import CatalogEntry
+from vlm_pipeline.common.download_rules import name_ok
+from vlm_pipeline.common.paths import GIB
+from vlm_pipeline.common.runinfo import read_small_json
+from vlm_pipeline.download import resolver
+from vlm_pipeline.download.hub import INDEX_NAME, meta_caps
+
+logger = logging.getLogger(__name__)
+
+STORE_REL = Path(".cache") / "user_assets" / "models"
+RECORD_MAX = 64 * 1024
+RESOLVE_MAX = 4 << 20  # resolve.json: up to 2 000 file names
+USER_ID = re.compile(r"^user--[a-z0-9.-]{1,200}$")
+DEFAULT_MAX_MODEL_GB = 40.0  # ADR-021 A1: per user-added model; Settings raises it (H5c)
+
+
+class UserModelTooLargeError(ValueError):
+    """Over the per-model cap (raised by the resolve finish; the download service maps it to NET-004)."""
+
+    def __init__(self, size_gb: float, cap_gb: float) -> None:
+        super().__init__("over the user model cap")
+        self.params = {"size_gb": round(size_gb, 1), "quota_gb": round(cap_gb, 1)}
+
+
+class UserModelRecord(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: Literal[1] = 1
+    entry: CatalogEntry
+    family: str = Field(pattern=r"^[a-z0-9_]+$")
+    architecture: str = Field(max_length=resolver.MAX_NAME)
+    added_at: float
+    license_confirmed: bool = False
+    license_confirmed_at: float | None = None
+    trial_run_id: str | None = Field(None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+    @model_validator(mode="after")
+    def _a_user_entry(self) -> Self:
+        e = self.entry
+        if (e.tier, e.security, e.remote_code, e.ram_source) != ("user", "unreviewed", "none", "estimated"):
+            raise ValueError("not a user-added entry")
+        if e.id != resolver.user_model_id(e.repo, e.revision):
+            raise ValueError("id does not match repo + revision")
+        return self
+
+    def to_api(self) -> dict[str, object]:
+        e = self.entry
+        return {"id": e.id, "name": e.display_name, "repo": e.repo, "revision": e.revision, "family": self.family,
+                "architecture": self.architecture, "params_b": e.params_b, "size_gb": e.disk_gb,
+                "license": e.license, "license_confirmed": self.license_confirmed, "gated": e.gated,
+                "ram_gb_train": e.ram_gb_train, "ram_source": e.ram_source, "verified": False,
+                "trial_run_id": self.trial_run_id}  # fmt: skip
+
+
+# --------------------------------------------------------------------------------------------- store
+def _store(root: Path) -> Path:
+    return root / STORE_REL
+
+
+def save(root: Path, record: UserModelRecord) -> None:
+    folder = _store(root)
+    folder.mkdir(parents=True, exist_ok=True)
+    if any(p.is_symlink() for p in (folder.parent, folder)):  # never write through a link out of the data root
+        raise OSError("the user asset store must not be a symlink")
+    fd, tmp = tempfile.mkstemp(dir=folder, prefix=".tmp-", suffix=".json")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(record.model_dump_json(indent=1))
+        Path(tmp).replace(folder / f"{record.entry.id}.json")
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def load(root: Path, model_id: str) -> UserModelRecord | None:
+    """The record, or None when absent or not valid (a hand-edited file never becomes a model)."""
+    if not USER_ID.fullmatch(model_id):
+        return None
+    try:
+        return UserModelRecord.model_validate(read_small_json(_store(root) / f"{model_id}.json", RECORD_MAX))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError, ValidationError):
+        logger.warning("user model record %s is not valid: ignored", model_id)
+        return None
+
+
+def list_all(root: Path) -> list[UserModelRecord]:
+    folder = _store(root)
+    names = sorted(p.stem for p in folder.glob("user--*.json")) if folder.is_dir() else []
+    return [r for r in (load(root, n) for n in names) if r is not None]
+
+
+def delete(root: Path, model_id: str) -> bool:
+    if not USER_ID.fullmatch(model_id):
+        return False
+    path = _store(root) / f"{model_id}.json"
+    existed = path.is_file()
+    path.unlink(missing_ok=True)
+    return existed
+
+
+def confirm_license(root: Path, model_id: str) -> UserModelRecord | None:
+    record = load(root, model_id)
+    if record is None:
+        return None
+    confirmed = record.model_copy(update={"license_confirmed": True, "license_confirmed_at": time.time()})
+    save(root, confirmed)
+    return confirmed
+
+
+def max_model_gb(root: Path) -> float:
+    """The per-model cap for user-added models (ADR-021 A1). Settings raises it (H5c); until then the default."""
+    del root
+    return DEFAULT_MAX_MODEL_GB
+
+
+# --------------------------------------------------------------------------------------------- resolve (host side)
+class _PlannedFile(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    size: int = Field(ge=0)
+
+
+class ResolveMeta(BaseModel):
+    """``stage/resolve.json`` as the job wrote it: untrusted, so every field is typed and bounded."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sha: str = Field(pattern=r"^[0-9a-f]{40}$")
+    gated: bool
+    license: str | None
+    all_files: list[str] = Field(max_length=2000)
+    files: list[_PlannedFile] = Field(max_length=2000)
+    total_bytes: int = Field(ge=0)
+    unreadable: list[str]
+
+    @model_validator(mode="after")
+    def _names(self) -> Self:
+        if not all(name_ok(n) for n in self.all_files) or not all(name_ok(f.name) for f in self.files):
+            raise ValueError("a file name the download rules refuse")
+        if not set(self.unreadable) <= set(meta_caps()):
+            raise ValueError("unreadable names a file the job does not read")
+        if self.total_bytes != sum(f.size for f in self.files):
+            raise ValueError("total_bytes does not add up")
+        return self
+
+
+def read_resolve(run_dir: Path) -> ResolveMeta:
+    try:
+        return ResolveMeta.model_validate(read_small_json(run_dir / "stage" / "resolve.json", RESOLVE_MAX))
+    except (OSError, ValueError, ValidationError) as exc:
+        raise resolver.RepoFilesInvalidError(f"resolve.json: {type(exc).__name__}") from None
+
+
+def finish_model(root: Path, run_dir: Path, repo: str) -> UserModelRecord:
+    """The record of a resolved repo (not yet saved), or the catalog error that says why it cannot be added."""
+    meta = read_resolve(run_dir)
+    if meta.unreadable:  # too big to check is never "absent" (security H2 R1)
+        raise resolver.ModelNeedsRemoteCodeError(
+            "a config file is too large to check",
+            params={"repo": repo, "revision": meta.sha[:12], "reason": "unreadable_config",
+                    "file": resolver.clean_name(meta.unreadable[0])},
+        )  # fmt: skip
+    folder = run_dir / "stage" / "meta"
+    caps = meta_caps()
+    configs = {
+        name: resolver.read_repo_json(folder / name, caps[name])
+        for name in resolver.CONFIG_FILES
+        if name in meta.all_files
+    }
+    family, facts = resolver.resolve_family(configs, meta.all_files, repo=repo, revision=meta.sha,
+                                            families=resolver.load_families())  # fmt: skip
+    weights = [f for f in meta.files if f.name.endswith(".safetensors")]
+    if not weights:
+        raise resolver.ModelArchUnsupportedError(
+            "no safetensors weights",
+            params={"repo": repo, "revision": meta.sha[:12], "architecture": facts.architecture,
+                    "model_type": facts.model_type, "reason": "no_safetensors"},
+        )  # fmt: skip
+    params_b = None
+    if INDEX_NAME in meta.all_files:
+        params_b = resolver.params_b_from_index(resolver.read_repo_json(folder / INDEX_NAME, caps[INDEX_NAME]),
+                                                facts.torch_dtype)  # fmt: skip
+    if params_b is None:  # one shard and no index: the weights' bytes at the declared dtype (an upper bound)
+        dtype_bytes = 4 if facts.torch_dtype == "float32" else 2
+        params_b = round(sum(f.size for f in weights) / dtype_bytes / 1e9, 2) or 0.01
+    size_gb = meta.total_bytes / GIB
+    cap = max_model_gb(root)
+    if size_gb > cap:
+        raise UserModelTooLargeError(size_gb, cap)
+    entry = resolver.user_entry(repo=repo, revision=meta.sha, family=family, params_b=params_b, disk_gb=size_gb,
+                                license_id=meta.license or "unknown", gated=meta.gated)  # fmt: skip
+    return UserModelRecord(entry=entry, family=family.id, architecture=facts.architecture, added_at=time.time())
+
+
+__all__ = [
+    "DEFAULT_MAX_MODEL_GB",
+    "ResolveMeta",
+    "UserModelRecord",
+    "UserModelTooLargeError",
+    "confirm_license",
+    "delete",
+    "finish_model",
+    "list_all",
+    "load",
+    "max_model_gb",
+    "read_resolve",
+    "save",
+]

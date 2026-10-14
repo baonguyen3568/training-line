@@ -52,7 +52,8 @@ def test_every_static_remote_code_sign_blocks(configs: dict[str, Any], files: li
     assert sign in r.remote_code_signs(configs, files)
     with pytest.raises(r.ModelNeedsRemoteCodeError) as info:
         r.resolve_family(configs, files, repo="org/x", revision=SHA, families=r.load_families())
-    assert (info.value.code, info.value.params) == ("MODEL-004", {"repo": "org/x", "revision": SHA[:12]})
+    assert (info.value.code, info.value.params) == (
+        "MODEL-004", {"repo": "org/x", "revision": SHA[:12], "reason": "remote_code"})  # fmt: skip
 
 
 def test_a_native_repo_has_no_sign_and_resolves() -> None:

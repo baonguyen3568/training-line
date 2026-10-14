@@ -126,6 +126,7 @@ class Download:
     status: str = "queued"  # queued | downloading | verifying | installing | completed | failed
     error: dict[str, Any] | None = None
     progress: dict[str, int] = field(default_factory=dict)
+    result: Any = None  # a resolve: what its finish returned (a user model record)
 
     def to_api(self) -> dict[str, Any]:
         return {"download_id": self.download_id, **self.asset.to_api(), "status": self.status,
@@ -313,11 +314,24 @@ class DownloadService:
     def _fetch(self, d: Download, part: Asset, run_id: str, planned: int, plan_only: bool) -> bool:
         """One repo: the job into its own run dir, then the host verifies and installs (or checks) it."""
         run_dir = self.root / "outputs" / "runs" / run_id
-        run_dir.mkdir(parents=True)
         pins = pinned_hashes(self.root, part.catalog_id, part.revision) if part.kind == "model" else {}
         code = sorted(n for n in pins if n.endswith(".py"))
         spec = {"kind": part.kind, "repo": part.repo, "revision": part.revision,
                 "remote_code_files": code, "max_bytes": planned, "plan_only": plan_only}  # fmt: skip
+        final = self._job(d, part, run_dir, spec, planned)
+        if final.status != RunStatus.COMPLETED:
+            self._fail(d, _job_failure(final.exit_code, part))
+            return False
+        self._set(d, "verifying", part=part.repo)
+        finish = verify_existing if plan_only else install
+        finish(self.root, run_dir, kind=part.kind, repo=part.repo, revision=part.revision,
+               catalog_id=part.catalog_id, name=part.name)  # fmt: skip
+        return True
+
+    def _job(self, d: Download, part: Asset, run_dir: Path, spec: dict[str, Any], planned: int) -> Any:
+        """The download job of ``spec`` in ``run_dir`` (egress proxy, budget, token file); its final manifest."""
+        run_id = run_dir.name
+        run_dir.mkdir(parents=True)
         (run_dir / SPEC_NAME).write_text(json.dumps(spec), encoding="utf-8")
         container_dir = f"{CONTAINER_ROOT}/outputs/runs/{run_id}"
         job = ContainerJob(
@@ -329,17 +343,59 @@ class DownloadService:
                                dataset=f"{part.repo}@{part.revision}")  # fmt: skip
         self._set(d, "downloading", part=part.repo)
         threading.Thread(target=self._watch_progress, args=(d, run_dir), daemon=True).start()
-        final = run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
-                        take_gpu_lock=False, launcher=self._launcher, on_wait=self._waiting(d),
-                        memory_wait_s=self.memory_wait_s)  # fmt: skip
-        if final.status != RunStatus.COMPLETED:
-            self._fail(d, _job_failure(final.exit_code, part))
-            return False
-        self._set(d, "verifying", part=part.repo)
-        finish = verify_existing if plan_only else install
-        finish(self.root, run_dir, kind=part.kind, repo=part.repo, revision=part.revision,
-               catalog_id=part.catalog_id, name=part.name)  # fmt: skip
-        return True
+        return run_job(job, manifest, run_dir, project_root=self.root, who="vlm-app", est_peak_gb=2.0,
+                       take_gpu_lock=False, launcher=self._launcher, on_wait=self._waiting(d),
+                       memory_wait_s=self.memory_wait_s)  # fmt: skip
+
+    # ------------------------------------------------------------------------------------------ resolve (ADR-021)
+    def start_resolve(self, kind: Kind, repo: str, ref: str, finish: Callable[[Path], Any]) -> Download:
+        """Resolve a user-added repo (P021 H2): the plan-only hub job in the download slot, then the host's finish.
+
+        ``finish(run_dir)`` returns the result kept on the Download, or raises the catalog error to show.
+        """
+        run_id = f"{time.strftime('%Y%m%d-%H%M')}-rs-{secrets.token_hex(4)}"
+        self._take_active(run_id)  # one hub job at a time, downloads and resolves alike (security §1)
+        asset = Asset(kind, "user-resolve", repo, ref, repo, 0.0, "unknown", False)
+        download = Download(download_id=run_id, asset=asset, run_id=run_id)
+        with self._lock:
+            self.downloads[run_id] = download
+        threading.Thread(target=self._resolve_run, args=(download, finish), name=f"resolve-{run_id}",
+                         daemon=True).start()  # fmt: skip
+        threading.Thread(target=self._heartbeat, args=(download,), name=f"resolve-lock-{run_id}", daemon=True).start()
+        return download
+
+    def _resolve_run(self, d: Download, finish: Callable[[Path], Any]) -> None:
+        from vlm_pipeline.app.user_assets import UserModelTooLargeError
+        from vlm_pipeline.download.hub import EXIT_HUB
+        from vlm_pipeline.download.resolver import RepoFilesInvalidError
+
+        part = d.asset
+        run_dir = self.root / "outputs" / "runs" / d.run_id
+        planned = planned_bytes(0.05)
+        spec = {"kind": part.kind, "repo": part.repo, "revision": part.revision, "resolve": True,
+                "remote_code_files": [], "max_bytes": planned, "plan_only": True}  # fmt: skip
+        try:
+            final = self._job(d, part, run_dir, spec, planned)
+            if final.status != RunStatus.COMPLETED:
+                hub_said = _hub_reason(run_dir) if final.exit_code == EXIT_HUB else None
+                self._fail(d, {"code": "NET-005", "params": {"repo": part.repo, "kind": part.kind, "reason": hub_said}}
+                           if hub_said else _job_failure(final.exit_code, part))  # fmt: skip
+                return
+            self._set(d, "verifying", part=part.repo)
+            d.result = finish(run_dir)
+            self._set(d, "completed")
+        except UserModelTooLargeError as exc:
+            self._fail(d, {"code": "NET-004", "params": exc.params})
+        except RepoFilesInvalidError:  # a config the app cannot read safely: never used (security H2)
+            unreadable = {"repo": part.repo, "revision": "", "reason": "unreadable_config", "file": "unknown"}
+            self._fail(d, {"code": "MODEL-004", "params": unreadable})
+        except VlmPipelineError as exc:
+            self._fail(d, {"code": exc.code, "params": exc.params})
+        except Exception:  # never a traceback to the UI
+            logger.exception("resolve %s failed", d.download_id)
+            self._fail(d, {"code": "SYS-000", "params": {}})
+        finally:
+            self._release(d.run_id)
 
     def _extract(self, d: Download) -> bool:
         """Eval data as plain files: a no-network job extracts the checked source, the host checks and installs it."""
@@ -401,6 +457,19 @@ def _last_line(path: Path, max_bytes: int = 4096) -> dict[str, int] | None:
     if not isinstance(data, dict) or not all(isinstance(data.get(k), int) for k in keys):
         return None
     return {k: int(data[k]) for k in keys}
+
+
+_HUB_REASONS = ("not_found", "not_found_or_private", "gated_no_token", "gated_not_accepted", "network")
+
+
+def _hub_reason(run_dir: Path) -> str | None:
+    """The NET-005 reason the resolve job wrote (``stage/error.json``), only from the closed list."""
+    try:
+        data = read_small_json(run_dir / "stage" / "error.json", max_bytes=4096)
+    except (OSError, ValueError):
+        return None
+    reason = data.get("reason") if isinstance(data, dict) else None
+    return reason if reason in _HUB_REASONS else None
 
 
 def _job_failure(exit_code: int | None, part: Asset) -> dict[str, Any]:

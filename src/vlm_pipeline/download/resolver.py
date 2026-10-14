@@ -247,7 +247,9 @@ def resolve_family(
     if "config.json" not in configs:
         raise RepoFilesInvalidError("the repo has no config.json")
     if remote_code_signs(configs, files):
-        raise ModelNeedsRemoteCodeError("the repo needs its own code", params={"repo": repo, "revision": revision[:12]})
+        raise ModelNeedsRemoteCodeError(
+            "the repo needs its own code", params={"repo": repo, "revision": revision[:12], "reason": "remote_code"}
+        )
     facts = model_facts(configs["config.json"])
     family = families.for_architecture(facts.architecture)
     # transformers builds the class from model_type (CONFIG_MAPPING), not from architectures: both must be the

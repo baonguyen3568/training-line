@@ -559,6 +559,9 @@ def create_app(
     register_lan_routes(app)  # A5: LAN links + the local CA, for a local session only
     _register_advanced_routes(app, services)
     _register_download_routes(app, services, bus, ws_auth)
+    from vlm_pipeline.app.user_assets_api import register_user_asset_routes
+
+    register_user_asset_routes(app)  # ADR-021: needs app.state.downloads (one hub job at a time)
     _register_template_routes(app, services)
     _register_ws(app, bus, ws_auth, services.registry)
     if static_dir is None and getattr(services, "root", None) is not None:
