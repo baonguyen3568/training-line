@@ -129,3 +129,13 @@ Xem P002 mục "Ảnh hưởng của RESET". Tóm tắt: các gate phải do app
 - TODO Phase 2 (E2E Playwright, dialog cài plugin, P009 annex F6e): mock `/api/plugins/install/plan` trả payload XSS ở title/description/enum.
   Assert: text hiện nguyên văn; `img[src="x"]` count 0; `document.querySelectorAll('[onerror],[onload]').length === 0`;
   `page.on('dialog')` → fail; link `javascript:` hiện dạng chữ thô. Kiểm Chromium linux-arm64 trước, KHÔNG chạy browser khi đang có GPU_LOCK.
+
+## Chẩn đoán lỗi "câm" trên bản cài compose (bài học 2026-10-14)
+- Job fail SYS-000 trong < 1 s, logs/ rỗng, không lấy GPU lock ⇒ runner đã từ chối spec trước khi tạo container.
+  Xem đầu tiên: `docker exec ntc-training-runner-1 tail /var/lib/vlm-runner/runner.jsonl` (audit `submit ok:false error:<lý do>`).
+  Ca thật: `inputs_nested`: train và val lấy từ cùng 1 split nên trỏ cùng 1 thư mục, app gửi input trùng.
+- Test E2E đọc trạng thái node từ WS `/api/runs/{id}/events`, KHÔNG quét run.json theo mtime: node host chạy lại trong cùng
+  run dir giữ status cũ trong run.json, chỉ mtime đổi.
+- Edge LAN (ADR-019): nginx cho POST /api/session 5 lần/phút/IP. Fixture phải đăng nhập 1 lần mỗi worker.
+- Khi dừng script nền: `pgrep -f "^bash <đường dẫn script>$"` (neo đầu/cuối). `pkill -f` / grep theo tên sẽ khớp cả
+  shell đang chạy lệnh đó và kill nó (đã gặp 3 lần).
