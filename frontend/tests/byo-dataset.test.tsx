@@ -40,7 +40,7 @@ describe("dataset from Hugging Face", () => {
     expect(dialog.textContent).not.toContain("image_unreadable");
     // a text column as the image: said under its select, and "Dùng cách ghép này" stays off
     fireEvent.change(image, { target: { value: "query" } });
-    expect(within(dialog).getByRole("alert")).toBeTruthy();
+    expect(dialog.querySelector(".field-error")).toBeTruthy();
     expect(hints()).toBe(suggested - 1); // changed by the user: no longer "gợi ý"
     const apply = within(dialog).getByRole("button", { name: "Dùng cách ghép này" });
     expect(apply).toHaveProperty("disabled", true);

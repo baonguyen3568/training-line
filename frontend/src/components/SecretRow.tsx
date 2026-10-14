@@ -163,7 +163,7 @@ export function SecretRow({
             </span>
           )}
         </div>
-        {error && <FieldError>{error}</FieldError>}
+        {error && <FieldError live>{error}</FieldError>}
       </div>
     </div>
   );

@@ -24,10 +24,16 @@ describe("model size cap", () => {
       ) as HTMLButtonElement;
     fireEvent.change(input, { target: { value: "2000" } });
     // said while typing, the field marked and pointing at it, "Lưu" off: nothing to click for nothing
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe(t("settings.max_model_gb_range", { min: 1, max: 1000 }));
+    const msg = (await waitFor(() => {
+      const el = document.getElementById(input.getAttribute("aria-describedby") ?? "");
+      if (!el) throw new Error("no message");
+      return el;
+    })) as HTMLElement;
+    expect(msg.textContent).toBe(t("settings.max_model_gb_range", { min: 1, max: 1000 }));
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    expect(input.getAttribute("aria-describedby")).toBe(alert.id);
+    // said while typing: read with the field, not announced on every key (design)
+    expect(msg.getAttribute("role")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(save().disabled).toBe(true);
     fireEvent.keyDown(input, { key: "Enter" });
     expect(put).not.toHaveBeenCalled(); // out of range: never sent

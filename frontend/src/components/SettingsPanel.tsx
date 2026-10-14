@@ -170,7 +170,7 @@ function SessionSection() {
           )}
         </div>
       </div>
-      {error && <FieldError>{error}</FieldError>}
+      {error && <FieldError live>{error}</FieldError>}
     </section>
   );
 }
@@ -496,7 +496,7 @@ function ModelLimitSection() {
             {t("settings.save")}
           </button>
           {bad && (
-            <FieldError id="set-max-model-range">
+            <FieldError id="set-max-model-range" live={refused !== false}>
               {refused || t("settings.max_model_gb_range", { min: lo, max: hi })}
             </FieldError>
           )}
