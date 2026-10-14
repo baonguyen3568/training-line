@@ -1694,7 +1694,7 @@ reference_pipeline:
   data-cleanup-lora:
     summary: Filter broken images, drop duplicates and images also in the test data, then LoRA-tune.
   invoice-to-json:
-    summary: 'Retrains the whole language part of Nemotron Parse to read CORD-v2 receipts into JSON.'
+    summary: 'Retrains Nemotron Parse''s connector and language part to read CORD-v2 receipts into JSON.'
   invoice-qwen35-2b-lora:
     summary: LoRA-tune Qwen3.5-2B to read receipts into JSON, scored like the receipt template.
   image-video-understanding:

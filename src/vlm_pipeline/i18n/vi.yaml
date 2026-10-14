@@ -1694,7 +1694,7 @@ reference_pipeline:
   data-cleanup-lora:
     summary: Lọc ảnh hỏng, bỏ ảnh trùng và ảnh trùng với dữ liệu kiểm tra, rồi mới dạy nhẹ bằng LoRA.
   invoice-to-json:
-    summary: 'Dạy lại toàn bộ phần ngôn ngữ của Nemotron Parse để đọc hoá đơn CORD-v2 ra JSON.'
+    summary: 'Dạy lại bộ nối và phần ngôn ngữ của Nemotron Parse để đọc hoá đơn CORD-v2 ra JSON.'
   invoice-qwen35-2b-lora:
     summary: Dạy nhẹ Qwen3.5-2B bằng LoRA để đọc hoá đơn ra JSON, chấm cùng bộ với mẫu Đọc hoá đơn.
   image-video-understanding:
