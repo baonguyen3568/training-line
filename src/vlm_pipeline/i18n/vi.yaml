@@ -1217,6 +1217,7 @@ inspector:
   recommended: khuyên dùng
   empty_hint: Chọn một bước trên canvas để xem và chỉnh thiết lập.
 license:
+  card_says: 'Tác giả ghi: “{text}”'
   badge:
     commercial_ok: Dùng thương mại được
     conditional: Dùng được, có điều kiện

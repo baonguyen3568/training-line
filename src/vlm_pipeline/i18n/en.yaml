@@ -1217,6 +1217,7 @@ inspector:
   recommended: recommended
   empty_hint: Select a step on the canvas to see and edit its settings.
 license:
+  card_says: 'The author wrote: “{text}”'
   badge:
     commercial_ok: Commercial use OK
     conditional: Allowed, with conditions
