@@ -203,7 +203,9 @@ describe("dataset from Hugging Face", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     const dialog = await screen.findByRole("dialog", {}, { timeout: 4000 });
     expect(within(dialog).queryByLabelText(t("byo.map.prompt"))).toBeNull(); // a question column is mapped
-    fireEvent.change(within(dialog).getByLabelText(/Cột câu hỏi/), { target: { value: "" } });
+    const qSelect = within(dialog).getByLabelText(/Cột câu hỏi/) as HTMLSelectElement;
+    expect(qSelect.options[0]?.textContent).toBe(t("byo.map.none")); // said in words, never "—"
+    fireEvent.change(qSelect, { target: { value: "" } });
     const prompt = within(dialog).getByLabelText(t("byo.map.prompt")) as HTMLInputElement;
     expect(prompt.value).toBe("Describe this image."); // the server's default_question, never typed in the UI
     expect(dialog.textContent).toContain(t("byo.map.prompt_default_note"));

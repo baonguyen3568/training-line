@@ -155,6 +155,11 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
 }
+/* raw data / ids (revisions, sha, policy values, a sample's answer): one rule for every .mono, not per component;
+   until now only .chip.mono and inputs had it, so a span marked mono read in the UI font */
+.mono {
+  font-family: var(--font-family-mono);
+}
 .chip.mono {
   font-family: var(--font-family-mono);
   font-variant-numeric: tabular-nums;

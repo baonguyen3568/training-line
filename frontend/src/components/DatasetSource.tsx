@@ -149,7 +149,7 @@ function ColumnMapDialog({
               value={map[role] ?? ""}
               onChange={(e) => setMap({ ...map, [role]: e.target.value || undefined })}
             >
-              <option value="">—</option>
+              <option value="">{tpOptional(["byo", "map", "none"]) ?? "—"}</option>
               {inspection.columns.map((c) => (
                 <option key={c.name} value={c.name}>
                   {untrustedText(c.name, 60)}
