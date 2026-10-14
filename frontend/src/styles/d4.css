@@ -1474,3 +1474,25 @@ fieldset.seg-radio {
 .byo-map-head {
   margin: 0;
 }
+.byo-added ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-4);
+}
+.byo-added-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-8);
+  width: 100%;
+  text-align: left;
+}
+.byo-added-row code {
+  overflow-wrap: anywhere;
+}
+.byo-added-row[aria-current="true"] {
+  background: var(--color-canvas-placeholder-bg);
+  color: var(--color-text-primary);
+}

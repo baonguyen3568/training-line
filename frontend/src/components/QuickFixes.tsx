@@ -5,6 +5,7 @@ import { downloadTargetOf } from "../lib/downloadTarget";
 import { isModelType, nearestUpstream } from "../lib/graph";
 import { requestRun } from "../lib/requestRun";
 import { useUi } from "../store/ui";
+import { useUserModels } from "../store/userModels";
 import { useWorkflow } from "../store/workflow";
 import { ISSUES_URL } from "./BugReportDialog";
 import { Icon } from "./Icon";
@@ -105,6 +106,20 @@ function navigation(
   if (target === "request_catalog")
     return () => window.open(ISSUES_URL, "_blank", "noopener,noreferrer"); // no query: the user writes it
   if (target === "column_mapping") return () => selectAndFocus(nodeId);
+  if (target === "add_model_dialog") {
+    // MODEL-006: the step's "Từ Hugging Face" tab with the workflow's repo + pinned revision typed in (not checked)
+    const repo = issue.params.repo;
+    const revision = issue.params.revision;
+    if (typeof repo !== "string" || !repo) return undefined;
+    return () => {
+      useUserModels.getState().openAdd({
+        nodeId,
+        repo,
+        revision: typeof revision === "string" ? revision : "",
+      });
+      selectAndFocus(nodeId);
+    };
+  }
   if (target === "license_dialog") {
     const t0 = downloadTargetOf(
       { ...issue, code: "NET-002", params: { reason: "not_cached", ...issue.params } },

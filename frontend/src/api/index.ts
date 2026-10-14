@@ -24,6 +24,7 @@ function lazyMock(): Api {
     addUserModel: (body) => load().then((m) => m.addUserModel(body)),
     userModelResolve: (id) => load().then((m) => m.userModelResolve(id)),
     confirmUserModelLicense: (id) => load().then((m) => m.confirmUserModelLicense(id)),
+    listUserModels: () => load().then((m) => m.listUserModels()),
     inspectDataset: (body) => load().then((m) => m.inspectDataset(body)),
     datasetInspection: (id) => load().then((m) => m.datasetInspection(id)),
     startDownload: (body) => load().then((m) => m.startDownload(body)),

@@ -211,6 +211,8 @@ export interface Api {
   addUserModel(body: { repo: string; revision?: string }): Promise<{ resolve_id: string }>;
   userModelResolve(id: string): Promise<ModelResolveJob>;
   confirmUserModelLicense(id: string): Promise<{ model: UserModel }>;
+  /** The user-added models this machine has a record of (the `user_model` widget's choices, backend H3). */
+  listUserModels(): Promise<{ models: UserModel[] }>;
   inspectDataset(body: {
     repo: string;
     revision?: string;
@@ -329,6 +331,7 @@ export const httpApi: Api = {
     request("POST", `/api/user-assets/models/${encodeURIComponent(id)}/confirm-license`, {
       accept: true,
     }),
+  listUserModels: () => request("GET", "/api/user-assets/models"),
   inspectDataset: (body) => request("POST", "/api/user-assets/datasets/inspect", body),
   datasetInspection: (id) =>
     request("GET", `/api/user-assets/inspections/${encodeURIComponent(id)}`),

@@ -713,6 +713,7 @@ export const mockApi: Api = {
     mockUserModels.set(id, confirmed);
     return delay({ model: confirmed });
   },
+  listUserModels: () => delay({ models: [...mockUserModels.values()] }),
   inspectDataset: ({ repo, config, split }) => {
     const id = `ins-${++mockJobSeq}`;
     mockJobs.set(id, { polls: 0, repo, config, split });

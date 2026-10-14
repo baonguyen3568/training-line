@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { EventError, ModelResolveJob, UserModel } from "../api/types";
 import { t } from "../i18n";
-import { hubError, isRepoId, pollHubJob, recentRepos, rememberRepo } from "../lib/hubJob";
+import { hubError, isRepoId, pollHubJob } from "../lib/hubJob";
 import { licenseName } from "../lib/licenses";
 import { runErrorText } from "../lib/runWarning";
+import { useUserModels } from "../store/userModels";
 import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
@@ -73,7 +74,22 @@ export function ModelHubPanel({ nodeId }: { nodeId: string }) {
       alive.current = false;
     };
   }, []);
-  const recent = recentRepos("model");
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const added = useUserModels((st) => st.models);
+  const inUse = useWorkflow(
+    (st) => st.workflow?.nodes.find((n) => n.id === nodeId)?.params.user_model ?? "",
+  );
+  // MODEL-006 "Thêm model này": the repo and its pinned revision typed in, the revision row open; never checked
+  // for the user (they press "Kiểm tra"), and the licence is asked again as for any add
+  useEffect(() => {
+    void useUserModels.getState().load();
+    const p = useUserModels.getState().takePrefill(nodeId);
+    if (p) {
+      setRepo(p.repo);
+      setRevision(p.revision);
+      setRevisionOpen(!!p.revision);
+    }
+  }, [nodeId]);
 
   const check = async (value = repo) => {
     const r = value.trim();
@@ -87,13 +103,13 @@ export function ModelHubPanel({ nodeId }: { nodeId: string }) {
         repo: r,
         ...(revision.trim() ? { revision: revision.trim() } : {}),
       });
-      rememberRepo("model", r);
       const end = await pollHubJob(
         () => api.userModelResolve(resolve_id),
         (j) => alive.current && setJob(j),
         () => !alive.current,
       );
       if (end?.status === "failed" && end.error) setError(end.error);
+      else if (end?.status === "done") void useUserModels.getState().load();
     } catch (e) {
       if (alive.current) setError(hubError(e));
     } finally {
@@ -129,7 +145,11 @@ export function ModelHubPanel({ nodeId }: { nodeId: string }) {
           {t("byo.check")}
         </button>
       </div>
-      <details className="byo-revision">
+      <details
+        className="byo-revision"
+        open={revisionOpen}
+        onToggle={(e) => setRevisionOpen(e.currentTarget.open)}
+      >
         <summary>{t("byo.revision")}</summary>
         <input
           type="text"
@@ -140,18 +160,26 @@ export function ModelHubPanel({ nodeId }: { nodeId: string }) {
           onChange={(e) => setRevision(e.target.value)}
         />
       </details>
-      {recent.length > 0 && !busy && !model && (
-        <p className="small muted byo-recent">
-          {t("byo.recent")}:{" "}
-          {recent.map((r, i) => (
-            <span key={r}>
-              {i > 0 && ", "}
-              <button type="button" className="link mono" onClick={() => void check(r)}>
-                {r}
-              </button>
-            </span>
-          ))}
-        </p>
+      {added.length > 0 && !busy && !model && (
+        <div className="byo-added">
+          <p className="small muted">{t("byo.model.added")}</p>
+          <ul>
+            {added.map((m) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  className="hairline byo-added-row"
+                  aria-current={inUse === m.id ? "true" : undefined}
+                  onClick={() => setUserModel(nodeId, m)}
+                >
+                  <code>{m.repo}</code>
+                  <span className="small muted mono">{m.revision.slice(0, 12)}</span>
+                  {inUse === m.id && <span className="chip small">{t("byo.model.in_use")}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {busy && (
         <p className="small" role="status">

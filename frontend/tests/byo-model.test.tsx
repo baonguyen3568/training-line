@@ -161,6 +161,93 @@ describe("quick fixes of ADR-021", () => {
   });
 });
 
+describe("models already added (H3)", () => {
+  const added = {
+    id: "user--acme--doc-vlm--1a2b3c4d",
+    name: "doc-vlm",
+    repo: "acme/doc-vlm",
+    revision: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+    family: "Qwen2.5-VL",
+    architecture: "Qwen2_5_VLForConditionalGeneration",
+    params_b: 3.8,
+    size_gb: 7.6,
+    license: "apache-2.0",
+    license_confirmed: true,
+    gated: false,
+    ram_gb_train: 31.5,
+    ram_source: "estimated",
+    verified: false as const,
+  };
+
+  it("picks one from the list without checking it again", async () => {
+    const { api } = await import("../src/api");
+    vi.spyOn(api, "listUserModels").mockResolvedValue({ models: [added] });
+    const add = vi.spyOn(api, "addUserModel");
+    const { useWorkflow, id } = await setup();
+    const row = await screen.findByRole("button", { name: /acme\/doc-vlm/ });
+    expect(row.getAttribute("aria-current")).toBeNull();
+    const { t } = await import("../src/i18n");
+    expect(screen.queryByText(t("byo.recent"), { exact: false })).toBeNull(); // the list replaces "recent" (spec §1)
+    act(() => fireEvent.click(row));
+    expect(useWorkflow.getState().workflow?.nodes.find((n) => n.id === id)?.params).toMatchObject({
+      user_model: added.id,
+      user_repo: added.repo,
+      user_revision: added.revision,
+    });
+    await waitFor(() => expect(row.getAttribute("aria-current")).toBe("true"));
+    expect(row.textContent).toContain(t("byo.model.in_use"));
+    expect(add).not.toHaveBeenCalled();
+  });
+
+  it("MODEL-006 'Thêm model này' opens the hub tab with the repo and revision typed in, not checked", async () => {
+    const { api } = await import("../src/api");
+    const add = vi.spyOn(api, "addUserModel");
+    const { useWorkflow } = await import("../src/store/workflow");
+    await useWorkflow.getState().loadCatalog();
+    useWorkflow.getState().newWorkflow();
+    const id = useWorkflow.getState().addNode("model.hf_pick", { x: 0, y: 0 }) as string;
+    const { Inspector } = await import("../src/components/Inspector");
+    const { QuickFixes } = await import("../src/components/QuickFixes");
+    render(
+      <>
+        <QuickFixes
+          nodeId={id}
+          issue={{
+            node_id: id,
+            code: "MODEL-006",
+            severity: "error",
+            params: { node: "Chọn model gốc", repo: added.repo, revision: added.revision },
+            title: "…",
+            what: "…",
+            action_ids: ["add_user_model"],
+            actions: [
+              {
+                id: "add_user_model",
+                kind: "navigate",
+                confirm: false,
+                node_id: id,
+                target: "add_model_dialog",
+              },
+            ],
+          }}
+        />
+        <Inspector />
+      </>,
+    );
+    const { t } = await import("../src/i18n");
+    act(() => fireEvent.click(screen.getByRole("button", { name: t("action.add_user_model") })));
+    const tab = await screen.findByRole("tab", { name: /Từ Hugging Face/ });
+    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect((screen.getByPlaceholderText(/Qwen\/Qwen3.5-2B/) as HTMLInputElement).value).toBe(
+      added.repo,
+    );
+    expect((screen.getByLabelText(t("byo.revision")) as HTMLInputElement).value).toBe(
+      added.revision,
+    );
+    expect(add).not.toHaveBeenCalled(); // the user presses "Kiểm tra"
+  });
+});
+
 describe("unknown licence", () => {
   it("says export stays blocked, above the 'I agree' tick, and never shows the raw id", async () => {
     const { DownloadDialog } = await import("../src/components/DownloadDialog");

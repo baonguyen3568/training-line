@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type {
   NodeSpec,
   OptionMeta,
@@ -27,6 +27,7 @@ import { runErrorText } from "../lib/runWarning";
 import { selfAndDownstream } from "../lib/topo";
 import { useSystem } from "../store/system";
 import { useUi } from "../store/ui";
+import { useUserModels } from "../store/userModels";
 import { useWorkflow } from "../store/workflow";
 import { AdvancedOptions } from "./AdvancedOptions";
 import { DatasetHubPanel } from "./DatasetSource";
@@ -610,6 +611,11 @@ export function Inspector() {
   const mode = useUi((s) => s.mode);
   const [expanded, setExpanded] = useState(false);
   const [hubTab, setHubTab] = useState(false);
+  // MODEL-006 "Thêm model này": the step's hub tab opens with the repo typed in (the panel takes the prefill)
+  const prefillFor = useUserModels((st) => st.prefill?.nodeId);
+  useEffect(() => {
+    if (prefillFor && prefillFor === selectedId) setHubTab(true);
+  }, [prefillFor, selectedId]);
   const groupPath = useUi((st) => st.groupPath);
   const node = workflow?.nodes.find((n) => n.id === selectedId);
   // a step inside a group (flat id "g__step"): its own view-only inspector
@@ -644,7 +650,8 @@ export function Inspector() {
       const cur = node.params[k] ?? props[k]?.default;
       return vals.map(String).includes(String(cur));
     }) || fieldErrors(name).length > 0;
-  const modelTab: "catalog" | "hub" = hubTab || node.params.user_model ? "hub" : "catalog";
+  const modelTab: "catalog" | "hub" =
+    hubTab || node.params.user_model || prefillFor === node.id ? "hub" : "catalog";
   const dataTab: "catalog" | "hub" =
     hubTab || (typeof node.params.repo === "string" && node.params.repo !== props.repo?.default)
       ? "hub"
