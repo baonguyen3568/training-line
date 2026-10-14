@@ -23,6 +23,51 @@ if TYPE_CHECKING:
     from vlm_pipeline.common.jobrun import ContainerJob, ExitInfo
 
 
+# check_submit's stand-in lock token: it only satisfies the gpu_needs_lock_token rule and is never sent anywhere.
+CHECK_LOCK_TOKEN = "x" * 16
+
+
+def submit_body(job: ContainerJob, project_root: Path, lock_token: str | None) -> dict[str, object]:
+    """The runner ``submit`` request for ``job`` (what RunnerLauncher sends); RunnerError for what it never sends."""
+    from vlm_pipeline.common.job_kinds import job_kind
+
+    if not job.narrow or len(job.rw_dirs) != 1:
+        raise RunnerError("not_a_narrowed_job")
+    if job.group_add:  # not in the runner protocol: never run without the groups the job needs (host CLI only)
+        raise RunnerError("group_add_not_supported")
+    # The runner picks the entrypoint from the job kind; a job naming its own (vLLM: python3) sends it as argv[0].
+    argv = (job.entrypoint, *job.argv) if job.entrypoint else tuple(job.argv)
+    kind = job_kind(argv)
+    if kind is None:
+        raise RunnerError("argv_not_allowed")
+    extra: dict[str, object] = {}
+    if job.download_budget is not None:  # a catalog download (P018): its budget, and the token if the user set one
+        extra["max_bytes"] = job.download_budget
+        if job.hf_token:
+            extra["hf_token"] = job.hf_token
+    return {
+        **extra,
+        "command": "submit", "run_id": job.name, "job_kind": kind, "image_tag": job.image, "argv": list(argv),
+        "gpu": job.gpu, "memory_gb": job.memory_gb, "lock_token": lock_token,
+        "run_dir": _app_path(job.rw_dirs[0], project_root),
+        "inputs": [_app_path(p, project_root) for p in _outermost(job.ro_inputs)],
+    }  # fmt: skip
+
+
+def check_submit(job: ContainerJob, project_root: Path, lock_token: str | None) -> None:
+    """RunnerError(reason) when the compose runner would refuse ``job`` (``common.runner_protocol.parse_submit``).
+
+    Slot #2 found two compose-only refusals (inputs_nested, bad_run_dir) after hours of GPU time: every narrowed job
+    (what the app builds) is checked on the dev launcher too, so dev / E2E runs hit them first.
+    """
+    from vlm_pipeline.common.runner_protocol import ProtocolError, parse_submit
+
+    try:
+        parse_submit(submit_body(job, project_root, lock_token or (CHECK_LOCK_TOKEN if job.gpu else None)))
+    except ProtocolError as exc:
+        raise RunnerError(exc.reason) from None
+
+
 class JobLauncher(Protocol):
     def image_id(self, image: str) -> str | None: ...
 
@@ -69,6 +114,8 @@ class LocalDockerLauncher:
 
         if job.download_budget is not None or job.hf_token is not None:  # no egress proxy outside the compose stack
             raise RunnerError("downloads_need_runner")
+        if job.narrow:  # an app job: the compose runner's rules on the dev path too (host CLI jobs are not narrow)
+            check_submit(job, project_root, lock_token)
         pinned = dataclasses.replace(job, image=image_id) if image_id else job  # run by id, never re-resolve the tag
         argv = docker_args(pinned, project_root, lock_token=lock_token, image_id=image_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,29 +197,7 @@ class RunnerLauncher:
     def run(
         self, job: ContainerJob, project_root: Path, *, lock_token: str | None, log_path: Path, image_id: str | None
     ) -> int:
-        from vlm_pipeline.common.job_kinds import job_kind
-
-        if not job.narrow or len(job.rw_dirs) != 1:
-            raise RunnerError("not_a_narrowed_job")
-        if job.group_add:  # not in the runner protocol: never run without the groups the job needs (host CLI only)
-            raise RunnerError("group_add_not_supported")
-        # The runner picks the entrypoint from the job kind; a job naming its own (vLLM: python3) sends it as argv[0].
-        argv = (job.entrypoint, *job.argv) if job.entrypoint else tuple(job.argv)
-        kind = job_kind(argv)
-        if kind is None:
-            raise RunnerError("argv_not_allowed")
-        extra: dict[str, object] = {}
-        if job.download_budget is not None:  # a catalog download (P018): its budget, and the token if the user set one
-            extra["max_bytes"] = job.download_budget
-            if job.hf_token:
-                extra["hf_token"] = job.hf_token
-        reply = self._call({
-            **extra,
-            "command": "submit", "run_id": job.name, "job_kind": kind, "image_tag": job.image, "argv": list(argv),
-            "gpu": job.gpu, "memory_gb": job.memory_gb, "lock_token": lock_token,
-            "run_dir": _app_path(job.rw_dirs[0], project_root),
-            "inputs": [_app_path(p, project_root) for p in _outermost(job.ro_inputs)],
-        })  # fmt: skip
+        reply = self._call(submit_body(job, project_root, lock_token))
         if reply.get("ok") is not True:
             error = str(reply.get("error", "refused"))
             logger.error("vlm-runner refused job %s: %s", job.name, error)  # never silent (slot #2, 2026-10-14)

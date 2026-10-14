@@ -126,3 +126,37 @@ def test_a_refusal_never_carries_the_input() -> None:
         parse_request(_req(argv=["bash", secret]))
     assert secret not in str(err.value)
     assert secret not in repr(err.value)
+
+
+NODE = "n5-0750560c71548df3"  # slot #2's eval node (2026-10-14: refused bad_run_dir on compose)
+
+
+@pytest.mark.parametrize(("run_id", "run_dir"), [
+    (f"{NODE}-model", f"/app/outputs/graph/runs/{NODE}/jobs/model"),  # eval's model turn (CORD / OCRBench)
+    (f"{NODE}-base", f"/app/outputs/graph/runs/{NODE}/jobs/base"),  # bench's measurements
+    ("ocrbench-base-0123456789abcdef-fedcba9876543210",
+     "/app/outputs/eval-cache/ocrbench-0123456789abcdef01234567.run-4242-a1b2c3"),
+    ("eval-base-0123456789abcdef-fedcba9876543210",
+     "/app/outputs/eval-cache/cord-v2-0123456789abcdef01234567.tmp-17-a1b2c3"),
+])  # fmt: skip
+def test_a_nodes_sub_job_and_a_base_eval_cache_turn_are_run_dirs(run_id: str, run_dir: str) -> None:
+    sub = parse_request(_req(run_id=run_id, run_dir=run_dir, gpu=False, lock_token=_DROP))
+    assert isinstance(sub, Submit)
+    assert str(sub.run_dir) == run_dir
+
+
+@pytest.mark.parametrize(("run_id", "run_dir"), [
+    (f"{NODE}-model", f"/app/outputs/graph/runs/{NODE}/jobs/other"),  # another sub-job's dir
+    (f"{NODE}-model", "/app/outputs/graph/runs/n6-0750560c71548df3/jobs/model"),  # another node's
+    (f"{NODE}-model", f"/app/outputs/runs/{NODE}/jobs/model"),  # only under graph runs
+    (f"{NODE}-model", f"/app/outputs/graph/runs/{NODE}/jobs/model/deeper"),
+    (f"{NODE}-model", f"/app/outputs/graph/runs/{NODE}/work/model"),
+    ("ocrbench-base-ffffffffffffffff-fedcba9876543210",
+     "/app/outputs/eval-cache/ocrbench-0123456789abcdef01234567.run-4242-a1b2c3"),  # another key's turn
+    ("ocrbench-base-0123456789abcdef-fedcba9876543210",
+     "/app/outputs/eval-cache/ocrbench-0123456789abcdef01234567.json"),  # the cache entry itself
+    ("ocrbench-base-0123456789abcdef-fedcba9876543210",
+     "/app/outputs/eval-cache/sub/ocrbench-0123456789abcdef01234567.run-4242-a1b2c3"),
+])  # fmt: skip
+def test_any_other_nested_dir_is_still_refused(run_id: str, run_dir: str) -> None:
+    assert _reason(_req(run_id=run_id, run_dir=run_dir, gpu=False, lock_token=_DROP)) == "bad_run_dir"

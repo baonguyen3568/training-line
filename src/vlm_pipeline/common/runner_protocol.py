@@ -12,7 +12,10 @@ an env var, a container name or a free image name. Everything here is a pure che
 * ``gpu``, ``memory_gb`` (1..MEMORY_CAP_GB), ``lock_token`` (required with gpu);
 * ``hf_token`` (optional, ``download`` jobs ONLY): handed to the job as a mounted file, never env, never logged;
 * ``max_bytes`` (``download`` jobs ONLY, required there): the proxy's hard byte budget for the job;
-* ``run_dir``: the job's writable dir, an app path ``/app/outputs/runs/<run_id>`` or ``/app/outputs/graph/runs/<dir>``;
+* ``run_dir``: the job's writable dir, an app path ``/app/outputs/runs/<run_id>`` or ``/app/outputs/graph/runs/<dir>``,
+  or one of a node's own sub-jobs (eval / bench): ``/app/outputs/graph/runs/<node dir>/jobs/<name>`` for run id
+  ``<node dir>-<name>``, or a base-model eval cache turn ``/app/outputs/eval-cache/<ds>-<key24>.(run|tmp)-<pid>-<6hex>``
+  for run id ``(ocrbench|eval)-base-<key24[:16]>-<16hex>``;
 * ``inputs``: app paths mounted READ-ONLY (earlier nodes' outputs, uploads, datasets), each under INPUT_ROOTS.
 The paths are translated to host paths by ``common.host_paths`` and checked there (no symlink, owner, kind).
 
@@ -46,6 +49,12 @@ HF_TOKEN = re.compile(r"^hf_[A-Za-z0-9]{20,100}$")  # the shape of a Hugging Fac
 COMMANDS = frozenset({"submit", "stop", "kill", "status", "logs", "remove", "image_id"})
 JOB_KINDS = frozenset({"train", "eval", "quantize", "probe", "download", "serve", "data"})
 RUN_DIR_PARENTS = (APP_ROOT / "outputs" / "runs", APP_ROOT / "outputs" / "graph" / "runs")
+GRAPH_RUNS = APP_ROOT / "outputs" / "graph" / "runs"
+EVAL_CACHE = APP_ROOT / "outputs" / "eval-cache"
+SUB_JOB = re.compile(r"^[a-z0-9_]{1,32}$")  # eval's "model", bench's measurement names
+# eval/node_worker.py: the base model's predictions are generated in a private turn dir next to the cache entry
+EVAL_CACHE_TURN = re.compile(r"^[a-z][a-z0-9_-]{0,31}-([0-9a-f]{24})\.(?:run|tmp)-[0-9]{1,10}-[0-9a-f]{6}$")
+EVAL_CACHE_RUN_ID = re.compile(r"^(?:ocrbench|eval)-base-([0-9a-f]{16})-[0-9a-f]{16}$")
 INPUT_ROOTS = (
     APP_ROOT / "outputs" / "runs",
     APP_ROOT / "outputs" / "graph" / "runs",
@@ -112,9 +121,25 @@ def _app_path(value: Any, reason: str) -> PurePosixPath:
 
 
 def _run_dir(value: Any, run_id: str) -> PurePosixPath:
-    """The job's own dir: named exactly ``run_id`` (never another job's), directly under a run-dir parent."""
+    """The job's own dir, named after ``run_id`` (never another job's), in one of three closed shapes.
+
+    Directly under a run-dir parent and named ``run_id``; a node's sub-job ``<graph runs>/<node dir>/jobs/<name>``
+    for run id ``<node dir>-<name>`` (eval's model turn, bench's measurements: compose found it, slot #2); or a base
+    eval cache turn whose key matches the run id's. The server still checks every host component (no link, owner).
+    """
     path = _app_path(value, "bad_run_dir")
     if path.parent in RUN_DIR_PARENTS and path.name == run_id:
+        return path
+    node_dir = path.parent.parent
+    if (
+        path.parent.name == "jobs"
+        and node_dir.parent == GRAPH_RUNS
+        and SUB_JOB.fullmatch(path.name)
+        and run_id == f"{node_dir.name}-{path.name}"
+    ):
+        return path
+    turn, claim = EVAL_CACHE_TURN.fullmatch(path.name), EVAL_CACHE_RUN_ID.fullmatch(run_id)
+    if path.parent == EVAL_CACHE and turn and claim and turn.group(1)[:16] == claim.group(1):
         return path
     raise ProtocolError("bad_run_dir")
 
@@ -244,4 +269,5 @@ __all__ = [
     "RunRef",
     "Submit",
     "parse_request",
+    "parse_submit",
 ]

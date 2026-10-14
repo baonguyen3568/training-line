@@ -149,3 +149,29 @@ def test_what_the_launcher_sends_passes_the_runners_own_check(tmp_path: Path, mo
     with pytest.raises(Exception, match="stop_here"):
         launcher.run(job, tmp_path, lock_token=token, log_path=tmp_path / "l", image_id=None)
     assert len(parsed[0].inputs) == 2
+
+
+def test_the_dev_launcher_refuses_what_compose_refuses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Slot #2 (PM 2026-10-14): inputs_nested then bad_run_dir were found only on compose, hours into a GPU run.
+
+    The docker-CLI launcher refuses the same narrowed (app) jobs before any container starts.
+    """
+    from vlm_pipeline.common.jobrun import ContainerJob
+    from vlm_pipeline.common.launcher import RunnerError, check_submit
+
+    monkeypatch.setattr(launcher_mod.subprocess, "Popen", lambda argv, **kw: pytest.fail("no container may start"))
+    node = tmp_path / "outputs" / "graph" / "runs" / "n5-0750560c71548df3"
+    data = tmp_path / "data" / "d"
+    argv = ("python", "-m", "vlm_pipeline.download.convert", "--files", "x")  # a data job: no budget, no GPU
+
+    def job(run: Path, *inputs: Path) -> ContainerJob:
+        return ContainerJob(name="n5-0750560c71548df3-model", image="vlm-x:1", argv=argv, narrow=True, rw_dirs=(run,),
+                            ro_inputs=inputs)  # fmt: skip
+
+    run = launcher_mod.LocalDockerLauncher().run
+    for bad, reason in ((job(node / "work"), "bad_run_dir"),
+                        (job(node / "jobs" / "model", node), "input_overlaps_run_dir")):  # fmt: skip
+        with pytest.raises(RunnerError) as info:
+            run(bad, tmp_path, lock_token=None, log_path=tmp_path / "l", image_id=None)
+        assert info.value.reason == reason
+    check_submit(job(node / "jobs" / "model", data, data / "train"), tmp_path, None)  # sub-job OK; outermost input
