@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 
+PROJECT = "ntc-training"  # compose project name (compose.yaml)
 OWN_NETWORKS = frozenset({"ntc-training_edge", "ntc-training_egress"})  # ours: a re-run must not refuse them
 _HOST = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 
@@ -30,22 +31,37 @@ def _host_networks() -> list[ipaddress.IPv4Interface]:
     return [ipaddress.IPv4Interface(line.split()[3]) for line in out.splitlines() if len(line.split()) > 3]
 
 
-def _docker_subnets() -> list[ipaddress.IPv4Network]:
+def _docker_subnets() -> tuple[list[ipaddress.IPv4Network], list[ipaddress.IPv4Network]]:
+    """(other docker networks' subnets, OUR networks' subnets): ours by compose project label or name."""
     argv = ["docker", "network", "ls", "-q"]
     ids = subprocess.run(argv, capture_output=True, text=True, check=True).stdout.split()  # noqa: S603
     if not ids:
-        return []
-    fmt = "{{.Name}} {{range .IPAM.Config}}{{.Subnet}} {{end}}"
+        return [], []
+    fmt = '{{.Name}} {{index .Labels "com.docker.compose.project"}} {{range .IPAM.Config}}{{.Subnet}} {{end}}'
     argv = ["docker", "network", "inspect", "--format", fmt, *ids]  # ids: docker's own hex network ids
     out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout  # noqa: S603
-    nets: list[ipaddress.IPv4Network] = []
+    others: list[ipaddress.IPv4Network] = []
+    ours: list[ipaddress.IPv4Network] = []
     for line in out.splitlines():
-        name, *subnets = line.split()
-        for raw in subnets if name not in OWN_NETWORKS else []:
+        parts = line.split(" ")  # "<name> <project label or empty> <subnet> <subnet> ..."
+        name, project, subnets = parts[0], parts[1] if len(parts) > 1 else "", parts[2:]
+        mine = name in OWN_NETWORKS or project == PROJECT
+        for raw in (r for r in subnets if r):
             net = ipaddress.ip_network(raw, strict=False)
             if isinstance(net, ipaddress.IPv4Network):
-                nets.append(net)
-    return nets
+                (ours if mine else others).append(net)
+    return others, ours
+
+
+def _taken(avoid: tuple[str, ...]) -> list[ipaddress.IPv4Network]:
+    """Networks a new subnet must not overlap: the host's and other docker networks', never our own.
+
+    Re-running the install must pass (ADR-015 "safe to run again"): our networks, and the host bridge interfaces
+    docker made for them (``br-...`` inside their subnets), are not "already used by someone else".
+    """
+    others, ours = _docker_subnets()
+    host = [i.network for i in _host_networks() if not any(i.ip in net for net in ours)]
+    return [*host, *others, *(ipaddress.IPv4Network(a) for a in avoid)]
 
 
 def edge(raw: str, *avoid: str) -> None:
@@ -56,8 +72,7 @@ def edge(raw: str, *avoid: str) -> None:
         _fail(f"the subnet must be an IPv4 network like 10.231.47.0/29 (got: {raw})")
     if not net.is_private or not 16 <= net.prefixlen <= 29:
         _fail(f"the subnet must be a private /16../29 network (got: {raw})")
-    taken = [*(i.network for i in _host_networks()), *_docker_subnets(), *(ipaddress.IPv4Network(a) for a in avoid)]
-    if clash := next((n for n in taken if n.overlaps(net)), None):
+    if clash := next((n for n in _taken(avoid) if n.overlaps(net)), None):
         _fail(f"subnet {raw} overlaps {clash} already used on this machine: set another one in .env.local")
     print(f"EDGE_IP_RANGE={list(net.subnets(prefixlen_diff=1))[1]}")
     print(f"PROXY_PEER={net.network_address + 2}")  # .1 is the bridge gateway

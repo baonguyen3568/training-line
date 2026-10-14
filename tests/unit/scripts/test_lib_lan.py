@@ -22,7 +22,9 @@ def lib(monkeypatch: pytest.MonkeyPatch) -> Any:
     host = [ipaddress.IPv4Interface("127.0.0.1/8"), ipaddress.IPv4Interface("192.168.2.178/24"),
             ipaddress.IPv4Interface("172.30.0.1/16")]  # fmt: skip
     monkeypatch.setattr(module, "_host_networks", lambda: host)
-    monkeypatch.setattr(module, "_docker_subnets", lambda: [ipaddress.IPv4Network("172.31.0.0/16")])
+    ours = [ipaddress.IPv4Network("10.231.47.0/29"), ipaddress.IPv4Network("10.231.48.0/28")]  # a previous install
+    host += [ipaddress.IPv4Interface("10.231.47.4/29"), ipaddress.IPv4Interface("10.231.48.8/28")]  # their bridges
+    monkeypatch.setattr(module, "_docker_subnets", lambda: ([ipaddress.IPv4Network("172.31.0.0/16")], ours))
     return module
 
 
@@ -79,3 +81,15 @@ def test_the_edge_network_gives_nginx_its_fixed_address(lib: Any, capsys: pytest
 def test_an_overlapping_or_odd_edge_subnet_is_refused(lib: Any, subnet: str) -> None:
     with pytest.raises(SystemExit):
         lib.edge(subnet)
+
+
+def test_re_running_the_install_accepts_its_own_networks(lib: Any, capsys: pytest.CaptureFixture[str]) -> None:
+    """PM 2026-10-14: the second install.sh failed on the edge network the first one made (and its br- bridge)."""
+    lib.edge("10.231.47.0/29")
+    lib.edge("10.231.48.0/28", "10.231.47.0/29")
+    assert "PROXY_PEER=10.231.48.2" in capsys.readouterr().out
+
+
+def test_our_own_two_subnets_still_must_not_overlap(lib: Any) -> None:
+    with pytest.raises(SystemExit):
+        lib.edge("10.231.47.0/28", "10.231.47.0/29")
