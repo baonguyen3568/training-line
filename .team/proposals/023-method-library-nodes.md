@@ -52,7 +52,8 @@ to today's per-pipeline record:
 |---|---|---|
 | `method` | enum of the 10 ADR-022 ids: `full_sft, lora, qlora, two_stage, vision_unfrozen, distill, dpo, grpo, ptq, qat` | one pipeline per method in 1.0 |
 | `when_to_use_key` | i18n key `reference_pipeline.<id>.when` | one sentence, design writes vi/en |
-| `train_arch` | `{vision, projector, lm}` each `frozen | lora | full | quantized | n/a`, + optional `stages: [{name_key, vision, projector, lm}]` | drives the card's architecture diagram |
+| `train_arch` | `{vision, projector, lm}` each `frozen | lora | full | full_low_lr | n/a`, + `quant: null | nf4 | fp8 | nvfp4 | fp8_fake` (separate from the state: QLoRA is `lm: lora` + `quant: nf4`; PTQ is all `frozen` + `quant: fp8`), + `extras: [teacher | reference | rollout | reward]`, + optional `stages: [{name_key, vision, projector, lm, quant}]` | drives the card's architecture diagram (design spec I §2–3: `full_low_lr` = method #5 vision tower at a low LR; extras draw side blocks for distill/DPO/GRPO) |
+| `measured_with` | `{model, data}` display names | the card says "Đo với: {model}"; the method itself is model-agnostic (ADR-021) |
 | `source` | `{url, publisher, paper_url?}` | replaces `source_url` + `publisher` |
 | `license`, `difficulty`, `measured`, `steps`, `template_id`, `status` | unchanged | `measured` rules unchanged (sources cited) |
 
