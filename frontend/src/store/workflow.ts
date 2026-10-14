@@ -61,6 +61,8 @@ interface WorkflowState {
     status?: string;
     startedAt: number;
     endedAt?: number;
+    /** A "Chạy thử nhanh" run (a few steps), never a training result. */
+    trial?: boolean;
   } | null;
   loadCatalog(): Promise<void>;
   openTemplate(id: string): Promise<void>;
@@ -352,7 +354,15 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       const { run_id } = await api.startRun(wf, trial);
       const nodes: Record<string, NodeRunState> = {};
       for (const n of wf.nodes) nodes[n.id] = { status: "pending" };
-      set({ run: { id: run_id, nodes, done: false, startedAt: Date.now() } });
+      set({
+        run: {
+          id: run_id,
+          nodes,
+          done: false,
+          startedAt: Date.now(),
+          ...(trial ? { trial: true } : {}),
+        },
+      });
       unsubscribe = api.watchRun(run_id, (ev) => {
         const run = get().run;
         if (!run || run.id !== run_id) return;
@@ -386,7 +396,24 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
           const warnings = [...(prev.warnings ?? []), ev.error];
           set({ run: { ...run, nodes: { ...run.nodes, [ev.node_id]: { ...prev, warnings } } } });
         } else if (ev.type === "run_status") {
-          if (ev.status === "running") return;
+          if (ev.status === "running") {
+            // a trial runs one step and what feeds it: the others are not part of it, so the progress counts
+            // only the server's execution order
+            const trial = run.trial || ev.trial === true;
+            if (trial && ev.nodes?.length) {
+              const keep = new Set(ev.nodes);
+              set({
+                run: {
+                  ...run,
+                  trial: true,
+                  nodes: Object.fromEntries(
+                    Object.entries(run.nodes).filter(([id]) => keep.has(id)),
+                  ),
+                },
+              });
+            } else if (trial && !run.trial) set({ run: { ...run, trial: true } });
+            return;
+          }
           // Terminal (completed/failed/cancelled/interrupted/invalid): nodes never started stay as they are.
           set({ run: { ...run, done: true, status: ev.status, endedAt: Date.now() } });
         } else if (ev.type === "run_not_found" || ev.type === "connection_lost") {

@@ -6,6 +6,7 @@ import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
+import { TrialChip } from "./TrialChip";
 
 /** D4 left icon strip (48px): library flyout toggle; storage pinned at the bottom (DESIGN.md Layout). */
 export function IconStrip() {
@@ -162,6 +163,7 @@ export function StatusBar() {
           size={14}
         />
       </span>
+      {run.trial && <TrialChip />}
       <span>{text}</span>
       {!run.done && (
         <span

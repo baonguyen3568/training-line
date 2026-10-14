@@ -383,6 +383,8 @@ export interface RunStatusEvent {
   status: "running" | "invalid" | RunStatus;
   nodes?: string[]; // execution order, on "running"
   error?: EventError;
+  /** ADR-021 "Chạy thử nhanh": every run_status of a trial run says so. */
+  trial?: boolean;
 }
 export interface OtherEvent {
   /** `connection_lost` is synthesized by the client when the event socket closes before the run ends. */

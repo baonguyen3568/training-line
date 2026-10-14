@@ -386,3 +386,30 @@ describe("MODEL-005 in the mock follows the server", () => {
     expect(codes("train.grpo_vlm")).not.toContain("MODEL-005");
   });
 });
+
+describe("a trial run says so", () => {
+  it("the status bar carries 'Chạy thử' and counts only the steps the trial runs", async () => {
+    const { api } = await import("../src/api");
+    const { useWorkflow } = await import("../src/store/workflow");
+    const { t } = await import("../src/i18n");
+    await useWorkflow.getState().loadCatalog();
+    useWorkflow.getState().newWorkflow();
+    const m = useWorkflow.getState().addNode("model.hf_pick", { x: 0, y: 0 }) as string;
+    const tr = useWorkflow.getState().addNode("train.lora_vlm", { x: 300, y: 0 }) as string;
+    useWorkflow.getState().addNode("eval.benchmarks", { x: 600, y: 0 });
+    vi.spyOn(api, "startRun").mockResolvedValue({ run_id: "trial-1" });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal event sink for the test
+    let emit: (ev: any) => void = () => {};
+    vi.spyOn(api, "watchRun").mockImplementation((_id, onEvent) => {
+      emit = onEvent;
+      return () => {};
+    });
+    await act(() => useWorkflow.getState().startRun({ node: tr }));
+    expect(useWorkflow.getState().run?.trial).toBe(true);
+    act(() => emit({ type: "run_status", status: "running", nodes: [m, tr], trial: true }));
+    expect(Object.keys(useWorkflow.getState().run?.nodes ?? {}).sort()).toEqual([m, tr].sort());
+    const { StatusBar } = await import("../src/components/ShellD4");
+    const { container } = render(<StatusBar />);
+    expect(container.querySelector(".trial-chip")?.textContent?.trim()).toBe(t("run.trial_chip"));
+  });
+});

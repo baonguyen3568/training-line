@@ -15,6 +15,7 @@ import {
 import { EngineWarningsPanel } from "./EngineWarnings";
 import { Icon } from "./Icon";
 import { type ChartSeries, LineChart } from "./LineChart";
+import { TrialChip } from "./TrialChip";
 
 const POLL_MS = 3000;
 const MAX_POINTS = 2000; // display budget per chart (client LTTB)
@@ -155,6 +156,7 @@ export function RunMonitor({ runId }: { runId: string }) {
     <main className="run-monitor">
       <header className="run-head">
         <h1>{run.name ?? run.run_id}</h1>
+        {run.tags?.includes("trial") && <TrialChip />}
         <span className={`chip status-${status}`}>
           <span className={`si si-${status}`} aria-hidden="true">
             <Icon name={STATUS_ICON[status]} size={14} />

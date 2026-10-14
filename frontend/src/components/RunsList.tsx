@@ -5,6 +5,7 @@ import { t } from "../i18n";
 import { formatDateTime } from "../lib/format";
 import { useUi } from "../store/ui";
 import { EngineWarningsCell } from "./EngineWarnings";
+import { TrialChip } from "./TrialChip";
 
 export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
   const [runs, setRuns] = useState<RunInfo[] | null>(null);
@@ -51,6 +52,7 @@ export function RunsList({ onOpen }: { onOpen: (id: string) => void }) {
                   <button type="button" className="link" onClick={() => onOpen(r.run_id)}>
                     {r.name ?? r.run_id}
                   </button>
+                  {r.tags?.includes("trial") && <TrialChip />}
                 </td>
                 <td>{t(`run_monitor.status.${r.status ?? "running"}`)}</td>
                 <td>{r.started_at ? formatDateTime(r.started_at * 1000) : "—"}</td>

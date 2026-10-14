@@ -1616,3 +1616,15 @@ fieldset.seg-radio {
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
+/* "Chạy thử" (ADR-021 trial run): text ink, hairline, never accent (design) */
+.trial-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.chip.trial-chip {
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-axis);
+  background: transparent;
+}
