@@ -9,6 +9,17 @@
   DATASET_COLUMNS_MISSING {repo, missing, available}; DATA-011 DATASET_COLUMN_TYPE {repo, column, role, expected,
   found}. DATA-008 stays reserved for P020 (DATASET_NOT_FOR_NODE).
 
+## A1 (user, 2026-10-14) — folded in below
+
+- License unknown (no card id): the download is allowed, **export is blocked** for that asset and everything trained
+  from it (lineage check in the export worker: SEC-005 with `license: unknown`); a known license still needs the
+  confirmation before download.
+- **40 GB cap** per user-added model (`user_assets.max_model_gb` in the settings DB, default 40, the user may raise
+  it in Settings); over it → the existing large-download refusal with the cap named.
+- **WebDataset `.tar` / `.zip` in 1.0**: the hub job downloads the shards; extraction runs in a second job with
+  `--network none` (the OCRBench extraction path: `download/extracted.py`), limits from security (max members, max
+  member size, total expanded size, no links / absolute / `..` paths, image types only + json/txt sidecars).
+
 ## 0. Principle: a user-added asset becomes a catalog entry, so nothing downstream forks
 
 `check_support`, the workers, the estimates, the downloads and the cache all take a `CatalogEntry` today. A user-added
@@ -103,9 +114,11 @@ Params: `repo` (pattern = HF repo id), `revision?` (pinned at add time like mode
 | H3 | `model.hf_pick` 1.1.0 (user_model), catalog/entry lookup everywhere goes through one `resolve_entry()` | 0.5 d |
 | H4 | dataset inspect job + schema/sample API + column mapping + loader → Record | 1 d |
 | H5 | `data.hf_load` 1.1.0, DATA-V on hub data, quick trial action | 0.5 d |
+| H5b | WebDataset tar/zip: extraction job (network none, security limits) + `__key__` grouping → Record | 0.75 d |
+| H5c | A1: export lineage block for unknown licence + 40 GB setting | 0.25 d |
 | H6 | E2E with tester: 3 repos outside the catalog (research list), one remote-code repo blocked | 0.5 d |
 
-Total ≈ 3.5 backend days; H1–H3 can start as soon as research's family table has its first family (Qwen3.5
+Total ≈ 4.5 backend days (A1 adds ≈ 1 d); H1–H3 can start as soon as research's family table has its first family (Qwen3.5
 native is enough to test the path). Depends on: research `families.yaml` + recipes, fixcode codes, frontend dialogs.
 
 ## 7. Open questions
