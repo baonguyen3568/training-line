@@ -322,6 +322,9 @@ error:
   DATA-013:
     title: 'Workflow dùng bộ dữ liệu chưa có trên máy này'
     what: 'Workflow này dùng bộ dữ liệu "{repo}" do tác giả tự thêm, còn máy này chưa có. Bấm "Thêm bộ dữ liệu này" để thêm đúng bản tác giả đã dùng; bạn vẫn xem và xác nhận giấy phép trước khi tải.'
+  DATA-014:
+    title: 'Bộ dữ liệu này đang được dùng'
+    what: 'Bộ dữ liệu "{name}" đang được tải về hoặc có bước đang chạy đọc nó, nên chưa đổi hay xoá được. Đợi xong rồi thử lại.'
   CFG-001:
     title: Hai bước này không nối được với nhau
     what: Đầu ra của "{a}" là {type_a} nhưng "{b}" cần {type_b}.

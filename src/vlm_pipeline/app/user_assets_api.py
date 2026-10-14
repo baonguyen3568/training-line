@@ -277,6 +277,11 @@ def _register_dataset_record_routes(app: FastAPI, service: Any, root: Path, insp
         try:
             columns = user_datasets.ColumnMap.model_validate(body.columns)
         except ValueError:
+            from vlm_pipeline.download.convert import MAX_PROMPT
+
+            if len(body.columns.get("prompt") or "") > MAX_PROMPT:
+                raise HTTPException(status_code=400, detail={"code": "CFG-005", "params": {
+                    "param": "prompt", "rule": "range"}}) from None  # fmt: skip
             missing = "image" if "image" not in body.columns else "answer"
             params = {"repo": seen.repo, "missing": missing, "available": ", ".join(seen.columns[:10])}
             raise HTTPException(status_code=400, detail={"code": "DATA-010", "params": params}) from None
@@ -285,6 +290,9 @@ def _register_dataset_record_routes(app: FastAPI, service: Any, root: Path, insp
         except VlmPipelineError as exc:
             raise HTTPException(status_code=400, detail={"code": exc.code, "params": exc.params}) from None
         kept = user_datasets.load(root, record.id)  # the same split again: the licence answer stays
+        if kept is not None and kept.columns != columns:  # another mapping or question: convert again
+            _not_in_use(root, record.id, kept.to_api()["name"], service)
+            user_datasets.drop_converted(root, record.id)
         if kept is not None and kept.revision == record.revision:
             record = record.model_copy(update={"license_confirmed": kept.license_confirmed,
                                                "license_confirmed_sha": kept.license_confirmed_sha,
@@ -306,9 +314,22 @@ def _register_dataset_record_routes(app: FastAPI, service: Any, root: Path, insp
 
     @app.delete("/api/user-assets/datasets/{dataset_id}")
     def remove_dataset(dataset_id: str) -> dict[str, Any]:
+        record = user_datasets.load(root, dataset_id)
+        if record is not None:
+            _not_in_use(root, dataset_id, str(record.to_api()["name"]), service)
         if not user_datasets.delete(root, dataset_id):
             raise not_found()
         return {"deleted": dataset_id}
+
+
+def _not_in_use(root: Path, dataset_id: str, name: object, service: Any) -> None:
+    """409 DATA-014 while the converted folder is being written or read (it is about to be deleted)."""
+    from vlm_pipeline.app import user_datasets
+
+    why = user_datasets.in_use(root, dataset_id, list(service.downloads.values()))
+    if why is not None:
+        run = "" if why == "downloading" else why
+        raise HTTPException(status_code=409, detail={"code": "DATA-014", "params": {"name": str(name), "run": run}})
 
 
 def _hub_job(service: Any, job_id: str, kind: str) -> Any:

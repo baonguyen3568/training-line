@@ -96,3 +96,16 @@ def test_a_huge_line_is_refused_without_reading_it_whole(tmp_path: Path, monkeyp
     rc, out = _run(tmp_path, {"t.jsonl": b'{"a": "' + b"x" * 500}, {"files": ["t.jsonl"], "format": "jsonl",
                                                                    "mapping": {"answer": "a"}})  # fmt: skip
     assert (rc, json.loads((out / "report.json").read_text())) == (4, {"error": "line_too_long"})
+
+
+def test_the_shared_question_fills_only_the_rows_without_one(tmp_path: Path) -> None:
+    """design 2026-10-14: a user's shared question (e.g. Vietnamese) instead of the trainer's English default."""
+    meta = [{"file_name": "a.png", "question": "", "answer": "A"},
+            {"file_name": "a.png", "question": "Own?", "answer": "B"}]  # fmt: skip
+    files = {"t/metadata.jsonl": "\n".join(json.dumps(m) for m in meta).encode(), "t/a.png": _img()}
+    spec = {"files": ["t/metadata.jsonl"], "format": "imagefolder", "prompt": "Đọc hoá đơn này\x07",
+            "mapping": {"image": "file_name", "question": "question", "answer": "answer"}}  # fmt: skip
+    rc, out = _run(tmp_path, files, spec)
+    assert rc == 0
+    prompts = [json.loads(x).get("prompt") for x in (out / "labels.jsonl").read_text().splitlines()]
+    assert prompts == ["Đọc hoá đơn này", "Own?"]  # control characters dropped; a row's own question wins

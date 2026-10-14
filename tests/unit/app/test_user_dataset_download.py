@@ -203,3 +203,29 @@ def test_a_converted_folder_with_anything_else_is_refused(tmp_path: Path, stray:
     (out / stray).write_text("x")
     with pytest.raises(user_datasets.DatasetUnreadableError):
         user_datasets._check_converted(out)
+
+
+def test_another_question_converts_again_but_never_under_a_live_user(
+    service: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """design: the shared question goes into labels.jsonl; security: never delete the folder while it is in use."""
+    _fake_jobs(monkeypatch, service.root, [])
+    client = _client(service)
+    assert _added(service, client).status_code == 200
+    assert client.post(f"/api/user-assets/datasets/{DS_ID}/confirm-license", json={"accept": True}).status_code == 200
+    assert _wait(service, service.start("dataset", DS_ID, confirm=True)["download_id"]).status == "completed"
+    folder = user_datasets.data_folder(service.root, DS_ID)
+    cols = {"image": "file_name", "question": "question", "answer": "answer", "prompt": "Đọc hoá đơn"}
+    monkeypatch.setattr(user_datasets, "in_use", lambda root, dataset_id, downloads: "n1-x")
+    busy = _added(service, client, cols)
+    assert (busy.status_code, busy.json()["detail"]["code"]) == (409, "DATA-014")
+    assert busy.json()["detail"]["params"]["run"] == "n1-x"
+    assert (folder / "labels.jsonl").is_file()  # untouched
+    assert client.delete(f"/api/user-assets/datasets/{DS_ID}").status_code == 409
+    assert (folder / "labels.jsonl").is_file()
+    monkeypatch.setattr(user_datasets, "in_use", lambda root, dataset_id, downloads: None)
+    added = _added(service, client, cols)
+    assert added.json()["dataset"]["prompt"] == "Đọc hoá đơn"
+    assert not folder.exists()  # the next download converts with the new question
+    too_long = _added(service, client, {**cols, "prompt": "x" * 2001})
+    assert (too_long.status_code, too_long.json()["detail"]["code"]) == (400, "CFG-005")

@@ -14,10 +14,11 @@ import re
 import stat
 import tempfile
 import time
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from vlm_pipeline.app.user_assets import _card_text, _card_words
 from vlm_pipeline.common.catalog import normalize_license
@@ -25,6 +26,7 @@ from vlm_pipeline.common.download_rules import name_ok
 from vlm_pipeline.common.errors import VlmPipelineError
 from vlm_pipeline.common.local_records import DEFAULT_PROMPT
 from vlm_pipeline.common.runinfo import read_small_json
+from vlm_pipeline.download.convert import MAX_PROMPT, clean
 from vlm_pipeline.download.resolver import RepoFilesInvalidError, user_dataset_id
 
 INSPECT_MAX = 2 << 20
@@ -170,7 +172,12 @@ _COLUMN = r"^[A-Za-z0-9_.\- ]{1,64}$"
 
 
 class ColumnMap(BaseModel):
-    """Which column plays which role (the column-mapping screen): an image, and messages or question + answer."""
+    """Which column plays which role (the column-mapping screen): an image, and messages or question + answer.
+
+    ``prompt`` is not a column: the question a sample is asked when it has none (no question column, an empty cell,
+    or a conversation without a user turn); None = ``DEFAULT_PROMPT``. Written into labels.jsonl by the convert job,
+    so a new prompt is a new dataset for the cache (design 2026-10-14: a Vietnamese user must see and choose it).
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -178,6 +185,13 @@ class ColumnMap(BaseModel):
     question: str | None = Field(None, pattern=_COLUMN)
     answer: str | None = Field(None, pattern=_COLUMN)
     messages: str | None = Field(None, pattern=_COLUMN)
+    prompt: str | None = Field(None, max_length=MAX_PROMPT)
+
+    @field_validator("prompt")
+    @classmethod
+    def _prompt_text(cls, value: str | None) -> str | None:
+        """Control characters dropped, trimmed (as convert does); blank means the default question."""
+        return clean(value, MAX_PROMPT) or None if value is not None else None
 
     @model_validator(mode="after")
     def _texts(self) -> Self:
@@ -188,7 +202,8 @@ class ColumnMap(BaseModel):
         return self
 
     def roles(self) -> dict[str, str]:
-        return {k: v for k, v in self.model_dump().items() if v is not None}
+        """Role -> column name (the prompt is text, not a column)."""
+        return {k: v for k, v in self.model_dump(exclude={"prompt"}).items() if v is not None}
 
 
 class _SplitFile(BaseModel):
@@ -242,6 +257,7 @@ class UserDatasetRecord(BaseModel):
                 "format": self.format, "size_gb": round(self.size_bytes / (1 << 30), 2),
                 "license": licence, "license_card": self.license_card,
                 "license_confirmed": self.license_confirmed, "gated": self.gated, "columns": self.columns.roles(),
+                "prompt": self.columns.prompt,
                 "rows": self.rows, "verified": False}  # fmt: skip
 
 
@@ -279,6 +295,51 @@ def list_all(root: Path) -> list[UserDatasetRecord]:
     folder = root / STORE_REL
     names = sorted(p.stem for p in folder.glob("user--ds--*.json")) if folder.is_dir() else []
     return [r for r in (load(root, n) for n in names) if r is not None]
+
+
+def in_use(root: Path, dataset_id: str, downloads: Iterable[Any]) -> str | None:
+    """Why the converted folder must not be deleted now, else None (security H5).
+
+    ``"downloading"`` while a download / convert of this id is not finished, else the id of a queued / running run
+    (graph node runs and stand-alone runs) whose dataset names this origin (``#origin=<id>``) and is not surely gone.
+    """
+    from vlm_pipeline.common.runinfo import read_manifest
+
+    if any(d.asset.catalog_id == dataset_id and d.status not in ("completed", "failed") for d in downloads):
+        return "downloading"
+    for runs in (root / "outputs" / "runs", root / "outputs" / "graph" / "runs"):
+        for run_dir in sorted(runs.iterdir()) if runs.is_dir() else []:
+            if run_dir.is_symlink() or not (run_dir / "run.json").is_file():
+                continue
+            try:
+                m = read_manifest(run_dir)
+            except (OSError, ValueError):
+                continue
+            if m.status in ("queued", "running") and f"#origin={dataset_id}" in (m.dataset or "") and _alive(m):
+                return m.run_id
+    return None
+
+
+def _alive(manifest: Any) -> bool:
+    """Still in use unless ``holder_gone`` is CERTAIN the writer is gone (security: never an own pid check).
+
+    The app runs in a container and a CLI run on the host has a pid of another namespace (or a reused one), so a
+    plain ``kill(pid, 0)`` would fail open. A run stuck in "running" only blocks re-mapping until the reaper marks it.
+    """
+    from vlm_pipeline.common.run_claims import holder_gone
+
+    return holder_gone(manifest.model_dump()) is not True
+
+
+def drop_converted(root: Path, dataset_id: str) -> None:
+    """Remove a converted folder made with another mapping or prompt: the next download converts it again."""
+    import shutil
+
+    if len(dataset_id) > MAX_ID or not DATASET_ID.fullmatch(dataset_id):
+        return
+    data = _store(root) / dataset_id
+    if data.is_dir() and not data.is_symlink():
+        shutil.rmtree(data)
 
 
 def delete(root: Path, dataset_id: str) -> bool:
@@ -381,7 +442,7 @@ def convert_and_install(service: Any, d: Any, record: UserDatasetRecord, files: 
     spec_path = service.root / "outputs" / "runs" / f"{d.run_id}" / "convert_spec.json"
     spec_path.write_text(json.dumps({"files": [f.name for f in record.files if not f.name.lower().endswith(
         (".png", ".jpg", ".jpeg", ".webp"))], "format": record.format, "mapping": record.columns.roles(),
-        "limit": 0, "max_bytes": budget * 3}), encoding="utf-8")  # fmt: skip
+        "prompt": record.columns.prompt or "", "limit": 0, "max_bytes": budget * 3}), encoding="utf-8")  # fmt: skip
     argv = ("python", "-m", "vlm_pipeline.download.convert", "--files", container(files),
             "--spec", container(spec_path), "--out", container(out))  # fmt: skip
     final = service.run_data_job(d, name, argv, (files, spec_path.parent))

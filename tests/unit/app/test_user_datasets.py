@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from vlm_pipeline.app import downloads, user_datasets
 from vlm_pipeline.app.downloads import DownloadService
-from vlm_pipeline.common.catalog import set_user_model_lookup
+from vlm_pipeline.common.catalog import set_user_model_lookup, user_dataset_id
 from vlm_pipeline.common.jobrun import CONTAINER_ROOT
 from vlm_pipeline.common.local_records import DEFAULT_PROMPT
 from vlm_pipeline.common.runinfo import RunStatus
@@ -168,3 +168,52 @@ def test_a_model_resolve_id_is_not_an_inspection(service: Any) -> None:
     client = _client(service)
     assert client.get("/api/user-assets/inspections/20261014-1200-rs-deadbeef").status_code == 404
     assert client.get("/api/user-assets/inspections/20261014-1200-rs-deadbeef/thumbs/0.png").status_code == 404
+
+
+@pytest.mark.parametrize(("given", "kept"), [(None, None), ("  ", None), ("Đọc hoá đơn\x00 ", "Đọc hoá đơn")])
+def test_the_shared_question_is_text_not_a_column(given: str | None, kept: str | None) -> None:
+    columns = user_datasets.ColumnMap(image="img", answer="ans", prompt=given)
+    assert columns.prompt == kept
+    assert columns.roles() == {"image": "img", "answer": "ans"}  # never sent as a column to the convert job
+    with pytest.raises(ValueError, match="prompt"):
+        user_datasets.ColumnMap(image="img", answer="ans", prompt="x" * (user_datasets.MAX_PROMPT + 1))
+
+
+def test_another_mapping_drops_the_converted_folder(tmp_path: Path) -> None:
+    dataset_id = user_dataset_id("org/d", "c" * 40, "default", "train")
+    folder = tmp_path / ".cache" / "user_assets" / "datasets" / dataset_id
+    folder.mkdir(parents=True)
+    (folder / "labels.jsonl").write_text("{}\n")
+    user_datasets.drop_converted(tmp_path, dataset_id)
+    assert not folder.exists()
+    user_datasets.drop_converted(tmp_path, "../../etc")  # not an id: nothing happens
+
+
+def test_a_dataset_in_use_is_never_deleted_under_a_run(tmp_path: Path) -> None:
+    """security H5: a download / convert of the id, or a live run reading it, keeps its converted folder (DATA-014)."""
+    import json as _json
+    import os as _os
+    from types import SimpleNamespace
+
+    dataset_id = user_dataset_id("org/d", "c" * 40, "default", "train")
+    busy = SimpleNamespace(asset=SimpleNamespace(catalog_id=dataset_id), status="installing")
+    assert user_datasets.in_use(tmp_path, dataset_id, [busy]) == "downloading"
+    assert user_datasets.in_use(tmp_path, dataset_id, [SimpleNamespace(asset=busy.asset, status="failed")]) is None
+    run = tmp_path / "outputs" / "graph" / "runs" / "n1-x"
+    run.mkdir(parents=True)
+
+    def manifest(status: str, pid: int | None, origin: str = dataset_id) -> None:
+        (run / "run.json").write_text(_json.dumps({
+            "schema_version": 1, "run_id": "n1-x", "name": "t", "stage": "train", "task": "train.lora_vlm",
+            "status": status, "pid": pid, "dataset": f"local:{'a' * 64}#split=train#origin={origin}"}))  # fmt: skip
+
+    manifest("running", _os.getpid())
+    assert user_datasets.in_use(tmp_path, dataset_id, []) == "n1-x"
+    manifest("running", None)  # no pid: maybe still reading
+    assert user_datasets.in_use(tmp_path, dataset_id, []) == "n1-x"
+    manifest("running", 2**22 + 12345)  # no such pid here (a host CLI run seen from the app container): still in use
+    assert user_datasets.in_use(tmp_path, dataset_id, []) == "n1-x"
+    manifest("completed", _os.getpid())
+    assert user_datasets.in_use(tmp_path, dataset_id, []) is None
+    manifest("running", _os.getpid(), origin=user_dataset_id("org/other", "c" * 40, "default", "train"))
+    assert user_datasets.in_use(tmp_path, dataset_id, []) is None

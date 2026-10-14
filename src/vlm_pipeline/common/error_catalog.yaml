@@ -452,6 +452,19 @@ DATA-013:
   actions:
     - {id: add_user_dataset, kind: navigate, target: add_dataset_dialog, confirm: false}
 
+DATA-014:
+  slug: USER_DATASET_IN_USE
+  severity: error
+  prevent_in_preflight: false
+  # ADR-021 H5 (security 2026-10-14): re-mapping (columns / shared question) or removing a user dataset deletes its
+  # converted folder; refused (409) while that folder is being downloaded / converted or a live run reads it.
+  # name = the dataset's display name; run = the live run's id ("" while it is downloading).
+  params: [name, run]
+  match:
+    - {kind: executor, value: "POST /api/user-assets/datasets (another mapping) or DELETE while the dataset is in use"}
+  actions:
+    - {id: keep_waiting, kind: navigate, target: run_queue, confirm: false}
+
 MODEL-001:
   slug: CKPT_LOAD_KEY_MISMATCH
   severity: error

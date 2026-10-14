@@ -322,6 +322,9 @@ error:
   DATA-013:
     title: 'This workflow uses a dataset not added here'
     what: 'This workflow uses dataset "{repo}", which its author added themselves and this machine does not have yet. Click "Add this dataset" to add the exact version the author used; you still review and confirm the license before downloading.'
+  DATA-014:
+    title: 'This dataset is in use right now'
+    what: 'Dataset "{name}" is being downloaded or a running step is reading it, so it cannot be changed or removed now. Wait until that finishes, then try again.'
   CFG-001:
     title: These two steps can't connect
     what: '"{a}" outputs {type_a} but "{b}" needs {type_b}.'

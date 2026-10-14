@@ -144,7 +144,7 @@ def _texts(row: Mapping[str, Any], mapping: Mapping[str, str]) -> tuple[str, str
 
 # --------------------------------------------------------------------------------------------- convert
 def convert(files: list[Path], fmt: str, mapping: Mapping[str, str], out: Path, *, limit: int,
-            max_bytes: int) -> dict[str, Any]:  # fmt: skip
+            max_bytes: int, default_prompt: str = "") -> dict[str, Any]:  # fmt: skip
     from vlm_pipeline.common.image_rules import ImageRuleError, open_image_bytes
 
     images = out / "images"
@@ -157,6 +157,7 @@ def convert(files: list[Path], fmt: str, mapping: Mapping[str, str], out: Path, 
                 if (limit and rows >= limit) or rows >= MAX_ROWS:
                     break
                 prompt, target = _texts(row, mapping)
+                prompt = prompt or default_prompt  # the user's shared question; none: the trainer's DEFAULT_PROMPT
                 if not target:
                     skipped["empty_target"] += 1
                     continue
@@ -200,7 +201,8 @@ def main(argv: list[str] | None = None) -> int:
         files.append(path)
     try:
         report = convert(files, spec["format"], spec["mapping"], args.out, limit=int(spec.get("limit", 0)),
-                         max_bytes=int(spec["max_bytes"]))  # fmt: skip
+                         max_bytes=int(spec["max_bytes"]),
+                         default_prompt=clean(spec.get("prompt"), MAX_PROMPT))  # fmt: skip
     except (ConvertError, OSError, ValueError, UnicodeDecodeError) as exc:
         reason = exc.reason if isinstance(exc, ConvertError) else "unreadable"
         (args.out / "report.json").write_text(json.dumps({"error": reason}), encoding="utf-8")
