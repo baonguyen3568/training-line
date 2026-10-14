@@ -335,6 +335,7 @@ PENDING_PATCH_PARAMS = {
     "torch_compile": "no compile option exposed on any node yet",
     "skip_invalid_samples": "data nodes do not skip samples yet (B-3b reports them, DATA-006)",
     "convert_images_rgb": "no automatic image conversion node yet",
+    "revision": "the hub dataset node (ADR-021 / P021) is not registered yet",
 }
 
 
@@ -400,3 +401,42 @@ def test_not_downloaded_offers_download_only_when_the_app_can_download(reason: s
     assert ("download" in ids) is download
     assert "pick_other_asset" in ids
     assert variant_key("NET-002", {"reason": reason}) == reason
+
+
+def test_data011_renders_role_and_kinds_as_words_not_ids() -> None:
+    from vlm_pipeline.app.main import _render_issue
+
+    issue = {"code": "DATA-011", "params": {"repo": "a/b", "column": "img", "role": "image", "expected": "image",
+                                            "found": "text"}}  # fmt: skip
+    vi = _render_issue(issue, "vi")["what"]
+    assert "chứa chữ, không dùng làm cột ảnh" in vi
+    assert "(cần ảnh)" in vi
+    en = _render_issue(issue, "en")["what"]
+    assert "holds text, so it cannot be the image column (it needs images)" in en
+    assert issue["params"]["found"] == "text"  # raw params stay ids for the UI
+
+
+def test_word_param_unknown_kind_falls_back_to_other() -> None:
+    from vlm_pipeline.common.error_catalog import word_params
+
+    words = {"byo.kind.other": "kiểu khác", "byo.role.image": "cột ảnh"}
+    shown = word_params("DATA-011", {"role": "image", "found": "Sequence(int64)", "column": "x"}, words.get)
+    assert shown == {"role": "cột ảnh", "found": "kiểu khác", "column": "x"}
+
+
+def test_data009_offers_the_parquet_export_only_when_the_hub_has_one() -> None:
+    from vlm_pipeline.common.error_catalog import available_actions
+
+    with_export = SimpleNamespace(code="DATA-009", params={"repo": "a/b", "has_parquet_export": True})
+    without = SimpleNamespace(code="DATA-009", params={"repo": "a/b", "has_parquet_export": False})
+    assert available_actions(with_export) == ["use_parquet_export", "fix_repo_id"]
+    assert available_actions(without) == ["fix_repo_id"]
+
+
+def test_model005_offers_a_trial_run_of_the_step_not_a_patch() -> None:
+    from vlm_pipeline.common.error_catalog import resolved_actions
+
+    err = SimpleNamespace(code="MODEL-005", params={"node": "n3", "model": "Qwen/Qwen3.5-2B"})
+    assert resolved_actions(err, node_id="n3") == [
+        {"id": "run_smoke", "kind": "trial", "confirm": False, "target": None, "patch": None, "node_id": "n3"}
+    ]

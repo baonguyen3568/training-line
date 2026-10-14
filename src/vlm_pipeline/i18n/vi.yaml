@@ -261,6 +261,44 @@ error:
   NET-004:
     title: "Vượt hạn mức tải của máy"
     what: 'Lần tải này cần {size_gb} GB, vượt hạn mức tải {quota_gb} GB do quản trị viên đặt. Hãy nhờ quản trị viên nới hạn mức, hoặc chọn model nhỏ hơn.'
+  NET-005:
+    title: 'Không đọc được repo trên Hugging Face'
+    what:
+      not_found: 'Không tìm thấy repo "{repo}" trên Hugging Face. Hãy kiểm tra lại tên (dạng tổ-chức/tên-repo).'
+      not_found_or_private: 'Không tìm thấy repo "{repo}", hoặc đây là repo riêng tư. Nếu repo riêng tư, hãy lưu token Hugging Face trong Cài đặt rồi thử lại.'
+      gated_no_token: 'Repo "{repo}" yêu cầu đăng nhập và đồng ý điều khoản. Hãy lưu token Hugging Face trong Cài đặt.'
+      gated_not_accepted: 'Tài khoản Hugging Face của bạn chưa được duyệt dùng repo "{repo}". Mở trang repo, đồng ý điều khoản, rồi thử lại.'
+      network: 'Không kết nối được tới Hugging Face để đọc repo "{repo}". Hãy kiểm tra mạng rồi thử lại.'
+  MODEL-003:
+    title: 'Kiến trúc model này chưa được hỗ trợ'
+    what: 'Model "{repo}" dùng kiến trúc {architecture} ({model_type}), app chưa train được kiến trúc này. Hãy chọn một model khác, hoặc đề nghị hỗ trợ kiến trúc này.'
+  MODEL-004:
+    title: 'Model này chưa dùng được vì lý do an toàn'
+    what:
+      remote_code: 'Model "{repo}" cần chạy mã Python đi kèm, mà app không chạy mã của model bạn tự thêm. Hãy chọn model khác, hoặc đề nghị đưa model này vào danh mục đã kiểm chứng.'
+      unreadable_config: 'Tệp cấu hình "{file}" của model "{repo}" quá lớn nên app không kiểm tra được an toàn, vì vậy app không dùng model này. Hãy chọn model khác, hoặc đề nghị đưa model này vào danh mục đã kiểm chứng.'
+    why: 'Để an toàn, app chỉ chạy mã của những model đã được đội ngũ kiểm tra.'
+  MODEL-005:
+    title: 'Nên chạy thử nhanh trước'
+    what: 'Model "{model}" do bạn tự thêm nên chưa được kiểm chứng. Nên chạy thử nhanh vài bước ở bước "{node}" trước khi huấn luyện thật.'
+  SEC-005:
+    title: 'Chưa xác nhận giấy phép'
+    what: 'Bạn cần đọc và xác nhận giấy phép ({license}) của "{name}" trước khi app tải về.'
+  DATA-009:
+    title: 'Bộ dữ liệu này cần chạy mã riêng'
+    what:
+      has_parquet_export: 'Bộ dữ liệu "{repo}" được nạp bằng mã Python riêng, app không chạy mã đó. Hugging Face có sẵn bản chuyển đổi sang tệp dữ liệu; bấm "Dùng bản chuyển đổi" để app đọc bản đó.'
+      not_has_parquet_export: 'Bộ dữ liệu "{repo}" được nạp bằng mã Python riêng, app không chạy mã đó. Hãy chọn bộ dữ liệu khác có sẵn tệp dữ liệu (parquet, json hoặc thư mục ảnh).'
+  DATA-010:
+    title: 'Chưa ghép đủ cột dữ liệu'
+    what:
+      image: 'Bộ dữ liệu "{repo}" chưa có cột ảnh được ghép. Các cột hiện có: {available}.'
+      question: 'Bộ dữ liệu "{repo}" chưa có cột câu hỏi được ghép. Các cột hiện có: {available}.'
+      answer: 'Bộ dữ liệu "{repo}" chưa có cột câu trả lời được ghép. Các cột hiện có: {available}.'
+      messages: 'Bộ dữ liệu "{repo}" chưa có cột hội thoại (messages) được ghép. Các cột hiện có: {available}.'
+  DATA-011:
+    title: 'Cột dữ liệu không đúng loại'
+    what: 'Cột "{column}" của "{repo}" chứa {found}, không dùng làm {role} được (cần {expected}). Hãy chọn cột khác.'
   CFG-001:
     title: Hai bước này không nối được với nhau
     what: Đầu ra của "{a}" là {type_a} nhưng "{b}" cần {type_b}.
@@ -320,6 +358,13 @@ quick_fix:
   apply: Áp dụng
   applied: 'Đã áp dụng: {action}. Bấm Hoàn tác (Ctrl+Z) để quay lại.'
 action:
+  open_hub_page: 'Mở trang repo'
+  fix_repo_id: 'Sửa tên repo'
+  request_catalog: 'Đề nghị thêm vào danh mục'
+  confirm_license: 'Đọc và xác nhận giấy phép'
+  open_column_mapping: 'Ghép cột dữ liệu'
+  use_parquet_export: 'Dùng bản chuyển đổi'
+  run_smoke: 'Chạy thử nhanh'
   open_inner_step: 'Mở bước bị lỗi'
   check_files: Kiểm tra tệp
   migrate_node: Xem thay đổi và cập nhật

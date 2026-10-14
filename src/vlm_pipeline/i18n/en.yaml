@@ -261,6 +261,44 @@ error:
   NET-004:
     title: "Over this machine's download limit"
     what: 'This download needs {size_gb} GB, over the {quota_gb} GB limit set by the admin. Ask the admin to raise it, or pick a smaller model.'
+  NET-005:
+    title: 'Could not read the Hugging Face repo'
+    what:
+      not_found: 'Repo "{repo}" was not found on Hugging Face. Check the name (organization/repo-name).'
+      not_found_or_private: 'Repo "{repo}" was not found, or it is private. If it is private, save your Hugging Face token in Settings and try again.'
+      gated_no_token: 'Repo "{repo}" requires signing in and accepting its terms. Save your Hugging Face token in Settings.'
+      gated_not_accepted: 'Your Hugging Face account has not been granted access to "{repo}" yet. Open the repo page, accept the terms, and try again.'
+      network: 'Could not reach Hugging Face to read "{repo}". Check the network and try again.'
+  MODEL-003:
+    title: 'This model architecture is not supported yet'
+    what: 'Model "{repo}" uses the {architecture} architecture ({model_type}), which the app cannot train yet. Pick another model, or ask for this architecture to be supported.'
+  MODEL-004:
+    title: "This model can't be used for safety reasons"
+    what:
+      remote_code: 'Model "{repo}" needs to run the Python code that ships with it, and the app does not run code from models you add yourself. Pick another model, or ask for it to be added to the verified catalog.'
+      unreadable_config: 'The config file "{file}" of model "{repo}" is too large for the app to check that it is safe, so the app does not use this model. Pick another model, or ask for it to be added to the verified catalog.'
+    why: 'For safety, the app only runs code from models the team has checked.'
+  MODEL-005:
+    title: 'Try a quick run first'
+    what: 'You added model "{model}" yourself, so it has not been verified. Do a quick test run of a few steps in "{node}" before the real training.'
+  SEC-005:
+    title: 'License not confirmed yet'
+    what: 'Read and confirm the license ({license}) of "{name}" before the app downloads it.'
+  DATA-009:
+    title: 'This dataset runs its own code'
+    what:
+      has_parquet_export: 'Dataset "{repo}" is loaded by its own Python script, which the app does not run. Hugging Face has a converted copy as plain data files; click "Use the converted copy" to read that instead.'
+      not_has_parquet_export: 'Dataset "{repo}" is loaded by its own Python script, which the app does not run. Pick another dataset that ships plain data files (parquet, json or an image folder).'
+  DATA-010:
+    title: 'Some data columns are not mapped yet'
+    what:
+      image: 'Dataset "{repo}" has no image column mapped. Available columns: {available}.'
+      question: 'Dataset "{repo}" has no question column mapped. Available columns: {available}.'
+      answer: 'Dataset "{repo}" has no answer column mapped. Available columns: {available}.'
+      messages: 'Dataset "{repo}" has no conversation (messages) column mapped. Available columns: {available}.'
+  DATA-011:
+    title: 'A data column has the wrong type'
+    what: 'Column "{column}" of "{repo}" holds {found}, so it cannot be the {role} (it needs {expected}). Pick another column.'
   CFG-001:
     title: These two steps can't connect
     what: '"{a}" outputs {type_a} but "{b}" needs {type_b}.'
@@ -320,6 +358,13 @@ quick_fix:
   apply: Apply
   applied: 'Applied: {action}. Press Undo (Ctrl+Z) to go back.'
 action:
+  open_hub_page: 'Open the repo page'
+  fix_repo_id: 'Fix the repo name'
+  request_catalog: 'Ask to add it to the catalog'
+  confirm_license: 'Read and confirm the license'
+  open_column_mapping: 'Map the data columns'
+  use_parquet_export: 'Use the converted copy'
+  run_smoke: 'Quick test run'
   open_inner_step: 'Open the failing step'
   check_files: Check files
   migrate_node: Review changes and update

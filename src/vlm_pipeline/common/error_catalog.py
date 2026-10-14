@@ -46,11 +46,16 @@ class Param(_Frozen):
     # The raw value is an internal id (node id, port name, param name, port type id): ``display_params`` swaps it
     # for its localized label before rendering, the raw id stays on the Issue (node_id/port/param) for the UI.
     ref: ParamRef | None = None
+    # i18n key prefix for a param whose raw value is a fixed word id (``byo.kind`` + ``image`` -> "ảnh"):
+    # ``word_params`` renders ``<words>.<value>``, else ``<words>.other``, else the raw value.
+    words: str | None = None
 
     @model_validator(mode="after")
     def _enum_has_values(self) -> Self:
         if self.type == "enum" and not self.values:
             raise ValueError(f"enum param {self.name!r} needs values")
+        if self.words is not None and self.ref is not None:
+            raise ValueError(f"param {self.name!r}: words and ref are exclusive")
         return self
 
 
@@ -72,7 +77,8 @@ class PatchOp(_Frozen):
 
 class Action(_Frozen):
     id: str
-    kind: Literal["patch", "resume", "navigate"]
+    # trial: a quick server-side trial run of the step the issue points at (node_id), its params unchanged.
+    kind: Literal["patch", "resume", "navigate", "trial"]
     confirm: bool
     target: str | None = None
     patch: tuple[PatchOp, ...] | None = None
@@ -408,6 +414,18 @@ def display_params(
     return out
 
 
+def word_params(code: str, params: Mapping[str, object], translate: Callable[[str], str | None]) -> dict[str, object]:
+    """Params with word-id entries (``Param.words``) replaced by their localized word; needs no workflow."""
+    entry = load_catalog().get(code)
+    out = dict(params)
+    for p in entry.params if entry else ():
+        raw = out.get(p.name)
+        if p.words is None or not isinstance(raw, str) or not raw:
+            continue
+        out[p.name] = translate(f"{p.words}.{raw}") or translate(f"{p.words}.other") or raw
+    return out
+
+
 __all__ = [
     "Action",
     "CatalogError",
@@ -428,4 +446,5 @@ __all__ = [
     "log_matches",
     "resolved_actions",
     "variant_key",
+    "word_params",
 ]

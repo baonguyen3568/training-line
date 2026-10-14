@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from vlm_pipeline import i18n
 from vlm_pipeline.app.events import EventBus
 from vlm_pipeline.app.services import BadRequestError, NotAvailableError, Services
-from vlm_pipeline.common.error_catalog import Labels, display_params, variant_key
+from vlm_pipeline.common.error_catalog import Labels, display_params, variant_key, word_params
 from vlm_pipeline.nodes.standards import MESSAGE_PATTERN, STANDARD_CODE
 
 Locale = Annotated[str, Query(pattern="^(vi|en)$")]
@@ -52,6 +52,11 @@ def _labels(workflow: Mapping[str, Any], registry: Any, locale: str) -> Labels:
     )
 
 
+def _translated(key: str, locale: str) -> str | None:
+    text = i18n.load(locale).get(key)  # not i18n.t: a miss (an unknown word id -> ".other") is expected, not a warning
+    return text if isinstance(text, str) else None
+
+
 _STD_MESSAGE = re.compile(MESSAGE_PATTERN)  # only standards.* keys may replace error.STD-001.what
 
 
@@ -60,6 +65,7 @@ def _render_issue(issue: Mapping[str, Any], locale: str, labels: Labels | None =
     raw = dict(issue.get("params") or {})
     node_id = issue.get("node_id")
     params = display_params(code, raw, labels, node_id=node_id if isinstance(node_id, str) else None) if labels else raw
+    params = word_params(code, params, lambda key: _translated(key, locale))
     out = dict(issue)  # node_id / port / param / params stay raw for the UI
     texts = i18n.load(locale)
     variant = variant_key(code, raw)  # chosen on raw ids, never on display labels

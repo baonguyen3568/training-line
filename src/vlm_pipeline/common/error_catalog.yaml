@@ -371,6 +371,55 @@ DATA-007:
   actions:
     - {id: pick_workspace_folder, kind: navigate, target: folder_picker, confirm: false}
 
+DATA-009:
+  slug: DATASET_HAS_SCRIPT
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 §4: a dataset repo that is loaded by its own Python script is never run (only parquet / arrow / json /
+  # imagefolder). has_parquet_export: the hub's automatic parquet conversion exists for it.
+  params: [repo, {name: has_parquet_export, type: bool}]
+  variant_by: has_parquet_export
+  match:
+    - {kind: executor, value: "hub dataset resolver: loading script in the repo (ADR-021 §4)"}
+  actions:
+    # The hub's own parquet conversion branch; inspect pins it to a 40-char sha like any revision (P021 §Inspect).
+    - {id: use_parquet_export, kind: patch, patch: [{param: revision, op: set, value: refs/convert/parquet}], confirm: false, when: {has_parquet_export: true}}
+    - {id: fix_repo_id, kind: navigate, target: "node:self", confirm: false}
+
+DATA-010:
+  slug: DATASET_COLUMNS_MISSING
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 §4: the column mapping lacks a role the node needs. available = up to 10 column names (each <= 64 chars),
+  # comma-separated, from the dataset's features.
+  params:
+    - repo
+    - {name: missing, type: enum, values: [image, question, answer, messages]}
+    - available
+  variant_by: missing
+  match:
+    - {kind: validate, value: "hub dataset column mapping: required role unmapped (ADR-021 §4)"}
+  actions:
+    - {id: open_column_mapping, kind: navigate, target: column_mapping, confirm: false}
+
+DATA-011:
+  slug: DATASET_COLUMN_TYPE
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 §4: a mapped column has the wrong feature type for its role (e.g. an image role on a string column).
+  # expected / found are column-kind ids (image, text, number, messages, list, other) rendered as words (byo.kind);
+  # an unknown kind renders as byo.kind.other.
+  params:
+    - repo
+    - column
+    - {name: role, type: enum, values: [image, question, answer, messages], words: byo.role}
+    - {name: expected, words: byo.kind}
+    - {name: found, words: byo.kind}
+  match:
+    - {kind: validate, value: "hub dataset column mapping: feature type does not fit the role (ADR-021 §4)"}
+  actions:
+    - {id: open_column_mapping, kind: navigate, target: column_mapping, confirm: false}
+
 MODEL-001:
   slug: CKPT_LOAD_KEY_MISMATCH
   severity: error
@@ -393,6 +442,54 @@ MODEL-002:
     - {id: view_comparison, kind: navigate, target: verify_report, confirm: false}
     - {id: use_original_model, kind: patch, confirm: true}
     - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+MODEL-003:
+  slug: MODEL_ARCH_UNSUPPORTED
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021: config.json (parsed as JSON only, never imported) names an architecture the training image has no native
+  # support for. architecture / model_type are sanitized by the resolver (<= 80 chars, [A-Za-z0-9_.-], "unknown" when
+  # absent); revision = the pinned commit, 12 chars.
+  params: [repo, revision, architecture, model_type]
+  match:
+    - {kind: executor, value: "hub resolver: architectures[0] / model_type not in the supported family table (ADR-021)"}
+  actions:
+    - {id: request_catalog, kind: navigate, target: request_catalog, confirm: false}
+    - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
+
+MODEL-004:
+  slug: MODEL_NEEDS_REMOTE_CODE
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 §3 (user decision): a model added by the user that needs trust_remote_code is blocked; only catalog models
+  # (each .py file pinned by hash after review) may run their own code. The user can ask for it to be added.
+  # reason unreadable_config: a config / tokenizer / processor json is over the size cap, so remote code cannot be ruled
+  # out; blocked the same way (security). file = that file's name (sanitized by the resolver).
+  params:
+    - repo
+    - revision
+    - {name: reason, type: enum, values: [remote_code, unreadable_config]}
+    - file
+  variant_by: reason
+  match:
+    - {kind: executor, value: "hub resolver: auto_map / custom code in config.json (ADR-021 §3)"}
+  actions:
+    - {id: request_catalog, kind: navigate, target: request_catalog, confirm: false}
+    - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
+
+MODEL-005:
+  slug: MODEL_UNVERIFIED_TRY_FIRST
+  severity: info
+  prevent_in_preflight: false
+  # ADR-021 / design spec H §2: a train step on a user-added model with no completed quick trial run yet. A hint, never
+  # a block. run_smoke = a server-side trial run of that step (POST /api/runs {workflow, trial: {node}}), params kept.
+  params:
+    - {name: node, ref: node}
+    - model
+  match:
+    - {kind: validate, value: "train step on a user-added model without a completed trial run (ADR-021)"}
+  actions:
+    - {id: run_smoke, kind: trial, confirm: false}
 
 NET-001:
   slug: DOWNLOAD_FAILED
@@ -461,6 +558,26 @@ NET-004:
     - {kind: executor, value: "download quota check before the job and on its plan"}
   actions:
     - {id: pick_other_asset, kind: navigate, target: "node:self", confirm: false}
+
+NET-005:
+  slug: HUB_REPO_UNAVAILABLE
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021 (bring your own model / dataset): the Hugging Face repo the user pasted cannot be read. HF answers 401 for a
+  # private repo AND an unknown one when no token is stored, hence not_found_or_private. repo is sanitized by the
+  # resolver (HF id syntax); kind = model | dataset.
+  params:
+    - repo
+    - {name: kind, type: enum, values: [model, dataset]}
+    - {name: reason, type: enum, values: [not_found, not_found_or_private, gated_no_token, gated_not_accepted, network]}
+  variant_by: reason
+  match:
+    - {kind: executor, value: "hub resolver: repo_info 404 / 401 / 403 / connection error (ADR-021)"}
+  actions:
+    - {id: enter_token, kind: navigate, target: settings_secrets, confirm: false, when: {reason: [not_found_or_private, gated_no_token]}}
+    - {id: open_hub_page, kind: navigate, target: hub_page, confirm: false, when: {reason: gated_not_accepted}}
+    - {id: check_connection, kind: navigate, target: settings_network, confirm: false, when: {reason: network}}
+    - {id: fix_repo_id, kind: navigate, target: "node:self", confirm: false}
 
 CFG-001:
   slug: GRAPH_PORT_TYPE_MISMATCH
@@ -746,6 +863,19 @@ SEC-004:
     - {kind: executor, value: "common/images.py ImageMismatchError (run_job, preflight): tag -> image id != IMAGES.lock"}
   actions:
     - {id: send_report, kind: navigate, target: bug_report, confirm: false}
+
+SEC-005:
+  slug: LICENSE_NOT_CONFIRMED
+  severity: error
+  prevent_in_preflight: true
+  # ADR-021: a model / dataset the user added is downloaded only after the user confirmed its licence (shown from the
+  # model card; "unknown" when the card names none). name = display name, repo = HF id, license = licence id.
+  # catalog_id + kind: the user asset the licence dialog opens on (frontend needs both to show the button).
+  params: [name, repo, license, catalog_id, {name: kind, type: enum, values: [model, dataset]}]
+  match:
+    - {kind: validate, value: "user-added asset without a licence confirmation (ADR-021)"}
+  actions:
+    - {id: confirm_license, kind: navigate, target: license_dialog, confirm: false}
 
 CACHE-001:
   slug: CACHE_ARTIFACT_INVALID
