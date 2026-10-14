@@ -439,7 +439,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - install.sh
     service = DownloadService(root, emit=lambda _i, e: print(json.dumps(e), flush=True),
                               token=lambda: store.reveal("HF_TOKEN"))  # fmt: skip
     service.memory_wait_s = max(1.0, args.memory_wait_min) * 60
-    failed = 0
+    failed = broken = 0
     for kind, catalog_id in template_assets(template):
         reply = service.start(kind, catalog_id, confirm=args.yes_large)  # never confirmed for the user (P1)
         if reply.get("needs_confirm"):
@@ -451,9 +451,12 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - install.sh
         while download_id and service.downloads[download_id].status not in ("completed", "failed"):
             time.sleep(1.0)
         status = service.downloads[download_id].status if download_id else reply.get("status")
-        print(f"{kind} {catalog_id}: {status}", flush=True)
+        error = service.downloads[download_id].error if download_id else None
+        print(f"{kind} {catalog_id}: {status}" + (f" ({error.get('code')})" if error else ""), flush=True)
         failed += status != "completed"
-    return 1 if failed else 0
+        broken += bool(error and str(error.get("code", "")).startswith("SYS-"))
+    # 2: the system itself failed (not the network or a refused file): install.sh stops on it (PM 2026-10-14).
+    return 2 if broken else 1 if failed else 0
 
 
 __all__ = ["CONFIRM_GB", "Asset", "Download", "DownloadService", "planned_bytes", "resolve", "template_assets"]

@@ -319,6 +319,7 @@ def docker_args(
             continue
         if key.startswith(_FORBIDDEN_ENV_PREFIXES) or _SECRET_NAME.search(key):
             raise ValueError(f"secret-like env var {key} must not be passed to job containers")
+    _check_offline(env, online=False)  # a wide job is never a download job
     if lock_token is not None:
         env[gpu_lock.TOKEN_ENV] = lock_token
     mount = f"{project_root}:{CONTAINER_ROOT}" + (":ro" if job.read_only_project else "")
@@ -370,6 +371,20 @@ def _no_egress(job: ContainerJob) -> None:
         raise ValueError("network and token files are for narrowed download jobs only")
 
 
+OFFLINE_ENV = ("HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE", "TRANSFORMERS_OFFLINE")
+
+
+def _check_offline(env: Mapping[str, str], *, online: bool) -> None:
+    """Every job but a download is offline, whatever job.env says (security 2026-10-14).
+
+    A job that silently turned the hub on would only hang on its --network none, and blur the S6 evidence.
+    """
+    want = "0" if online else "1"
+    wrong = [k for k in OFFLINE_ENV if env.get(k) != want]
+    if wrong:
+        raise ValueError(f"{'download' if online else 'offline'} job with {', '.join(wrong)} != {want}")
+
+
 def _egress_args(job: ContainerJob) -> tuple[list[str], dict[str, str]]:
     """(docker args, env) of a download job's network and token; ``--network none`` for every other job."""
     if not job.egress:
@@ -379,7 +394,10 @@ def _egress_args(job: ContainerJob) -> tuple[list[str], dict[str, str]]:
     if job.egress_auth is None or not _EGRESS_AUTH.fullmatch(job.egress_auth):
         raise ValueError("a download job needs its proxy credential")
     proxy = EGRESS_PROXY.replace("http://", f"http://{job.egress_auth}@", 1)
-    env = {"HTTPS_PROXY": proxy, "NO_PROXY": "", "HF_HUB_DISABLE_XET": "1", "HF_HUB_DISABLE_TELEMETRY": "1"}
+    env = {"HTTPS_PROXY": proxy, "NO_PROXY": "", "HF_HUB_DISABLE_XET": "1", "HF_HUB_DISABLE_TELEMETRY": "1",
+           # BASE_ENV keeps every other job offline; the download job is the one that must reach the hub (PM/tester
+           # 2026-10-14: OfflineModeIsEnabled). Its only way out is still the egress proxy.
+           "HF_HUB_OFFLINE": "0", "HF_DATASETS_OFFLINE": "0", "TRANSFORMERS_OFFLINE": "0"}  # fmt: skip
     args = ["--network", EGRESS_NETWORK]
     if job.secret_file is not None:
         st = os.lstat(job.secret_file)
@@ -397,6 +415,7 @@ def _narrow_docker_args(job: ContainerJob, project_root: Path, *, lock_token: st
     env = {**BASE_ENV, **_narrow_cache_env(rw_rel), **job.env}  # job.env wins
     _check_env(env)
     env.update(egress_env)  # set here, never from job.env: HF_TOKEN_PATH names the mounted file, not a secret
+    _check_offline(env, online=job.egress)
     if lock_token is not None:
         env[gpu_lock.TOKEN_ENV] = lock_token
     args = [

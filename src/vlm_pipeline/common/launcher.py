@@ -117,6 +117,7 @@ class RunnerLauncher:
 
     checks_images = False
     POLL_S = 2.0
+    START_GRACE_S = 120.0  # a container the runner just launched may not be visible yet (image of ~30 GB)
 
     def __init__(self, socket_path: Path) -> None:
         self.socket_path = socket_path
@@ -170,8 +171,19 @@ class RunnerLauncher:
         if reply.get("ok") is not True:
             raise RunnerError(str(reply.get("error", "refused")))
         self.last_image_id = str(reply.get("image_id") or "") or None
+        submitted, seen = time.monotonic(), False
         while True:  # the runner owns the container; we only watch it
-            running, info = self._status(f"vlm-{job.name}")
+            try:
+                running, info = self._status(f"vlm-{job.name}")
+            except RunnerError as exc:
+                # The runner starts `docker run` and answers at once: the container may not exist for a moment yet
+                # (PM 2026-10-14: the first poll said not_found -> SYS-000, hiding the job's real exit). Only until
+                # it has been seen once: a container that disappears afterwards is an error at once.
+                if exc.reason == "not_found" and not seen and time.monotonic() - submitted < self.START_GRACE_S:
+                    time.sleep(self.POLL_S)
+                    continue
+                raise
+            seen = True
             if not running:
                 return info.exit_code
             time.sleep(self.POLL_S)

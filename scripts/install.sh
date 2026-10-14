@@ -246,9 +246,12 @@ if (( ! SKIP_DOWNLOAD )); then
     [[ "${answer:-y}" =~ ^[Nn] ]] || large=(--yes-large)  # typed at a terminal: big files confirmed too
   fi
   if [[ ! "${answer:-y}" =~ ^[Nn] ]]; then  # no terminal: never confirms a download over the threshold (security P1)
+    dl_rc=0
     run "${COMPOSE[@]}" exec -T app python -m vlm_pipeline.app.downloads --template invoice_to_json --memory-wait-min 10 \
-      "${large[@]}" \
-      || say "WARNING: the download did not finish; the app offers it again (\"Download\" on the step)."
+      "${large[@]}" || dl_rc=$?
+    # 2 = the system failed (runner, verify...), not the network: that is a broken install, never just a warning.
+    (( dl_rc != 2 )) || fail "the download failed inside the app (system error): see ${COMPOSE[*]} logs app runner"
+    (( dl_rc == 0 )) || say "WARNING: the download did not finish; the app offers it again (\"Download\" on the step)."
   fi
 fi
 say ""

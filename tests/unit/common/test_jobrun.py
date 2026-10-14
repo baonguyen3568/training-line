@@ -865,3 +865,78 @@ def test_an_app_capped_at_4gb_still_runs_a_2gb_job_when_the_host_has_40gb(
         launcher=Launcher(), memory_wait_s=0.5,  # type: ignore[arg-type]
     )  # fmt: skip
     assert final.status == RunStatus.COMPLETED  # before the fix: SYS-002 after the memory wait
+
+
+def test_only_the_download_job_is_online(tmp_path: Path) -> None:
+    """PM/tester 2026-10-14: the download job inherited HF_HUB_OFFLINE=1 (OfflineModeIsEnabled). It alone is online,
+    still only through the egress proxy; every other job stays offline."""
+    root, run, _repo, data = _narrow_project(tmp_path)
+    auth = "t:" + "ab" * 16
+    download = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), egress=True,
+                            egress_auth=auth)  # fmt: skip
+    online = docker_args(download, root)
+    for var in ("HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE", "TRANSFORMERS_OFFLINE"):
+        assert f"{var}=0" in online
+        assert f"{var}=1" not in online
+    other = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,), ro_inputs=(data,))
+    offline = docker_args(other, root)
+    assert "HF_HUB_OFFLINE=1" in offline
+    assert "HF_HUB_OFFLINE=0" not in offline
+    sneaky = ContainerJob(name="t", image="i", argv=("true",), narrow=True, rw_dirs=(run,),
+                          env={"HF_HUB_OFFLINE": "0"})  # fmt: skip
+    with pytest.raises(ValueError, match="offline job"):  # security: job.env never turns a normal job online
+        docker_args(sneaky, root)
+
+
+def _race_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replies: list[dict[str, object]]) -> object:
+    """run_job with the REAL RunnerLauncher polling loop; the runner's replies are scripted."""
+    import threading
+    from types import SimpleNamespace
+
+    from vlm_pipeline.common import jobrun
+    from vlm_pipeline.common.launcher import RunnerLauncher
+    from vlm_pipeline.common.runinfo import RunManifest
+
+    root = _probe_root(tmp_path, "bao-security APPROVED 2026-10-13")
+    monkeypatch.setattr(jobrun, "image_digest", lambda _image: f"sha256:{'a' * 64}")
+    monkeypatch.setattr(jobrun, "_wait_for_memory", lambda *a, **k: None)
+    monkeypatch.setattr(jobrun, "git_state", lambda _root: ("c0ffee", False))
+    monkeypatch.setattr(jobrun, "read_meminfo", lambda: SimpleNamespace(mem_available_gb=40.0))
+    guard = SimpleNamespace(should_stop=threading.Event(), min_available_gb=35.0, fast_fall_killed=False,
+                            thresholds=SimpleNamespace(abort_gb=8.0))  # fmt: skip
+    monkeypatch.setattr(jobrun, "run_guarded", lambda launch, *a, **k: (launch(), guard))
+    monkeypatch.setattr(RunnerLauncher, "POLL_S", 0.0)
+    launcher = RunnerLauncher(tmp_path / "runner.sock")
+    calls = iter(replies)
+    monkeypatch.setattr(launcher, "_call", lambda body: next(calls))
+    run_dir = root / "outputs" / "runs" / "20261014-0201-dl-x"
+    job = ContainerJob(name="20261014-0201-dl-x", image="vlm-x:1", gpu=False, narrow=True, rw_dirs=(run_dir,),
+                       argv=("python", "-m", "vlm_pipeline.download.hub", "--run-dir", "/workspace/x"))  # fmt: skip
+    return jobrun.run_job(job, RunManifest(run_id="20261014-0201-dl-x", name="t", stage="data", task="download"),
+                          run_dir, project_root=root, who="t", est_peak_gb=2.0, take_gpu_lock=False,
+                          launcher=launcher)  # fmt: skip
+
+
+def test_the_runner_start_race_ends_with_the_jobs_real_exit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PM 2026-10-14: first poll not_found, then running, then exit 1 -> FAILED with exit 1 (download: NET-001),
+    never a RunnerError (SYS-000) hiding it."""
+    from vlm_pipeline.common.runinfo import RunStatus
+
+    final = _race_run(tmp_path, monkeypatch, [
+        {"ok": True, "image_id": "sha256:x"},  # submit
+        {"ok": False, "error": "not_found"},  # docker has not created it yet
+        {"ok": True, "running": True},
+        {"ok": True, "running": False, "exit_code": 1},
+        {"ok": True, "running": False, "exit_code": 1},  # state() after the run
+        {"ok": True},  # remove
+    ])  # fmt: skip
+    assert (final.status, final.exit_code) == (RunStatus.FAILED, 1)  # type: ignore[attr-defined]
+
+
+def test_a_container_that_never_appears_is_a_system_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from vlm_pipeline.common.launcher import RunnerError, RunnerLauncher
+
+    monkeypatch.setattr(RunnerLauncher, "START_GRACE_S", 0.05)
+    replies = [{"ok": True, "image_id": "sha256:x"}, *({"ok": False, "error": "not_found"} for _ in range(10_000))]
+    with pytest.raises(RunnerError, match="not_found"):  # the download maps this to SYS-000, and install.sh fails
+        _race_run(tmp_path, monkeypatch, replies)
