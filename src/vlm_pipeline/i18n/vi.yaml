@@ -1573,6 +1573,8 @@ pipelines:
   search: Tìm pipeline…
   filter:
     all: Tất cả
+    available: Mở được ngay
+    preparing: Đang chuẩn bị
     app_template: Mẫu của app
     external: Từ nguồn ngoài
     candidate: Ứng viên

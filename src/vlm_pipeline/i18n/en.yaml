@@ -1573,6 +1573,8 @@ pipelines:
   search: Search pipelines…
   filter:
     all: All
+    available: Ready to open
+    preparing: In preparation
     app_template: App templates
     external: External sources
     candidate: Candidates
