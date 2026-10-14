@@ -111,3 +111,30 @@ class GrpoParams(Params):
     @property
     def learning_rate(self) -> float:
         return LORA_LR[self.lr_preset]
+
+
+# Preference training moves the policy with far smaller steps than SFT (TRL / Zephyr); provisional LoRA rates until
+# research's first VLM DPO run measures them (backend review 2026-10-14).
+DPO_LR: dict[LrPreset, float] = {"slow": 5e-6, "medium": 1e-5, "fast": 2e-5}
+
+
+class DpoParams(Params):
+    """train.dpo_vlm (ADR-022 #7, P023 §2): a LoRA adapter trained on preference pairs (records' chosen / rejected).
+
+    Engine: NeMo-RL has DPO for text only (research 2026-10-14); research patches the multimodal path. Until then the
+    support check refuses the node (CFG-011 reason engine_no_vlm_dpo). loss = DPO + sft_weight x SFT on the chosen
+    answer (0 = plain DPO); the reference model is the base with the adapter off (no second copy in memory).
+    """
+
+    beta: float = Field(0.1, ge=0.01, le=1.0, json_schema_extra=ui(order=0))  # TRL default; NeMo-RL's KL penalty
+    epochs: Epochs = Field(1, json_schema_extra=ui(order=1, widget="segmented", option_keys="epoch_count"))
+    lr_preset: LrPreset = Field(
+        "medium", json_schema_extra=ui(order=2, widget="segmented", preset=True, option_keys="lr_preset")
+    )
+    sft_weight: float = Field(0.0, ge=0.0, le=1.0, json_schema_extra=ui(advanced=True))
+    lora_dim: int = Field(8, ge=4, le=64, json_schema_extra=ui(advanced=True))
+    seed: int = Field(DEFAULT_SEED, json_schema_extra=ui(advanced=True))
+
+    @property
+    def learning_rate(self) -> float:
+        return DPO_LR[self.lr_preset]

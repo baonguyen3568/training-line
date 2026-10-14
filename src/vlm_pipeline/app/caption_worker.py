@@ -42,8 +42,9 @@ def check_support(node_id: str, params: object, model: CatalogEntry | None, inpu
     from vlm_pipeline.app.trial_worker import VLLM_PARITY_MODELS
     from vlm_pipeline.app.workers import NodeNotRunnableError
 
-    del params
     refuse = {"node": node_id, "node_type": "data.caption_vlm"}
+    if getattr(params, "task", "caption") == "qa":  # ADR-022 #6: the qa worker path is not built yet
+        raise NodeNotRunnableError("caption task qa is not runnable yet", params={**refuse, "reason": "qa_pending"})
     if model is not None and (model.auto_class != "AutoModelForImageTextToText" or model.id not in VLLM_PARITY_MODELS):
         raise NodeNotRunnableError("caption needs a native model that passed the vLLM parity gate", params=refuse)
     if inputs.get("dataset", "dataset:local") != "dataset:local":  # allowlist; unwired is CFG-003's job

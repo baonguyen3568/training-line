@@ -701,6 +701,17 @@ def _check_grpo(q: SupportQuery) -> None:
     )
 
 
+DPO_BLOCKED_REASON = "engine_no_vlm_dpo"  # NeMo-RL v0.7.0 DPO is text-only; research patches the VLM path (ADR-022 #7)
+
+
+def _check_dpo(q: SupportQuery) -> None:
+    """Refused on the canvas and at run with its real reason until the multimodal DPO patch passes (research)."""
+    raise NodeNotRunnableError(
+        "DPO has no vision-language engine path yet",
+        params={"node": q.node_id, "node_type": q.spec.type_id, "reason": DPO_BLOCKED_REASON},
+    )
+
+
 def _check_export(q: SupportQuery) -> None:
     from vlm_pipeline.app.export_worker import ExportUnsupportedError
 
@@ -730,6 +741,8 @@ def _support_checks() -> dict[str, Callable[[SupportQuery], None]]:
         "train.sft_vlm": _check_train,
         "train.merge_lora": _check_merge,
         "train.grpo_vlm": _check_grpo,  # "coming soon": no handler, refused with its reason (P020)
+        "train.dpo_vlm": _check_dpo,  # ADR-022 #7: refused with its reason until the VLM DPO patch
+        "quantize.qat": _owner_check("vlm_pipeline.quantize.qat"),  # ADR-022 #10 (fixcode)
         "data.caption_vlm": _owner_check("vlm_pipeline.app.caption_worker"),
         "data.filter": _owner_check("vlm_pipeline.app.data_workers"),
         "data.dedupe": _owner_check("vlm_pipeline.app.data_workers"),

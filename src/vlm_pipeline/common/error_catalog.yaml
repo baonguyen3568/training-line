@@ -742,6 +742,7 @@ CFG-011:
   params: [{name: node, ref: node}, node_type, reason]
   variants:
     - {when: {reason: engine_single_gpu}, key: engine_single_gpu}
+    - {when: {reason: engine_no_vlm_dpo}, key: engine_no_vlm_dpo}
     - {when: {}, key: generic}
   match:
     - {kind: validate, value: "node type has no real worker yet (container worker)"}

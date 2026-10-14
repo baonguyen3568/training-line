@@ -148,6 +148,7 @@ error:
     title: Bước này chưa chạy thật được
     what:
       engine_single_gpu: 'Bước "{node}" chưa chạy được: bản engine hiện tại chưa chạy được bước này trên máy chỉ có một GPU. Bạn có thể xoá bước này để chạy phần còn lại.'
+      engine_no_vlm_dpo: 'Bước "{node}" chưa chạy được: bản engine hiện tại chưa học được từ cặp câu trả lời có kèm ảnh. Bạn có thể xoá bước này để chạy phần còn lại.'
       generic: 'Bước "{node}" chưa được hỗ trợ chạy thật trong phiên bản này. Bạn có thể xoá bước này để chạy phần còn lại, hoặc chờ bản cập nhật.'
   CFG-012:
     title: Nhóm bước bị lỗi nên chưa chạy được
@@ -803,6 +804,12 @@ node:
     title: Tạo mô tả ảnh bằng model
     desc: Dùng một model đọc ảnh để viết câu trả lời cho các mẫu chưa có, rồi dùng làm dữ liệu train. Nên xem lại vài câu trước khi train, vì model có thể viết sai.
     param:
+      task:
+        label: Model viết gì
+        help: '"Mô tả ảnh" viết một đoạn mô tả. "Câu hỏi + trả lời" để model lớn tự đặt một câu hỏi về ảnh và trả lời, làm dữ liệu dạy model nhỏ.'
+      qa_focus:
+        label: Loại câu hỏi
+        help: Model sẽ hỏi về điều gì trong ảnh. Mỗi loại dùng một mẫu câu hỏi cố định của app.
       prompt:
         label: Câu hỏi cho model
         help: Câu yêu cầu gửi kèm mỗi ảnh, ví dụ "Mô tả chi tiết ảnh này".
@@ -843,6 +850,60 @@ node:
       dataset_3: Bộ dữ liệu 3
       dataset_4: Bộ dữ liệu 4
       dataset: Dữ liệu đã trộn
+  quantize.qat:
+    title: Nén có học lại (QAT)
+    desc: Nén model rồi cho học thêm một chút với phép nén giả lập, để lấy lại phần điểm bị mất khi nén.
+    param:
+      format:
+        label: Kiểu nén
+        help: Định dạng số mà model dùng sau khi nén.
+      adapter:
+        label: Cách học lại
+        help: '"Nhẹ (LoRA)" chỉ học một phần nhỏ, ít tốn bộ nhớ. "Toàn bộ" học mọi trọng số, chỉ dùng được với model nhỏ.'
+      epochs:
+        label: Thời lượng học lại
+        help: Số lượt model đọc hết dữ liệu. Học lại sau khi nén thường chỉ cần ít.
+      lr_preset:
+        label: Tốc độ học
+        help: Học lại sau khi nén dùng tốc độ thấp để không làm hỏng model. Nên để "Thấp".
+      max_steps:
+        label: Số bước tối đa
+        help: Dừng sau bấy nhiêu bước dù chưa hết lượt (0 = học theo số lượt).
+      calib_size:
+        label: Số ảnh hiệu chỉnh
+        help: Số ảnh dùng để đo khoảng giá trị trước khi nén.
+    port:
+      model: Model
+      train_data: Dữ liệu học lại
+      calib_data: Dữ liệu hiệu chỉnh (tuỳ chọn)
+      quantized: Model đã nén
+  train.dpo_vlm:
+    title: Học theo cặp tốt/kém (DPO)
+    desc: Dạy model thích câu trả lời tốt hơn, từ các cặp "câu được chọn / câu bị loại" trong dữ liệu.
+    param:
+      beta:
+        label: Mức giữ gần model gốc (beta)
+        help: Càng lớn thì model càng ít đi xa khỏi model gốc (0.01–1). Nên giữ mặc định.
+      epochs:
+        label: Thời lượng huấn luyện
+        help: Số lượt model đọc hết dữ liệu.
+      lr_preset:
+        label: Tốc độ học
+        help: Tốc độ model thay đổi theo các cặp câu trả lời. Nên để "Vừa".
+      sft_weight:
+        label: Học thêm câu được chọn
+        help: Ngoài so sánh cặp, model học thẳng câu được chọn với trọng số này (0 = chỉ so sánh).
+      lora_dim:
+        label: Kích thước LoRA (dim)
+        help: Lớn hơn thì học được nhiều hơn nhưng tốn RAM hơn (4–64). Nên giữ mặc định.
+      seed:
+        label: Hạt giống ngẫu nhiên (seed)
+        help: Giữ nguyên để kết quả chạy lại giống hệt.
+    port:
+      base_model: Model gốc
+      train_data: Dữ liệu cặp câu trả lời
+      val_data: Dữ liệu kiểm tra (tuỳ chọn)
+      adapter: Phần học thêm (LoRA)
   data.preview:
     title: Xem trước dữ liệu
     desc: Xem vài mẫu và các lỗi thường gặp trước khi train.
@@ -1255,6 +1316,20 @@ grpo_reward:
   exact_match: Khớp đáp án
   numeric: So giá trị (số, biểu thức)
   format: Chỉ chấm định dạng
+qat_adapter:
+  lora: Nhẹ (LoRA)
+  full: Toàn bộ
+qat_lr:
+  low: Thấp
+  lower: Rất thấp
+caption_task:
+  caption: Mô tả ảnh
+  qa: Câu hỏi + trả lời
+qa_focus:
+  general: Chung
+  text_reading: Đọc chữ
+  counting: Đếm
+  charts: Biểu đồ
 lr_preset:
   slow: Chậm – an toàn
   medium: Vừa

@@ -148,6 +148,7 @@ error:
     title: This step can't run for real yet
     what:
       engine_single_gpu: '"{node}" can''t run yet: the current engine version cannot run this step on a machine with a single GPU. Remove the step to run the rest.'
+      engine_no_vlm_dpo: '"{node}" can''t run yet: the current engine version cannot learn from answer pairs with images. Remove the step to run the rest.'
       generic: '"{node}" isn''t supported for real runs in this version yet. Remove the step to run the rest, or wait for an update.'
   CFG-012:
     title: This step group has a problem
@@ -803,6 +804,12 @@ node:
     title: Caption images with a model
     desc: A vision model writes the answer for samples that have none, to use as training data. Check a few answers before training; the model can get things wrong.
     param:
+      task:
+        label: What the model writes
+        help: '"Describe" writes a description. "Question + answer" lets a large model ask one question about the image and answer it, as data to teach a small model.'
+      qa_focus:
+        label: Kind of question
+        help: What the model asks about in the image. Each kind uses one of the app's fixed question templates.
       prompt:
         label: Question for the model
         help: The request sent with every image, for example "Describe this image in detail".
@@ -843,6 +850,60 @@ node:
       dataset_3: Dataset 3
       dataset_4: Dataset 4
       dataset: Mixed data
+  quantize.qat:
+    title: Quantization-aware training (QAT)
+    desc: Quantizes the model, then trains it briefly with simulated quantization to win back the score lost.
+    param:
+      format:
+        label: Quantization format
+        help: The number format the model uses after quantization.
+      adapter:
+        label: How to retrain
+        help: '"Light (LoRA)" trains a small add-on and needs less memory. "Full" trains every weight, only for small models.'
+      epochs:
+        label: Retraining length
+        help: How many times the model goes through the data. Retraining after quantization usually needs little.
+      lr_preset:
+        label: Learning speed
+        help: Retraining after quantization uses a low speed so the model is not damaged. Keep "Low".
+      max_steps:
+        label: Maximum steps
+        help: Stops after this many steps even before the passes end (0 = by passes).
+      calib_size:
+        label: Calibration images
+        help: How many images measure the value ranges before quantization.
+    port:
+      model: Model
+      train_data: Retraining data
+      calib_data: Calibration data (optional)
+      quantized: Quantized model
+  train.dpo_vlm:
+    title: Learn from good/bad pairs (DPO)
+    desc: Teaches the model to prefer the better answer, from "chosen / rejected" pairs in your data.
+    param:
+      beta:
+        label: Stay close to the base model (beta)
+        help: Higher keeps the model closer to the base model (0.01–1). Keep the default.
+      epochs:
+        label: Training length
+        help: How many times the model goes through the data.
+      lr_preset:
+        label: Learning speed
+        help: How fast the model changes with the answer pairs. Keep "Medium".
+      sft_weight:
+        label: Also learn the chosen answer
+        help: Besides comparing pairs, the model learns the chosen answer directly with this weight (0 = compare only).
+      lora_dim:
+        label: LoRA rank (dim)
+        help: Bigger learns more but needs more RAM (4–64). Keep the default.
+      seed:
+        label: Random seed
+        help: Keep it the same to get identical results when re-running.
+    port:
+      base_model: Base model
+      train_data: Answer-pair data
+      val_data: Validation data (optional)
+      adapter: Add-on (LoRA)
   data.preview:
     title: Preview data
     desc: Look at a few samples and common problems before training.
@@ -1255,6 +1316,20 @@ grpo_reward:
   exact_match: Exact answer
   numeric: Same value (number, expression)
   format: Format only
+qat_adapter:
+  lora: Light (LoRA)
+  full: Full
+qat_lr:
+  low: Low
+  lower: Lower
+caption_task:
+  caption: Describe
+  qa: Question + answer
+qa_focus:
+  general: General
+  text_reading: Reading text
+  counting: Counting
+  charts: Charts
 lr_preset:
   slow: Slow – safe
   medium: Medium

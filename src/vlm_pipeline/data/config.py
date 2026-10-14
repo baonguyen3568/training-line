@@ -100,8 +100,19 @@ class CaptionParams(Params):
     decoding only (no sampling knob). The model + revision go into the dataset metadata (its licence carries over).
     """
 
-    prompt: str = Field(
-        "Describe this image in detail.", min_length=1, max_length=500, json_schema_extra=ui(order=0, widget="textarea")
+    # ADR-022 #6 distillation (P023 §4, fixcode): qa = the teacher writes ONE question + its answer per image as JSON
+    # (vLLM structured output) -> prompt = question, target = answer; the prompt is then a fixed template (qa_focus).
+    task: Literal["caption", "qa"] = Field(
+        "caption", json_schema_extra=ui(order=0, widget="segmented", option_keys="caption_task")
     )
-    max_new_tokens: int = Field(256, ge=32, le=1024, json_schema_extra=ui(order=1))
-    overwrite_existing: bool = Field(False, json_schema_extra=ui(order=2))  # False: only samples without a target
+    prompt: str = Field(
+        "Describe this image in detail.",
+        min_length=1,
+        max_length=500,
+        json_schema_extra=ui(order=1, widget="textarea", visible_when={"task": ["caption"]}),
+    )
+    qa_focus: Literal["general", "text_reading", "counting", "charts"] = Field(
+        "general", json_schema_extra=ui(advanced=True, option_keys="qa_focus", visible_when={"task": ["qa"]})
+    )
+    max_new_tokens: int = Field(256, ge=32, le=1024, json_schema_extra=ui(order=2))
+    overwrite_existing: bool = Field(False, json_schema_extra=ui(order=3))  # False: only samples without a target

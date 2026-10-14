@@ -6,7 +6,7 @@ from pydantic import Field
 
 from vlm_pipeline.common.params import LocalPath, Params, ui
 from vlm_pipeline.nodes.spec import EmptyParams, NodeSpec, PortSpec
-from vlm_pipeline.quantize.config import QuantizeParams
+from vlm_pipeline.quantize.config import QatParams, QuantizeParams
 from vlm_pipeline.serve.config import InferenceParams
 
 
@@ -60,5 +60,21 @@ EXPORT_HF_DIR = NodeSpec(
     outputs={"artifact": PortSpec(type="ExportArtifact")},
     params_model=ExportParams,
     cacheable=False,  # writes to a user-chosen folder
+    runner="container",
+)
+
+# ADR-022 #10: same output as PTQ (QuantizedModel), so Eval / Benchmark / Export after it work unchanged.
+QUANTIZE_QAT = NodeSpec(
+    type_id="quantize.qat",
+    version="1.0.0",
+    category="quantize",
+    icon="quantize",
+    inputs={
+        "model": PortSpec(type="Model"),
+        "train_data": PortSpec(type="Dataset"),
+        "calib_data": PortSpec(type="Dataset", optional=True),
+    },
+    outputs={"quantized": PortSpec(type="QuantizedModel")},
+    params_model=QatParams,
     runner="container",
 )

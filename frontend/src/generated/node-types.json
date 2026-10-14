@@ -1239,7 +1239,7 @@
             "title": "Max New Tokens",
             "type": "integer",
             "x-ui": {
-              "order": 1
+              "order": 2
             }
           },
           "overwrite_existing": {
@@ -1247,7 +1247,7 @@
             "title": "Overwrite Existing",
             "type": "boolean",
             "x-ui": {
-              "order": 2
+              "order": 3
             }
           },
           "prompt": {
@@ -1257,8 +1257,47 @@
             "title": "Prompt",
             "type": "string",
             "x-ui": {
-              "order": 0,
+              "order": 1,
+              "visible_when": {
+                "task": [
+                  "caption"
+                ]
+              },
               "widget": "textarea"
+            }
+          },
+          "qa_focus": {
+            "default": "general",
+            "enum": [
+              "general",
+              "text_reading",
+              "counting",
+              "charts"
+            ],
+            "title": "Qa Focus",
+            "type": "string",
+            "x-ui": {
+              "advanced": true,
+              "option_keys": "qa_focus",
+              "visible_when": {
+                "task": [
+                  "qa"
+                ]
+              }
+            }
+          },
+          "task": {
+            "default": "caption",
+            "enum": [
+              "caption",
+              "qa"
+            ],
+            "title": "Task",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "caption_task",
+              "order": 0,
+              "widget": "segmented"
             }
           }
         },
@@ -1762,6 +1801,121 @@
     {
       "cacheable": true,
       "category": "train",
+      "icon": "train",
+      "inputs": {
+        "base_model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        },
+        "train_data": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        },
+        "val_data": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "adapter": {
+          "many": false,
+          "optional": false,
+          "type": "Adapter"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "train.dpo_vlm (ADR-022 #7, P023 \u00a72): a LoRA adapter trained on preference pairs (records' chosen / rejected).\n\nEngine: NeMo-RL has DPO for text only (research 2026-10-14); research patches the multimodal path. Until then the\nsupport check refuses the node (CFG-011 reason engine_no_vlm_dpo). loss = DPO + sft_weight x SFT on the chosen\nanswer (0 = plain DPO); the reference model is the base with the adapter off (no second copy in memory).",
+        "properties": {
+          "beta": {
+            "default": 0.1,
+            "maximum": 1.0,
+            "minimum": 0.01,
+            "title": "Beta",
+            "type": "number",
+            "x-ui": {
+              "order": 0
+            }
+          },
+          "epochs": {
+            "default": 1,
+            "enum": [
+              1,
+              2,
+              3,
+              5
+            ],
+            "title": "Epochs",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "epoch_count",
+              "order": 1,
+              "widget": "segmented"
+            }
+          },
+          "lora_dim": {
+            "default": 8,
+            "maximum": 64,
+            "minimum": 4,
+            "title": "Lora Dim",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "lr_preset": {
+            "default": "medium",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ],
+            "title": "Lr Preset",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "lr_preset",
+              "order": 2,
+              "preset": true,
+              "widget": "segmented"
+            }
+          },
+          "seed": {
+            "default": 1234,
+            "title": "Seed",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          },
+          "sft_weight": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Sft Weight",
+            "type": "number",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "DpoParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "train.dpo_vlm",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "train",
       "icon": "merge",
       "inputs": {
         "adapter": {
@@ -2015,6 +2169,135 @@
       "policy_block": null,
       "runner": "container",
       "type_id": "quantize.modelopt_ptq",
+      "version": "1.0.0"
+    },
+    {
+      "cacheable": true,
+      "category": "quantize",
+      "icon": "quantize",
+      "inputs": {
+        "calib_data": {
+          "many": false,
+          "optional": true,
+          "type": "Dataset"
+        },
+        "model": {
+          "many": false,
+          "optional": false,
+          "type": "Model"
+        },
+        "train_data": {
+          "many": false,
+          "optional": false,
+          "type": "Dataset"
+        }
+      },
+      "origin": {
+        "kind": "first_party"
+      },
+      "outputs": {
+        "quantized": {
+          "many": false,
+          "optional": false,
+          "type": "QuantizedModel"
+        }
+      },
+      "params_schema": {
+        "additionalProperties": false,
+        "description": "quantize.qat (ADR-022 #10, P023 \u00a73): calibrate like PTQ, then a short fine-tune with fake quantization.\n\nWorker: vlm_pipeline.quantize.qat (bao-fixcode, ModelOpt 0.44 QATTrainer in the train image). ``full`` is refused by\nthe support check above the full fine-tune size limit (as train.sft_vlm). QAD and INT4 formats are not in 1.0.",
+        "properties": {
+          "adapter": {
+            "default": "lora",
+            "enum": [
+              "lora",
+              "full"
+            ],
+            "title": "Adapter",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "qat_adapter",
+              "order": 1,
+              "widget": "segmented"
+            }
+          },
+          "calib_size": {
+            "default": 128,
+            "enum": [
+              128,
+              512
+            ],
+            "title": "Calib Size",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true,
+              "option_keys": "calib_size",
+              "widget": "segmented"
+            }
+          },
+          "epochs": {
+            "default": 1,
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Epochs",
+            "type": "integer",
+            "x-ui": {
+              "option_keys": "epoch_count",
+              "order": 2,
+              "widget": "segmented"
+            }
+          },
+          "format": {
+            "default": "fp8",
+            "enum": [
+              "fp8",
+              "nvfp4"
+            ],
+            "title": "Format",
+            "type": "string",
+            "x-ui": {
+              "disabled_options": {
+                "nvfp4": "param_unsupported.worker_v1"
+              },
+              "option_keys": "quantize_preset",
+              "order": 0,
+              "summary": true
+            }
+          },
+          "lr_preset": {
+            "default": "low",
+            "enum": [
+              "low",
+              "lower"
+            ],
+            "title": "Lr Preset",
+            "type": "string",
+            "x-ui": {
+              "option_keys": "qat_lr",
+              "order": 3,
+              "widget": "segmented"
+            }
+          },
+          "max_steps": {
+            "default": 0,
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Max Steps",
+            "type": "integer",
+            "x-ui": {
+              "advanced": true
+            }
+          }
+        },
+        "title": "QatParams",
+        "type": "object"
+      },
+      "permissions": [],
+      "policy_block": null,
+      "runner": "container",
+      "type_id": "quantize.qat",
       "version": "1.0.0"
     },
     {
