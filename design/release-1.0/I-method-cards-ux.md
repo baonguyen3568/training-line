@@ -48,6 +48,7 @@ A11y:
 - Kích thước tối thiểu: khối 64×28px; chữ trong khối 11px. Thẻ hẹp thì 3 khối xếp vừa 280px.
 
 ## 3. Dữ liệu cần trong `reference_pipelines.yaml` (research/cleancode chốt)
+Đã chốt theo proposal 023 §5: dùng `train_arch` (`full` = train, `full_low_lr` = train_low_lr), `quant` tách riêng khỏi trạng thái, `extras`, `stages`, `measured_with`, `when_to_use_key` = `reference_pipeline.<id>.when`. Khối YAML dưới đây chỉ là minh hoạ ý.
 ```yaml
 method: lora_sft            # id phương pháp → key method.<id>.*
 arch:
