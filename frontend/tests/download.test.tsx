@@ -376,6 +376,8 @@ describe("waiting for memory", () => {
     );
     const line = await screen.findByTestId("download-waiting");
     expect(line.textContent).not.toMatch(/\{\w+\}/);
+    expect(line.textContent).toContain("cần khoảng 42 GB, đang trống 30 GB"); // design 38f9aca, rounded
+    expect(line.getAttribute("aria-live")).toBe("off"); // not re-read on every poll
     // a newer server's event this client does not know: ignored, never read as a failure
     act(() => emit({ type: "brand_new_event" } as unknown as DownloadEvent));
     expect(useDownloads.getState().entries["model:xw"]?.status).toBe("queued");

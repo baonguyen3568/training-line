@@ -136,7 +136,8 @@ export function DownloadDialog({
               <p>{t("download.verifying")}</p>
             ) : entry.waiting && entry.status !== "downloading" ? (
               // queued until enough RAM is free; the numbers when the server sent them, never "{need_gb}"
-              <p data-testid="download-waiting">
+              // the numbers change each poll: announced once (with the region), not re-read every 30 s
+              <p data-testid="download-waiting" aria-live="off">
                 <span className="si si-warn" aria-hidden="true">
                   <Icon name="clock" size={14} />
                 </span>{" "}
