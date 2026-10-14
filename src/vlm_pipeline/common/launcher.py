@@ -9,12 +9,15 @@ receives the typed job and builds the argv itself, never an argv from the app.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import signal
 import subprocess
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from vlm_pipeline.common.jobrun import ContainerJob, ExitInfo
@@ -168,10 +171,12 @@ class RunnerLauncher:
             "command": "submit", "run_id": job.name, "job_kind": kind, "image_tag": job.image, "argv": list(argv),
             "gpu": job.gpu, "memory_gb": job.memory_gb, "lock_token": lock_token,
             "run_dir": _app_path(job.rw_dirs[0], project_root),
-            "inputs": [_app_path(p, project_root) for p in job.ro_inputs],
+            "inputs": [_app_path(p, project_root) for p in _outermost(job.ro_inputs)],
         })  # fmt: skip
         if reply.get("ok") is not True:
-            raise RunnerError(str(reply.get("error", "refused")))
+            error = str(reply.get("error", "refused"))
+            logger.error("vlm-runner refused job %s: %s", job.name, error)  # never silent (slot #2, 2026-10-14)
+            raise RunnerError(error)
         self.last_image_id = str(reply.get("image_id") or "") or None
         submitted, seen = time.monotonic(), False
         while True:  # the runner owns the container; we only watch it
@@ -237,3 +242,9 @@ def default_launcher() -> JobLauncher:
 
 
 __all__ = ["JobLauncher", "LocalDockerLauncher", "RunnerError", "RunnerLauncher", "default_launcher"]
+
+
+def _outermost(paths: tuple[Path, ...]) -> tuple[Path, ...]:
+    from vlm_pipeline.common.jobrun import outermost_inputs  # jobrun imports this module: import late
+
+    return outermost_inputs(paths)

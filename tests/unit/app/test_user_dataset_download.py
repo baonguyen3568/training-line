@@ -36,9 +36,9 @@ def _png() -> bytes:
     return buf.getvalue()
 
 
+_META = [{"file_name": f"{n}.png", "question": f"Q{n}?", "answer": f"A{n}"} for n in range(3)]
 SPLIT = {
-    "train/metadata.jsonl": "\n".join(json.dumps({"file_name": f"{n}.png", "question": f"Q{n}?", "answer": f"A{n}"})
-                                      for n in range(3)).encode(),  # fmt: skip
+    "train/metadata.jsonl": "\n".join(json.dumps(m) for m in _META).encode(),
     **{f"train/{n}.png": _png() for n in range(3)},
 }
 
@@ -117,8 +117,9 @@ def _added(service: Any, client: TestClient, columns: dict[str, str] | None = No
     return client.post("/api/user-assets/datasets", json={"inspect_id": inspect_id, "columns": cols})
 
 
-def test_add_confirm_download_convert_then_read_like_a_local_folder(service: Any,
-                                                                   monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
+def test_add_confirm_download_convert_then_read_like_a_local_folder(
+    service: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     seen: list[dict[str, Any]] = []
     _fake_jobs(monkeypatch, service.root, seen)
     client = _client(service)

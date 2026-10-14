@@ -88,3 +88,36 @@ def test_the_runner_never_drops_extra_groups(tmp_path: Path, monkeypatch: pytest
     job = dataclasses.replace(_narrow_job(tmp_path), image="vlm-nemo-rl:0.7.0-1", group_add=(0,))  # type: ignore[type-var]
     with pytest.raises(RunnerError, match="group_add_not_supported"):
         launcher.run(job, tmp_path, lock_token=None, log_path=tmp_path / "l", image_id=None)  # type: ignore[attr-defined]
+
+
+def test_one_split_feeding_train_and_val_sends_one_input(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                         caplog: pytest.LogCaptureFixture) -> None:  # fmt: skip
+    """Slot #2 2026-10-14: train and val data from one split named the same dataset twice; vlm-runner refused it
+    (inputs_nested) and the job failed SYS-000 without a word."""
+    from vlm_pipeline.common.jobrun import ContainerJob
+    from vlm_pipeline.common.launcher import RunnerError, RunnerLauncher
+
+    data = tmp_path / ".cache" / "hf" / "hub" / "datasets--o--d"
+    model = tmp_path / ".cache" / "hf" / "hub" / "models--o--m"
+    run = tmp_path / "outputs" / "runs" / "r"
+    job = ContainerJob(name="r", image="vlm-x:1", argv=("automodel", "c.yaml"), narrow=True, rw_dirs=(run,),
+                       ro_inputs=(model, data, data, data / "snapshots" / "x"))  # fmt: skip
+    sent: list[dict[str, Any]] = []
+    launcher = RunnerLauncher(tmp_path / "runner.sock")
+
+    def call(body: dict[str, Any]) -> dict[str, Any]:
+        sent.append(body)
+        return {"ok": False, "error": "inputs_nested"}
+
+    monkeypatch.setattr(launcher, "_call", call)
+    with caplog.at_level("ERROR", logger="vlm_pipeline.common.launcher"), pytest.raises(RunnerError):
+        launcher.run(job, tmp_path, lock_token="t", log_path=tmp_path / "l", image_id=None)  # noqa: S106 - dummy
+    assert sent[0]["inputs"] == ["/app/.cache/hf/hub/datasets--o--d", "/app/.cache/hf/hub/models--o--m"]
+    assert "vlm-runner refused job r: inputs_nested" in caplog.text  # a refusal is never silent
+
+
+def test_outermost_inputs_drop_duplicates_and_nested_paths(tmp_path: Path) -> None:
+    from vlm_pipeline.common.jobrun import outermost_inputs
+
+    a, b = tmp_path / "a", tmp_path / "b"
+    assert outermost_inputs([b, a / "x", a, a, tmp_path / "ab"]) == (a, tmp_path / "ab", b)

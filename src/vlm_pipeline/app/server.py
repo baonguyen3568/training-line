@@ -33,8 +33,25 @@ def cmd_app(args: argparse.Namespace) -> int:
     guard = getattr(app.state, "vlm_security", None)
     if guard is not None:
         guard.announce(guard.token)  # the sign-in links (#t=, never sent to a server); shown, never logged (D13)
+    _log_to_stderr()
     uvicorn.run(app, host=bind_host(), port=args.port, log_level="info", access_log=False)
     return 0
+
+
+def _log_to_stderr() -> None:
+    """The app's own loggers to stderr (docker logs).
+
+    Without a handler only the root's lastResort existed, and an executor error never reached any log (slot #2,
+    2026-10-14). Messages never carry secrets (tokens are not logged).
+    """
+    import logging
+
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    app_log = logging.getLogger("vlm_pipeline")
+    app_log.addHandler(handler)
+    app_log.setLevel(logging.INFO)
+    app_log.propagate = False
 
 
 PUBLIC_PORT_ENV = "VLM_PUBLIC_PORT"

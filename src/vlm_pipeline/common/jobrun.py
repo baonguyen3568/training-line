@@ -272,6 +272,20 @@ def _refuse_bad_inputs(job: ContainerJob, project_root: Path) -> None:
             raise JobInputRefusedError(str(exc), params={"path": shown}) from None
 
 
+def outermost_inputs(paths: Iterable[Path]) -> tuple[Path, ...]:
+    """Read-only inputs without duplicates and without a path inside another one (it is visible through it).
+
+    The runner refuses nested or repeated mounts (``inputs_nested``): a train job whose train and val data come from
+    one split node names the same dataset twice (slot #2, 2026-10-14: refused, and the job failed silently).
+    """
+    unique = sorted({Path(os.path.normpath(Path(p).absolute())) for p in paths}, key=lambda p: (len(p.parts), str(p)))
+    kept: list[Path] = []
+    for path in unique:
+        if not any(path == k or path.is_relative_to(k) for k in kept):
+            kept.append(path)
+    return tuple(sorted(kept))
+
+
 def narrow_mounts(job: ContainerJob, project_root: Path) -> list[str]:
     """``-v``/``--tmpfs`` args of a narrowed job (P017 step 6). Every source is checked on the host first.
 

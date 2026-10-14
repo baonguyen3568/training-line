@@ -592,3 +592,20 @@ def test_rerunning_a_failed_node_in_its_old_dir_reports_the_new_success(tmp_path
     assert list((tmp_path / "runs").glob("m-*")) == [run_dir]  # the same dir was reused (no workspace claims)
     now = read_manifest(run_dir)
     assert (now.status.value, now.error_code) == ("completed", None)
+
+
+def test_an_unclassified_failure_logs_its_traceback(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Slot #2 2026-10-14: a node failed SYS-000 and neither the app log nor run.json said why."""
+
+    class Broken(FakeWorker):
+        def run(self, job: NodeJob) -> NodeResult:
+            if job.node_id == "t":
+                raise RuntimeError("runner said inputs_nested")
+            return super().run(job)
+
+    with caplog.at_level("ERROR", logger="vlm_pipeline.graph.executor"):
+        run = Executor(make_test_registry(), Broken(), tmp_path).run(_wf())
+    assert run.status["t"] == "failed"
+    assert run.errors["t"].code == "SYS-000"  # the UI: the catalog error only
+    assert "node t failed (SYS-000)" in caplog.text
+    assert "runner said inputs_nested" in caplog.text  # the log: the cause

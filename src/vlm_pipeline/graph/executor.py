@@ -45,7 +45,7 @@ from vlm_pipeline.common.runinfo import (
 )
 from vlm_pipeline.graph.actions import issue_actions
 from vlm_pipeline.graph.cache import compute_cache_key
-from vlm_pipeline.graph.errors import UserError, classify
+from vlm_pipeline.graph.errors import Classified, UserError, classify
 from vlm_pipeline.graph.groups import expand
 from vlm_pipeline.graph.validation import Issue, validate
 from vlm_pipeline.graph.worker import (
@@ -212,6 +212,14 @@ def _mark_retried(run_dir: Path, reason: str) -> None:
     except (OSError, ValueError):
         return
     write_manifest(run_dir, manifest.model_copy(update={"retried_after": reason}))
+
+
+def _classified(node_id: str, exc: BaseException, *, cancelled: bool, checkpoint_step: int | None) -> Classified:
+    """``classify`` + the traceback of an unclassified failure in the log (the UI gets SYS-000, never the trace)."""
+    outcome = classify(exc, cancelled=cancelled, checkpoint_step=checkpoint_step)
+    if outcome.error is not None and outcome.error.code == "SYS-000":  # slot #2 2026-10-14: failed without a word
+        logger.error("node %s failed (SYS-000)", node_id, exc_info=exc)
+    return outcome
 
 
 def _write_node_manifest(
@@ -566,7 +574,7 @@ class Executor:
         except Exception as exc:  # noqa: BLE001 - every worker failure becomes a catalog error, never a crash
             # A try that failed before saving keeps the earlier attempt's checkpoint as its resume point.
             saved = read_checkpoint_step(run_dir) if resume_from is None else (read_checkpoint_step(run_dir) or step)
-            outcome = classify(exc, cancelled=cancel.is_set(), checkpoint_step=saved)
+            outcome = _classified(nid, exc, cancelled=cancel.is_set(), checkpoint_step=saved)
             if retry_ok and self._paused_for_retry(run, node, run_dir, outcome.error, started=started, cancel=cancel):
                 self._compute(run, node, key=key, inputs=inputs, upstream=upstream, keys=keys, cancel=cancel)
                 return
