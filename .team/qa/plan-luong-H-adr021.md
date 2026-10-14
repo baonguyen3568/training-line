@@ -61,3 +61,21 @@ Mình chụp snapshot (2) ngay bây giờ, trước khi code luồng H vào main
 ## Phụ thuộc
 research: danh sách repo H1/H2/H3 + bảng family · backend: API + check_support · fixcode: mã lỗi và câu chữ ·
 security: ca config.json bất thường + review · frontend: UI dán repo / ghép cột.
+
+## Repo đã chọn (research, 2026-10-14, sha từ HF API)
+- H1:
+  - Qwen/Qwen3-VL-4B-Instruct @ebb281ec70b0 (qwen3_vl, apache-2.0, 8.89 GB)
+  - HuggingFaceTB/SmolVLM-Instruct @81cd9a775a4d (idefics3, apache-2.0, 4.5 GB)
+  - Qwen/Qwen2-VL-2B-Instruct @895c3a49bc3f (qwen2_vl, apache-2.0, 4.43 GB)
+  - Thêm (họ không phải Qwen + bộ lọc chỉ tải safetensors): llava-hf/llava-onevision-qwen2-0.5b-ov-hf @74dd0bf8
+    (repo 14 GB vì có onnx; phần cần tải khoảng 1.8 GB). Mình chạy cả 4 nếu GPU cho phép, tối thiểu 3 khác họ.
+- H2: katanaml-org/invoices-donut-data-v1 @d2cde298e79c (MIT, 0.2 GB, cột image + ground_truth JSON kiểu Donut).
+  Ca phụ WebDataset: pixparse/docvqa-wds @23106d41, chỉ 1–2 shard, theo điều kiện của security (không train-rồi-báo-điểm,
+  không đưa ảnh lên site/docs, E2E kiểm nhãn "license card chưa duyệt").
+- H3:
+  - remote code: OpenGVLab/InternVL3-2B @89915501
+  - kiến trúc chưa hỗ trợ: Salesforce/blip2-opt-2.7b @59a1ef6c1e51
+  - text-only: Qwen/Qwen3-0.6B @c1899de289a0
+  - gated: google/gemma-3-4b-it @093f9f388b31
+  - dataset có script: nlphuji/flickr30k @2b239befc81b (dự phòng HuggingFaceM4/VQAv2 @4b98c864262e)
+- Bảng họ kiến trúc: .team/knowledge/vlm-families-26.08-7.md.
