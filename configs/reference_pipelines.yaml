@@ -67,6 +67,28 @@ pipelines:
       - {node: train.merge_lora, label: {vi: "Gộp vào model", en: "Merge"}}
       - {node: eval.benchmarks, label: {vi: "Chấm CORD", en: "Score on CORD"}}
 
+  - id: qlora-4bit-qwen35-2b
+    summary_key: reference_pipeline.qlora-4bit-qwen35-2b.summary
+    kind: candidate
+    template_id: null
+    status: planned  # the LoRA node's 4-bit option opens with image vlm-automodel:26.08-7 (bao-backend)
+    difficulty: advanced
+    title: {vi: "Fine-tune nhẹ 4-bit (QLoRA) Qwen3.5-2B", en: "4-bit QLoRA (Qwen3.5-2B)"}
+    source_url: https://github.com/NVIDIA-NeMo/Automodel/blob/main/examples/llm_finetune/llama3_3/llama_3_3_70b_instruct_squad_peft_qlora_spark.yaml
+    publisher: "NVIDIA"
+    license: {code: apache-2.0, model: apache-2.0, data: cc-by-4.0}
+    measured:
+      train_minutes: 6.8
+      peak_ram_gb: 24.7
+      score: null
+      config: "40 steps on CORD v2 receipts, NF4 base weights with the vision tower kept BF16, image vlm-automodel:26.08-7. Same run with BF16 LoRA: 28.1 GB, validation loss 0.0507 vs 0.0516 for QLoRA. A short comparison run, no task score"
+      sources: [benchmarks/perf/qlora-vs-lora-qwen3.5-2b-26.08-7-20261014.json]
+    steps:
+      - {node: model.hf_pick, label: {vi: "Qwen3.5-2B", en: "Qwen3.5-2B"}}
+      - {node: data.hf_load, label: {vi: "CORD v2", en: "CORD v2"}}
+      - {node: train.lora_vlm, label: {vi: "Fine-tune nhẹ 4-bit (QLoRA)", en: "4-bit QLoRA fine-tune"}}
+      - {node: train.merge_lora, label: {vi: "Gộp vào model", en: "Merge"}}
+
   - id: image-video-understanding
     summary_key: reference_pipeline.image-video-understanding.summary
     kind: app_template
