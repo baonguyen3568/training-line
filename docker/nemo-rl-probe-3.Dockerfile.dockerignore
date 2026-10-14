@@ -1,2 +1,4 @@
 *
 !third_party/patches/nemo-rl/
+.env*
+**/.env*
