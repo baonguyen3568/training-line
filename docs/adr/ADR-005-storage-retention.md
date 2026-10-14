@@ -44,3 +44,10 @@ User: "cứ chơi đi, không quá 80% VRAM". Team dùng GPU tự do (bỏ cơ c
   - Sàn tuyệt đối vẫn giữ (cái nào chặt hơn thắng): abort khi < 8GB, emergency kill khi < 4GB.
   - Triển khai (34d4f7e): preflight `est_peak ≤ 0.8 × MemAvailable` VÀ `est_peak + 8GB ≤ MemAvailable`; cgroup là ngân sách thứ 2. Margin 10GB và sàn 20GB cũ đã BỎ. Runtime: warn < max(14GB, 0.25·A0), stop < max(8GB, 0.2·A0), emergency 4GB.
 - Amendment A2 (2026-10-13): run `interrupted` quá 7 ngày (từ ended_at) mà không ai resume → xử lý như `failed`: ckpt thường xoá tự động; LATEST = PERMANENT_LOSS, chỉ xoá tay. UI nhắc trước hạn 1 ngày.
+
+## Amendment A3 (2026-10-14, PM; đồng ý: bao-fixcode, bao-security) — Miễn sàn swap cho job nhỏ có cgroup cứng
+- Job **không dùng GPU**, có cgroup memory cứng **≤ 4 GB** (`SWAP_EXEMPT_MAX_GB`) và **không có swap** (`--memory-swap = --memory`, `--pids-limit 512`) được bỏ qua sàn `SwapFree ≥ 2 GB`. MemAvailable / ngân sách 80% phần còn trống / abort_gb giữ nguyên.
+- Điều kiện ở 1 chỗ: `jobrun.swap_exempt(job)`; argv docker và ngưỡng đều suy từ cùng `ContainerJob`.
+- Lý do: host dùng chung, SwapFree dao động 1–4 GB do service khác, khiến job tải chờ mãi. Job miễn mà vượt cap thì bị OOM-kill trong cgroup riêng, không kéo host xuống.
+- Job train/eval/quantize/serve giữ nguyên sàn swap. Khi chờ swap, UI/CLI báo `waiting_for: swap` (SYS-002 riêng), không ghi "memory".
+- Test: `test_swap_exempt_jobs_get_no_swap_and_a_pids_limit`, `test_only_the_swap_floor_is_dropped_for_an_exempt_job`, `test_the_runner_gives_small_cpu_jobs_no_swap`.
