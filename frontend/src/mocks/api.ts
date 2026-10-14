@@ -486,6 +486,9 @@ export function mockValidate(
       .map((e) => workflow.nodes.find((n) => n.id === e.from[0]))
       .find((n) => typeof n?.params.user_model === "string" && n.params.user_model);
     if (!src) continue;
+    // like the server: only for a model this machine added, and only until its trial ran
+    const rec = mockUserModels.get(String(src.params.user_model));
+    if (!rec || rec.trial_run_id) continue;
     const model = String(src.params.user_model).split("--")[2] ?? String(src.params.user_model);
     errors.push(
       issue(
@@ -576,9 +579,17 @@ export const mockApi: Api = {
     });
   },
   // FakeWorker: walks the graph in topological order and emits node_status events like the real executor.
-  startRun: (workflow) => {
+  startRun: (workflow, trial) => {
     const id = `mock-${Date.now()}`;
     fakeRuns.set(id, structuredClone(workflow));
+    if (trial) {
+      // the server records the trial on the user model once it finishes; the mock does it when it starts
+      for (const e of workflow.edges.filter((x) => x.to[0] === trial.node)) {
+        const src = workflow.nodes.find((n) => n.id === e.from[0]);
+        const rec = mockUserModels.get(String(src?.params.user_model ?? ""));
+        if (rec) mockUserModels.set(rec.id, { ...rec, trial_run_id: id });
+      }
+    }
     return delay({ run_id: id });
   },
   cancelRun: (id) => {

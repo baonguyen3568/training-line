@@ -362,8 +362,12 @@ describe("unknown licence", () => {
 });
 
 describe("MODEL-005 in the mock follows the server", () => {
-  it("only LoRA and full SFT steps get the trial hint", async () => {
-    const { mockValidate } = await import("../src/mocks/api");
+  it("only LoRA and full SFT steps get the trial hint, for an added model, until its trial ran", async () => {
+    const { mockValidate, mockApi } = await import("../src/mocks/api");
+    // a model this machine added (the server's record): resolve "a/b" through the mock
+    const { resolve_id } = await mockApi.addUserModel({ repo: "a/b" });
+    await mockApi.userModelResolve(resolve_id); // queued
+    await mockApi.userModelResolve(resolve_id); // done: record user--a--b--0f3a9c1e
     const { useWorkflow } = await import("../src/store/workflow");
     await useWorkflow.getState().loadCatalog();
     const s = useWorkflow.getState();
@@ -384,6 +388,10 @@ describe("MODEL-005 in the mock follows the server", () => {
     expect(codes("train.sft_vlm")).toContain("MODEL-005");
     expect(codes("train.dpo_vlm")).not.toContain("MODEL-005");
     expect(codes("train.grpo_vlm")).not.toContain("MODEL-005");
+    // its trial ran: the hint is gone
+    // biome-ignore lint/suspicious/noExplicitAny: the same minimal workflow literal
+    await mockApi.startRun(wf("train.lora_vlm") as any, { node: "t" });
+    expect(codes("train.lora_vlm")).not.toContain("MODEL-005");
   });
 });
 
