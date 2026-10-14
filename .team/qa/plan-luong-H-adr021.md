@@ -106,8 +106,9 @@ security: ca config.json bất thường + review · frontend: UI dán repo / gh
 2. Qwen/Qwen3.5-0.8B-Base (apache-2.0, ~1.7 GB): bản Base, khác bản Instruct trong catalog.
 3. Qwen/Qwen3-VL-2B-Thinking (apache-2.0, qwen3_vl, 4.26 GB).
 4. Ca âm license: Qwen/Qwen2.5-VL-3B-Instruct (license trên card = null, 7.5 GB). Kỳ vọng: thêm được kèm cảnh báo license
-   không rõ, train/trial được, export bị chặn SEC-006, license_class "unknown". Cần đối chiếu: repo này có file LICENSE
-   riêng (theo trí nhớ của tester là Qwen Research License, không thương mại; CHƯA kiểm). Nếu đúng vậy thì cảnh báo nên
-   nói rõ hơn "không rõ".
+   không rõ, train/trial được, export bị chặn SEC-006, license_class "unknown". Backend đã kiểm (sha 66285546d2b8): file LICENSE =
+   "Qwen RESEARCH LICENSE AGREEMENT", card có license_name: qwen-research. Assert hiện tại: license_card hiện "qwen-research"
+   (sửa nhỏ chờ security), class "unknown", export chặn SEC-006. Nếu security thêm qwen-research (non_commercial) vào bảng
+   obligations thì assert đổi sang class non_commercial; export chặn hoặc cảnh báo theo chính sách security chốt.
 5. Ca âm remote code: một repo có *.py ⇒ MODEL-004 ngay ở resolve, 0 byte tải.
 Tổng tải < 20 GB.
