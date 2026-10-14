@@ -1561,6 +1561,8 @@ docs_error:
   actions_lead: "Depending on the situation, the app suggests one of these:"
 pipelines:
   more_steps: "+{step_count} steps"
+  measured_with: 'Measured with: {model}'
+  paper: Paper
   swap_hint: Change the model or data in the source steps to use this pipeline with others; the numbers on the card only hold for the measured setup.
   metric:
     field_f1: Field F1
