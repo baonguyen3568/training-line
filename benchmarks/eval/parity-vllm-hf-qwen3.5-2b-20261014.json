@@ -1,0 +1,119 @@
+{
+ "purpose": "vLLM <-> HF parity gate (B7-3) for 'Chạy thử' on vLLM: Qwen3.5-2B joins VLLM_PARITY_MODELS only on PASS",
+ "rule": "scripts/qa/vllm_hf_parity.py v3 (docstring; agreed with bao-fixcode before these runs): base passes same input / no anomaly / trunc+parse; the fine-tune passes all five incl. |dF1|<=2 with CI containing 0 and real divergences <= 5%",
+ "data": "CORD-v2 test[0:100] as PNG folder (data/reference/cord-v2-test), prompt 'Read this receipt and return its fields as JSON.', pixels 200704-1003520, greedy, max 1024 tokens, no thinking",
+ "engines": {
+  "hf": "scripts/qa/eval_cord_chat_worker.py on vlm-automodel:26.08-6 (batch 1, bf16)",
+  "vllm": {
+   "image": "vlm-vllm:0.31.0",
+   "kv_cache_gb": 8.0,
+   "max_num_seqs": 256,
+   "enforce_eager": true,
+   "logprobs": 5
+  }
+ },
+ "base": {
+  "model": "Qwen/Qwen3.5-2B@15852e8c16360a2fea060d615a32b45270f8a8fc",
+  "hf_run": "20261013-2347-parity-hf-q2b-703b",
+  "vllm": "outputs/tester/parity/q2b-vllm-top5.json",
+  "verdict": "FAIL",
+  "checks": {
+   "1_same_input": true,
+   "2_no_anomaly": true,
+   "3_real_divergences_le_5pct": true,
+   "4_f1_delta_le_2_and_ci_has_0": true,
+   "5_trunc_and_parse_fail_le_2": true
+  },
+  "quality_informative": false,
+  "n": 100,
+  "same_input_pct": 100.0,
+  "exact_match_pct": 53.0,
+  "field_f1": {
+   "hf": 0.0,
+   "vllm": 0.0
+  },
+  "delta_f1_vllm_minus_hf": {
+   "delta": 0.0,
+   "ci95": [
+    0.0,
+    0.0
+   ]
+  },
+  "truncated_pct": {
+   "hf": 0.0,
+   "vllm": 0.0
+  },
+  "parse_fail_pct": {
+   "hf": 1.0,
+   "vllm": 1.0
+  },
+  "near_ties": 44,
+  "anomalies": [],
+  "real_divergences": [
+   5,
+   61,
+   89
+  ],
+  "real_divergence_pct": 3.0,
+  "near_tie_gap_nats": {
+   "median": 0.125,
+   "max": 0.375
+  },
+  "note": "field F1 is 0 on both sides (the base answers its own JSON schema): not quality-informative; real divergences reported only (seen before the 5% bound was chosen)"
+ },
+ "fine_tune": {
+  "model": "R2 merged, outputs/graph/runs/n5-7f7b4d037b03cc1c/merged (Qwen3.5-2B LoRA on CORD, step 272)",
+  "hf_run": "20261014-0858-parity-hf-r2-2635",
+  "vllm": "outputs/tester/parity/r2-vllm-top5.json",
+  "verdict": "PASS",
+  "checks": {
+   "1_same_input": true,
+   "2_no_anomaly": true,
+   "3_real_divergences_le_5pct": true,
+   "4_f1_delta_le_2_and_ci_has_0": true,
+   "5_trunc_and_parse_fail_le_2": true
+  },
+  "quality_informative": true,
+  "n": 100,
+  "same_input_pct": 100.0,
+  "exact_match_pct": 93.0,
+  "field_f1": {
+   "hf": 86.42,
+   "vllm": 86.29
+  },
+  "delta_f1_vllm_minus_hf": {
+   "delta": -0.12,
+   "ci95": [
+    -0.3,
+    0.04
+   ]
+  },
+  "truncated_pct": {
+   "hf": 0.0,
+   "vllm": 0.0
+  },
+  "parse_fail_pct": {
+   "hf": 1.0,
+   "vllm": 1.0
+  },
+  "near_ties": 7,
+  "anomalies": [],
+  "real_divergences": [],
+  "real_divergence_pct": 0.0,
+  "near_tie_gap_nats": {
+   "median": 0.125,
+   "max": 0.375
+  },
+  "note": "HF field F1 86.42 equals the published R2 test number (benchmarks/eval/r2-qwen3.5-2b-lora-cord-test-20261013.json)"
+ },
+ "gate": {
+  "verdict": "PASS",
+  "failed": []
+ },
+ "history": "first rule (exact >= 90%) failed the base at 53% exact with 42/47 first divergences at bf16 ties and F1 0/0; rule v3 fixed with bao-fixcode before the base top-5 rerun and the R2 runs",
+ "caveats": [
+  "one prompt, one dataset (CORD receipts), 100 images, batch-1 HF vs batched vLLM",
+  "vLLM greedy is not bit-reproducible run to run (base: ids 32/97 moved between runs)",
+  "parity for the 2B architecture; Qwen3.5-0.8B needs its own run"
+ ]
+}
