@@ -721,9 +721,9 @@ node:
         help: Model nhỏ chạy nhanh hơn; model lớn trả lời tốt hơn nhưng cần nhiều bộ nhớ hơn.
       user_model:
         label: Model bạn đã thêm
-        help: Một model bạn tự thêm từ Hugging Face (chưa được đội kiểm chứng). Khi chọn, nó thay cho model gốc ở trên.
+        help: Một model bạn tự thêm từ Hugging Face (chưa kiểm chứng). Khi chọn, nó thay cho model gốc ở trên.
       user_repo:
-        label: Kho của model đã thêm
+        label: Repo của model đã thêm
         help: Tên kho trên Hugging Face của model bạn đã thêm. App tự điền.
       user_revision:
         label: Phiên bản của model đã thêm
