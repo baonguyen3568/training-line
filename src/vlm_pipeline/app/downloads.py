@@ -441,25 +441,41 @@ def template_assets(template: dict[str, Any]) -> list[tuple[Kind, str]]:
 
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - install.sh, inside the app container
-    """``python -m vlm_pipeline.app.downloads --template invoice_to_json``: the SAME download path as the app."""
+    """``python -m vlm_pipeline.app.downloads --template invoice_to_json``: the SAME download path as the app.
+
+    ``--model <catalog id>`` / ``--dataset <catalog id>`` fetch one catalog asset the same way (egress proxy, verify,
+    install); only catalog ids resolve, never a free repo name (research 2026-10-14: a model for a reference pipeline).
+    """
     import argparse
 
     from vlm_pipeline.app.secret_store import SecretStore
     from vlm_pipeline.common.paths import project_root
 
     parser = argparse.ArgumentParser(prog="python -m vlm_pipeline.app.downloads")
-    parser.add_argument("--template", required=True)
+    what = parser.add_mutually_exclusive_group(required=True)
+    what.add_argument("--template")
+    what.add_argument("--model", metavar="CATALOG_ID")
+    what.add_argument("--dataset", metavar="CATALOG_ID")
     parser.add_argument("--yes-large", action="store_true", help="the user confirmed downloads over the threshold")
     parser.add_argument("--memory-wait-min", type=float, default=30.0, help="give up waiting for free memory after")
     args = parser.parse_args(argv)
     root = project_root()
-    template = json.loads((root / "configs" / "templates" / f"{Path(args.template).name}.json").read_text("utf-8"))
+    if args.template:
+        template = json.loads((root / "configs" / "templates" / f"{Path(args.template).name}.json").read_text("utf-8"))
+        assets = template_assets(template)
+    else:
+        assets = [("model", args.model)] if args.model else [("dataset", args.dataset)]
+        try:
+            resolve(*assets[0])
+        except DownloadUnknownError:
+            print(f"{assets[0][0]} {assets[0][1]}: not a catalog id (configs/catalog)", flush=True)
+            return 1
     store = SecretStore(root, create_key=False)
     service = DownloadService(root, emit=lambda _i, e: print(json.dumps(e), flush=True),
                               token=lambda: store.reveal("HF_TOKEN"))  # fmt: skip
     service.memory_wait_s = max(1.0, args.memory_wait_min) * 60
     failed = broken = 0
-    for kind, catalog_id in template_assets(template):
+    for kind, catalog_id in assets:
         reply = service.start(kind, catalog_id, confirm=args.yes_large)  # never confirmed for the user (P1)
         if reply.get("needs_confirm"):
             print(f"{kind} {catalog_id}: {reply['size_gb']} GB is over {reply['threshold_gb']} GB; "
