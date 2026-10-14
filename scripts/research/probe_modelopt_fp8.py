@@ -2,7 +2,7 @@
 
 Runs inside a project image via ``vlm_pipeline.common.jobrun_cli`` (offline, GPU lock, memguard):
 
-    uv run python -m vlm_pipeline.common.jobrun_cli --image vlm-automodel:26.08-5 --tag b4-fp8-probe \
+    uv run python -m vlm_pipeline.common.jobrun_cli --image vlm-automodel:26.08-6 --tag b4-fp8-probe \
         --stage quantize --est-peak-gb 12 -- python /workspace/scripts/research/probe_modelopt_fp8.py \
         --model /workspace/.cache/hf/hub/models--Qwen--Qwen3.5-0.8B/snapshots/<rev> \
         --cord /workspace/.cache/hf/hub/datasets--naver-clova-ix--cord-v2/snapshots/<rev>/data --out RUN_DIR

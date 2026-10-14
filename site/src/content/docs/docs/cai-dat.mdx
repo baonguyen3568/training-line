@@ -46,7 +46,7 @@ Vì sao máy 128 GB vẫn có lúc báo thiếu bộ nhớ: xem [Phần cứng v
 | Docker và NVIDIA Container Toolkit | Bản đi kèm DGX OS; việc train chạy trong container |
 | Python | `3.12`, cài và quản lý bằng `uv` |
 | Node.js | `22.12` trở lên, chỉ cần khi tự build giao diện |
-| Image train | `vlm-automodel:26.08-5`, dựng từ image `nvcr.io/nvidia/nemo-automodel:26.08` bản arm64 |
+| Image train | `vlm-automodel:26.08-6`, dựng từ image `nvcr.io/nvidia/nemo-automodel:26.08` bản arm64 |
 
 Mọi image và thư viện phải có bản **arm64**. Image gốc được ghim theo mã băm (digest), không dùng tag có thể bị đổi nội dung.
 
@@ -115,8 +115,8 @@ Giao diện được build thành file tĩnh và do chính app phục vụ. App 
 
 ```bash
 docker buildx build --builder vlm-builder --platform linux/arm64 \
-  -f docker/automodel-2.Dockerfile --build-arg VLM_TAG=26.08-5 \
-  -t vlm-automodel:26.08-5 --load .
+  -f docker/automodel-2.Dockerfile --build-arg VLM_TAG=26.08-6 \
+  -t vlm-automodel:26.08-6 --load .
 ```
 
 :::caution

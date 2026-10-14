@@ -443,4 +443,4 @@ models:
     serve_engine: unknown          # README ships a vllm_tied_patch (vendored, container-only)
     task_prompt_fixed: true
     gallery_gates: [white_image_probe, train_serve_parity, cord_field_f1]
-    min_image: vlm-automodel:26.08-5   # same Parse adapter as v1.1 (+ tied lm_head, processor_normalizes alias)
+    min_image: vlm-automodel:26.08-6   # same Parse adapter as v1.1 (+ tied lm_head, processor_normalizes alias)
