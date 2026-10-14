@@ -287,6 +287,7 @@ class ResolveMeta(BaseModel):
     files: list[_PlannedFile] = Field(max_length=2000)
     total_bytes: int = Field(ge=0)
     unreadable: list[str]
+    license_name: str | None = Field(None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     dataset: dict[str, object] | None = None  # a dataset resolve: validated by app.user_datasets.DatasetBlock
 
     @model_validator(mode="after")
@@ -344,9 +345,15 @@ def finish_model(root: Path, run_dir: Path, repo: str) -> UserModelRecord:
     if size_gb > cap:
         raise UserModelTooLargeError(size_gb, cap)
     entry = resolver.user_entry(repo=repo, revision=meta.sha, family=family, params_b=params_b, disk_gb=size_gb,
-                                license_id=meta.license or "unknown", gated=meta.gated)  # fmt: skip
+                                license_id=normalize_license(meta.license, meta.license_name),
+                                gated=meta.gated)  # fmt: skip
     return UserModelRecord(entry=entry, family=family.id, architecture=facts.architecture, added_at=time.time(),
-                           license_card=_card_text(meta.license))  # fmt: skip
+                           license_card=_card_text(_card_words(meta.license, meta.license_name)))  # fmt: skip
+
+
+def _card_words(license_id: str | None, name: str | None) -> str | None:
+    """What the card says, for the UI: ``other (qwen)`` when it names its licence in license_name."""
+    return f"{license_id} ({name})" if license_id and name else license_id
 
 
 def _card_text(value: object) -> str | None:

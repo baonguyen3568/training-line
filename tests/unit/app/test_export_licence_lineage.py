@@ -171,3 +171,36 @@ def test_a_dataset_only_compared_against_never_blocks(tmp_path: Path, datasets: 
     assert list(export_needs_known_dataset_licences(view)) == []
     sources[("u", "dataset")] = ("h",)  # the same dataset as training data: blocked
     assert [i.code for i in export_needs_known_dataset_licences(view)] == ["SEC-006"]
+
+
+@pytest.mark.parametrize(("card", "name", "seen"), [
+    ("other", "nvidia-open-model-license", "nvidia-open-model-license"),  # nvidia/Cosmos-Reason2-2B
+    ("other", "qwen", "qwen"),  # Qwen/Qwen2.5-VL-72B
+    ("other", "lfm1.0", "lfm1.0"),  # LiquidAI/LFM2-VL
+    ("other", "my-own-terms", "unknown"),
+    ("other", None, "unknown"),
+    ("apache-2.0", "qwen", "apache-2.0"),  # license_name only fills in for "other"
+])  # fmt: skip
+def test_other_with_a_known_license_name_is_known(card: str, name: str | None, seen: str) -> None:
+    from vlm_pipeline.common.catalog import normalize_license
+
+    assert normalize_license(card, name) == seen
+
+
+def test_the_resolve_reads_license_name_and_the_record_keeps_the_cards_words(tmp_path: Path) -> None:
+    import json as _json
+
+    from vlm_pipeline.app import user_assets
+
+    run = tmp_path / "run"
+    meta = run / "stage" / "meta"
+    meta.mkdir(parents=True)
+    (meta / "config.json").write_text(_json.dumps({"architectures": ["Qwen3_5ForConditionalGeneration"],
+                                                   "model_type": "qwen3_5"}))  # fmt: skip
+    files = [{"name": "config.json", "size": 10, "sha256": None, "git_sha1": None},
+             {"name": "model.safetensors", "size": 2_000_000_000, "sha256": None, "git_sha1": None}]  # fmt: skip
+    (run / "stage" / "resolve.json").write_text(_json.dumps({
+        "sha": SHA, "gated": False, "license": "other", "license_name": "qwen", "all_files": ["config.json",
+        "model.safetensors"], "files": files, "total_bytes": 2_000_000_010, "unreadable": []}))  # fmt: skip
+    record = user_assets.finish_model(tmp_path, run, "Qwen/x")
+    assert (record.entry.license, record.license_card) == ("qwen", "other (qwen)")

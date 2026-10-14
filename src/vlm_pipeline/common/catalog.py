@@ -278,9 +278,15 @@ def _known_licences() -> frozenset[str]:
     return _SPDX_KNOWN | {str(k).lower() for k in listed if str(k) != "mixed-unverified"}
 
 
-def normalize_license(card: object) -> str:
-    """The licence id a user-added asset is treated under: a known id, else ``unknown`` (fail closed)."""
+def normalize_license(card: object, name: object = None) -> str:
+    """The licence id a user-added asset is treated under: a known id, else ``unknown`` (fail closed).
+
+    Many cards say ``license: other`` with the real id in ``license_name`` (Qwen, NVIDIA, LiquidAI; security
+    2026-10-14): that name counts when it is a known id too.
+    """
     text = card.strip().lower() if isinstance(card, str) else ""
+    if text == "other" and isinstance(name, str):
+        text = name.strip().lower()
     return text if text in _known_licences() else LICENSE_UNKNOWN
 
 

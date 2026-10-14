@@ -146,10 +146,11 @@ def hub_failure_reason(exc: BaseException, *, has_token: bool) -> str:
     return "network"
 
 
-def _card_license(info: Any) -> str | None:
+def _card_license(info: Any, key: str = "license") -> str | None:
+    """A card field (``license`` / ``license_name``) as short plain text, else None (never trusted further)."""
     card = getattr(info, "card_data", None) or getattr(info, "cardData", None)
-    value = card.get("license") if isinstance(card, dict) else getattr(card, "license", None)
-    return value if isinstance(value, str) else None
+    value = card.get(key) if isinstance(card, dict) else getattr(card, key, None)
+    return value[:200] if isinstance(value, str) else None
 
 
 def _dataset_choice(
@@ -206,7 +207,9 @@ def resolve(run_dir: Path, spec: dict[str, Any], *, api: Any, fetch: Callable[..
     # A file the resolver must read that is there but too big (or not planned) is NEVER "absent": the host refuses
     # the repo (security H2: an oversized tokenizer_config.json could hide an auto_map).
     unreadable = sorted(n for n, cap in caps.items() if n in names and (n not in sizes or sizes[n] > cap))
+    name = _card_license(info, "license_name")  # "license: other" + the real id here (Qwen, NVIDIA, LiquidAI)
     meta = {"sha": sha, "gated": bool(gated), "license": _card_license(info), "all_files": names,
+            "license_name": name if name is not None and _NAME.fullmatch(name) else None,
             "files": files, "total_bytes": sum(f["size"] for f in files), "unreadable": unreadable}  # fmt: skip
     sample: list[str] = []
     if kind == "dataset":

@@ -270,3 +270,14 @@ def test_a_split_file_list_that_does_not_match_is_refused(tmp_path: Path, only: 
     fake = _Hub([_sib("data/train-0.parquet", 10, "a" * 64)], {})
     assert hub.run(_run_dir(tmp_path, kind="dataset", only_files=only), api=fake, fetch=fake.fetch) == hub.EXIT_BAD_SPEC
     assert fake.fetched == []
+
+
+@pytest.mark.parametrize(("name", "kept"), [("qwen", "qwen"), ("a b; rm -rf", None), ("x" * 80, None)])
+def test_resolve_keeps_a_plain_license_name_only(tmp_path: Path, name: str, kept: str | None) -> None:
+    fake = _ResolveHub([_sib("config.json", 10)], {"config.json": b"{}"})
+    fake.model_info = lambda *a, **k: SimpleNamespace(  # type: ignore[method-assign]
+        siblings=fake.siblings, sha="b" * 40, gated=False, card_data={"license": "other", "license_name": name}
+    )
+    run_dir = _run_dir(tmp_path, revision="main", resolve=True)
+    assert hub.run(run_dir, api=fake, fetch=fake.fetch) == 0
+    assert json.loads((run_dir / "stage" / "resolve.json").read_text())["license_name"] == kept

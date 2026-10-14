@@ -19,7 +19,7 @@ from typing import Any, ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from vlm_pipeline.app.user_assets import _card_text
+from vlm_pipeline.app.user_assets import _card_text, _card_words
 from vlm_pipeline.common.catalog import normalize_license
 from vlm_pipeline.common.download_rules import name_ok
 from vlm_pipeline.common.errors import VlmPipelineError
@@ -327,7 +327,8 @@ def from_inspection(run_dir: Path, repo: str, columns: ColumnMap, available: lis
     return UserDatasetRecord(
         id=user_dataset_id(repo, meta.sha, block.config, block.split), repo=repo, revision=meta.sha,
         config=block.config, split=block.split, format=block.format, files=files,
-        license=normalize_license(meta.license), license_card=_card_text(meta.license), gated=meta.gated,
+        license=normalize_license(meta.license, meta.license_name),
+        license_card=_card_text(_card_words(meta.license, meta.license_name)), gated=meta.gated,
         columns=columns, added_at=time.time(),
     )  # fmt: skip
 
