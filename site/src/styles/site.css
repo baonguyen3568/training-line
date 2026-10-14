@@ -399,3 +399,27 @@ main > .prose {
   border-left: 0;
   border-top: 0;
 }
+
+/* App screenshots on content pages (components/Shot.astro): the column's width, never wider */
+.prose .shot {
+  margin: 1.5rem 0;
+}
+.prose .shot img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--color-axis);
+  border-radius: 8px;
+}
+/* .wide: up to 960 px, centred on the column; never wider than the screen minus the 16 px gutters */
+.prose .shot.wide {
+  width: min(960px, calc(100vw - 32px));
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+.prose .shot figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}

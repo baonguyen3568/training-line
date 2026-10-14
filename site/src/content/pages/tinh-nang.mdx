@@ -10,12 +10,15 @@ sources:
 numbers_without_source: []
 ---
 import Hint from '~/components/Hint.astro';
+import Shot from '~/components/Shot.astro';
 
 ## Ghép workflow bằng kéo thả
 
 Mỗi việc là một khối trên màn hình: chọn model, lấy dữ liệu, chia dữ liệu học và kiểm tra, dạy model, đo điểm. Bạn kéo khối từ thư viện vào rồi nối dây từ đầu ra của khối này sang đầu vào của khối kia. Các khối tự xếp theo thứ tự các bước, từ Nguồn đến Xuất, nên workflow dài vẫn dễ theo dõi.
 
 Workflow được lưu thành một file. Gửi file đó cho đồng nghiệp là họ mở ra được đúng như bạn thấy.
+
+<Shot wide src="/images/tinh-nang/workflow-canvas.webp" width={1920} height={615} alt="Mẫu Đọc hoá đơn → JSON đang mở: năm bước đã nối dây từ Chọn model gốc và Dataset Hugging Face qua Chia dữ liệu, Fine-tune toàn bộ tới Đo điểm benchmark; bước Fine-tune đang được chọn và bảng bên phải hiện thiết lập của nó" caption="Ảnh chụp app. Tên và số liệu trong ảnh chỉ để minh hoạ." />
 
 ## Kiểm tra trước khi chạy
 
@@ -32,6 +35,8 @@ Mọi ước lượng đều ghi rõ nguồn: đã đo trên máy, tính theo c�
 Không có stack trace. Mỗi lỗi có một mã, kèm câu nói chuyện gì đã xảy ra và bạn có thể làm gì tiếp. Ví dụ: máy đang bận nên không đủ bộ nhớ thì app nói rõ đó không phải lỗi của bạn, và cho xếp hàng để tự chạy khi máy rảnh.
 
 Nhiều lỗi có nút **Sửa nhanh**: bấm là app đổi đúng thiết lập cần đổi, và bạn hoàn tác được bằng Ctrl+Z. Lỗi do chính app thì có nút **Gửi báo cáo lỗi**: app chép mã lỗi và phiên bản để bạn dán vào trang báo lỗi, không tự gửi gì. <Hint title="Báo cáo lỗi chép những gì">Chỉ chép mã lỗi, tên lỗi, phiên bản app, tên GPU và một mã tham chiếu ngắn. Không chép nhật ký, đường dẫn thư mục, token hay dữ liệu của bạn, và bạn xem trước toàn bộ nội dung.</Hint>
+
+<Shot src="/images/tinh-nang/quick-fix.webp" width={1520} height={838} alt="Bước Fine-tune toàn bộ bị đánh dấu Chưa đủ; bảng bên phải hiện thẻ lỗi Không đủ bộ nhớ cho bước này, nói bước cần khoảng 60 GB nhưng máy chỉ còn 40 GB trống, kèm nút Sửa nhanh Xếp hàng, tự chạy khi đủ bộ nhớ" caption="Ảnh chụp app. Tên và số liệu trong ảnh chỉ để minh hoạ." />
 
 ## Chỉ chạy lại phần đã thay đổi
 
@@ -52,6 +57,8 @@ Sau khi dạy, bạn hỏi thử model ngay trong app. Khi hài lòng, xuất mo
 ## Quản lý dung lượng
 
 Bảng Dung lượng cho biết mỗi lần chạy đang chiếm bao nhiêu chỗ trên ổ đĩa, mục nào được giữ lại và vì sao, mục nào xoá được. Xoá một model đã train phải gõ đúng tên để xác nhận. Nút **Đặt lại bước** xoá mọi lần chạy của một bước để chạy lại từ đầu.
+
+<Shot wide src="/images/tinh-nang/storage-panel.webp" width={1920} height={770} alt="Bảng Dung lượng, nhóm Cần bạn chọn: ba mục model đã train, mỗi mục ghi dung lượng, vì sao app không tự xoá, và cảnh báo xoá sẽ mất vĩnh viễn" caption="Ảnh chụp app. Tên và số liệu trong ảnh chỉ để minh hoạ." />
 
 ## Tiếng Việt và tiếng Anh
 

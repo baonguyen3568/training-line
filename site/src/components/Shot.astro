@@ -1,0 +1,21 @@
+---
+// A screenshot of the app on a docs/marketing page: lazy below the fold, real size to keep the layout still, an alt
+// that says what is happening, and a caption saying the data in it is an illustration (design E, rule: no made-up
+// numbers presented as measurements). Styles live in site.css (.prose .shot): scoped ones did not reach the <img>.
+interface Props {
+  src: string;
+  alt: string;
+  caption: string;
+  width?: number;
+  height?: number;
+  /** Wider than the prose column (up to 960 px) for a wide screenshot whose text would be too small (design). */
+  wide?: boolean;
+}
+const { src, alt, caption, width = 1520, height = 760, wide = false } = Astro.props;
+---
+<figure class:list={["shot", { wide }]}>
+  <a href={src}>
+    <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+  </a>
+  <figcaption>{caption}</figcaption>
+</figure>
