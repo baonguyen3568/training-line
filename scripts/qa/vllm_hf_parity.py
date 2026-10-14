@@ -1,24 +1,30 @@
 """Parity gate vLLM <-> HF for "Chạy thử" on vLLM (B7-3): a catalog model joins VLLM_PARITY_MODELS only on PASS.
 
 Same CORD-v2 test images, same training prompt and pixels, greedy. HF side: scripts/qa/eval_cord_chat_worker.py
-(pred.jsonl with prompt_ids_sha + token_ids); vLLM side: ``run`` here (serve.vllm_runner.run_vllm_batch, logprobs=2).
+(pred.jsonl with prompt_ids_sha + token_ids); vLLM side: ``run`` here (serve.vllm_runner.run_vllm_batch, logprobs=5).
 
   uv run python scripts/qa/vllm_hf_parity.py run --model <dir> --out outputs/tester/parity/<id>-vllm.json [--n 100]
   uv run python scripts/qa/vllm_hf_parity.py compare <hf pred.jsonl> <vllm.json> [--out report.json]
+  uv run python scripts/qa/vllm_hf_parity.py gate <base report.json> <fine-tune report.json>
 
-PASS needs all of (agreed with bao-fixcode, 2026-10-13):
+A model joins only when BOTH its base and a fine-tune of it pass (``gate``); each ``compare`` reports, per run:
 1. the same input on 100% of the images - blocking: image_sha256 equal (both sides read the same PNG; the HF worker
    records it) AND prompt_ids_sha equal (same tokens in, image tokens included); a vLLM image error is a failure;
-2. exact text match >= 90% OR (every first divergence is a near tie AND no anomaly) - changed 2026-10-13 with
-   bao-fixcode after the first Qwen3.5-2B probe: 3/3 images diverged, all at near ties (margins 0.0 / 0.125 / 0.0
-   nats). Greedy bf16 over a JSON answer hundreds of tokens long forks at the first tie, so exact match measures
-   length, not engine agreement; conditions 3 and 4 stay the quality gate. The original rule is still reported.
-   At each first differing token: the rank of HF's token in vLLM's top-2 and vLLM's top1-top2 margin. A near tie =
-   rank 2 with margin < 0.5 nats, or rank 1 with margin 0 (equal logprobs: vLLM picks among them arbitrarily). Rank 1
-   with a margin > 0 means vLLM's greedy did not take its own top-1: an anomaly, which fails the gate. Anything else
-   is a real divergence;
-3. |delta field F1| <= 2 points AND its paired 95% CI contains 0;
-4. truncated% and parse_fail% each differ by <= 2 points.
+2. no anomaly; 3. real divergences <= 5% of the images. At each image's first differing token, gap = vLLM's logprob
+   of the token it chose - its logprob of HF's token (vLLM's top-5 recorded): a near tie = gap < 0.5 nats; an
+   anomaly = HF's token scored higher than vLLM's own greedy choice, or that choice is missing from its top-5; a real
+   divergence = gap >= 0.5 or HF's token outside the top-5. Rank and the top1-top2 margin are reported only;
+4. |delta field F1| <= 2 points AND its paired 95% CI contains 0, and 5. truncated% and parse_fail% each differ by
+   <= 2 points. Condition 4 only means something when the model answers in CORD's schema ("quality_informative": HF
+   field F1 >= 20), so ``gate`` takes it from the fine-tune; the base must pass 1, 2 and 5.
+History (bao-fixcode + bao-tester, 2026-10-13/14), fixed BEFORE the runs it judges: the first rule (exact match >= 90%)
+measured answer length - Qwen3.5-2B base, 100 images: same input 100%, exact 53%, 42 of 47 first divergences near
+ties (bf16 logprobs move in 0.125 steps; greedy forks at the first tie), and field F1 was 0 on both sides, so the F1
+condition could not catch anything on a base. The 5% bound was chosen after that base run showed 5/100 real
+divergences (two at gaps 0.5 / 0.625, three outside a top-2 that was then the only one recorded): it is judged on
+the R2 fine-tune only: a base rerun with top-5 is the same model, images and greedy decoding, so it would show the
+same divergences again (only ranked better), and judging it against a bound read off it would be circular. On the
+base, condition 3 is reported, not decisive. The 0.5 nats threshold is unchanged.
 """
 
 from __future__ import annotations
@@ -40,6 +46,9 @@ PIXELS = (200704, 1003520)
 MAX_TOKENS = 1024
 NEAR_TIE_NATS = 0.5
 EXACT_TIE_NATS = 1e-6
+LOGPROBS = 5
+MAX_REAL_DIVERGENCE_PCT = 5.0
+INFORMATIVE_F1 = 20.0
 RESAMPLES, SEED = 1000, 0
 
 
@@ -54,7 +63,7 @@ def run(args: argparse.Namespace) -> int:
     ]
     res = run_vllm_batch(
         root, Path(args.model), items, who="bao-tester", tag="parity-vllm", min_pixels=PIXELS[0],
-        max_pixels=PIXELS[1], enable_thinking=False, logprobs=2, kv_cache_gb=args.kv_cache_gb,
+        max_pixels=PIXELS[1], enable_thinking=False, logprobs=args.logprobs, kv_cache_gb=args.kv_cache_gb,
     )  # fmt: skip
     if not res.ok:
         print(f"batch failed: {res.status} {res.error_code} {res.run_dir}", file=sys.stderr)
@@ -92,23 +101,34 @@ def _strip_end(ids: list[int], drop: set[int]) -> list[int]:
 
 
 def hf_rank(row: dict[str, Any], index: int, hf_token: int | None) -> str | None:
-    """Rank of HF's token among vLLM's recorded top tokens at ``index``: "1", "2" or ">2" (None if unknown)."""
+    """Rank of HF's token among vLLM's recorded top tokens at ``index``: "1".."k" or ">k" (None if unknown)."""
     top = row.get("top_logprobs")
     if hf_token is None or not top or index >= len(top):
         return None
     ranked = [int(t[0]) for t in top[index]]
-    return str(ranked.index(hf_token) + 1) if hf_token in ranked else ">2"
+    return str(ranked.index(hf_token) + 1) if hf_token in ranked else f">{len(ranked)}"
 
 
-def kind_of(rank: str | None, margin: float | None) -> str:
-    """First divergence kind: "near_tie", "anomaly" (greedy skipped its own top-1) or "divergence" (anything else)."""
-    if margin is None:
-        return "divergence"
-    if rank == "1":
-        return "near_tie" if abs(margin) < EXACT_TIE_NATS else "anomaly"
-    if rank == "2" and margin < NEAR_TIE_NATS:
-        return "near_tie"
-    return "divergence"
+def gap_at(row: dict[str, Any], index: int, hf_token: int | None) -> tuple[float | None, bool]:
+    """(vLLM logprob of its own token - of HF's token, or None when HF's is not recorded; own token recorded?)."""
+    top = row.get("top_logprobs")
+    ids = row.get("token_ids") or []
+    if not top or index >= len(top) or index >= len(ids):
+        return None, False
+    lp = {int(t[0]): float(t[1]) for t in top[index]}
+    own = lp.get(int(ids[index]))
+    if own is None:
+        return None, False
+    return (None if hf_token is None or hf_token not in lp else own - lp[hf_token]), True
+
+
+def kind_of(gap: float | None, own_recorded: bool) -> str:
+    """First divergence kind: "near_tie", "anomaly" (greedy did not take its best token) or "divergence"."""
+    if not own_recorded or (gap is not None and gap < -EXACT_TIE_NATS):
+        return "anomaly"
+    if gap is None:
+        return "divergence"  # HF's token is outside vLLM's recorded top-k
+    return "near_tie" if gap < NEAR_TIE_NATS else "divergence"
 
 
 def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dict[str, Any]:
@@ -140,10 +160,13 @@ def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dic
         pos = first_difference(h_ids, v_ids)
         m = margin_at(vl[i], pos) if pos is not None else None
         # HF's token there, its EOS included (HF stopping where vLLM went on is a choice like any other)
-        rank = hf_rank(vl[i], pos, h_full[pos] if pos < len(h_full) else None) if pos is not None else None
+        hf_tok = h_full[pos] if pos is not None and pos < len(h_full) else None
+        rank = hf_rank(vl[i], pos, hf_tok) if pos is not None else None
+        gap, own = gap_at(vl[i], pos, hf_tok) if pos is not None else (None, False)
         diverged.append(
             {"id": i, "first_diff_token": pos, "hf_choice_rank_in_vllm": rank,
-             "vllm_margin_nats": None if m is None else round(m, 3), "kind": kind_of(rank, m)}
+             "vllm_margin_nats": None if m is None else round(m, 3),
+             "gap_nats": None if gap is None else round(gap, 3), "kind": kind_of(gap, own)}
         )  # fmt: skip
     hf_rows = [{"answer_format": "json", "sequence": hf[i]["sequence"], "gt_parse": hf[i]["gt_parse"]} for i in ids]
     vl_rows = [{"answer_format": "json", "sequence": text[i], "gt_parse": hf[i]["gt_parse"]} for i in ids]
@@ -160,19 +183,22 @@ def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dic
     trunc_hf = 100 * sum(bool(hf[i]["truncated"]) for i in ids) / n
     trunc_vl = 100 * sum(vl[i].get("finish_reason") == "length" for i in ids) / n
     kinds = [d["kind"] for d in diverged]
-    near = sorted(d["vllm_margin_nats"] for d in diverged if d["kind"] == "near_tie")
-    exact_ge_90 = 100 * len(exact) / n >= 90
-    rule_2 = (exact_ge_90 or all(k == "near_tie" for k in kinds)) and "anomaly" not in kinds
+    near = sorted(d["gap_nats"] for d in diverged if d["kind"] == "near_tie")
+    real_pct = 100 * kinds.count("divergence") / n
+    informative = hf_scores.field_f1 >= INFORMATIVE_F1
     checks = {
         "1_same_input": len(same_input) == n,
-        "2_exact_ge_90_or_all_near_ties": rule_2,
-        "3_f1_delta_le_2_and_ci_has_0": abs(delta) <= 2 and ci[0] <= 0 <= ci[1],
-        "4_trunc_and_parse_fail_le_2": abs(trunc_hf - trunc_vl) <= 2
+        "2_no_anomaly": "anomaly" not in kinds,
+        "3_real_divergences_le_5pct": real_pct <= MAX_REAL_DIVERGENCE_PCT,
+        "4_f1_delta_le_2_and_ci_has_0": abs(delta) <= 2 and ci[0] <= 0 <= ci[1],
+        "5_trunc_and_parse_fail_le_2": abs(trunc_hf - trunc_vl) <= 2
         and abs(hf_scores.parse_fail_rate - vl_scores.parse_fail_rate) <= 2,
     }
+    exact_ge_90 = 100 * len(exact) / n >= 90
     return {
-        "verdict": "PASS" if all(checks.values()) else "FAIL",
+        "verdict": "PASS" if all(checks.values()) and informative else "FAIL",
         "checks": checks,
+        "quality_informative": informative,
         "n": n,
         "same_input_pct": round(100 * len(same_input) / n, 1),
         "vllm_image_errors": image_errors,
@@ -184,12 +210,28 @@ def compare(hf: dict[int, dict[str, Any]], vl: dict[int, dict[str, Any]]) -> dic
         "near_ties": len(near),
         "anomalies": [d["id"] for d in diverged if d["kind"] == "anomaly"],
         "real_divergences": [d["id"] for d in diverged if d["kind"] == "divergence"],
-        "near_tie_margin_nats": {"median": near[len(near) // 2] if near else None, "max": near[-1] if near else None},
-        "original_rule": {
-            "2_exact_match_ge_90": exact_ge_90,
-            "verdict": "PASS" if exact_ge_90 and all(v for k, v in checks.items() if k[0] != "2") else "FAIL",
-        },
+        "real_divergence_pct": round(real_pct, 1),
+        "near_tie_gap_nats": {"median": near[len(near) // 2] if near else None, "max": near[-1] if near else None},
+        "original_rule": {"2_exact_match_ge_90": exact_ge_90},
         "diverged": diverged,
+    }
+
+
+def gate(base: dict[str, Any], tuned: dict[str, Any]) -> dict[str, Any]:
+    """Join decision: the base passes 1, 2, 5 and the fine-tune passes everything, its F1 informative.
+
+    The base's condition 3 is reported only: its numbers were seen before the 5% bound was chosen (see above).
+    """
+    need_base = ("1_same_input", "2_no_anomaly", "5_trunc_and_parse_fail_le_2")
+    failed = [f"base:{k}" for k in need_base if not base["checks"].get(k)]
+    failed += [f"fine_tune:{k}" for k, ok in tuned["checks"].items() if not ok]
+    if not tuned.get("quality_informative"):
+        failed.append("fine_tune:quality_informative")
+    return {
+        "verdict": "FAIL" if failed else "PASS",
+        "failed": failed,
+        "base_real_divergence_pct": base.get("real_divergence_pct"),
+        "base_note": "base: numbers seen before the threshold was chosen; condition 3 reported, not decisive",
     }
 
 
@@ -201,13 +243,21 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--out", required=True)
     r.add_argument("--n", type=int, default=100)
     r.add_argument("--kv-cache-gb", type=float, default=8.0)
+    r.add_argument("--logprobs", type=int, default=LOGPROBS)
     c = sub.add_parser("compare")
     c.add_argument("hf")
     c.add_argument("vllm")
     c.add_argument("--out", default=None)
+    g = sub.add_parser("gate")
+    g.add_argument("base")
+    g.add_argument("fine_tune")
     args = ap.parse_args(argv)
     if args.cmd == "run":
         return run(args)
+    if args.cmd == "gate":
+        verdict = gate(json.loads(Path(args.base).read_text()), json.loads(Path(args.fine_tune).read_text()))
+        print(json.dumps(verdict, indent=1))
+        return 0 if verdict["verdict"] == "PASS" else 1
     hf = {int(json.loads(line)["index"]): json.loads(line) for line in Path(args.hf).read_text().splitlines()}
     vl = {int(row["id"]): row for row in json.loads(Path(args.vllm).read_text())["rows"]}
     report = compare(hf, vl)

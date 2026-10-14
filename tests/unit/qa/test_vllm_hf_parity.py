@@ -60,16 +60,18 @@ def test_divergences_report_the_first_token_and_the_near_tie() -> None:
         "first_diff_token": 1,
         "hf_choice_rank_in_vllm": "2",
         "vllm_margin_nats": 0.05,
+        "gap_nats": 0.05,
         "kind": "near_tie",
     }
     assert report["near_ties"] == 3
 
 
-def test_too_many_differences_fail_exact_and_f1() -> None:
+def test_near_ties_alone_pass_2_and_3_but_worse_answers_fail_f1() -> None:
     report = _mod().compare(*_pair(50, differ=10))
     assert report["original_rule"]["2_exact_match_ge_90"] is False
-    assert report["checks"]["2_exact_ge_90_or_all_near_ties"] is True  # 10 near ties: rule 2' holds...
-    assert report["checks"]["3_f1_delta_le_2_and_ci_has_0"] is False  # ...but the answers are worse
+    assert report["checks"]["2_no_anomaly"] is True
+    assert report["checks"]["3_real_divergences_le_5pct"] is True  # 10 near ties, 0 real divergence...
+    assert report["checks"]["4_f1_delta_le_2_and_ci_has_0"] is False  # ...but the answers are worse
     assert report["verdict"] == "FAIL"
 
 
@@ -109,23 +111,71 @@ def test_an_exact_tie_listed_first_is_a_near_tie() -> None:
     assert report["diverged"][0]["kind"] == "near_tie"
 
 
-def test_hf_top1_with_a_margin_is_an_anomaly_and_fails() -> None:
-    # vLLM greedy did not take its own top-1: not a tie, whatever the exact-match rate.
+def test_hf_token_scored_above_vllm_choice_is_an_anomaly_and_fails() -> None:
+    # vLLM greedy did not take its best token: not a tie, whatever else holds.
     hf, vl = _pair(50, differ=1)
     vl[0]["top_logprobs"][1] = [[2, -0.4], [9, -0.7]]
     report = _mod().compare(hf, vl)
     assert report["diverged"][0]["kind"] == "anomaly"
+    assert report["diverged"][0]["gap_nats"] == -0.3
     assert report["anomalies"] == [0]
-    assert report["checks"]["2_exact_ge_90_or_all_near_ties"] is False
+    assert report["checks"]["2_no_anomaly"] is False
     assert report["verdict"] == "FAIL"
 
 
-def test_one_real_divergence_fails_rule_2_below_90_pct_exact() -> None:
+def test_vllm_choice_missing_from_its_own_top_k_is_an_anomaly() -> None:
+    hf, vl = _pair(10, differ=1)
+    vl[0]["top_logprobs"][1] = [[2, -0.7], [5, -0.9]]  # vLLM generated 9, which its top-k does not list
+    assert _mod().compare(hf, vl)["diverged"][0]["kind"] == "anomaly"
+
+
+def test_real_divergences_over_5pct_fail_and_gap_decides_not_rank() -> None:
     hf, vl = _pair(10, differ=2)
-    hf[0]["token_ids"] = [1, 8, 3, 7]  # outside vLLM's top-2
+    hf[0]["token_ids"] = [1, 8, 3, 7]  # outside vLLM's recorded top-k
+    vl[1]["top_logprobs"][1] = [[9, -0.70], [2, -1.20]]  # rank 2 but gap 0.5: not < 0.5
     report = _mod().compare(hf, vl)
-    assert report["real_divergences"] == [0]
-    assert report["checks"]["2_exact_ge_90_or_all_near_ties"] is False
+    assert report["real_divergences"] == [0, 1]
+    assert report["real_divergence_pct"] == 20.0
+    assert report["checks"]["3_real_divergences_le_5pct"] is False
+
+
+def test_a_rank_3_token_within_half_a_nat_is_a_near_tie() -> None:
+    hf, vl = _pair(10, differ=1)
+    vl[0]["top_logprobs"][1] = [[9, -1.10], [4, -1.15], [2, -1.30]]  # flat: HF's token is third, gap 0.2
+    report = _mod().compare(hf, vl)
+    assert report["diverged"][0]["hf_choice_rank_in_vllm"] == "3"
+    assert report["diverged"][0]["kind"] == "near_tie"
+
+
+def test_a_base_answering_its_own_schema_is_not_quality_informative() -> None:
+    hf, vl = _pair(20)
+    for side, key in ((hf, "sequence"), (vl, "text")):
+        for row in side.values():
+            row[key] = json.dumps({"ticket": {"price": 1}})  # valid JSON, not CORD's schema: field F1 0
+    report = _mod().compare(hf, vl)
+    assert all(report["checks"].values())
+    assert report["quality_informative"] is False
+    assert report["verdict"] == "FAIL"  # a base alone never decides
+
+
+def test_gate_needs_the_base_engine_checks_and_the_fine_tune_quality() -> None:
+    mod = _mod()
+    base_hf, base_vl = _pair(20)
+    for side, key in ((base_hf, "sequence"), (base_vl, "text")):
+        for row in side.values():
+            row[key] = json.dumps({"ticket": {"price": 1}})
+    base = mod.compare(base_hf, base_vl)
+    tuned = mod.compare(*_pair(20))
+    assert mod.gate(base, tuned)["verdict"] == "PASS"
+    assert mod.gate(base, base)["failed"] == ["fine_tune:quality_informative"]
+    bad_hf, bad_vl = _pair(20, differ=2)
+    bad_hf[0]["token_ids"] = [1, 8, 3, 7]
+    bad_hf[1]["token_ids"] = [1, 8, 3, 7]
+    worse = mod.compare(bad_hf, bad_vl)  # 2/20 real divergences = 10%
+    assert worse["checks"]["3_real_divergences_le_5pct"] is False
+    assert mod.gate(worse, tuned)["verdict"] == "PASS"  # on the base, condition 3 is reported, not decisive
+    assert mod.gate(worse, tuned)["base_real_divergence_pct"] == 10.0
+    assert "fine_tune:3_real_divergences_le_5pct" in mod.gate(base, worse)["failed"]  # decisive on the fine-tune
 
 
 def test_hf_stopping_where_vllm_goes_on_is_ranked_with_the_eos() -> None:
