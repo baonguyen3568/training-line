@@ -39,6 +39,12 @@ COPY_SUFFIXES = frozenset({".safetensors", ".json", ".jinja", ".txt", ".model", 
 NEVER_COPY = frozenset({"run.json", "merge_report.json", "dataset.json", "problems.json", "export.json"})
 
 
+class ExportLicenseUnknownError(VlmPipelineError):
+    """A user-added model whose card names no licence: usable in the app, never exported (ADR-021 A1, SEC-006)."""
+
+    code: ClassVar[str] = "SEC-006"
+
+
 class ExportUnsupportedError(VlmPipelineError):
     """The model runs its own code: not exportable as a portable folder yet (ADR-012 B3)."""
 
@@ -173,6 +179,9 @@ def run_export(worker: RealWorker, job: NodeJob) -> NodeResult:
     entry = worker.base_of(model)
     src = worker.model_dir(model)
     unsupported = {"node": job.node_id, "model": entry.display_name}
+    if entry.tier == "user" and entry.license == "unknown":  # ADR-021 A1: trains, never leaves the app
+        raise ExportLicenseUnknownError("no licence named for this model", params={
+            "node": job.node_id, "name": entry.display_name, "repo": entry.repo})  # fmt: skip
     if entry.remote_code != "none" or portable.remote_code_findings(src):
         raise ExportUnsupportedError("model runs its own code", params=unsupported)
     dest = _destination(worker, job, str(getattr(job.params, "dest")))  # noqa: B009

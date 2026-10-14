@@ -167,6 +167,11 @@ class RealWorker:
         for entry in self.catalog.models:
             if ref.hash == f"{entry.repo}@{entry.revision}":
                 return entry
+        from vlm_pipeline.app.user_assets import list_all  # ADR-021: a user-added model is a base model too
+
+        for record in list_all(self.root):
+            if ref.hash == f"{record.entry.repo}@{record.entry.revision}":
+                return record.entry
         raise UnknownModelError("base model is not a catalog model", params={"hash": ref.hash})
 
     # ------------------------------------------------------------------------------------------ nodes
@@ -765,12 +770,16 @@ def _check_dpo(q: SupportQuery) -> None:
 
 
 def _check_export(q: SupportQuery) -> None:
-    from vlm_pipeline.app.export_worker import ExportUnsupportedError
+    from vlm_pipeline.app.export_worker import ExportLicenseUnknownError, ExportUnsupportedError
 
     if q.model is not None and q.model.remote_code != "none":  # the folder's real content is re-checked at run time
         raise ExportUnsupportedError(
             "model runs its own code", params={"node": q.node_id, "model": q.model.display_name}
         )
+    if q.model is not None and q.model.tier == "user" and q.model.license == "unknown":  # ADR-021 A1
+        raise ExportLicenseUnknownError(
+            "no licence named for this model", params={"node": q.node_id, "name": q.model.display_name,
+                                                       "repo": q.model.repo})  # fmt: skip
 
 
 def _owner_check(module: str) -> Callable[[SupportQuery], None]:

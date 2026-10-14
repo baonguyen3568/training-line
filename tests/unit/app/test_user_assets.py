@@ -358,3 +358,67 @@ def test_a_user_template_edited_on_disk_never_trains(service: DownloadService, m
     path.symlink_to(service.root / "elsewhere.yaml")
     with pytest.raises(RecipeError):
         user_assets.training_template(service.root, entry)
+
+
+# ------------------------------------------------------------------------------------------- H5c
+def test_the_model_cap_is_a_setting_the_user_can_raise(service: DownloadService, monkeypatch: pytest.MonkeyPatch,
+                                                      tmp_path: Path) -> None:  # fmt: skip
+    client = _client(service)
+    assert client.get("/api/user-assets/limits").json()["max_model_gb"] == 40.0
+    for bad in ({"max_model_gb": 0}, {"max_model_gb": 5000}, {"max_model_gb": 50, "x": 1}):
+        assert client.put("/api/user-assets/limits", json=bad).status_code == 422
+    assert client.put("/api/user-assets/limits", json={"max_model_gb": 2.0}).json() == {"max_model_gb": 2.0}
+    assert user_assets.max_model_gb(service.root) == 2.0
+    with pytest.raises(user_assets.UserModelTooLargeError):  # 3.7 GB over the user's 2 GB
+        user_assets.finish_model(service.root, _stage(tmp_path / "run"), "o/x")
+    (service.root / user_assets.LIMITS_REL).write_text('{"max_model_gb": 999999}')  # hand-edited: never trusted
+    assert user_assets.max_model_gb(service.root) == user_assets.DEFAULT_MAX_MODEL_GB
+
+
+def _record(root: Path, license_id: str | None) -> Any:
+    record = user_assets.finish_model(root, _stage(root / "run", license_id=license_id), "o/x")
+    user_assets.save(root, record)
+    return record
+
+
+@pytest.mark.parametrize(("license_id", "blocked"), [(None, True), ("apache-2.0", False)])
+def test_an_unknown_licence_never_leaves_the_app(tmp_path: Path, license_id: str | None, blocked: bool) -> None:
+    """ADR-021 A1: a user model whose card names no licence trains and runs, but export is refused (SEC-006)."""
+    from vlm_pipeline.app.export_worker import ExportLicenseUnknownError
+    from vlm_pipeline.app.workers import _check_export
+    from vlm_pipeline.graph.worker import SupportQuery
+    from vlm_pipeline.nodes import REGISTRY
+
+    entry = _record(tmp_path, license_id).entry
+    spec = REGISTRY.get("export.hf_dir")
+    assert spec is not None
+    query = SupportQuery("x", spec, spec.validate_params({}), entry, {})
+    if not blocked:
+        _check_export(query)
+        return
+    with pytest.raises(ExportLicenseUnknownError) as info:
+        _check_export(query)
+    assert (info.value.code, info.value.params) == ("SEC-006", {"node": "x", "name": "x", "repo": "o/x"})
+
+
+def test_a_user_model_is_a_base_model_for_every_worker(tmp_path: Path) -> None:
+    """base_of() resolved catalog models only: a user model's train, merge, eval or export failed (UnknownModel)."""
+    from vlm_pipeline.app.workers import RealWorker
+    from vlm_pipeline.graph.worker import ArtifactRef
+
+    entry = _record(tmp_path, "mit").entry
+    worker = RealWorker(tmp_path)
+    assert worker._entry_for(ArtifactRef("Model", "", f"{entry.repo}@{entry.revision}")) == entry
+
+
+def test_the_admin_download_cap_bounds_the_setting(service: DownloadService, monkeypatch: pytest.MonkeyPatch) -> None:
+    """security H5c: on a shared host the policy's [download] max_gb is the ceiling; Settings only tighten."""
+    monkeypatch.setattr("vlm_pipeline.common.app_config.read_policy", lambda: {"download": {"max_gb": 60}})
+    client = _client(service)
+    assert client.get("/api/user-assets/limits").json()["admin_cap_gb"] == 60.0
+    refused = client.put("/api/user-assets/limits", json={"max_model_gb": 100})
+    assert (refused.status_code, refused.json()["detail"]) == (422, {"code": "NET-004", "params": {
+        "size_gb": 100.0, "quota_gb": 60.0}})  # fmt: skip
+    assert client.put("/api/user-assets/limits", json={"max_model_gb": 50}).status_code == 200
+    user_assets.save_limits(service.root, user_assets.UserLimits(max_model_gb=500))  # saved before a stricter policy
+    assert user_assets.max_model_gb(service.root) == 60.0

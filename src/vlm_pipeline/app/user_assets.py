@@ -213,10 +213,56 @@ def training_template(root: Path, entry: CatalogEntry) -> dict[str, object]:
     return template_from_bytes(data, path.name)
 
 
+LIMITS_REL = Path("outputs") / "system" / "user_limits.json"
+MAX_MODEL_GB_RANGE = (1.0, 1000.0)
+
+
+class UserLimits(BaseModel):
+    """What the user may raise in Settings (ADR-021 A1): the size cap of one user-added model."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    max_model_gb: float = Field(DEFAULT_MAX_MODEL_GB, ge=MAX_MODEL_GB_RANGE[0], le=MAX_MODEL_GB_RANGE[1])
+
+
+def read_limits(root: Path) -> UserLimits:
+    """The saved limits, or the defaults (absent, unreadable or invalid: never above the default by accident)."""
+    try:
+        return UserLimits.model_validate(read_small_json(root / LIMITS_REL, 4096))
+    except (OSError, ValueError, ValidationError):
+        return UserLimits()
+
+
+def save_limits(root: Path, limits: UserLimits) -> None:
+    path = root / LIMITS_REL
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=".json")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(limits.model_dump_json())
+        Path(tmp).replace(path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def admin_cap_gb() -> float | None:
+    """The admin policy's ``[download] max_gb`` (G-5): Settings may tighten below it, never go above (security)."""
+    from vlm_pipeline.common.app_config import read_policy
+
+    policy = read_policy()
+    cap = policy.get("download", {}).get("max_gb") if isinstance(policy, dict) else None
+    return float(cap) if isinstance(cap, int | float) and not isinstance(cap, bool) and cap > 0 else None
+
+
 def max_model_gb(root: Path) -> float:
-    """The per-model cap for user-added models (ADR-021 A1). Settings raises it (H5c); until then the default."""
-    del root
-    return DEFAULT_MAX_MODEL_GB
+    """The per-model cap for user-added models (ADR-021 A1).
+
+    The default 40 GB or the user's setting, never above the admin policy's download cap.
+    """
+    cap = admin_cap_gb()
+    value = read_limits(root).max_model_gb
+    return min(value, cap) if cap is not None else value
 
 
 # --------------------------------------------------------------------------------------------- resolve (host side)
@@ -304,8 +350,10 @@ __all__ = [
     "DEFAULT_MAX_MODEL_GB",
     "LicenseNotConfirmedError",
     "ResolveMeta",
+    "UserLimits",
     "UserModelRecord",
     "UserModelTooLargeError",
+    "admin_cap_gb",
     "confirm_license",
     "delete",
     "downloadable_entry",
@@ -313,8 +361,10 @@ __all__ = [
     "list_all",
     "load",
     "max_model_gb",
+    "read_limits",
     "read_resolve",
     "save",
+    "save_limits",
     "save_template",
     "training_template",
 ]

@@ -140,6 +140,22 @@ def register_user_asset_routes(app: FastAPI) -> None:
             out["error"] = download.error
         return out
 
+    @app.get("/api/user-assets/limits")
+    def get_limits() -> dict[str, Any]:
+        low, high = user_assets.MAX_MODEL_GB_RANGE
+        return {**user_assets.read_limits(root).model_dump(), "max_model_gb_range": [low, high],
+                "default_max_model_gb": user_assets.DEFAULT_MAX_MODEL_GB,
+                "admin_cap_gb": user_assets.admin_cap_gb()}  # fmt: skip
+
+    @app.put("/api/user-assets/limits")
+    def put_limits(body: user_assets.UserLimits) -> dict[str, Any]:
+        cap = user_assets.admin_cap_gb()
+        if cap is not None and body.max_model_gb > cap:  # the admin policy wins: Settings only tighten
+            params = {"size_gb": round(body.max_model_gb, 1), "quota_gb": round(cap, 1)}
+            raise HTTPException(status_code=422, detail={"code": "NET-004", "params": params})
+        user_assets.save_limits(root, body)
+        return body.model_dump()
+
     @app.get("/api/user-assets/models")
     def list_models() -> dict[str, Any]:
         return {"models": [r.to_api() for r in user_assets.list_all(root)]}
