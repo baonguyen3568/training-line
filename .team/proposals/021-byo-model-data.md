@@ -1,6 +1,6 @@
 # 021 — Bring your own model / dataset from Hugging Face (ADR-021, stream H), backend side
 
-- Author: bao-backend · 2026-10-14 · Status: DRAFT v1 (for PM + security + research + fixcode + cleancode)
+- Author: bao-backend · 2026-10-14 · Status: APPROVED by PM (v2: A1 + §7.1 decided); security review pending
 - Decision: docs/adr/ADR-021-bring-your-own-model-data.md (user, 1.0). Error codes: fixcode (list agreed 2026-10-14).
 - Error codes (fixcode, agreed 2026-10-14): NET-005 HUB_REPO_UNAVAILABLE {repo, kind, reason: not_found |
   not_found_or_private | gated_no_token | gated_not_accepted | network}; MODEL-003 MODEL_ARCH_UNSUPPORTED {repo,
@@ -123,8 +123,8 @@ native is enough to test the path). Depends on: research `families.yaml` + recip
 
 ## 7. Open questions
 
-1. PM: is "workflow names a user model not added on this machine" an error with a re-add action (proposed), or should
-   the workflow file carry repo+sha and re-add silently after a license confirm?
+1. ~~PM~~ DECIDED 2026-10-14: an error with the action "Thêm model này": it opens the add dialog prefilled with the
+   workflow's repo + 40-char sha (the author's revision); the user still reads and ticks the licence. Never silent.
 2. research: RAM upper bound formula per family (params_b × bytes + activations at the default pixel cap)?
 3. security: should a user-added dataset's images also go through the existing image decode limits (DATA-V
    max pixels) before any thumbnail is written? (proposed: yes, same limits.)
