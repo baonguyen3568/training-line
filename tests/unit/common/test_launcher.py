@@ -125,12 +125,12 @@ def test_outermost_inputs_drop_duplicates_and_nested_paths(tmp_path: Path) -> No
 
 def test_what_the_launcher_sends_passes_the_runners_own_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """bao-tester 2026-10-14: the unit tests never met the runner's validation; this sends a split-fed train job's
-    real submit body through vlm_pipeline.runner.protocol.parse_submit (the code the runner runs)."""
+    real submit body through vlm_pipeline.common.runner_protocol.parse_submit (the code the runner runs)."""
     import json
 
     from vlm_pipeline.common.jobrun import ContainerJob
     from vlm_pipeline.common.launcher import RunnerLauncher
-    from vlm_pipeline.runner.protocol import parse_request
+    from vlm_pipeline.common.runner_protocol import parse_request
 
     data = tmp_path / ".cache" / "hf" / "hub" / "datasets--o--d" / "snapshots" / "x"
     model = tmp_path / ".cache" / "hf" / "hub" / "models--o--m"

@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from vlm_pipeline.runner.protocol import MAX_REQUEST_BYTES, ProtocolError, RunRef, Submit, parse_request
+from vlm_pipeline.common.runner_protocol import MAX_REQUEST_BYTES, ProtocolError, RunRef, Submit, parse_request
 
 RUN = "20261013-1200-p3b-full-parse-c4f6"
 GOOD: dict[str, Any] = {

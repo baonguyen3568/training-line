@@ -38,7 +38,7 @@ from vlm_pipeline.common.images import ImageMismatchError, check_pinned_image
 from vlm_pipeline.common.job_kinds import NGC_ENTRYPOINT, job_entrypoint
 from vlm_pipeline.common.jobrun import STOP_GRACE_S, ContainerJob, docker_args
 from vlm_pipeline.common.run_log import open_run_log
-from vlm_pipeline.runner.protocol import (
+from vlm_pipeline.common.runner_protocol import (
     MAX_REQUEST_BYTES,
     ImageQuery,
     ProtocolError,
