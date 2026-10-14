@@ -27,7 +27,10 @@ ALLOWED_ARGV: dict[str, tuple[tuple[tuple[str, ...], str], ...]] = {
         (("python", "/workspace/scripts/qa/eval_cord_worker.py"), NGC_ENTRYPOINT),
         (("python3", "-m", "vlm_pipeline.serve.vllm_batch"), ARGV0),  # vlm-vllm image (B7-3)
     ),
-    "quantize": ((("python", "-m", "vlm_pipeline.quantize.ptq"), NGC_ENTRYPOINT),),
+    "quantize": (
+        (("python", "-m", "vlm_pipeline.quantize.ptq"), NGC_ENTRYPOINT),
+        (("python", "-m", "vlm_pipeline.quantize.qat"), NGC_ENTRYPOINT),  # ADR-022 #10, train image
+    ),
     "serve": (
         (("python", "-m", "vlm_pipeline.serve.trial"), NGC_ENTRYPOINT),
         (("python", "-m", "vlm_pipeline.serve.bench"), NGC_ENTRYPOINT),
