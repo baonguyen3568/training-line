@@ -1,9 +1,10 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { type CSSProperties, memo } from "react";
-import type { NodeSpec, PortType, ValidationIssue } from "../api/types";
+import type { NodeSpec, Permission, PortSpec, PortType, ValidationIssue } from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { downloadTargetOf } from "../lib/downloadTarget";
 import { minutesText } from "../lib/format";
+import { copyOwner } from "../lib/groups";
 import { nodeTitle } from "../lib/nodeText";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible, portShape, tokenVar } from "../lib/ports";
@@ -23,12 +24,24 @@ export interface ShellData extends Record<string, unknown> {
   step: number;
   params: Record<string, unknown>;
   runState?: NodeRunState | undefined;
+  /** P4-4: a collapsed group's folded progress and the errors inside it (from issues' inner_path). */
+  group?: { doneCount: number; stepCount: number; innerErrors: number } | undefined;
 }
 export type ShellNode = Node<ShellData, "vlm">;
 
-/** Node-specific port copy (node.<type>.port.<name>) first, then the generic port-type label. */
-function portLabel(ports: PortType[], typeId: string, name: string, type: string): string {
-  const specific = tpOptional(["node", typeId, "port", name]);
+/**
+ * Node-specific port copy (node.<type>.port.<name>) first, then the generic port-type label. A group's exposed port
+ * reads the copy of the inner step that owns it (P4-4).
+ */
+function portLabel(
+  ports: PortType[],
+  typeId: string,
+  name: string,
+  type: string,
+  kind: "input" | "output",
+): string {
+  const owner = copyOwner(typeId, name, kind, useWorkflow.getState().specs);
+  const specific = tpOptional(["node", owner.typeId, "port", owner.name]);
   if (specific) return specific;
   const pt = ports.find((p) => p.id === type);
   return pt ? tp(pt.label_key.split(".")) : type;
@@ -40,7 +53,12 @@ function portColor(ports: PortType[], type: string): string {
 }
 
 // Node permission → icon (text glyphs were OS-dependent emoji)
-const PERM_ICON: Record<string, string> = { gpu: "cpu", network: "globe", time: "timer" };
+const PERM_ICON: Record<Permission["id"], string> = {
+  gpu: "cpu",
+  network: "globe",
+  runtime: "timer",
+  memory: "memory-stick",
+};
 
 function ThirdPartyBadge({ spec }: { spec: NodeSpec }) {
   // Badge depends ONLY on origin.kind/reviewed from the server, never on the node's name (P003 D16 T8).
@@ -129,17 +147,24 @@ function WaitingBadge({ waiting }: { waiting: NonNullable<NodeRunState["waiting"
 }
 
 /** Run state on the node face: icon + text (never color alone) and a 3px progress bar while running. */
-function RunBadge({ state }: { state: NodeRunState }) {
+function RunBadge({ state, group }: { state: NodeRunState; group?: ShellData["group"] }) {
   if (state.waiting && state.status === "running") return <WaitingBadge waiting={state.waiting} />;
-  const percent = state.progress === undefined ? undefined : Math.round(state.progress * 100);
+  const percent = group
+    ? Math.round((group.doneCount / Math.max(1, group.stepCount)) * 100)
+    : state.progress === undefined
+      ? undefined
+      : Math.round(state.progress * 100);
   const text =
-    state.status === "running"
-      ? percent === undefined
-        ? t("node_state.running", { percent: "…" })
-        : t("node_state.running", { percent })
-      : state.status === "cached"
-        ? t("node_state.cached_no_time") // no saved time here: never "lúc " with nothing after it
-        : t(`node_state.${RUN_COPY[state.status]}`);
+    state.status === "running" && group
+      ? // a group counts its steps, not a percentage (P4-4 §1)
+        t("canvas.group.progress", { done_count: group.doneCount, step_count: group.stepCount })
+      : state.status === "running"
+        ? percent === undefined
+          ? t("node_state.running", { percent: "…" })
+          : t("node_state.running", { percent })
+        : state.status === "cached"
+          ? t("node_state.cached_no_time") // no saved time here: never "lúc " with nothing after it
+          : t(`node_state.${RUN_COPY[state.status]}`);
   return (
     <>
       <span className={`state run ${state.status}`}>
@@ -163,7 +188,7 @@ function RunBadge({ state }: { state: NodeRunState }) {
 }
 
 function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
-  const { spec, ports, issues, typeId, step, params, runState } = data;
+  const { spec, ports, issues, typeId, step, params, runState, group } = data;
   const mode = useUi((s) => s.mode);
   const wireDrag = useUi((s) => s.wireDrag);
   // G-5: a step whose model/dataset is not on this machine says so on its face, with "Tải về máy"
@@ -186,6 +211,10 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
       : !isCompatible(type, wireDrag.type, ports);
   };
   const d4 = useUi((s) => s.skin) === "d4";
+  const openGroup = (nodeId: string) => {
+    const ui = useUi.getState();
+    ui.setGroupPath([...ui.groupPath, nodeId]);
+  };
   const customized = mode === "simple" ? customizedAdvanced(spec, params) : [];
   // Key choices on the node face (x-ui.summary), e.g. the chosen model/dataset; repo ids shortened to the name.
   const summary = Object.entries(spec?.params_schema.properties ?? {})
@@ -205,14 +234,17 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
   const isDownload = (i: { code: string; params?: Record<string, unknown> }) =>
     !!target && i.code === "NET-002" && !!downloadTargetOf(i, specs);
   const userIssues = issues.filter((i) => !isDownload(i));
-  const errors = userIssues.filter((i) => i.severity === "error");
+  // a group's own problems (CFG-012) count as usual; its inner steps' errors show as "n lỗi bên trong nhóm"
+  const innerErrors = userIssues.filter((i) => i.inner_path?.length && i.severity === "error");
+  const errors = userIssues.filter((i) => i.severity === "error" && !i.inner_path?.length);
   const warns = userIssues.filter((i) => i.severity === "warn");
   const runNeedsDownload = !!runErr && isDownload(runErr);
   const thirdParty = spec?.origin.kind === "third_party";
   const classes = [
     "vlm-node",
     selected ? "selected" : "",
-    errors.length ? "has-error" : warns.length ? "has-warn" : "",
+    errors.length || innerErrors.length ? "has-error" : warns.length ? "has-warn" : "",
+    spec?.group ? "group" : "",
     thirdParty ? "third-party" : "",
     spec ? "" : "placeholder",
   ].join(" ");
@@ -239,18 +271,47 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
   );
   const outputs = Object.entries(spec.outputs);
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: React Flow owns the node's focus/role; these only add shortcuts
     <div
       className={`${classes}${runState && !runNeedsDownload ? ` run-${runState.status}` : ""}`}
       data-testid={`node-${typeId}`}
       data-status={runState?.status ?? "idle"}
+      onDoubleClick={spec.group ? () => openGroup(id) : undefined}
+      onKeyDown={
+        spec.group
+          ? (e) => {
+              if (e.key === "Enter") openGroup(id);
+            }
+          : undefined
+      }
     >
       <div className="node-header">
         <span className="step" aria-hidden="true">
           {step}
         </span>
+        {spec.group && (
+          <span className="group-mark" aria-hidden="true">
+            <Icon name="layers" size={14} />
+          </span>
+        )}
         <span className="node-title" title={nodeTitle(spec, typeId)}>
           {nodeTitle(spec, typeId)}
         </span>
+        {spec.group && (
+          <button
+            type="button"
+            className="group-open nodrag"
+            aria-label={t("canvas.group.open")}
+            data-tip={t("canvas.group.open")}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              openGroup(id);
+            }}
+          >
+            <Icon name="square-arrow-down-right" size={14} />
+          </button>
+        )}
       </div>
       {thirdParty && <ThirdPartyBadge spec={spec} />}
       {summary.length > 0 && <div className="node-summary">{summary.join(" · ")}</div>}
@@ -275,7 +336,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
                   } as CSSProperties
                 }
               />
-              <span>{portLabel(ports, typeId, name, ps.type)}</span>
+              <span>{portLabel(ports, typeId, name, ps.type, "input")}</span>
               {missing.has(name) && (
                 // Users stumble exactly here (design M1 r1): name what to connect, from CFG-003.
                 <span className="port-hint">{t("canvas.hint.connect_port")}</span>
@@ -286,7 +347,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
         <ul className="ports out">
           {outputs.map(([name, ps]) => (
             <li key={name} className={unreachable("source", ps.type) ? "port-dim" : undefined}>
-              <span>{portLabel(ports, typeId, name, ps.type)}</span>
+              <span>{portLabel(ports, typeId, name, ps.type, "output")}</span>
               <Handle
                 type="source"
                 position={Position.Right}
@@ -310,14 +371,21 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
             className={`perm level-${p.level}`}
             title={t(p.perm_copy_key, { max_runtime: "" })}
           >
-            <Icon name={PERM_ICON[p.id] ?? "timer"} size={12} />{" "}
-            {t(`custom_node.badge_perm.${p.id}`)}
+            <Icon name={PERM_ICON[p.id]} size={12} /> {t(`custom_node.badge_perm.${p.id}`)}
           </span>
         ))}
         {customized.length > 0 && (
           <span className="state customized">
             <Icon name="sliders-horizontal" size={12} />{" "}
             {t("canvas.customized", { param_count: customized.length })}
+          </span>
+        )}
+        {innerErrors.length > 0 && (
+          <span className="state failed" data-testid="group-inner-errors">
+            <StateGlyph icon="circle-x" tone="bad" />{" "}
+            {innerErrors.length === 1
+              ? t("canvas.group.inner_errors_one")
+              : t("canvas.group.inner_errors", { error_count: innerErrors.length })}
           </span>
         )}
         {errors.length > 0 && (
@@ -369,7 +437,7 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
             </>
           ))}
         {runState
-          ? !runNeedsDownload && <RunBadge state={runState} />
+          ? !runNeedsDownload && <RunBadge state={runState} group={group} />
           : issues.length === 0 && (
               <span className="state ready">
                 <StateGlyph icon="circle-dot" tone="muted" /> {t("node_state.ready")}
@@ -381,3 +449,69 @@ function NodeShellImpl({ id, data, selected }: NodeProps<ShellNode>) {
 }
 
 export const NodeShell = memo(NodeShellImpl);
+
+/** P4-4 §2: "Đầu vào nhóm" / "Đầu ra nhóm" inside an entered group; fixed (never deleted), the group's exposed ports. */
+export interface BoundaryData extends Record<string, unknown> {
+  side: "in" | "out";
+  /** The entered group's type, whose exposed ports these are. */
+  groupType: string;
+  ports: PortType[];
+  exposed: Record<string, PortSpec>;
+}
+export type BoundaryFlowNode = Node<BoundaryData, "boundary">;
+
+function BoundaryNodeImpl({ data }: NodeProps<BoundaryFlowNode>) {
+  const { side, ports, exposed, groupType } = data;
+  return (
+    <div className={`vlm-node group-boundary ${side}`} data-testid={`group-boundary-${side}`}>
+      <div className="node-header">
+        <span className="node-title">
+          {t(side === "in" ? "canvas.group.boundary_in" : "canvas.group.boundary_out")}
+        </span>
+      </div>
+      <div className="node-ports">
+        <ul className={side === "in" ? "ports out" : "ports in"}>
+          {Object.entries(exposed).map(([name, ps]) => (
+            <li key={name}>
+              {side === "out" && (
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id={name}
+                  isConnectable={false}
+                  className={`port shape-${ps.type} hg-${portShape(ps.type)}`}
+                  style={
+                    {
+                      background: portColor(ports, ps.type),
+                      "--pc": portColor(ports, ps.type),
+                    } as CSSProperties
+                  }
+                />
+              )}
+              <span>
+                {portLabel(ports, groupType, name, ps.type, side === "in" ? "input" : "output")}
+              </span>
+              {side === "in" && (
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={name}
+                  isConnectable={false}
+                  className={`port shape-${ps.type} hg-${portShape(ps.type)}`}
+                  style={
+                    {
+                      background: portColor(ports, ps.type),
+                      "--pc": portColor(ports, ps.type),
+                    } as CSSProperties
+                  }
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+export const BoundaryNode = memo(BoundaryNodeImpl);

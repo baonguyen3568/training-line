@@ -320,6 +320,7 @@ quick_fix:
   apply: Apply
   applied: 'Applied: {action}. Press Undo (Ctrl+Z) to go back.'
 action:
+  open_inner_step: 'Open the failing step'
   check_files: Check files
   migrate_node: Review changes and update
   open_node: Open this step
@@ -526,6 +527,23 @@ gallery:
   empty: No templates match. Try another keyword.
   blank_workflow: Blank workflow
 canvas:
+  group:
+    open: 'Open group'
+    progress: '{done_count}/{step_count} steps'
+    inner_errors: '{error_count} errors inside this group'
+    inner_errors_one: '1 error inside this group'
+    inner_title: 'Inside'
+    boundary_in: 'Group inputs'
+    boundary_out: 'Group outputs'
+    readonly: 'Built-in group: view only. Change its settings on the group step outside.'
+    readonly_user: 'This version can''t edit inside a group yet. Change its settings on the group step outside.'
+    param_exposed: 'Set on the group step'
+    breadcrumb_label: 'Location in workflow'
+    root: 'Workflow'
+    up: 'Up one level'
+    create: 'Group steps'
+    ungroup: 'Ungroup'
+    default_title: 'New group'
   lane:
     source: ① Sources
     prepare: ② Prepare

@@ -11,6 +11,7 @@ import type {
   WorkflowNode,
 } from "../api/types";
 import { getLocale } from "../i18n";
+import { specsFromCatalog, withUserGroups } from "../lib/groups";
 import { laneLayout } from "../lib/lanes";
 import { isCompatible } from "../lib/ports";
 import { selfAndDownstream } from "../lib/topo";
@@ -41,6 +42,8 @@ export interface NodeRunState {
 
 interface WorkflowState {
   specs: Map<string, NodeSpec>;
+  /** The server's catalog (node types + first-party groups); `specs` adds the open workflow's own user.* groups. */
+  baseSpecs: Map<string, NodeSpec>;
   ports: PortType[];
   workflow: Workflow | null;
   selectedId: string | null;
@@ -133,6 +136,7 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
 
   return {
     specs: new Map(),
+    baseSpecs: new Map(),
     ports: [],
     workflow: null,
     selectedId: null,
@@ -145,7 +149,12 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
 
     async loadCatalog() {
       const res = await api.nodeTypes(getLocale());
-      set({ specs: new Map(res.node_types.map((s) => [s.type_id, s])), ports: res.port_types });
+      const base = specsFromCatalog(res.node_types, res.groups);
+      set({
+        baseSpecs: base,
+        specs: withUserGroups(base, get().workflow?.groups),
+        ports: res.port_types,
+      });
     },
 
     async openTemplate(id) {
@@ -396,4 +405,12 @@ export const useWorkflow = create<WorkflowState>((set, get) => {
       unsubscribe = null;
     },
   };
+});
+
+// A workflow file brings its own user.* groups (P016): when the open workflow's group definitions change (another
+// file opens), the spec map is rebuilt from the catalog plus those groups. 1.0 never edits them in the app.
+useWorkflow.subscribe((st, prev) => {
+  if (st.workflow?.groups === prev.workflow?.groups && st.baseSpecs === prev.baseSpecs) return;
+  const specs = withUserGroups(st.baseSpecs, st.workflow?.groups);
+  if (specs !== st.specs) useWorkflow.setState({ specs });
 });

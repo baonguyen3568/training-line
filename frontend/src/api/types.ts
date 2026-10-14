@@ -141,11 +141,24 @@ export interface NodeSpec {
   origin: NodeOrigin;
   permissions: Permission[];
   policy_block: { code: string; reason_key: string } | null;
+  /** P016 group (016b): what it is made of, for the read-only inside view. Absent on ordinary steps. */
+  group?: { body: GroupBody; readOnly: boolean; user?: boolean };
+}
+
+/** A group's definition body: its own steps and wires, and what it exposes (P016 §2). */
+export interface GroupBody {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  inputs: Record<string, [string, string][]>;
+  outputs: Record<string, [string, string]>;
+  params: Record<string, [string, string]>;
 }
 
 export interface NodeTypesResponse {
   node_types: NodeSpec[];
   port_types: PortType[];
+  /** First-party groups (016b); absent from servers before it. */
+  groups?: import("../lib/groups").GroupTypeEntry[];
 }
 
 export interface WorkflowNode {
@@ -235,6 +248,8 @@ export interface ValidationIssue {
   actions?: ResolvedAction[];
   port?: string;
   param?: string;
+  /** P016: on a step inside a group, node_id is the outermost group node and this lists the inner ids per level. */
+  inner_path?: string[];
   code: string;
   severity: Severity;
   params: Record<string, string | number>;

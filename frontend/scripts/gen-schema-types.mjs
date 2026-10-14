@@ -82,6 +82,23 @@ writeFileSync(outFile, out.join("\n"));
 const snapshot = readFileSync(resolve(schemaDir, "node_types.snapshot.json"), "utf8");
 writeFileSync(resolve(here, "../src/generated/node-types.json"), snapshot);
 
+// Group golden fixtures (cleancode, 016b §4): definition → the server's derived entry; the frontend's own derivation
+// for user.* groups is tested against them. Bundled in name order; committed and drift-checked like the snapshot.
+const goldenDir = resolve(schemaDir, "group_examples");
+const golden = Object.fromEntries(
+  readdirSync(goldenDir)
+    .filter((f) => f.endsWith(".json"))
+    .sort()
+    .map((f) => [
+      f.replace(/\.json$/, ""),
+      JSON.parse(readFileSync(resolve(goldenDir, f), "utf8")),
+    ]),
+);
+writeFileSync(
+  resolve(here, "../src/generated/group-examples.json"),
+  `${JSON.stringify(golden, null, 2)}\n`,
+);
+
 // Templates: single source configs/templates/<id>.json (backend serves them at /api/templates). Bundled
 // for the mock API in id order; estimates are computed by the server from the catalog, not stored here.
 const tplDir = resolve(here, "../../configs/templates");

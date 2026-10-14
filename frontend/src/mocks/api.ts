@@ -28,9 +28,11 @@ import type {
   ValidationResult,
   Workflow,
 } from "../api/types";
+import groupExamples from "../generated/group-examples.json";
 import registrySnapshot from "../generated/node-types.json";
 import templatesBundle from "../generated/templates.json";
-import { tp } from "../i18n";
+import { tp, tpOptional } from "../i18n";
+import { type GroupTypeEntry, specsFromCatalog, withUserGroups } from "../lib/groups";
 import { parseJsonl } from "../lib/metrics";
 import { isCompatible } from "../lib/ports";
 import { stepNumbers } from "../lib/topo";
@@ -38,6 +40,28 @@ import advancedFixture from "./fixtures/advanced-options.json";
 import s3aMetrics from "./fixtures/s3a.metrics.jsonl?raw";
 import s3aRun from "./fixtures/s3a.run.json";
 import storagePlanSample from "./fixtures/storage-plan.v3.json";
+
+// First-party groups (016b) for the mock: cleancode's golden fixtures, as the server derives them; titles from i18n
+// when a key exists, else a demo name (the real groups ship their own groups.<slug> copy).
+const MOCK_GROUP_TITLE: Record<string, string> = {
+  "group.example_lora": "Fine-tune LoRA rồi gộp",
+  "group.example_outer": "Fine-tune và chấm điểm",
+};
+function mockGroups(): GroupTypeEntry[] {
+  return Object.values(
+    groupExamples as unknown as Record<string, { expected: Record<string, unknown> }>,
+  )
+    .map((e) => e.expected)
+    .filter((e) => !("error" in e))
+    .map((e) => {
+      const entry = e as unknown as GroupTypeEntry;
+      const key = entry.title_key?.split(".");
+      return {
+        ...entry,
+        title: (key && tpOptional(key)) ?? MOCK_GROUP_TITLE[entry.group_id] ?? entry.group_id,
+      };
+    });
+}
 
 const mockSession: SessionInfo = {
   origin_class: "local",
@@ -391,7 +415,7 @@ export function mockValidate(
   ports: PortType[],
 ): ValidationResult {
   const byType = new Map(types.map((s) => [s.type_id, s]));
-  const nodeTitle = (typeId: string) => tp(["node", typeId, "title"]);
+  const nodeTitle = (typeId: string) => byType.get(typeId)?.title ?? tp(["node", typeId, "title"]);
   const errors: ValidationIssue[] = [];
   for (const node of workflow.nodes) {
     const nodeSpec = byType.get(node.type);
@@ -456,13 +480,27 @@ export const mockApi: Api = {
     delay<NodeTypesResponse>({
       node_types: registry.node_types,
       port_types: registry.port_types,
+      groups: mockGroups(),
     }),
   templates: () => delay(templates.map(({ workflow: _w, ...meta }) => meta)),
   template: (id) => {
     const found = templates.find((x) => x.id === id);
     return found ? delay(found) : Promise.reject(new Error(`template ${id} not found`));
   },
-  validate: (workflow) => delay(mockValidate(workflow, registry.node_types, registry.port_types)),
+  validate: (workflow) =>
+    delay(
+      mockValidate(
+        workflow,
+        // node types + first-party groups + the file's own user.* groups, as the server expands them
+        [
+          ...withUserGroups(
+            specsFromCatalog(registry.node_types, mockGroups()),
+            workflow.groups,
+          ).values(),
+        ],
+        registry.port_types,
+      ),
+    ),
   system: () =>
     delay({
       mem_total_gb: 121,

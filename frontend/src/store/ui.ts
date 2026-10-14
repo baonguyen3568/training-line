@@ -54,6 +54,12 @@ interface UiState {
   /** G-4: node base ("<nid>-<key16>") whose "Đặt lại bước" dialog is open. */
   resetNode: string | null;
   setResetNode(node: string | null): void;
+  /**
+   * P4-4 drill-in: the group nodes entered, outermost first (each id is the node's id at its own level). Empty = the
+   * workflow itself. The flat id of a step inside is `[...groupPath, step].join("__")`.
+   */
+  groupPath: string[];
+  setGroupPath(path: string[]): void;
 }
 
 export interface WireDrag {
@@ -90,6 +96,10 @@ export const useUi = create<UiState>((set) => ({
     set({ bugReport });
   },
   resetNode: null,
+  groupPath: [],
+  setGroupPath(groupPath) {
+    set({ groupPath });
+  },
   setResetNode(resetNode) {
     set({ resetNode });
   },

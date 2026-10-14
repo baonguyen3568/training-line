@@ -5,6 +5,7 @@ import { untrustedText } from "./safeText";
 /** Node title for display. Third-party text is untrusted: plain text, invisible chars escaped, truncated. */
 export function nodeTitle(spec: NodeSpec | undefined, typeId: string): string {
   const raw = spec?.title ?? tp(["node", typeId, "title"]);
+  if (spec?.group?.user) return untrustedText(raw, 80); // a user group's title is plain text from a file (P016)
   return spec?.origin.kind === "third_party" ? untrustedText(raw, 60) : raw;
 }
 

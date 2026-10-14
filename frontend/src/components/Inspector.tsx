@@ -1,5 +1,13 @@
 import { type ReactNode, useState } from "react";
-import type { NodeSpec, OptionMeta, ParamSchema, PortType, Range, Workflow } from "../api/types";
+import type {
+  NodeSpec,
+  OptionMeta,
+  ParamSchema,
+  PortType,
+  Range,
+  Workflow,
+  WorkflowNode,
+} from "../api/types";
 import { t, tp, tpOptional } from "../i18n";
 import { downloadTargetOf } from "../lib/downloadTarget";
 import {
@@ -8,8 +16,11 @@ import {
   formatMinutesRange,
   workflowDurationText,
 } from "../lib/format";
+import { copyOwner, SEPARATOR } from "../lib/groups";
+import { issuesAt, issueTrail } from "../lib/groupView";
 import { withCode } from "../lib/machineText";
 import { nodeDesc, nodeTitle, workflowTitle } from "../lib/nodeText";
+import { openInnerStep } from "../lib/openInner";
 import { customizedAdvanced } from "../lib/params";
 import { isCompatible } from "../lib/ports";
 import { runErrorText } from "../lib/runWarning";
@@ -117,7 +128,9 @@ function ParamField({
   /** Measured time per option (estimate per_node.by_epochs), shown next to each option. */
   optionMinutes?: Record<string, Range | null>;
 }) {
-  const label = tp(["node", nodeType, "param", name, "label"]);
+  // a group's exposed param reads the copy of the inner step that owns it (P4-4)
+  const owner = copyOwner(nodeType, name, "param", useWorkflow.getState().specs);
+  const label = tp(["node", owner.typeId, "param", owner.name, "label"]);
   const id = `param-${name}`;
   const mode = useUi((s) => s.mode);
   const availGb = useSystem((s) => s.status?.mem_available_gb);
@@ -264,7 +277,8 @@ type FieldProps = Parameters<typeof ParamField>[0];
  */
 function ParamRow(props: FieldProps & { errors?: string[] }) {
   const { errors = [], ...field } = props;
-  const help = tpOptional(["node", props.nodeType, "param", props.name, "help"]);
+  const helpOwner = copyOwner(props.nodeType, props.name, "param", useWorkflow.getState().specs);
+  const help = tpOptional(["node", helpOwner.typeId, "param", helpOwner.name, "help"]);
   const d4 = useUi((s) => s.skin) === "d4";
   const popId = `help-${props.name}`;
   return (
@@ -323,6 +337,61 @@ function upstreamModelMeta(
  * D4: with nothing selected the right column still helps (design r1 #3): step count, pre-flight state and the
  * estimate with its source; unknown numbers read "chưa có số đo", never a guess.
  */
+/**
+ * P4-4: inside a group with nothing selected, a summary of that group, not of the workflow outside: its title,
+ * steps, the errors inside it and the view-only line. No time/RAM/disk until a group has its own (design).
+ */
+function GroupSummary() {
+  const { workflow, validation, specs } = useWorkflow();
+  const path = useUi((st) => st.groupPath);
+  if (!workflow || path.length === 0) return null;
+  let nodes = workflow.nodes;
+  let spec: NodeSpec | undefined;
+  for (const id of path) {
+    const n = nodes.find((x) => x.id === id);
+    spec = n && specs.get(n.type);
+    if (!spec?.group) return null;
+    nodes = spec.group.body.nodes;
+  }
+  if (!spec?.group) return null;
+  const groupId = path[path.length - 1] as string;
+  const inner = issuesAt(validation?.errors ?? [], path.slice(0, -1), groupId).filter(
+    (e) => e.inner_path?.length && e.severity === "error",
+  );
+  const title = nodeTitle(spec, spec.type_id);
+  return (
+    <aside className="inspector wf-summary" aria-label={title}>
+      <p className="wf-title">{title}</p>
+      <p>{t("d4.step_count", { step_count: spec.group.body.nodes.length })}</p>
+      <p>
+        {inner.length === 0 ? (
+          <>
+            <span className="si si-completed">
+              <Icon name="circle-check-big" size={14} />
+            </span>{" "}
+            {t("preflight.summary_ok")}
+          </>
+        ) : (
+          <>
+            <span className="si si-bad">
+              <Icon name="circle-x" size={14} />
+            </span>{" "}
+            {inner.length === 1
+              ? t("canvas.group.inner_errors_one")
+              : t("canvas.group.inner_errors", { error_count: inner.length })}
+          </>
+        )}
+      </p>
+      <p className="inner-readonly small" role="note">
+        <span className="si si-muted" aria-hidden="true">
+          <Icon name="lock" size={14} />
+        </span>{" "}
+        {t(spec.group.user ? "canvas.group.readonly_user" : "canvas.group.readonly")}
+      </p>
+    </aside>
+  );
+}
+
 function WorkflowSummary() {
   const { workflow, validation, specs } = useWorkflow();
   if (!workflow) return null;
@@ -418,20 +487,142 @@ function WorkflowSummary() {
   );
 }
 
+/**
+ * P4-4 §2: a step inside an entered group, view-only in 1.0 (design 818e7c3). Its settings with their values; one
+ * the group exposes says "set on the group step" with a way back there; its own issues and run error.
+ */
+function InnerStepInspector({ flat }: { flat: string }) {
+  const { workflow, specs, validation, run } = useWorkflow();
+  const path = flat.split(SEPARATOR);
+  // walk down: each id but the last is a group node, the last is the step
+  let nodes = workflow?.nodes ?? [];
+  let parentSpec: NodeSpec | undefined;
+  let step: WorkflowNode | undefined;
+  for (const [k, id] of path.entries()) {
+    const n = nodes.find((x) => x.id === id);
+    if (!n) break;
+    if (k === path.length - 1) step = n;
+    else {
+      parentSpec = specs.get(n.type);
+      nodes = parentSpec?.group?.body.nodes ?? [];
+    }
+  }
+  const spec = step && specs.get(step.type);
+  if (!step || !spec || !parentSpec?.group) return null;
+  const exposed = new Map(
+    Object.entries(parentSpec.group.body.params)
+      .filter(([, [node]]) => node === step.id)
+      .map(([name, [, param]]) => [param, name]),
+  );
+  const issues = issuesAt(validation?.errors ?? [], path.slice(0, -1), step.id).filter(
+    (i) => !i.inner_path?.length,
+  );
+  const runError = run?.nodes[flat]?.status === "failed" ? run.nodes[flat]?.error : undefined;
+  const props = Object.entries(spec.params_schema.properties)
+    .filter(([, sc]) => sc.type !== "object")
+    .sort(([, a], [, b]) => (a["x-ui"]?.order ?? 99) - (b["x-ui"]?.order ?? 99));
+  const backToGroup = () => {
+    const parent = path.slice(0, -1);
+    useUi.getState().setGroupPath(parent.slice(0, -1));
+    useWorkflow.getState().select(parent.join(SEPARATOR));
+  };
+  return (
+    <aside className="inspector inner-step" aria-label={nodeTitle(spec, step.type)}>
+      <div className="insp-head">
+        <h2>{nodeTitle(spec, step.type)}</h2>
+      </div>
+      <p className="muted small">{nodeDesc(spec, step.type)}</p>
+      <p className="inner-readonly small" role="note">
+        <span className="si si-muted" aria-hidden="true">
+          <Icon name="lock" size={14} />
+        </span>{" "}
+        {t(parentSpec.group.user ? "canvas.group.readonly_user" : "canvas.group.readonly")}
+      </p>
+      {runError && (
+        <div className="error-card" role="alert" data-code={runError.code}>
+          <ErrorIcon tone="critical" />
+          <strong>{runErrorText(runError, (id) => id).title}</strong>
+        </div>
+      )}
+      {issues.length > 0 && (
+        <ul className="error-cards">
+          {issues.map((e) => (
+            <li
+              key={`${e.code}-${e.param}-${e.what}`}
+              className={`error-card ${e.severity}`}
+              data-code={e.code}
+            >
+              <ErrorIcon tone={e.severity === "error" ? "critical" : "warn"} />
+              <strong>{e.title}</strong>
+              <p>{e.what}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <dl className="inner-params">
+        {props.map(([name, sc]) => {
+          const value = step.params[name] ?? sc.default;
+          const shown =
+            value === undefined || value === null
+              ? "—"
+              : sc.enum
+                ? optionLabel(sc, value as string | number)
+                : String(value);
+          const exposedAs = exposed.get(name);
+          return (
+            <div key={name} className="inner-param" id={`param-${name}`} tabIndex={-1}>
+              <dt>{tp(["node", step.type, "param", name, "label"])}</dt>
+              <dd>
+                {sc.type === "boolean" ? (
+                  // a yes/no setting reads as the same control, disabled: no "true"/"false" text
+                  <input
+                    type="checkbox"
+                    checked={value === true}
+                    disabled
+                    aria-label={tp(["node", step.type, "param", name, "label"])}
+                  />
+                ) : (
+                  shown
+                )}
+                {exposedAs && (
+                  <span className="small muted">
+                    {" · "}
+                    <button type="button" className="link" onClick={backToGroup}>
+                      {t("canvas.group.param_exposed")}
+                    </button>
+                  </span>
+                )}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </aside>
+  );
+}
+
 export function Inspector() {
   const { workflow, specs, ports, selectedId, validation, run } = useWorkflow();
   const skin = useUi((st) => st.skin);
   const { setParam, connect, disconnect } = useWorkflow.getState();
   const mode = useUi((s) => s.mode);
   const [expanded, setExpanded] = useState(false);
+  const groupPath = useUi((st) => st.groupPath);
   const node = workflow?.nodes.find((n) => n.id === selectedId);
+  // a step inside a group (flat id "g__step"): its own view-only inspector
+  if (workflow && !node && selectedId?.includes(SEPARATOR))
+    return <InnerStepInspector flat={selectedId} />;
   if (!workflow || !node) {
-    if (skin === "d4" && workflow) return <WorkflowSummary />;
+    if (skin === "d4" && workflow)
+      return groupPath.length > 0 ? <GroupSummary /> : <WorkflowSummary />;
     return <aside className="inspector muted">{t("inspector.empty_hint")}</aside>;
   }
   const spec = specs.get(node.type);
   if (!spec) return <aside className="inspector">{t("error.CFG-004.title")}</aside>;
-  const issues = validation?.errors.filter((e) => e.node_id === node.id) ?? [];
+  const allIssues = validation?.errors.filter((e) => e.node_id === node.id) ?? [];
+  // a group: its own problems as usual; its inner steps' errors in their own block, with a way to each (P4-4 §3)
+  const issues = allIssues.filter((e) => !e.inner_path?.length);
+  const innerIssues = allIssues.filter((e) => e.inner_path?.length && e.severity === "error");
   const runState = run?.nodes[node.id];
   const runError = runState?.status === "failed" ? runState.error : undefined;
   const runErrorTexts = runError
@@ -527,6 +718,47 @@ export function Inspector() {
         </p>
       )}
 
+      {spec.group && innerIssues.length > 0 && (
+        <div className="error-card group-inner" role="alert" data-testid="group-inner-issues">
+          <ErrorIcon tone="critical" />
+          <strong>
+            {innerIssues.length === 1
+              ? t("canvas.group.inner_errors_one")
+              : t("canvas.group.inner_errors", { error_count: innerIssues.length })}
+          </strong>
+          <ul>
+            {innerIssues.map((e) => {
+              const trail = issueTrail(workflow, specs, e, nodeTitle);
+              return (
+                <li key={`${e.inner_path?.join("/")}-${e.code}-${e.param}-${e.port}`}>
+                  <span className="issue-trail">{trail?.labels.slice(1).join(" › ")}</span>
+                  {" · "}
+                  {e.title}{" "}
+                  {trail && (
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => openInnerStep(trail, { param: e.param, port: e.port })}
+                    >
+                      {t("action.open_inner_step")}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {spec.group && mode === "advanced" && (
+        <div className="group-inside">
+          <p className="small muted">{t("canvas.group.inner_title")}</p>
+          <ul className="small">
+            {spec.group.body.nodes.map((n) => (
+              <li key={n.id}>{nodeTitle(specs.get(n.type), n.type)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {runError && (
         // the step failed while running: say why and how to fix it, like a pre-flight issue
         <div className="error-card" role="alert" data-code={runError.code}>

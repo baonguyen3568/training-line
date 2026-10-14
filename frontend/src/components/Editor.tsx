@@ -11,7 +11,11 @@ import {
   ViewportPortal,
 } from "@xyflow/react";
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PortSpec } from "../api/types";
 import { t, tp } from "../i18n";
+import { attrValue } from "../lib/dom";
+import { foldGroupState, innerStepCount } from "../lib/groups";
+import { BOUNDARY_IN, BOUNDARY_OUT, issuesAt, resolveLevel } from "../lib/groupView";
 import {
   LANE_WIDTH,
   LANES,
@@ -36,14 +40,14 @@ import { DownloadDialog } from "./DownloadDialog";
 import { Icon } from "./Icon";
 import { Inspector } from "./Inspector";
 import { DRAG_MIME, NodeLibrary } from "./NodeLibrary";
-import { NodeShell, type ShellNode } from "./NodeShell";
+import { BoundaryNode, NodeShell, type ShellNode } from "./NodeShell";
 import { ResetStepDialog } from "./ResetStepDialog";
 import { RunMissingDialog } from "./RunMissingDialog";
 import { Dock, IconStrip, LibraryFlyout, StatusBar } from "./ShellD4";
 import { Toolbar } from "./Toolbar";
 import { ToolbarD4 } from "./ToolbarD4";
 
-const nodeTypes = { vlm: NodeShell };
+const nodeTypes = { vlm: NodeShell, boundary: BoundaryNode };
 const NARROW = "(max-width: 1279px)";
 
 function useNarrow(): boolean {
@@ -107,6 +111,21 @@ function Lanes({ boxes }: { boxes: readonly LaneBox[] }) {
 function EditorInner() {
   const { workflow, specs, ports, validation, selectedId, run, opened } = useWorkflow();
   const skin = useUi((st) => st.skin);
+  // P4-4 drill-in: the level the canvas shows (the workflow, or the inside of an entered group; read-only in 1.0)
+  const groupPath = useUi((st) => st.groupPath);
+  const level = useMemo(
+    () => (workflow ? resolveLevel(workflow, specs, groupPath) : null),
+    [workflow, specs, groupPath],
+  );
+  const inside = groupPath.length > 0 && !!level?.group;
+  useEffect(() => {
+    if (groupPath.length > 0 && workflow && !level) useUi.getState().setGroupPath([]); // the group is gone
+  }, [groupPath, workflow, level]);
+  // another workflow opened: back to its top level
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only `opened` (a new workflow) resets the level
+  useEffect(() => {
+    useUi.getState().setGroupPath([]);
+  }, [opened]);
   // D4 compact lanes: geometry from occupied lanes; frozen while a node is dragged (a lane only shrinks after
   // the drop), and the target lane of a library drag opens under the cursor.
   const [dragLane, setDragLane] = useState<Lane | null>(null);
@@ -115,11 +134,11 @@ function EditorInner() {
   const liveBoxes = useMemo(
     () =>
       laneBoxes(
-        occupiedLanes((workflow?.nodes ?? []).map((n) => n.ui?.x ?? 0)),
+        occupiedLanes([...(level?.positions.values() ?? [])].map((p) => p.x)),
         dragLane,
         true, // both skins: empty lanes compact, so a template fits at 1280 px (tester, classic desktop-min)
       ),
-    [workflow, dragLane],
+    [level, dragLane],
   );
   if (!nodeDragging) frozen.current = null;
   else if (!frozen.current) frozen.current = liveBoxes;
@@ -179,7 +198,7 @@ function EditorInner() {
   const narrow = useNarrow();
   const runLocked = !!run && !run.done;
   // Narrow screens (< 1280px) are view-only (P010): structure is locked, but Run/inspection still work.
-  const locked = runLocked || narrow;
+  const locked = runLocked || narrow || inside;
 
   // Re-validate on semantic changes only (not on drag), debounced (P010 §6).
   useEffect(() => {
@@ -264,36 +283,89 @@ function EditorInner() {
       measuredRef.current.clear();
       openedRef.current = opened;
     }
-    if (!workflow) return [];
-    const steps = stepNumbers(workflow);
-    return workflow.nodes.map((n) => ({
-      id: n.id,
-      type: "vlm",
-      measured: measuredOf(measuredRef.current.get(n.id), n.type),
-      position: { x: toDisplayX(n.ui?.x ?? 0, boxes), y: n.ui?.y ?? 0 },
-      selected: n.id === selectedId,
-      className: n.id === flashId ? "flash" : undefined,
-      draggable: !locked,
-      deletable: !locked,
-      data: {
-        typeId: n.type,
-        spec: specs.get(n.type),
-        ports,
-        issues: validation?.errors.filter((e) => e.node_id === n.id) ?? [],
-        step: steps.get(n.id) ?? 0,
-        params: n.params,
-        runState: run?.nodes[n.id],
-      },
-    }));
-  }, [workflow, specs, ports, validation, selectedId, run, locked, flashId, boxes, opened]);
+    if (!workflow || !level) return [];
+    const steps = stepNumbers({ ...workflow, nodes: level.nodes, edges: level.edges });
+    const issues = validation?.errors ?? [];
+    const steps_: ShellNode[] = level.nodes.map((n) => {
+      const flat = level.prefix + n.id;
+      const spec = specs.get(n.type);
+      const stepCount = spec?.group ? innerStepCount(spec, specs) : 0;
+      const folded = spec?.group ? foldGroupState(run?.nodes, flat, stepCount) : undefined;
+      const own = issuesAt(issues, groupPath, n.id);
+      const pos = level.positions.get(n.id) ?? { x: 0, y: 0 };
+      return {
+        id: n.id,
+        type: "vlm",
+        measured: measuredOf(measuredRef.current.get(flat), n.type),
+        position: { x: toDisplayX(pos.x, boxes), y: pos.y },
+        selected: flat === selectedId,
+        className: n.id === flashId ? "flash" : undefined,
+        draggable: !locked,
+        deletable: !locked,
+        data: {
+          typeId: n.type,
+          spec,
+          ports,
+          issues: own,
+          step: steps.get(n.id) ?? 0,
+          params: n.params,
+          runState: spec?.group ? folded?.state : run?.nodes[flat],
+          group: spec?.group
+            ? {
+                doneCount: folded?.doneCount ?? 0,
+                stepCount,
+                innerErrors: own.filter((i) => i.inner_path?.length).length,
+              }
+            : undefined,
+        },
+      };
+    });
+    if (!level.group) return steps_;
+    // the two fixed boundary nodes of an entered group (P4-4 §2)
+    const boundary = (id: string, side: "in" | "out", exposed: Record<string, PortSpec>) => ({
+      id,
+      type: "boundary" as const,
+      position: (() => {
+        const p = level.positions.get(id) ?? { x: 0, y: 0 };
+        return { x: toDisplayX(p.x, boxes), y: p.y };
+      })(),
+      draggable: false,
+      deletable: false,
+      selectable: false,
+      data: { side, ports, exposed, groupType: level.group?.typeId ?? "" },
+    });
+    return [
+      ...steps_,
+      boundary(BOUNDARY_IN, "in", level.group.inputs),
+      boundary(BOUNDARY_OUT, "out", level.group.outputs),
+    ] as unknown as ShellNode[];
+  }, [
+    workflow,
+    level,
+    groupPath,
+    specs,
+    ports,
+    validation,
+    selectedId,
+    run,
+    locked,
+    flashId,
+    boxes,
+    opened,
+  ]);
 
   const edges: Edge[] = useMemo(() => {
-    if (!workflow) return [];
-    return workflow.edges.map((e) => {
-      const src = workflow.nodes.find((n) => n.id === e.from[0]);
-      const type = src ? specs.get(src.type)?.outputs[e.from[1]]?.type : undefined;
+    if (!workflow || !level) return [];
+    return level.edges.map((e) => {
+      const src = level.nodes.find((n) => n.id === e.from[0]);
+      const type =
+        e.from[0] === BOUNDARY_IN
+          ? level.group?.inputs[e.from[1]]?.type
+          : src
+            ? specs.get(src.type)?.outputs[e.from[1]]?.type
+            : undefined;
       const pt = ports.find((p) => p.id === type);
-      const active = run?.nodes[e.to[0]]?.status === "running";
+      const active = run?.nodes[level.prefix + e.to[0]]?.status === "running";
       return {
         id: `${e.from.join(":")}->${e.to.join(":")}`,
         source: e.from[0],
@@ -305,7 +377,7 @@ function EditorInner() {
         style: { stroke: pt ? tokenVar(pt.color_token) : undefined, strokeWidth: 2 },
       };
     });
-  }, [workflow, specs, ports, run, locked]);
+  }, [workflow, level, specs, ports, run, locked]);
 
   const typeOf = useCallback(
     (nodeId: string, handle: string | null | undefined, dir: "in" | "out") => {
@@ -437,8 +509,9 @@ function EditorInner() {
     (changes: NodeChange<ShellNode>[]) => {
       for (const ch of changes) {
         if (ch.type === "dimensions" && ch.dimensions) {
-          const type = useWorkflow.getState().workflow?.nodes.find((n) => n.id === ch.id)?.type;
-          if (type) measuredRef.current.set(ch.id, { type, ...ch.dimensions });
+          const type = level?.nodes.find((n) => n.id === ch.id)?.type;
+          if (type)
+            measuredRef.current.set((level?.prefix ?? "") + ch.id, { type, ...ch.dimensions });
         }
         if (ch.type === "remove") measuredRef.current.delete(ch.id);
         if (ch.type === "position" && ch.position)
@@ -448,10 +521,10 @@ function EditorInner() {
           commitMove();
           setNodeDragging(false);
         }
-        if (ch.type === "select" && ch.selected) select(ch.id);
+        if (ch.type === "select" && ch.selected) select((level?.prefix ?? "") + ch.id);
       }
     },
-    [move, commitMove, select, boxes],
+    [move, commitMove, select, boxes, level],
   );
 
   const onNodesDelete = useCallback(
@@ -472,6 +545,33 @@ function EditorInner() {
     },
     [disconnect],
   );
+
+  // P4-4 §2: entering / leaving a group fits the new level, plays a 180 ms scale-in (none with reduced motion, CSS)
+  // and moves focus: in → the first inner step, out → the group step we came from.
+  const prevPath = useRef(groupPath);
+  const [entering, setEntering] = useState(false);
+  useEffect(() => {
+    const before = prevPath.current;
+    prevPath.current = groupPath;
+    if (before === groupPath) return;
+    setEntering(true);
+    const timer = setTimeout(() => setEntering(false), 200);
+    const deeper = groupPath.length > before.length;
+    // "Mở bước bị lỗi" already picked a step in this level and focuses its field: do not take focus from it
+    const picked =
+      deeper && !!level && !!useWorkflow.getState().selectedId?.startsWith(level.prefix);
+    const focusId = picked ? undefined : deeper ? level?.nodes[0]?.id : before[groupPath.length];
+    requestAnimationFrame(() => {
+      void fitView({ minZoom: 0.75, maxZoom: 1, padding: 0.06 });
+      if (focusId)
+        (
+          canvasRef.current?.querySelector(
+            `.react-flow__node[data-id="${attrValue(focusId)}"]`,
+          ) as HTMLElement | null
+        )?.focus();
+    });
+    return () => clearTimeout(timer);
+  }, [groupPath, level, fitView]);
 
   /** Double-click / Enter in the library: add at the end of the node's lane. */
   const addFromLibrary = useCallback(
@@ -533,7 +633,7 @@ function EditorInner() {
         <NodeLibrary onAdd={addFromLibrary} disabled={locked} />
       )}
       <main
-        className="canvas"
+        className={entering ? "canvas group-enter" : "canvas"}
         aria-label={workflow.name}
         ref={canvasRef}
         onDragOver={(e) => {

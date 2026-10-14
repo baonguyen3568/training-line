@@ -1,8 +1,11 @@
 import { useReactFlow } from "@xyflow/react";
 import { useState } from "react";
+import type { ValidationIssue } from "../api/types";
 import { t } from "../i18n";
 import { estimateLine, formatDuration } from "../lib/format";
+import { issueTrail } from "../lib/groupView";
 import { nodeTitle } from "../lib/nodeText";
+import { openInnerStep } from "../lib/openInner";
 import { requestRun } from "../lib/requestRun";
 import { runErrorText, runWarningText } from "../lib/runWarning";
 import { stepNumbers } from "../lib/topo";
@@ -66,8 +69,10 @@ export function CheckBar() {
           duration: formatDuration((run?.endedAt ?? Date.now()) - (run?.startedAt ?? Date.now())),
         });
 
+  const trailOf = (e: ValidationIssue) => issueTrail(workflow, specs, e, nodeTitle);
   const showMe = (nodeId: string | undefined) => {
     if (!nodeId) return;
+    useUi.getState().setGroupPath([]); // a top-level step: back to the workflow's own level first
     select(nodeId);
     const n = getNode(nodeId);
     if (n) setCenter(n.position.x + 120, n.position.y + 60, { zoom: 1.1, duration: 300 });
@@ -204,11 +209,23 @@ export function CheckBar() {
               </span>
               {/* Server-rendered copy is plain text; React escapes it. */}
               <span>
+                {/* inside a group: the trail of titles first, "Dạy model › Vòng học" (P4-4 §3) */}
+                {trailOf(e) && (
+                  <span className="issue-trail">{trailOf(e)?.labels.join(" › ")} · </span>
+                )}
                 <strong>{e.title}</strong> — {e.what}
               </span>
               {e.node_id && (
-                <button type="button" className="link" onClick={() => showMe(e.node_id)}>
-                  {t("preflight.show_me")}
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    const trail = trailOf(e);
+                    if (trail) openInnerStep(trail, { param: e.param, port: e.port });
+                    else showMe(e.node_id);
+                  }}
+                >
+                  {trailOf(e) ? t("action.open_inner_step") : t("preflight.show_me")}
                 </button>
               )}
             </li>

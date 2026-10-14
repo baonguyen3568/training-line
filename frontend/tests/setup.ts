@@ -19,6 +19,7 @@ afterEach(async () => {
     mode: "simple",
     skin: "d4",
     resetNode: null,
+    groupPath: [],
     wireDrag: null,
     bugReport: null,
     downloadTarget: null,

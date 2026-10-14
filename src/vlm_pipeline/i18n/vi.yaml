@@ -320,6 +320,7 @@ quick_fix:
   apply: Áp dụng
   applied: 'Đã áp dụng: {action}. Bấm Hoàn tác (Ctrl+Z) để quay lại.'
 action:
+  open_inner_step: 'Mở bước bị lỗi'
   check_files: Kiểm tra tệp
   migrate_node: Xem thay đổi và cập nhật
   open_node: Mở bước này
@@ -526,6 +527,23 @@ gallery:
   empty: Chưa có mẫu nào khớp. Thử từ khoá khác.
   blank_workflow: Workflow trống
 canvas:
+  group:
+    open: 'Mở nhóm'
+    progress: '{done_count}/{step_count} bước'
+    inner_errors: '{error_count} lỗi bên trong nhóm'
+    inner_errors_one: '1 lỗi bên trong nhóm'
+    inner_title: 'Bên trong'
+    boundary_in: 'Đầu vào nhóm'
+    boundary_out: 'Đầu ra nhóm'
+    readonly: 'Nhóm dựng sẵn chỉ xem được. Chỉnh thiết lập ở bước nhóm bên ngoài.'
+    readonly_user: 'Bản này chưa sửa được bên trong nhóm. Chỉnh thiết lập ở bước nhóm bên ngoài.'
+    param_exposed: 'Chỉnh ở bước nhóm'
+    breadcrumb_label: 'Vị trí trong workflow'
+    root: 'Workflow'
+    up: 'Lên một cấp'
+    create: 'Gộp thành nhóm'
+    ungroup: 'Tách nhóm'
+    default_title: 'Nhóm mới'
   lane:
     source: ① Nguồn
     prepare: ② Chuẩn bị

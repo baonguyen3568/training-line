@@ -1234,3 +1234,104 @@ fieldset.seg-radio {
   outline: 2px solid var(--color-accent-focus);
   outline-offset: 2px;
 }
+
+/* P4-4 groups. Collapsed: the layers mark before the title and one hairline "card underneath" 3px below (no
+   shadow, no colour of its own: Never-Colour-Alone / Hairline-First). */
+.vlm-node.group::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: -5px;
+  height: 0;
+  border-bottom: 1px solid var(--color-canvas-node-border);
+  border-radius: 0 0 var(--node-radius) var(--node-radius);
+  pointer-events: none;
+}
+.vlm-node .group-mark {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  margin-right: 4px;
+}
+.vlm-node .group-open {
+  margin-left: auto;
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  opacity: 0;
+}
+.vlm-node:hover .group-open,
+.vlm-node .group-open:focus-visible,
+.react-flow__node.selected .group-open {
+  opacity: 1;
+}
+.vlm-node .group-open:focus-visible {
+  outline: 2px solid var(--color-accent-focus);
+}
+/* inside a group: the two fixed boundary nodes sit on the page colour, apart from real steps */
+.vlm-node.group-boundary {
+  background: var(--color-page);
+  border-style: dashed;
+}
+/* breadcrumb after the workflow name */
+.tb-crumbs {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.tb-crumbs ol {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  white-space: nowrap;
+}
+.tb-crumb-sep {
+  color: var(--color-text-secondary);
+}
+.tb-crumb-here {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+/* a step inside a group, view-only */
+.inner-params {
+  margin: var(--space-12) 0 0;
+}
+.inner-params .inner-param {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-grid);
+}
+.inner-params dt {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.inner-params dd {
+  margin: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .editor.d4 .canvas.group-enter .react-flow__renderer {
+    animation: group-enter 180ms ease-out;
+  }
+}
+@keyframes group-enter {
+  from {
+    opacity: 0.4;
+    transform: scale(0.96);
+  }
+}
+/* the view-only line of a step inside a group, in the inspector (not the canvas' small-screen overlay) */
+.inner-readonly {
+  margin: var(--space-8) 0;
+  color: var(--color-text-secondary);
+}

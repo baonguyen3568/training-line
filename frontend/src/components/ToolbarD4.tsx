@@ -4,6 +4,7 @@ import { workflowTitle } from "../lib/nodeText";
 import { requestRun } from "../lib/requestRun";
 import { useUi } from "../store/ui";
 import { useWorkflow } from "../store/workflow";
+import { GroupBreadcrumb } from "./GroupBreadcrumb";
 import { gpuChip, useSystemPoll } from "./Header";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
@@ -52,6 +53,7 @@ export function ToolbarD4({ locked }: { locked: boolean }) {
       <h1 className="tb-name" title={workflowTitle(workflow.name)}>
         {workflowTitle(workflow.name)}
       </h1>
+      <GroupBreadcrumb />
       <span className="tb-sep" />
       <IconButton
         icon="file-plus"
