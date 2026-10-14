@@ -95,6 +95,10 @@ Loại: Mistral Small 4 (119B, quá lớn), InternVL3.5 (lạc hậu so với Qw
 - Luôn giữ held-out split + chạy general benchmark để đo **catastrophic forgetting** sau fine-tune.
 - RL (GRPO) chỉ sau SFT, với reward kiểm chứng được; bắt đầu trên model 2B.
 - Không train trên dữ liệu benchmark; dataset sinh từ GPT-4 (LLaVA-Instruct, ShareGPT4V) có rủi ro license/ToS (bao-security).
+- (✅ 2026-10-14) **Kiểm nhãn trước khi train họ mới**: AutoModel 26.08-7 tạo 0 token nhãn cho LLaVA-OneVision và SmolVLM/Idefics3 (marker lấy từ template của tokenizer, batch render bằng template của processor) → loss 0, train "chạy" mà không học. Patch 0008 sửa + chặn batch rỗng; quy trình thêm họ: `outputs/research/fam/collate_check.py` (đếm token nhãn, decode phần được học) rồi mới smoke.
+- (✅) LR theo khối: AutoModel có sẵn `optimizer.param_group_overrides [{pattern, lr_mult}]` (khớp đầu tiên thắng) nhưng `lr_mult` CHỈ có hiệu lực khi có `lr_scheduler` (vd `{lr_decay_style: constant, lr_warmup_steps: 0}`) — thiếu scheduler thì bị bỏ qua im lặng.
+- (✅) Đóng băng theo khối: `freeze_config` gốc chỉ có vision/audio/LM theo tên; Qwen để projector (`merger`) trong `visual`; PEFT đóng băng lại mọi thứ không phải `lora_` → patch 0007 `freeze_prefixes`/`train_prefixes`.
+- (✅) DPO VLM: NeMo-RL v0.7.0 DPO chỉ text, AutoModel không có → `src/vlm_pipeline/train/dpo_vlm.py` (reference = cùng model tắt LoRA, logp theo khúc + checkpoint).
 
 ## 5. Pitfalls GB10 / UMA
 - `docker --memory` **không chặn** cấp phát CUDA trên UMA → OOM có thể treo cả host (forum). Guard trong code: kiểm `MemAvailable` trước khi launch, abort nếu < ngưỡng.
@@ -104,6 +108,8 @@ Loại: Mistral Small 4 (119B, quá lớn), InternVL3.5 (lạc hậu so với Qw
 - NVFP4 không mặc nhiên nhanh hơn FP8 trên GB10 → luôn benchmark cả hai.
 - Pin `transformers` theo `config.json` của model (Qwen3.5 cần transformers 5.x).
 - Docs "latest" của NVIDIA thường trễ so với "nightly"/GitHub → đối chiếu cả hai.
+- (✅ 2026-10-14) **NeMo-RL GRPO 1 GPU trên GB10** (recipe VLM chính chủ cần ≥ 2 GPU): `cluster.gpus_per_node=1` + vLLM colocated (sleep mode); NVML không trả bộ nhớ trên UMA → patch `third_party/patches/nemo-rl/0001` (image vlm-nemo-rl:0.7.0-3); buffer refit tính theo cudaMemGetInfo (~0.5 GB "free") → đặt `++policy.refit_buffer_size_gb=4`; profiling KV của vLLM nhiễu bởi bộ nhớ hệ thống dùng chung → `++policy.generation.vllm_kwargs.kv_cache_memory_bytes` cố định; CuMemAllocator từ chối `expandable_segments` → bỏ `PYTORCH_CUDA_ALLOC_CONF`. Probe: `outputs/research/grpo_probe/probe.sh`.
+- (✅) Preflight chặn khi SwapFree < 2 GB dù RAM trống còn ~39 GB — máy dùng chung, chờ chứ không ép.
 
 ## 6. Checklist áp dụng cho dự án
 - [ ] Mỗi image: chạy `scripts/research/ngc_image_env.sh` + probe GPU trước khi pin; pin digest arm64.
