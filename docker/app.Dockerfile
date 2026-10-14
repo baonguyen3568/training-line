@@ -52,4 +52,5 @@ ENV PATH=/opt/venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 VLM_BU
     VLM_PROJECT_ROOT=/app VLM_IN_COMPOSE=1 HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
 USER app
 EXPOSE 7870
-CMD ["vlm-app", "--worker", "container"]
+# Always 7870 inside the container (compose publishes it; nginx proxies to app:7870): never the CLI default.
+CMD ["vlm-app", "--worker", "container", "--port", "7870"]

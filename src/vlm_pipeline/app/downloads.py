@@ -55,6 +55,10 @@ logger = logging.getLogger(__name__)
 Kind = Literal["model", "dataset"]
 CONFIRM_GB = 20.0
 ACTIVE_REL = Path("outputs") / "system" / "downloads" / "active"
+# The running download refreshes the lock's mtime; a lock untouched this long has no live holder, wherever it ran
+# (an app container replaced mid-download cannot be asked about from the new one: PM 2026-10-14).
+ACTIVE_HEARTBEAT_S = 30.0
+ACTIVE_STALE_S = 300.0
 _ID_PART = re.compile(r"[^a-z0-9-]+")
 
 
@@ -138,6 +142,7 @@ class DownloadService:
         self._token = token  # decrypts the user's HF token from Settings only when a job starts
         self._launcher = launcher
         self._lock = threading.Lock()
+        self._stop = threading.Event()  # tests: end the heartbeat threads
         self.downloads: dict[str, Download] = {}
 
     # ------------------------------------------------------------------------------------------ checks
@@ -200,6 +205,7 @@ class DownloadService:
             self.downloads[run_id] = download
         threading.Thread(target=self._run, args=(download, planned, plan_only), name=f"download-{run_id}",
                          daemon=True).start()  # fmt: skip
+        threading.Thread(target=self._heartbeat, args=(download,), name=f"download-lock-{run_id}", daemon=True).start()
         return download.to_api()
 
     def _take_active(self, run_id: str) -> None:
@@ -215,13 +221,30 @@ class DownloadService:
                     held = read_small_json(active, max_bytes=4096)
                 except (OSError, ValueError):
                     held = None
-                if attempt == 0 and isinstance(held, dict) and holder_gone(held) is True:
+                if attempt == 0 and (
+                    (isinstance(held, dict) and holder_gone(held) is True) or _untouched_for(active, ACTIVE_STALE_S)
+                ):
+                    logger.warning("download lock %s replaced: its holder is gone", active)
                     active.unlink(missing_ok=True)  # a racing peer that also saw it gone loses the next O_EXCL
                     continue
                 raise DownloadBusyError("another download is running", params={"minutes": 0}) from None
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(body)
             return
+
+    def _heartbeat(self, d: Download) -> None:
+        """Keep the lock's mtime fresh while ``d`` runs (and only while the lock is still ``d``'s)."""
+        active = self.root / ACTIVE_REL
+        while d.status not in ("completed", "failed"):
+            try:
+                held = read_small_json(active, max_bytes=4096)
+                if isinstance(held, dict) and held.get("download_id") == d.run_id:
+                    os.utime(active, follow_symlinks=False)
+            except (OSError, ValueError):
+                pass
+            self._stop.wait(ACTIVE_HEARTBEAT_S)
+            if self._stop.is_set():
+                return
 
     def _release(self, run_id: str) -> None:
         """Remove the one-at-a-time lock only if it is still ours: the next download may already hold a new one."""
@@ -363,6 +386,14 @@ def _last_line(path: Path, max_bytes: int = 4096) -> dict[str, int] | None:
     if not isinstance(data, dict) or not all(isinstance(data.get(k), int) for k in keys):
         return None
     return {k: int(data[k]) for k in keys}
+
+
+def _untouched_for(path: Path, seconds: float) -> bool:
+    """The lock file exists and nothing refreshed it for ``seconds`` (no-follow)."""
+    try:
+        return time.time() - os.lstat(path).st_mtime > seconds
+    except OSError:
+        return False
 
 
 def template_assets(template: dict[str, Any]) -> list[tuple[Kind, str]]:

@@ -11,6 +11,7 @@ the host's IPv4 addresses (``ip -4 -o addr``). Standard library only (the host's
 from __future__ import annotations
 
 import ipaddress
+import json
 import re
 import subprocess
 import sys
@@ -25,42 +26,48 @@ def _fail(msg: str) -> None:
     raise SystemExit(1)
 
 
-def _host_networks() -> list[ipaddress.IPv4Interface]:
+def _host_networks() -> list[tuple[str, ipaddress.IPv4Interface]]:
+    """(interface name, address) of every IPv4 address of this host."""
     argv = ["ip", "-4", "-o", "addr", "show"]
     out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout  # noqa: S603 - host tool
-    return [ipaddress.IPv4Interface(line.split()[3]) for line in out.splitlines() if len(line.split()) > 3]
+    rows = [line.split() for line in out.splitlines()]
+    return [(r[1], ipaddress.IPv4Interface(r[3])) for r in rows if len(r) > 3]
 
 
-def _docker_subnets() -> tuple[list[ipaddress.IPv4Network], list[ipaddress.IPv4Network]]:
-    """(other docker networks' subnets, OUR networks' subnets): ours by compose project label or name."""
+def _docker_subnets() -> tuple[list[ipaddress.IPv4Network], set[str]]:
+    """(other docker networks' subnets, the host bridge names of OUR networks): ours by project label or name.
+
+    Read as JSON: docker's text templates print a missing label as "" or "<no value>" depending on the call.
+    """
     argv = ["docker", "network", "ls", "-q"]
     ids = subprocess.run(argv, capture_output=True, text=True, check=True).stdout.split()  # noqa: S603
     if not ids:
-        return [], []
-    fmt = '{{.Name}} {{index .Labels "com.docker.compose.project"}} {{range .IPAM.Config}}{{.Subnet}} {{end}}'
-    argv = ["docker", "network", "inspect", "--format", fmt, *ids]  # ids: docker's own hex network ids
+        return [], set()
+    argv = ["docker", "network", "inspect", *ids]  # ids: docker's own hex network ids; JSON array out
     out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout  # noqa: S603
     others: list[ipaddress.IPv4Network] = []
-    ours: list[ipaddress.IPv4Network] = []
-    for line in out.splitlines():
-        parts = line.split(" ")  # "<name> <project label or empty> <subnet> <subnet> ..."
-        name, project, subnets = parts[0], parts[1] if len(parts) > 1 else "", parts[2:]
-        mine = name in OWN_NETWORKS or project == PROJECT
-        for raw in (r for r in subnets if r):
-            net = ipaddress.ip_network(raw, strict=False)
-            if isinstance(net, ipaddress.IPv4Network):
-                (ours if mine else others).append(net)
-    return others, ours
+    bridges: set[str] = set()
+    for net in json.loads(out):
+        labels = net.get("Labels") or {}
+        if net.get("Name") in OWN_NETWORKS or labels.get("com.docker.compose.project") == PROJECT:
+            bridges.add(f"br-{str(net.get('Id', ''))[:12]}")  # the host side of a compose bridge network
+            continue
+        for cfg in (net.get("IPAM") or {}).get("Config") or []:
+            subnet = ipaddress.ip_network(str(cfg.get("Subnet", "")), strict=False) if cfg.get("Subnet") else None
+            if isinstance(subnet, ipaddress.IPv4Network):
+                others.append(subnet)
+    return others, bridges
 
 
 def _taken(avoid: tuple[str, ...]) -> list[ipaddress.IPv4Network]:
     """Networks a new subnet must not overlap: the host's and other docker networks', never our own.
 
-    Re-running the install must pass (ADR-015 "safe to run again"): our networks, and the host bridge interfaces
-    docker made for them (``br-...`` inside their subnets), are not "already used by someone else".
+    Re-running the install must pass (ADR-015 "safe to run again"): our networks, and exactly the host bridges docker
+    made for them (``br-<network id[:12]>``), are not "already used by someone else". Any other interface in that
+    range (a VPN, a hand-made bridge) still counts (security 2026-10-14).
     """
-    others, ours = _docker_subnets()
-    host = [i.network for i in _host_networks() if not any(i.ip in net for net in ours)]
+    others, bridges = _docker_subnets()
+    host = [addr.network for ifname, addr in _host_networks() if ifname not in bridges]
     return [*host, *others, *(ipaddress.IPv4Network(a) for a in avoid)]
 
 
@@ -85,7 +92,7 @@ def lan(bind: str, port: str, allow: str, hostname: str) -> None:
         _fail(f"VLM_LAN_BIND must be an IPv4 address of this machine (got: {bind})")
     if address.is_loopback or address.is_unspecified or address.is_multicast or address.is_link_local:
         _fail(f"VLM_LAN_BIND must be this machine's LAN address, not {bind}")
-    if address not in {i.ip for i in _host_networks()}:
+    if address not in {addr.ip for _name, addr in _host_networks()}:
         _fail(f"{bind} is not an address of this machine (ip -4 addr)")
     if not (port.isascii() and port.isdigit() and 1024 <= int(port) <= 65535):
         _fail(f"VLM_LAN_PORT must be 1024..65535 (got: {port})")

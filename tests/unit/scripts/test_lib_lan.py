@@ -19,11 +19,15 @@ def lib(monkeypatch: pytest.MonkeyPatch) -> Any:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    host = [ipaddress.IPv4Interface("127.0.0.1/8"), ipaddress.IPv4Interface("192.168.2.178/24"),
-            ipaddress.IPv4Interface("172.30.0.1/16")]  # fmt: skip
+    host = [
+        ("lo", ipaddress.IPv4Interface("127.0.0.1/8")),
+        ("wlan0", ipaddress.IPv4Interface("192.168.2.178/24")),
+        ("br-other", ipaddress.IPv4Interface("172.30.0.1/16")),
+        ("br-c7357622e71a", ipaddress.IPv4Interface("10.231.47.4/29")),  # a previous install's edge bridge
+        ("br-7d5c152784a8", ipaddress.IPv4Interface("10.231.48.8/28")),
+    ]  # fmt: skip - and its egress bridge
+    ours = {"br-c7357622e71a", "br-7d5c152784a8"}
     monkeypatch.setattr(module, "_host_networks", lambda: host)
-    ours = [ipaddress.IPv4Network("10.231.47.0/29"), ipaddress.IPv4Network("10.231.48.0/28")]  # a previous install
-    host += [ipaddress.IPv4Interface("10.231.47.4/29"), ipaddress.IPv4Interface("10.231.48.8/28")]  # their bridges
     monkeypatch.setattr(module, "_docker_subnets", lambda: ([ipaddress.IPv4Network("172.31.0.0/16")], ours))
     return module
 
@@ -93,3 +97,11 @@ def test_re_running_the_install_accepts_its_own_networks(lib: Any, capsys: pytes
 def test_our_own_two_subnets_still_must_not_overlap(lib: Any) -> None:
     with pytest.raises(SystemExit):
         lib.edge("10.231.47.0/28", "10.231.47.0/29")
+
+
+def test_a_foreign_interface_in_our_range_is_still_an_overlap(lib: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """security 2026-10-14: only OUR bridges (br-<network id>) are skipped, never e.g. a VPN in the same range."""
+    host = [*lib._host_networks(), ("tun0", ipaddress.IPv4Interface("10.231.47.1/29"))]
+    monkeypatch.setattr(lib, "_host_networks", lambda: host)
+    with pytest.raises(SystemExit):
+        lib.edge("10.231.47.0/29")

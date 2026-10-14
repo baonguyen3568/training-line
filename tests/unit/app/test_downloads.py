@@ -279,3 +279,61 @@ def test_eval_data_is_extracted_by_a_no_network_job_then_checked(svc: Any, monke
     assert kw["take_gpu_lock"] is False
     assert (eval_data_dir(service.root, "ocrbench") / "questions.jsonl").is_file()
     assert service.start("dataset", "ocrbench")["status"] == "completed"  # installed + extracted: nothing to do
+
+
+def _held_by_another_container(active: Path, *, age_s: float) -> None:
+    import os
+    import time
+
+    active.parent.mkdir(parents=True, exist_ok=True)
+    active.write_text(json.dumps({"download_id": "old", "pid": 1, "boot_id": "same-boot?", "pidns": "pid:[999]",
+                                  "starttime": "1"}))  # fmt: skip
+    then = time.time() - age_s
+    os.utime(active, (then, then))
+
+
+def test_a_lock_nobody_refreshes_is_replaced(svc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PM 2026-10-14: the app container was replaced mid-download; its lock (another pid namespace: "cannot
+    tell") blocked every later download. A holder refreshes the lock; 5 minutes untouched means nobody holds it."""
+    service, _events = svc
+    _fake_job(monkeypatch, {})
+    monkeypatch.setattr(downloads, "holder_gone", lambda body: None)  # another container: cannot tell
+    active = service.root / downloads.ACTIVE_REL
+    _held_by_another_container(active, age_s=downloads.ACTIVE_STALE_S + 60)
+    started = service.start("model", "m")
+    assert _wait(service, started["download_id"]) == "completed"
+
+
+def test_a_lock_refreshed_recently_is_respected(svc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    service, _events = svc
+    monkeypatch.setattr(downloads, "holder_gone", lambda body: None)
+    _held_by_another_container(service.root / downloads.ACTIVE_REL, age_s=10)
+    with pytest.raises(downloads.DownloadBusyError):
+        service.start("model", "m")
+
+
+def test_a_running_download_refreshes_its_lock(svc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    import os
+
+    service, _events = svc
+    monkeypatch.setattr(downloads, "ACTIVE_HEARTBEAT_S", 0.02)
+    release = threading.Event()
+    _fake_job(monkeypatch, {})
+    fake = downloads.run_job
+
+    def slow(job: Any, manifest: Any, run_dir: Path, **kw: Any) -> Any:
+        release.wait(5)
+        return fake(job, manifest, run_dir, **kw)
+
+    monkeypatch.setattr(downloads, "run_job", slow)
+    started = service.start("model", "m")
+    active = service.root / downloads.ACTIVE_REL
+    os.utime(active, (1, 1))  # pretend it is old
+    for _ in range(100):
+        if os.lstat(active).st_mtime > 1:
+            break
+        threading.Event().wait(0.02)
+    assert os.lstat(active).st_mtime > 1  # refreshed by the heartbeat
+    release.set()
+    assert _wait(service, started["download_id"]) == "completed"
+    service._stop.set()
