@@ -1622,6 +1622,18 @@ session:
   ended_body: Mở đường link đăng nhập mới nhất mà app in trong nhật ký (log) để đăng nhập lại. Nếu app chạy trên máy khác, hãy hỏi người quản trị đường link đó.
   ended_retry: Thử lại
 byo:
+  role:
+    image: cột ảnh
+    question: cột câu hỏi
+    answer: cột câu trả lời
+    messages: cột hội thoại
+  kind:
+    image: ảnh
+    text: chữ
+    number: số
+    messages: hội thoại (messages)
+    list: danh sách
+    other: kiểu khác
   source:
     catalog: Đã kiểm chứng
     hub: Từ Hugging Face

@@ -1622,6 +1622,18 @@ session:
   ended_body: Open the latest sign-in link the app printed in its log to sign in again. If the app runs on another machine, ask its admin for that link.
   ended_retry: Try again
 byo:
+  role:
+    image: image column
+    question: question column
+    answer: answer column
+    messages: conversation column
+  kind:
+    image: images
+    text: text
+    number: numbers
+    messages: conversations (messages)
+    list: lists
+    other: another type
   source:
     catalog: Verified
     hub: From Hugging Face
