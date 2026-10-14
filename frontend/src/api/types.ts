@@ -689,21 +689,30 @@ export type ModelResolveJob = Omit<HubJob<never>, "result"> & { model?: UserMode
 
 export interface DatasetColumn {
   name: string;
-  kind: "image" | "text" | "messages" | "other";
+  kind: "image" | "text" | "messages" | "number" | "list" | "other";
 }
 
 /** POST /api/user-assets/datasets/inspect result (P021 §8): schema, a few samples, suggested mapping. */
 export interface DatasetInspection {
   repo: string;
+  /** The 40-char commit sha the inspection pinned. */
   revision: string;
   configs: string[];
   splits: string[];
-  config?: string;
+  config?: string | null;
   split: string;
-  format: "parquet" | "json" | "imagefolder" | "webdataset";
+  format: "parquet" | "arrow" | "jsonl" | "json" | "csv" | "imagefolder" | "webdataset" | "unknown";
   columns: DatasetColumn[];
   suggested: { image?: string; question?: string; answer?: string; messages?: string };
-  /** Untrusted text from the repo: rendered as plain text only. thumb_url is relative (/api/...). */
+  /**
+   * Untrusted text from the repo: rendered as plain text only. thumb_url is relative (/api/.../thumbs/{n}.png, a PNG
+   * of at most 256 px); `error` is a code (image_missing, image_not_a_file, image_too_large, image_too_many_pixels,
+   * image_unreadable), said in the user's words, never shown raw.
+   */
   samples: { thumb_url?: string; question?: string; answer?: string; error?: string }[];
-  rows_estimate?: number;
+  rows_estimate?: number | null;
+  split_bytes?: number | null;
+  has_script?: boolean;
+  /** Why there is no preview at all: no sample row, or none could be read. */
+  sample_error?: "no_sample" | "unreadable" | null;
 }

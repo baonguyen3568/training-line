@@ -728,7 +728,7 @@ export const mockApi: Api = {
     if (job.repo.includes("script"))
       return delay({
         status: "failed" as const,
-        error: { code: "DATA-009", params: { repo: job.repo } },
+        error: { code: "DATA-009", params: { repo: job.repo, has_parquet_export: false } },
       });
     const result: DatasetInspection = {
       repo: job.repo,
@@ -748,9 +748,12 @@ export const mockApi: Api = {
       samples: [
         { question: "Tổng tiền trên hoá đơn là bao nhiêu?", answer: '{"total": "125.000"}' },
         { question: "Cửa hàng tên gì?", answer: '{"store": "Bánh mì Hoà"}' },
-        { error: "Ảnh hỏng: không đọc được tệp" },
+        { error: "image_unreadable" },
       ],
-      rows_estimate: 800,
+      rows_estimate: null,
+      split_bytes: 48_000_000,
+      has_script: false,
+      sample_error: null,
     };
     return delay({ status: "done" as const, result });
   },

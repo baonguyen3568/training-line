@@ -2,13 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { appPrefix } from "../api/client";
 import type { DatasetInspection, EventError, HubJob } from "../api/types";
-import { t } from "../i18n";
+import { t, tpOptional } from "../i18n";
 import { hubError, isRepoId, pollHubJob, recentRepos, rememberRepo } from "../lib/hubJob";
 import { runErrorText } from "../lib/runWarning";
 import { untrustedText } from "../lib/safeText";
 import { useWorkflow } from "../store/workflow";
 import { ErrorIcon } from "./ErrorIcon";
 import { Icon } from "./Icon";
+
+/** A sample's error code (backend H4) in the user's words; an unknown code reads as "unreadable", never raw. */
+function sampleErrorText(code: string): string {
+  return tpOptional(["byo", "sample_error", code]) ?? t("byo.sample_error.image_unreadable");
+}
 
 type Mapping = { image?: string; question?: string; answer?: string; messages?: string };
 
@@ -111,12 +116,17 @@ function ColumnMapDialog({
           </label>
         )}
         <p className="small muted">{t("byo.map.preview")}</p>
+        {inspection.sample_error && (
+          <p className="small" role="status">
+            {t(`byo.sample_error.${inspection.sample_error}`)}
+          </p>
+        )}
         <ul className="byo-preview">
           {inspection.samples.slice(0, 5).map((smp, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list of samples
             <li key={i}>
               {smp.error ? (
-                <span className="byo-thumb err" title={untrustedText(smp.error, 200)}>
+                <span className="byo-thumb err" aria-hidden="true">
                   <Icon name="triangle-alert" size={16} />
                 </span>
               ) : smp.thumb_url ? (
@@ -133,7 +143,7 @@ function ColumnMapDialog({
               )}
               <span className="byo-sample">
                 {smp.error ? (
-                  <span className="small">{untrustedText(smp.error, 200)}</span>
+                  <span className="small">{sampleErrorText(smp.error)}</span>
                 ) : (
                   <>
                     <span className="clamp2">{untrustedText(smp.question ?? fixed, 300)}</span>

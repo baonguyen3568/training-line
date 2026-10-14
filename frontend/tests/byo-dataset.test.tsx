@@ -34,7 +34,10 @@ describe("dataset from Hugging Face", () => {
     const suggested = hints();
     expect(suggested).toBeGreaterThan(0); // beside the label, only while the value is the server's
     expect(dialog.querySelectorAll(".byo-preview li")).toHaveLength(3);
-    expect(dialog.textContent).toContain("Ảnh hỏng"); // a bad sample says why instead of a thumbnail
+    // a bad sample says why (its code in words, never raw) instead of a thumbnail
+    const { t } = await import("../src/i18n");
+    expect(dialog.textContent).toContain(t("byo.sample_error.image_unreadable"));
+    expect(dialog.textContent).not.toContain("image_unreadable");
     // a text column as the image: said under its select, and "Dùng cách ghép này" stays off
     fireEvent.change(image, { target: { value: "query" } });
     expect(within(dialog).getByRole("alert")).toBeTruthy();
