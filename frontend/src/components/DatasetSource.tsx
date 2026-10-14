@@ -72,6 +72,13 @@ function ColumnMapDialog({
   const [map, setMap] = useState<Mapping>(s);
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<EventError | null>(null);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   // the shared question (design r3): the server's default typed in, editable; sent only when it differs
   const defaultQ = inspection.default_question ?? "";
   const [prompt, setPrompt] = useState(defaultQ);
@@ -106,6 +113,7 @@ function ColumnMapDialog({
           }
         : { messages: map.messages, image: map.image },
     );
+    if (!alive.current) return; // added: the dialog has closed (and the panel may have too)
     setBusy(false);
     if (err) setRefused(err);
   };
