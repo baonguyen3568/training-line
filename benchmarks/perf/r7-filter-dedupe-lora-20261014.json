@@ -43,5 +43,17 @@
     "peak_mem_gb": null,
     "note": "run.json recorded 0.0 GB (no memguard sample for this short CPU job; reported to bao-backend)"
   },
-  "finding": "CORD v2 train holds 2 byte-identical images; none of the train images is in the test split; one train image is larger than the default 4096 px side"
+  "finding": "CORD v2 train holds 2 byte-identical images; none of the train images is in the test split; one train image is larger than the default 4096 px side",
+  "eval_data_point": {
+    "benchmark": "CORD-v2 test (first 100)",
+    "metric": "F1",
+    "value": 82.69,
+    "engine": "hf",
+    "worker": "eval_cord_chat_worker",
+    "same_prompt_and_pixels_as": "R2 (r2-qwen3.5-2b-lora-cord-20261013.json)",
+    "parse_fail_pct": 0.0,
+    "truncated_pct": 0.0,
+    "source": "benchmarks/eval/parity-vllm-hf-qwen3.5-0.8b-20261014.json (bao-tester)",
+    "caveat": "data point, not a published number: 1 epoch, checkpoint not selected on validation; R2 (2B, 3 epochs) is 86.42"
+  }
 }
