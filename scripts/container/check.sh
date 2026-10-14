@@ -5,7 +5,8 @@
 # With --gpu: also `pytest -m gpu` under the GPU lock (token passed as VLM_GPU_LOCK_TOKEN; tests verify it).
 # Code under test: a pristine worktree of REV (default HEAD), like check.sh --clean and install.sh: the shared tree
 # changes under a 25-minute run (2026-10-14: a commit landed mid-run and one test saw half-old files). Only the
-# untracked inputs come from the shared tree, read-only: .cache/hf, data/, outputs/. --dirty mounts the shared
+# untracked inputs come from the shared tree, read-only: .cache/hf, .cache/prepared (pinned remote-code copies),
+# data/, outputs/. --dirty mounts the shared
 # tree as before (to try uncommitted work; never the evidence for an image).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -47,9 +48,10 @@ if [[ $DIRTY -eq 0 ]]; then
   trap 'cleanup; exit 130' INT
   trap 'cleanup; exit 143' TERM HUP
   git worktree add --detach --quiet "$WORKTREE" "$COMMIT"
-  mkdir -p "$WORKTREE/.cache/hf" "$WORKTREE/data" "$WORKTREE/outputs"  # mount points inside the read-only tree
+  INPUTS=(.cache/hf .cache/prepared data outputs)  # without .cache/prepared 31 Nemotron-Parse tests skip
+  for d in "${INPUTS[@]}"; do mkdir -p "$WORKTREE/$d"; done  # mount points inside the read-only tree
   MOUNTS=(-v "$WORKTREE:/workspace:ro")
-  for d in .cache/hf data outputs; do
+  for d in "${INPUTS[@]}"; do
     [[ -d "$ROOT/$d" ]] && MOUNTS+=(-v "$ROOT/$d:/workspace/$d:ro")
   done
   CODE="$(git rev-parse --short "$COMMIT") (pristine worktree; untracked inputs read-only)"
@@ -90,7 +92,10 @@ run "$IMAGE" python -c "import vlm_pipeline, vlm_pipeline.common.gpu_lock, vlm_p
 
 step "integration tests (no GPU)"
 rc=0
-run "$IMAGE" "${PYTEST[@]}" -m "integration and not gpu" tests/integration || rc=$?
+OUT=$(mktemp)  # host temp file: the pytest summary goes on the PASS line (skips show at a glance vs a --dirty run)
+run "$IMAGE" "${PYTEST[@]}" -m "integration and not gpu" tests/integration 2>&1 | tee "$OUT" || rc=${PIPESTATUS[0]}
+SUMMARY=$(grep -E '[0-9]+ (passed|failed|error)' "$OUT" | tail -1 | sed -E 's/\x1b\[[0-9;]*m//g; s/^=+ | =+$//g')
+rm -f "$OUT"
 [[ $rc -eq 0 || $rc -eq 5 ]] || exit $rc  # 5 = no tests collected
 
 if [[ $GPU -eq 1 ]]; then
@@ -103,4 +108,4 @@ if [[ $GPU -eq 1 ]]; then
   run --gpus all -e "VLM_GPU_LOCK_TOKEN=$LOCK_TOKEN" "$IMAGE" "${PYTEST[@]}" -m gpu tests/integration || rc=$?
   [[ $rc -eq 0 || $rc -eq 5 ]] || exit $rc
 fi
-printf '\n\033[32mContainer gates passed.\033[0m %s\n' "$EVIDENCE"
+printf '\n\033[32mContainer gates passed.\033[0m %s; integration: %s\n' "$EVIDENCE" "${SUMMARY:-?}"
