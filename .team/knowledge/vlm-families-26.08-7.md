@@ -112,7 +112,7 @@ Nguồn: chạy NGAY trong image (transformers 5.12.1, `--network none`, không 
 | idefics3, smolvlm | C | family-default | 26.08-8 | trên -7: 0 token nhãn (template tokenizer không render content chuỗi) |
 | llava, llava_next | C | family-default | 26.08-8 | |
 
-Số token ảnh mặc định (processor_default, 1 ảnh CORD): SmolVLM-256M ~530, InternVL3-1B ~1.7k (12 tile), LLaVA-OV-0.5B ~4.4k (anyres),
+Độ dài chuỗi mỗi mẫu CORD (ảnh + prompt + đáp án, processor_default): SmolVLM-256M ~530, InternVL3-1B ~1.7k (12 tile), LLaVA-OV-0.5B ~4.4k (anyres),
 Gemma-4-E2B ~230, Qwen3.5-2B (pixel cap) ~560 (`outputs/research/fam/collate_check.py`).
 
 Không đưa vào 1.0 (ngoài nhóm X ở trên), lý do cụ thể:
