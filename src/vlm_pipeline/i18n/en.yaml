@@ -1506,6 +1506,8 @@ settings_error:
   settings_body_too_large: The request is too large.
   settings_key_unusable: The key file has the wrong permissions; an admin must fix it.
 reference_pipeline:
+  qlora-4bit-qwen35-2b:
+    summary: QLoRA on Qwen3.5-2B, holding the language part in 4-bit to save memory.
   data-cleanup-lora:
     summary: Filter broken images, drop duplicates and images also in the test data, then LoRA-tune.
   invoice-to-json:

@@ -1506,6 +1506,8 @@ settings_error:
   settings_body_too_large: Nội dung gửi lên quá lớn.
   settings_key_unusable: File khoá có quyền truy cập sai, cần quản trị viên sửa.
 reference_pipeline:
+  qlora-4bit-qwen35-2b:
+    summary: Dạy nhẹ Qwen3.5-2B bằng QLoRA, nén phần ngôn ngữ xuống 4-bit cho đỡ tốn bộ nhớ.
   data-cleanup-lora:
     summary: Lọc ảnh hỏng, bỏ ảnh trùng và ảnh trùng với dữ liệu kiểm tra, rồi mới dạy nhẹ bằng LoRA.
   invoice-to-json:
