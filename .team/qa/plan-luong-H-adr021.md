@@ -88,3 +88,10 @@ security: ca config.json bất thường + review · frontend: UI dán repo / gh
 - Gemma-4-E2B nằm trong catalog nên KHÔNG tính cho H1.
 - Bằng chứng H1 phải đi qua đường của app: tải bằng G-5 vào data root, KHÔNG dùng bản có sẵn trong .cache/hf của repo.
   Smoke của research chỉ là điều kiện cần.
+
+### Chạy thử nhanh (MODEL-005, backend 14/10): assert cho mỗi model H1
+- Request: POST /api/runs {workflow, trial:{node:<id bước LoRA>}}. Server cắt workflow còn bước đó + upstream, chạy 5 bước.
+- (a) run_status có trial:true; (b) node train completed VÀ output có Adapter (checkpoint ở bước 5, ckpt_every_steps=5),
+  không chỉ nhìn status; (c) run.json tags ["trial"]; (d) sau đó validate không còn MODEL-005 cho model@sha đó.
+- Ca âm (tester thêm): trial vẫn phải qua support check / preflight RAM / chặn remote code; đổi revision thì MODEL-005
+  quay lại; trial fail thì MODEL-005 vẫn còn.
