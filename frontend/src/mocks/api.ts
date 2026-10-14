@@ -479,7 +479,8 @@ export function mockValidate(
   }
   // ADR-021 MODEL-005: a train step fed by a user-added model gets the catalog's "try a quick run first" hint
   for (const node of workflow.nodes) {
-    if (!node.type.startsWith("train.")) continue;
+    // like the server: a trial run exists for LoRA / full SFT only (DPO, GRPO, merge get no MODEL-005)
+    if (node.type !== "train.lora_vlm" && node.type !== "train.sft_vlm") continue;
     const src = workflow.edges
       .filter((e) => e.to[0] === node.id)
       .map((e) => workflow.nodes.find((n) => n.id === e.from[0]))
@@ -711,6 +712,9 @@ export const mockApi: Api = {
       size_gb: 7.6,
       license: job.repo.includes("license") ? "unknown" : "apache-2.0",
       license_card: job.repo.includes("license") ? "Custom research licence, ask the author" : null,
+      // from the server's obligations table; an id outside it is "unknown" (fail closed)
+      license_class: job.repo.includes("license") ? "unknown" : "commercial_ok",
+      obligations: [],
       license_confirmed: false,
       gated: job.repo.includes("gated"),
       ram_gb_train: 31.5,

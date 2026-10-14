@@ -360,3 +360,29 @@ describe("unknown licence", () => {
     );
   });
 });
+
+describe("MODEL-005 in the mock follows the server", () => {
+  it("only LoRA and full SFT steps get the trial hint", async () => {
+    const { mockValidate } = await import("../src/mocks/api");
+    const { useWorkflow } = await import("../src/store/workflow");
+    await useWorkflow.getState().loadCatalog();
+    const s = useWorkflow.getState();
+    const types = [...s.specs.values()];
+    const wf = (train: string) => ({
+      version: 1,
+      name: "t",
+      nodes: [
+        { id: "m", type: "model.hf_pick", params: { user_model: "user--a--b--0f3a9c1e" } },
+        { id: "t", type: train, params: {} },
+      ],
+      edges: [{ from: ["m", "model"], to: ["t", "base_model"] }],
+    });
+    const codes = (train: string) =>
+      // biome-ignore lint/suspicious/noExplicitAny: a minimal workflow literal for the mock validator
+      mockValidate(wf(train) as any, types, s.ports).errors.map((e) => e.code);
+    expect(codes("train.lora_vlm")).toContain("MODEL-005");
+    expect(codes("train.sft_vlm")).toContain("MODEL-005");
+    expect(codes("train.dpo_vlm")).not.toContain("MODEL-005");
+    expect(codes("train.grpo_vlm")).not.toContain("MODEL-005");
+  });
+});
