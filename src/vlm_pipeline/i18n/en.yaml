@@ -1217,6 +1217,21 @@ inspector:
   recommended: recommended
   empty_hint: Select a step on the canvas to see and edit its settings.
 license:
+  name:
+    "apache-2.0": Apache-2.0
+    "mit": MIT
+    "cc-by-4.0": CC-BY-4.0
+    "openmdw-1.1": OpenMDW-1.1
+    "nvidia-open-model-license": NVIDIA Open Model License
+    "llama3.1": Llama 3.1 Community License
+    "llama3.2": Llama 3.2 Community License
+    "llama3.3": Llama 3.3 Community License
+    "llama4": Llama 4 Community License
+    "gemma": Gemma Terms of Use
+    "qwen": Qwen License Agreement
+    "lfm1.0": LFM Open License v1.0
+    "mixed-unverified": Mixed, unverified
+    "unknown": Unknown
   card_says: 'The author wrote: “{text}”'
   badge:
     commercial_ok: Commercial use OK
