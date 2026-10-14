@@ -1666,3 +1666,28 @@ byo:
     suggested: gợi ý
     preview: Xem trước
     apply: Dùng cách ghép này
+arch:
+  block:
+    vision: Phần nhìn ảnh
+    projector: Bộ nối
+    lm: Phần ngôn ngữ
+  state:
+    frozen: đóng băng
+    full: train toàn bộ
+    full_low_lr: train với tốc độ học thấp
+    lora: đóng băng, học thêm bằng LoRA
+    n_a: không dùng
+  quant:
+    nf4: 4-bit
+    fp8: FP8
+    nvfp4: NVFP4
+    fp8_fake: FP8 giả lập
+  extra:
+    teacher: Model thầy
+    reference: Bản tham chiếu
+    rollout: Sinh câu trả lời
+    reward: Chấm điểm
+  stage: GĐ{n}
+  legend_title: Cách đọc sơ đồ
+  aria_stage: "Giai đoạn {n}: {blocks}."
+  aria_block: "{block} {state}"

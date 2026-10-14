@@ -1666,3 +1666,28 @@ byo:
     suggested: suggested
     preview: Preview
     apply: Use this mapping
+arch:
+  block:
+    vision: Vision part
+    projector: Connector
+    lm: Language part
+  state:
+    frozen: frozen
+    full: fully trained
+    full_low_lr: trained at a low learning rate
+    lora: frozen, learns through LoRA
+    n_a: not used
+  quant:
+    nf4: 4-bit
+    fp8: FP8
+    nvfp4: NVFP4
+    fp8_fake: Simulated FP8
+  extra:
+    teacher: Teacher model
+    reference: Reference copy
+    rollout: Answer sampling
+    reward: Scoring
+  stage: Stage {n}
+  legend_title: How to read the diagram
+  aria_stage: "Stage {n}: {blocks}."
+  aria_block: "{block} {state}"
