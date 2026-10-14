@@ -1649,7 +1649,6 @@ byo:
     use: Use this model
   unverified: Not verified
   unverified_help: You added this model yourself; the team has not test-run it like the verified models. Time and memory are estimates from its parameter count. Click "Quick test run" (a few steps) before a real training run.
-  smoke_hint: Unverified model. Do a quick test run of a few steps before a real training run.
   estimate_upper: Estimated from the model's parameter count; usually higher than actual.
   data:
     placeholder: "e.g. naver-clova-ix/cord-v2"
